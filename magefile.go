@@ -132,25 +132,25 @@ func Build() error {
 }
 
 // Preflight runs all pre-commit checks: format, tidy, vet, lint, build, test,
-// race detection, WSL tests, vulnerability scan, strict formatting, and dead
-// code detection.  If preflight passes, CI will pass.
+// race detection, WSL tests, vulnerability scan, strict formatting, dead code
+// detection, and install verification. If preflight passes, CI will pass.
 func Preflight() error {
-	fmt.Println("\n=== 1/11 Formatting ===")
+	fmt.Println("\n=== 1/12 Formatting ===")
 	if err := fmtSources(); err != nil {
 		return fmt.Errorf("format: %w", err)
 	}
 
-	fmt.Println("\n=== 2/11 Tidying modules ===")
+	fmt.Println("\n=== 2/12 Tidying modules ===")
 	if err := run("go", "mod", "tidy"); err != nil {
 		return fmt.Errorf("mod tidy: %w", err)
 	}
 
-	fmt.Println("\n=== 3/11 Vetting ===")
+	fmt.Println("\n=== 3/12 Vetting ===")
 	if err := run("go", "vet", "./..."); err != nil {
 		return fmt.Errorf("vet: %w", err)
 	}
 
-	fmt.Println("\n=== 4/11 Linting ===")
+	fmt.Println("\n=== 4/12 Linting ===")
 	if _, err := exec.LookPath("golangci-lint"); err == nil {
 		if err := run("golangci-lint", "run"); err != nil {
 			return fmt.Errorf("lint: %w", err)
@@ -159,27 +159,27 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
 	}
 
-	fmt.Println("\n=== 5/11 Building ===")
+	fmt.Println("\n=== 5/12 Building ===")
 	if err := run("go", "build", "./..."); err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
 
-	fmt.Println("\n=== 6/11 Testing ===")
+	fmt.Println("\n=== 6/12 Testing ===")
 	if err := run("go", "test", "./...", "-count=1"); err != nil {
 		return fmt.Errorf("test: %w", err)
 	}
 
-	fmt.Println("\n=== 7/11 Testing (race detector) ===")
+	fmt.Println("\n=== 7/12 Testing (race detector) ===")
 	if err := run("go", "test", "-race", "./...", "-count=1"); err != nil {
 		return fmt.Errorf("race test: %w", err)
 	}
 
-	fmt.Println("\n=== 8/11 Testing (WSL) ===")
+	fmt.Println("\n=== 8/12 Testing (WSL) ===")
 	if err := TestWSL(); err != nil {
 		return fmt.Errorf("WSL test: %w", err)
 	}
 
-	fmt.Println("\n=== 9/11 Vulnerability scan ===")
+	fmt.Println("\n=== 9/12 Vulnerability scan ===")
 	if _, err := exec.LookPath("govulncheck"); err == nil {
 		if err := run("govulncheck", "./..."); err != nil {
 			return fmt.Errorf("vulncheck: %w", err)
@@ -188,7 +188,7 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install golang.org/x/vuln/cmd/govulncheck@latest)")
 	}
 
-	fmt.Println("\n=== 10/11 Strict formatting (gofumpt) ===")
+	fmt.Println("\n=== 10/12 Strict formatting (gofumpt) ===")
 	if _, err := exec.LookPath("gofumpt"); err == nil {
 		out, _ := cmdOutput("gofumpt", "-l", ".")
 		if files := strings.TrimSpace(out); files != "" {
@@ -198,7 +198,7 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install mvdan.cc/gofumpt@latest)")
 	}
 
-	fmt.Println("\n=== 11/11 Dead code detection ===")
+	fmt.Println("\n=== 11/12 Dead code detection ===")
 	if _, err := exec.LookPath("deadcode"); err == nil {
 		if err := runDeadcode(); err != nil {
 			return err
@@ -207,7 +207,12 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install golang.org/x/tools/cmd/deadcode@latest)")
 	}
 
-	fmt.Println("\n=== Preflight passed — ready to commit ===")
+	fmt.Println("\n=== 12/12 Install verification ===")
+	if err := Install(); err != nil {
+		return fmt.Errorf("install: %w", err)
+	}
+
+	fmt.Println("\n=== All 12/12 preflight checks passed — ready to commit ===")
 	return nil
 }
 

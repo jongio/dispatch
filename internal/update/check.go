@@ -238,15 +238,29 @@ func writeCache(path string, cache *updateCache) {
 	}
 
 	// Ensure the config directory exists.
-	if err := os.MkdirAll(filepath.Dir(path), configDirPerm); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, configDirPerm); err != nil {
 		return
 	}
 
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, raw, cacheFilePerm); err != nil {
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return
+	}
+	tmpPath := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := tmpFile.Write(raw); err != nil {
+		_ = tmpFile.Close()
+		return
+	}
+	if err := tmpFile.Close(); err != nil {
+		return
+	}
+	if err := os.Chmod(tmpPath, cacheFilePerm); err != nil {
 		return
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
+		return
 	}
 }
