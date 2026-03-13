@@ -1,0 +1,84 @@
+version: 2
+
+builds:
+  - main: ./cmd/dispatch
+    binary: dispatch
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -X github.com/jongio/dispatch/internal/tui.Version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: "dispatch_checksums.txt"
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--oidc-issuer=https://token.actions.githubusercontent.com"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^style:"
+      - "^ci:"
+      - "^test:"
+
+release:
+  draft: false
+  prerelease: auto
+  header: |
+    ## Install
+
+    **Linux / macOS:**
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | bash
+    ```
+
+    **Windows (PowerShell):**
+    ```powershell
+    irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+    ```

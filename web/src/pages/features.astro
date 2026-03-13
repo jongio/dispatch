@@ -1,0 +1,480 @@
+---
+import Base from '../layouts/Base.astro';
+import Screenshot from '../components/Screenshot.astro';
+---
+
+<Base title="Features — Dispatch">
+  <div class="container">
+    <div class="page-header">
+      <h1>Features</h1>
+      <p>Every feature in Dispatch, demonstrated.</p>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Full-Text Search -->
+    <section class="section" id="search">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Full-Text Search</h2>
+          <p>
+            Two-tier search. Quick mode searches session summaries, branches,
+            repositories, and directories instantly as you type. Deep mode
+            kicks in after 300ms and extends into conversation messages,
+            checkpoint content, file paths, and external references — commits,
+            PRs, and issues.
+          </p>
+          <ul>
+            <li>128-character input limit</li>
+            <li>"Searching…" spinner while deep search runs</li>
+            <li>Result count displayed in the header</li>
+            <li>Quick results appear immediately; deep results stream in</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/search-active.png" alt="Search bar with active query filtering sessions" caption="Searching sessions with a query" />
+          <Screenshot src="one-half-light/search-deep.png" alt="Deep search indicator scanning conversation content" caption="Deep search scanning conversations" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Directory Filtering -->
+    <section class="section" id="filter">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Directory Filtering</h2>
+          <p>
+            Overlay panel showing a hierarchical tree of all session
+            directories. Toggle individual folders or entire parent groups.
+            Applied exclusions persist to configuration.
+          </p>
+          <ul>
+            <li><kbd>Space</kbd> to toggle a directory on or off</li>
+            <li><kbd>Space</kbd> on a parent toggles all children</li>
+            <li><kbd>←</kbd> / <kbd>→</kbd> to collapse and expand nodes</li>
+            <li><kbd>Enter</kbd> to apply, <kbd>Esc</kbd> to cancel</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/filter-panel.png" alt="Filter panel showing hierarchical directory tree with toggles" caption="Filter panel with directory tree" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Sorting -->
+    <section class="section" id="sort">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Sorting</h2>
+          <p>
+            Five sort fields cycled with <kbd>s</kbd>: updated, folder, name,
+            created, turns. Direction toggled with <kbd>S</kbd> (Shift+S).
+            The active sort field and direction are shown in the header.
+          </p>
+          <ul>
+            <li>Descending by default</li>
+            <li>Ascending via <kbd>S</kbd> toggle</li>
+            <li>Sort applies within groups when a pivot mode is active</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/sort-updated.png" alt="Session list sorted by last updated timestamp" caption="Sorted by last updated" />
+          <Screenshot src="one-half-light/sort-folder.png" alt="Session list sorted alphabetically by folder" caption="Sorted by folder" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Grouping Modes -->
+    <section class="section" id="pivot">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Grouping Modes</h2>
+          <p>
+            Five pivot modes cycled with <kbd>Tab</kbd>: flat list, folder,
+            repository, branch, date. Grouped modes display a tree view with
+            collapsible folder headers showing session counts.
+          </p>
+          <ul>
+            <li>All groups start expanded</li>
+            <li><kbd>←</kbd> / <kbd>→</kbd> to collapse and expand groups</li>
+            <li>Double-click a folder header to launch a new session in that directory</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/pivot-flat.png" alt="Flat list with no grouping" caption="Flat list" />
+          <Screenshot src="one-half-light/pivot-folder.png" alt="Sessions grouped by working directory" caption="Grouped by folder" />
+          <Screenshot src="one-half-light/pivot-repo.png" alt="Sessions grouped by Git repository" caption="Grouped by repository" />
+          <Screenshot src="one-half-light/pivot-branch.png" alt="Sessions grouped by Git branch" caption="Grouped by branch" />
+          <Screenshot src="one-half-light/pivot-date.png" alt="Sessions grouped by date" caption="Grouped by date" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Time Range Filtering -->
+    <section class="section" id="time-range">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Time Range Filtering</h2>
+          <p>
+            Four ranges via keys <kbd>1</kbd>–<kbd>4</kbd>: last 1 hour,
+            last 1 day (default), last 7 days, all time. Displayed as
+            selectable badges in the header bar.
+          </p>
+          <ul>
+            <li>Clickable badge buttons in the header</li>
+            <li>Active range highlighted with a visual indicator</li>
+            <li>Default range is "last 1 day"</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/time-range-1h.png" alt="Time range set to last 1 hour" caption="Last 1 hour" />
+          <Screenshot src="one-half-light/time-range-7d.png" alt="Time range set to last 7 days" caption="Last 7 days" />
+          <Screenshot src="one-half-light/time-range-all.png" alt="Time range set to all time" caption="All time" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Preview Panel -->
+    <section class="section" id="preview">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Preview Panel</h2>
+          <p>
+            Toggle with <kbd>p</kbd>. Shows session metadata (created, updated,
+            turn count, working directory), conversation history rendered as
+            chat-style bubbles, checkpoints (up to 5), referenced files
+            (up to 5), and external references (up to 5).
+          </p>
+          <ul>
+            <li><kbd>PgUp</kbd> / <kbd>PgDn</kbd> for keyboard scrolling</li>
+            <li>Mouse wheel scrolling in 3-line increments</li>
+            <li>Scroll indicators: ▲ lines above / ▼ lines below</li>
+            <li>Responsive width: 30–40% of terminal</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/preview-panel.png" alt="Preview panel showing session conversation bubbles" caption="Preview with session conversation" />
+          <Screenshot src="one-half-light/preview-scroll.png" alt="Preview panel scrolled to checkpoint details" caption="Scrolled preview showing checkpoint details" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Launch Modes -->
+    <section class="section" id="launch">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Launch Modes</h2>
+          <p>
+            Four launch modes: in-place (replaces the TUI), new tab, new
+            window, and split pane (Windows Terminal only). The default is configurable via settings. Override per-session
+            with <kbd>w</kbd> (window), <kbd>t</kbd> (tab), or <kbd>e</kbd> (pane).
+          </p>
+          <ul>
+            <li><kbd>Ctrl</kbd>+double-click forces a new window</li>
+            <li><kbd>Shift</kbd>+double-click forces a new tab</li>
+            <li>Pane mode supports directional splits: auto, right, down, left, up</li>
+            <li>Windows: uses <code>wt</code> commands for Windows Terminal</li>
+            <li>macOS: supports Terminal.app and iTerm2</li>
+            <li>Linux: detects and delegates to the active terminal emulator</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Launch behavior is platform-specific and adapts to the detected
+            terminal. No screenshot — the result is a new Copilot CLI session
+            opening in your configured terminal.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Session Hiding -->
+    <section class="section" id="hiding">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Session Hiding</h2>
+          <p>
+            <kbd>h</kbd> hides the currently selected session.
+            <kbd>H</kbd> (Shift+H) toggles visibility of all hidden sessions.
+            Hidden sessions appear dimmed when visible. The footer shows the
+            hidden count with an eye icon.
+          </p>
+          <ul>
+            <li>Per-session persistence — hiding state saved to config</li>
+            <li>Hidden count displayed in footer with 👁 indicator</li>
+            <li>Dimmed styling differentiates hidden from active sessions</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/hidden-sessions.png" alt="Session list with hidden sessions shown dimmed and eye indicator in footer" caption="Hidden sessions shown dimmed with eye indicator" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Tree View Navigation -->
+    <section class="section" id="tree">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Tree View Navigation</h2>
+          <p>
+            When grouped (any pivot mode except flat), sessions display under
+            collapsible folder headers. Each header shows the path and session
+            count. Double-click a folder header to launch a new Copilot CLI
+            session in that directory.
+          </p>
+          <ul>
+            <li><kbd>←</kbd> to collapse, <kbd>→</kbd> to expand</li>
+            <li>Folder icon changes between open and closed states</li>
+            <li>Home directory paths abbreviated with <code>~</code></li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/tree-collapsed.png" alt="Collapsed folder groups showing only headers with counts" caption="Collapsed folder groups" />
+          <Screenshot src="one-half-light/tree-expanded.png" alt="Expanded folders revealing individual sessions" caption="Expanded folders showing sessions" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Panel -->
+    <section class="section" id="settings">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Settings Panel</h2>
+          <p>
+            <kbd>,</kbd> (comma) to open. Nine editable fields: Yolo Mode (boolean
+            toggle), Agent (text), Model (text), Launch Mode (selector:
+            in-place/tab/window/pane), Pane Direction (selector: auto/right/down/left/up,
+            dimmed when not in pane mode), Terminal (selector), Shell (selector),
+            Custom Command (text with <code>{"{sessionId}"}</code> placeholder),
+            and Theme (selector).
+          </p>
+          <ul>
+            <li><kbd>Enter</kbd> to edit or toggle a field</li>
+            <li>Agent and Model fields dim when Custom Command is set</li>
+            <li>Changes saved automatically on <kbd>Esc</kbd></li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/config-panel.png" alt="Settings panel showing all nine configuration fields" caption="Settings panel with all options" />
+          <Screenshot src="one-half-light/config-editing.png" alt="Text field in edit mode with cursor" caption="Editing a text field" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Shell Selection -->
+    <section class="section" id="shell-picker">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Shell Selection</h2>
+          <p>
+            Modal picker shown when multiple shells are detected. The default
+            shell is listed first with a "(default)" label. Navigate
+            with <kbd>↑</kbd>/<kbd>↓</kbd>, select with <kbd>Enter</kbd>,
+            cancel with <kbd>Esc</kbd>.
+          </p>
+          <ul>
+            <li>Auto-detects installed shells: PowerShell, bash, zsh, fish, cmd.exe</li>
+            <li>Default shell marked and listed first</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/shell-picker.png" alt="Shell selection modal listing detected shells" caption="Shell selection modal" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Themes -->
+    <section class="section" id="themes">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Themes</h2>
+          <p>
+            Terminal light/dark mode auto-detected by default. Five built-in
+            schemes: Dispatch Dark, Dispatch Light, Campbell, One Half Dark,
+            One Half Light. Custom schemes supported via Windows Terminal JSON
+            format pasted into the <code>schemes</code> config array.
+          </p>
+          <ul>
+            <li>Cycled in the settings panel</li>
+            <li>User-defined schemes merged with the built-in list</li>
+            <li>Terminal background detection for automatic selection</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="dispatch-dark/hero-main.png" alt="Dispatch Dark color scheme" caption="Dispatch Dark theme" />
+          <Screenshot src="dispatch-light/hero-main.png" alt="Dispatch Light color scheme" caption="Dispatch Light theme" />
+          <Screenshot src="campbell/hero-main.png" alt="Campbell color scheme from Windows Terminal" caption="Campbell theme" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Nerd Font Detection -->
+    <section class="section" id="nerd-fonts">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Nerd Font Detection</h2>
+          <p>
+            Dispatch auto-detects whether a Nerd Font is active in your
+            terminal. When detected, the UI uses rich Nerd Font icons for
+            folders, files, sessions, and status indicators. When no Nerd
+            Font is found, it falls back to clean ASCII icons.
+          </p>
+          <ul>
+            <li>Automatic detection — no configuration needed</li>
+            <li>Rich icons with Nerd Fonts, ASCII fallback without</li>
+            <li>Works across all platforms and terminals</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Install any <a href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Nerd Font</a>
+            and set it as your terminal font to enable rich icons.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Help Overlay -->
+    <section class="section" id="help">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Help Overlay</h2>
+          <p>
+            <kbd>?</kbd> to show. Two-column layout with grouped keyboard
+            shortcuts: Navigation, Search &amp; Filter, View, Time Range,
+            General. A short help bar is always visible in the footer.
+          </p>
+          <ul>
+            <li>Grouped by category for quick scanning</li>
+            <li>Persistent help bar in footer shows common shortcuts</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/help-overlay.png" alt="Help overlay showing two-column grouped keyboard shortcuts" caption="Help overlay with grouped shortcuts" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Mouse Support -->
+    <section class="section" id="mouse">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Mouse Support</h2>
+          <p>
+            Click to select sessions. Double-click to launch. Scroll wheel
+            scrolls whichever pane is under the cursor — the session list or
+            the preview panel. Click header elements (search bar, time range
+            badges, sort indicator, pivot indicator) to interact directly.
+          </p>
+          <ul>
+            <li><kbd>Ctrl</kbd>+double-click forces a new window</li>
+            <li><kbd>Shift</kbd>+double-click forces a new tab</li>
+            <li>300ms double-click debounce</li>
+            <li>Motion tracking enabled for hover states</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Mouse interactions mirror keyboard functionality. Every clickable
+            element has an equivalent keyboard shortcut.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Mode -->
+    <section class="section" id="demo">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Demo Mode</h2>
+          <p>
+            <code>dispatch --demo</code> loads a fake session database for
+            testing and screenshots. Non-destructive — the real session store
+            is untouched. Every screenshot on this site was captured using
+            demo mode.
+          </p>
+          <ul>
+            <li>Synthetic sessions with realistic metadata</li>
+            <li>Safe for experimentation — no data modified</li>
+            <li>Used for all documentation screenshots</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Run <code>dispatch --demo</code> in any terminal to try it.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Maintenance Commands -->
+    <section class="section" id="maintenance">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Maintenance Commands</h2>
+          <p>
+            Two maintenance subcommands for database and configuration upkeep.
+          </p>
+          <ul>
+            <li><code>dispatch --reindex</code> — Full chronicle reindex via Copilot CLI pseudo-terminal. Rebuilds sessions, turns, checkpoints, files, and refs. Falls back to FTS5 index maintenance if the CLI binary is not found.</li>
+            <li><code>dispatch --clear-cache</code> — Reset all configuration to defaults.</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Both commands run non-interactively and exit immediately.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading & Empty States -->
+    <section class="section" id="states">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Loading &amp; Empty States</h2>
+          <p>
+            A loading spinner is shown while sessions are fetched from the
+            database. An empty state message appears when no sessions match
+            the current search query or active filters.
+          </p>
+          <ul>
+            <li>Spinner visible on startup during initial database read</li>
+            <li>Empty state differentiates "no results" from "no sessions"</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/loading-state.png" alt="Loading spinner displayed during startup" caption="Loading spinner on startup" />
+          <Screenshot src="one-half-light/empty-state.png" alt="Empty state message when no sessions match filters" caption="Empty state with no matching sessions" />
+        </div>
+      </div>
+    </section>
+
+  </div>
+</Base>
+
+<style>
+  .feature-screenshots {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-height: 28rem;
+    overflow-y: auto;
+  }
+
+  .text-only-note {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    font-style: italic;
+    border-left: 2px solid var(--border);
+    padding-left: var(--space-4);
+  }
+
+  @media (max-width: 768px) {
+    .feature-screenshots {
+      margin-top: var(--space-4);
+      max-height: none;
+    }
+  }
+</style>

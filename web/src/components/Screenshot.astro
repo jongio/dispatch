@@ -1,0 +1,24 @@
+---
+interface Props {
+  src: string;
+  alt: string;
+  caption?: string;
+}
+
+const { src, alt, caption } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const imgUrl = `${base}screenshots/${src}`;
+const id = `lb-${src.replace(/[^a-zA-Z0-9]/g, '-')}`;
+---
+
+<figure class="screenshot">
+  <a href={`#${id}`} class="screenshot-link">
+    <img src={imgUrl} alt={alt} loading="lazy" />
+  </a>
+  {caption && <figcaption class="screenshot-caption">{caption}</figcaption>}
+</figure>
+
+<div class="lightbox" id={id}>
+  <a href="#!" class="lightbox-close" aria-label="Close">&times;</a>
+  <img src={imgUrl} alt={alt} />
+</div>

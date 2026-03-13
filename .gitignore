@@ -1,0 +1,49 @@
+# ── Build artifacts ──────────────────────────────────────────
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# ── Test / coverage ─────────────────────────────────────────
+*.out
+*_cov
+cover/
+cover_new/
+cover_store.html
+coverage
+coverage/
+coverage_config/
+coverage_store/
+coverage.html
+mq_coverage
+copilot_cov
+
+# ── OS generated ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor / IDE ────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+*.swp
+*~
+
+# ── Project-specific ────────────────────────────────────────
+.copilot/
+
+# ── Web (Astro) ─────────────────────────────────────────────
+web/node_modules/
+web/dist/
+web/.astro/
+
+# ── Screenshots tool (Playwright) ──────────────────────────
+cmd/screenshots/node_modules/
+cmd/screenshots/package.json
+cmd/screenshots/package-lock.json
+dispatch_debug.log
+dispatch_test.log
+/dispatch

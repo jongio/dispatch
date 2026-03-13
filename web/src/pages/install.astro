@@ -1,0 +1,121 @@
+---
+import Base from '../layouts/Base.astro';
+import InstallBlock from '../components/InstallBlock.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="Install — Dispatch">
+  <div class="page-header">
+    <div class="container">
+      <h1>Installation</h1>
+      <p>Get Dispatch running in under a minute.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <InstallBlock tabs={[
+        { label: 'Linux / macOS', id: 'unix', code: 'curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh' },
+        { label: 'Windows', id: 'windows', code: 'irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex' },
+        { label: 'From source', id: 'source', code: 'go install github.com/jongio/dispatch/cmd/dispatch@latest' },
+      ]} />
+
+      <p>Or clone and build locally:</p>
+      <pre><code>git clone https://github.com/jongio/dispatch.git
+cd dispatch
+go install ./cmd/dispatch/</code></pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Requirements</h2>
+      <ul class="req-list">
+        <li><strong>GitHub Copilot CLI</strong> — installed and used at least once</li>
+        <li><strong>Go 1.26+</strong> — only for building from source. Binary releases need no dependencies.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Shell Alias</h2>
+      <p>The installer creates a <code>disp</code> shorthand automatically. You can also add it manually:</p>
+      <pre><code># bash / zsh
+alias disp="dispatch"</code></pre>
+      <pre><code># PowerShell
+Set-Alias -Name disp -Value dispatch</code></pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Troubleshooting</h2>
+
+      <div class="troubleshoot-item">
+        <h3><code>dispatch: command not found</code></h3>
+        <p>Ensure <code>$GOPATH/bin</code> is in your <code>PATH</code>, then restart your terminal.</p>
+      </div>
+
+      <div class="troubleshoot-item">
+        <h3><code>session store not found</code></h3>
+        <p>Copilot CLI must be used at least once to create the session database. Check for <code>~/.copilot/session-store.db</code>. You can override the path with the <code>DISPATCH_DB</code> environment variable.</p>
+      </div>
+
+      <div class="troubleshoot-item">
+        <h3>Sessions not appearing</h3>
+        <p>Check the time range filter — the default may filter older sessions. Use <kbd>/</kbd> to search, and check <code>excluded_dirs</code> in your <a href={`${base}config/`}>config</a>.</p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .req-list {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--space-4);
+  }
+
+  .req-list li {
+    color: var(--text-secondary);
+    padding: var(--space-2) 0;
+    padding-left: var(--space-5);
+    position: relative;
+    font-size: var(--text-sm);
+  }
+
+  .req-list li::before {
+    content: '›';
+    position: absolute;
+    left: var(--space-2);
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  h2 {
+    margin-bottom: var(--space-4);
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-2);
+  }
+
+  p {
+    margin-bottom: var(--space-4);
+  }
+
+  pre {
+    margin-bottom: var(--space-4);
+  }
+
+  .troubleshoot-item {
+    margin-bottom: var(--space-8);
+  }
+
+  .troubleshoot-item:last-child {
+    margin-bottom: 0;
+  }
+</style>

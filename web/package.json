@@ -1,0 +1,19 @@
+{
+  "name": "dispatch-website",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "astro check && astro build"
+  },
+  "dependencies": {
+    "astro": "^5.7.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.7",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,176 @@
+---
+import Base from '../layouts/Base.astro';
+import ConfigTable from '../components/ConfigTable.astro';
+---
+
+<Base title="Configuration — Dispatch">
+  <div class="page-header">
+    <div class="container">
+      <h1>Configuration</h1>
+      <p>All settings and their defaults.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <h2>Config File Location</h2>
+      <ul class="path-list">
+        <li><strong>Linux</strong> — <code>~/.config/dispatch/config.json</code></li>
+        <li><strong>macOS</strong> — <code>~/Library/Application Support/dispatch/config.json</code></li>
+        <li><strong>Windows</strong> — <code>%APPDATA%\dispatch\config.json</code></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Options</h2>
+      <ConfigTable rows={[
+        { key: 'default_shell', type: 'string', default: '""', description: 'Preferred shell (bash, zsh, pwsh, cmd.exe). Empty = auto-detect.' },
+        { key: 'default_terminal', type: 'string', default: '""', description: 'Terminal emulator. Empty = auto-detect.' },
+        { key: 'default_time_range', type: 'string', default: '"1d"', description: 'Time filter on startup: 1h, 1d, 7d, all.' },
+        { key: 'default_sort', type: 'string', default: '"updated"', description: 'Sort field: updated, created, turns, name, folder.' },
+        { key: 'default_pivot', type: 'string', default: '"folder"', description: 'Grouping mode: none, folder, repo, branch, date.' },
+        { key: 'show_preview', type: 'bool', default: 'true', description: 'Show preview pane on startup.' },
+        { key: 'max_sessions', type: 'int', default: '100', description: 'Maximum sessions to load from the store.' },
+        { key: 'yoloMode', type: 'bool', default: 'false', description: 'Pass --allow-all to Copilot CLI (auto-confirm commands).' },
+        { key: 'agent', type: 'string', default: '""', description: 'Pass --agent <name> to Copilot CLI.' },
+        { key: 'model', type: 'string', default: '""', description: 'Pass --model <name> to Copilot CLI.' },
+        { key: 'launch_mode', type: 'string', default: '"tab"', description: 'How to open sessions: in-place, tab, window, pane.' },
+        { key: 'pane_direction', type: 'string', default: '"auto"', description: 'Split direction for pane mode: auto, right, down, left, up.' },
+        { key: 'custom_command', type: 'string', default: '""', description: 'Custom launch command. {sessionId} is replaced with the session ID.' },
+        { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
+        { key: 'theme', type: 'string', default: '"auto"', description: 'Color scheme: auto or a named scheme.' },
+      ]} />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Example</h2>
+      <pre><code>{`{
+  "default_shell": "",
+  "default_terminal": "",
+  "default_time_range": "1d",
+  "default_sort": "updated",
+  "default_pivot": "folder",
+  "show_preview": true,
+  "max_sessions": 100,
+  "yoloMode": false,
+  "agent": "",
+  "model": "",
+  "launch_mode": "tab",
+  "pane_direction": "auto",
+  "custom_command": "",
+  "excluded_dirs": [],
+  "theme": "auto"
+}`}</code></pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Themes</h2>
+      <p>Five built-in color schemes:</p>
+      <ul class="theme-list">
+        <li>Dispatch Dark</li>
+        <li>Dispatch Light</li>
+        <li>Campbell</li>
+        <li>One Half Dark</li>
+        <li>One Half Light</li>
+      </ul>
+      <p>Set <code>theme</code> to <code>auto</code> for automatic light/dark detection based on your terminal.</p>
+
+      <h3>Custom Themes</h3>
+      <p>Add custom schemes using Windows Terminal JSON format in the <code>schemes</code> config array. Each scheme's <code>name</code> field becomes available in the settings theme selector.</p>
+      <pre><code>{`"schemes": [
+  {
+    "name": "My Custom Theme",
+    "background": "#1a1b26",
+    "foreground": "#c0caf5",
+    "black": "#15161e",
+    "red": "#f7768e",
+    "green": "#9ece6a",
+    "yellow": "#e0af68",
+    "blue": "#7aa2f7",
+    "purple": "#bb9af7",
+    "cyan": "#7dcfff",
+    "white": "#a9b1d6"
+  }
+]`}</code></pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Custom Command</h2>
+      <p>Set <code>custom_command</code> to replace the default Copilot CLI launch command entirely. Use <code>{'{sessionId}'}</code> as a placeholder for the session ID.</p>
+      <p>When a custom command is set, the Agent, Model, and Yolo Mode fields are ignored (dimmed in the settings panel).</p>
+      <pre><code>"custom_command": "my-tool resume {'{sessionId}'}"</code></pre>
+    </div>
+  </section>
+</Base>
+
+<style>
+  h2 {
+    margin-bottom: var(--space-4);
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    margin-top: var(--space-6);
+    margin-bottom: var(--space-3);
+  }
+
+  p {
+    margin-bottom: var(--space-4);
+  }
+
+  pre {
+    margin-bottom: var(--space-4);
+  }
+
+  .path-list {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--space-4);
+  }
+
+  .path-list li {
+    color: var(--text-secondary);
+    padding: var(--space-2) 0;
+    padding-left: var(--space-5);
+    position: relative;
+    font-size: var(--text-sm);
+  }
+
+  .path-list li::before {
+    content: '›';
+    position: absolute;
+    left: var(--space-2);
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  .theme-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: var(--space-4);
+  }
+
+  .theme-list li {
+    color: var(--text-secondary);
+    padding: var(--space-1) 0;
+    padding-left: var(--space-5);
+    position: relative;
+    font-size: var(--text-sm);
+  }
+
+  .theme-list li::before {
+    content: '›';
+    position: absolute;
+    left: var(--space-2);
+    color: var(--accent);
+    font-weight: bold;
+  }
+</style>

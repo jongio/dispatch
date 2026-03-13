@@ -1,0 +1,53 @@
+---
+interface Row {
+  key: string;
+  type: string;
+  default: string;
+  description: string;
+}
+
+interface Props {
+  rows: Row[];
+}
+
+const { rows } = Astro.props;
+---
+
+<div class="config-table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Type</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map(row => (
+        <tr>
+          <td><code>{row.key}</code></td>
+          <td class="type-col">{row.type}</td>
+          <td><code>{row.default}</code></td>
+          <td>{row.description}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .config-table-wrap {
+    overflow-x: auto;
+  }
+
+  td:first-child {
+    white-space: nowrap;
+  }
+
+  .type-col {
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+</style>

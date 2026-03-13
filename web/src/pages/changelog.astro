@@ -1,0 +1,81 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Changelog — Dispatch">
+  <div class="page-header">
+    <div class="container">
+      <h1>Changelog</h1>
+      <p>All notable changes to Dispatch.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <h2>0.1.0 <span class="badge">2026-03-10</span></h2>
+
+      <h3>Added</h3>
+      <ul class="changelog-list">
+        <li>Terminal UI for browsing GitHub Copilot CLI sessions</li>
+        <li>Full-text search across session summaries, conversations, checkpoints, and file references</li>
+        <li>Two-tier search: quick (session fields) and deep (turns, checkpoints, files, refs) with debounce</li>
+        <li>Filter panel with time range (1h, 1d, 7d, all) and sort options</li>
+        <li>Sortable by updated, created, turns, name, or folder</li>
+        <li>Grouping/pivot modes: folder, repository, branch, date, or flat list</li>
+        <li>Preview pane with chat-style conversation display</li>
+        <li>Pane-aware mouse scrolling</li>
+        <li>Clickable header elements (search, filters, sort, pivot)</li>
+        <li>Click to select, double-click folders to launch new session</li>
+        <li>Four launch modes: in-place, new tab, new window, split pane</li>
+        <li>Configurable pane direction (auto, right, down, left, up) for Windows Terminal split panes</li>
+        <li>Configurable shell, terminal, agent, model, and custom commands</li>
+        <li>Session hiding with per-session toggle</li>
+        <li>Directory exclusion via configuration</li>
+        <li>Cross-platform support (Windows, macOS, Linux)</li>
+        <li>Windows Terminal theme detection and inheritance</li>
+        <li>Nerd Font detection with fallback icons</li>
+        <li>Vim-style navigation alongside arrow keys</li>
+        <li>Configuration persistence in platform-specific config directory</li>
+        <li><code>disp</code> shorthand alias created by installer</li>
+        <li>Read-only database access with parameterized queries</li>
+        <li>Session ID validation and shell command escaping</li>
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<style>
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-4);
+  }
+
+  .changelog-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .changelog-list li {
+    color: var(--text-secondary);
+    padding-left: var(--space-5);
+    margin-bottom: var(--space-2);
+    position: relative;
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .changelog-list li::before {
+    content: '›';
+    position: absolute;
+    left: var(--space-2);
+    color: var(--accent);
+    font-weight: bold;
+  }
+</style>

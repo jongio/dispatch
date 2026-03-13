@@ -1,0 +1,317 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'A terminal UI for browsing and launching GitHub Copilot CLI sessions.' } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0d1117" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container-lg">
+        <nav class="nav">
+          <a href={base} class="nav-brand">
+            <span class="nav-logo">{'>_'}</span>
+            <span class="nav-name">dispatch</span>
+          </a>
+          <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+            <span class="hamburger-icon" aria-hidden="true"></span>
+          </button>
+          <div class="nav-links" id="nav-menu">
+            <a href={`${base}features/`}>Features</a>
+            <a href={`${base}install/`}>Install</a>
+            <a href={`${base}config/`}>Config</a>
+            <a href={`${base}keys/`}>Keys</a>
+            <a href={`${base}changelog/`}>Changelog</a>
+            <a href="https://github.com/jongio/dispatch" class="nav-github" aria-label="GitHub">
+              <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+              </svg>
+            </a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-left">
+            <p class="footer-brand">{'>_ dispatch'}</p>
+            <p class="footer-text">MIT License</p>
+          </div>
+          <nav class="footer-nav">
+            <a href={`${base}install/`}>Install</a>
+            <a href={`${base}keys/`}>Keys</a>
+            <a href={`${base}changelog/`}>Changelog</a>
+          </nav>
+          <div class="footer-right">
+            <a href="https://github.com/jongio/dispatch" class="footer-github">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              Star on GitHub
+            </a>
+            <p class="footer-text">A terminal UI for your Copilot CLI sessions</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      const toggle = document.querySelector('.nav-toggle');
+      const menu = document.getElementById('nav-menu');
+      if (toggle && menu) {
+        toggle.addEventListener('click', () => {
+          const open = menu.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', String(open));
+        });
+      }
+
+      // ESC key dismisses lightbox — navigate to #! like the close button does
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && location.hash.startsWith('#lb-')) {
+          e.preventDefault();
+          location.hash = '#!';
+        }
+      });
+    </script>
+
+    <style>
+      .site-header {
+        border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+        position: sticky;
+        top: 0;
+        background: rgba(13, 17, 23, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 100;
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 3.5rem;
+        flex-wrap: wrap;
+      }
+
+      .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: var(--text-lg);
+      }
+
+      .nav-brand:hover {
+        color: var(--text-primary);
+      }
+
+      .nav-logo {
+        font-family: var(--font-mono);
+        font-size: var(--text-xl);
+        color: var(--accent);
+      }
+
+      .nav-name {
+        font-family: var(--font-mono);
+      }
+
+      .nav-toggle {
+        display: none;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: var(--space-1);
+      }
+
+      .nav-toggle:hover {
+        color: var(--text-primary);
+      }
+
+      .hamburger-icon {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: currentColor;
+        position: relative;
+      }
+
+      .hamburger-icon::before,
+      .hamburger-icon::after {
+        content: '';
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: currentColor;
+        position: absolute;
+        left: 0;
+      }
+
+      .hamburger-icon::before {
+        top: -6px;
+      }
+
+      .hamburger-icon::after {
+        top: 6px;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: var(--space-6);
+      }
+
+      .nav-links a {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        color: var(--text-secondary);
+        transition: color 0.15s;
+      }
+
+      .nav-links a:hover {
+        color: var(--text-primary);
+      }
+
+      .nav-github {
+        display: flex;
+        align-items: center;
+      }
+
+      .site-footer {
+        border-top: none;
+        padding: var(--space-12) 0;
+        margin-top: var(--space-16);
+        position: relative;
+      }
+
+      .site-footer::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, var(--border) 30%, var(--accent-muted) 50%, var(--border) 70%, transparent 100%);
+      }
+
+      .site-footer::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 80px;
+        background: radial-gradient(ellipse at 50% 0%, rgba(56, 139, 253, 0.04) 0%, transparent 70%);
+        pointer-events: none;
+      }
+
+      .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .footer-brand {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .footer-text {
+        font-size: var(--text-sm);
+        color: var(--text-tertiary);
+      }
+
+      .footer-nav {
+        display: flex;
+        gap: var(--space-6);
+      }
+
+      .footer-nav a {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        color: var(--text-secondary);
+      }
+
+      .footer-nav a:hover {
+        color: var(--text-primary);
+      }
+
+      .footer-right {
+        text-align: right;
+      }
+
+      .footer-github {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--space-2);
+      }
+
+      .footer-github:hover {
+        color: var(--text-primary);
+      }
+
+      @media (max-width: 640px) {
+        .nav-toggle {
+          display: block;
+        }
+
+        .nav-links {
+          display: none;
+          flex-direction: column;
+          width: 100%;
+          gap: var(--space-3);
+          padding: var(--space-4) 0;
+          border-top: 1px solid var(--border-muted);
+        }
+
+        .nav-links.open {
+          display: flex;
+        }
+
+        .footer-content {
+          flex-direction: column;
+          gap: var(--space-4);
+          text-align: center;
+        }
+
+        .footer-nav {
+          gap: var(--space-4);
+        }
+
+        .footer-right {
+          text-align: center;
+        }
+      }
+    </style>
+  </body>
+</html>

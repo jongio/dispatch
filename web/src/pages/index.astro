@@ -1,0 +1,115 @@
+---
+import Base from '../layouts/Base.astro';
+import FeatureCard from '../components/FeatureCard.astro';
+import InstallBlock from '../components/InstallBlock.astro';
+import Screenshot from '../components/Screenshot.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="Dispatch — Copilot CLI Session Browser">
+  <div class="hero">
+    <div class="container">
+      <h1><code>dispatch</code></h1>
+      <p>Your Copilot CLI sessions, organized. Search, preview, and launch — all from your terminal.</p>
+      <a href={`${base}install/`} class="hero-cta">Install dispatch</a>
+      <div class="hero-screenshot">
+        <Screenshot src="one-half-light/hero-main.png" alt="Dispatch main view" />
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="container">
+      <h2>Get started</h2>
+      <InstallBlock tabs={[
+        { label: 'Linux / macOS', id: 'unix', code: 'curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh' },
+        { label: 'Windows', id: 'windows', code: 'irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex' },
+        { label: 'From source', id: 'source', code: 'go install github.com/jongio/dispatch/cmd/dispatch@latest' },
+      ]} />
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="container">
+      <h2>Features</h2>
+      <div class="grid-3">
+        <FeatureCard
+          title="Full-Text Search"
+          description="Two-tier full-text search with instant quick results and deep search after 300ms. Find sessions by summary, branch, repo, directory, or conversation content."
+          screenshotSrc="one-half-light/search-active.png"
+        />
+        <FeatureCard
+          title="Sort, Group & Filter"
+          description="Sort by 5 fields, group by folder/repo/branch/date, filter by time range. Directory exclusion panel with hierarchical tree toggles."
+          screenshotSrc="one-half-light/pivot-folder.png"
+        />
+        <FeatureCard
+          title="Preview Pane"
+          description="Chat-style conversation bubbles, checkpoints, files, and refs in a scrollable side panel. Metadata at a glance without launching."
+          screenshotSrc="one-half-light/preview-panel.png"
+        />
+        <FeatureCard
+          title="Four Launch Modes"
+          description="Resume in-place, open in a new tab, new window, or split pane. Configurable defaults with per-session keyboard and mouse overrides."
+        >
+          <div class="launch-modes">
+            <div class="mode-tile">
+              <kbd class="mode-key">↵</kbd>
+              <span class="mode-name">in-place</span>
+            </div>
+            <div class="mode-tile">
+              <kbd class="mode-key">t</kbd>
+              <span class="mode-name">new tab</span>
+            </div>
+            <div class="mode-tile">
+              <kbd class="mode-key">w</kbd>
+              <span class="mode-name">window</span>
+            </div>
+            <div class="mode-tile">
+              <kbd class="mode-key">e</kbd>
+              <span class="mode-name">pane</span>
+            </div>
+          </div>
+        </FeatureCard>
+        <FeatureCard
+          title="Themes & Nerd Fonts"
+          description="Five built-in color schemes plus custom themes via Windows Terminal JSON. Auto-detects Nerd Fonts for rich icons with ASCII fallback."
+          screenshotSrc="dispatch-dark/hero-main.png"
+        />
+        <FeatureCard
+          title="Cross-Platform"
+          description="Windows, macOS, and Linux (amd64 + arm64). Windows Terminal theme detection, iTerm2 support, and platform-native shell detection."
+        >
+          <div class="launch-modes">
+            <div class="mode-tile">
+              <span class="mode-key platform-icon">⊞</span>
+              <span class="mode-name">Windows</span>
+            </div>
+            <div class="mode-tile">
+              <span class="mode-key platform-icon">⌘</span>
+              <span class="mode-name">macOS</span>
+            </div>
+            <div class="mode-tile">
+              <span class="mode-key platform-icon">❯</span>
+              <span class="mode-name">Linux</span>
+            </div>
+          </div>
+        </FeatureCard>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="container">
+      <h2>Quick start</h2>
+      <ol class="steps">
+        <li>Run <code>dispatch</code> in your terminal</li>
+        <li>Press <code>/</code> to search for previous sessions</li>
+        <li>Use arrow keys or <code>j</code>/<code>k</code> to navigate, <code>p</code> to preview</li>
+        <li>Press <code>Enter</code> to resume the selected session</li>
+      </ol>
+      <p>See the full <a href={`${base}keys/`}>keyboard reference</a> for all shortcuts.</p>
+    </div>
+  </div>
+</Base>

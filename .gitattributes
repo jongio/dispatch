@@ -1,0 +1,12 @@
+# Force LF line endings for shell scripts (cross-platform)
+*.sh text eol=lf
+
+# Keep Go source files consistent
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Windows-specific files keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -1,0 +1,160 @@
+---
+import Base from '../layouts/Base.astro';
+import KeyTable from '../components/KeyTable.astro';
+---
+
+<Base title="Keyboard & Mouse — Dispatch">
+  <div class="page-header">
+    <div class="container">
+      <h1>Keyboard & Mouse</h1>
+      <p>Every shortcut and interaction.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="page-with-toc">
+        <div>
+          <div id="navigation" class="shortcut-group">
+            <h3>Navigation</h3>
+            <KeyTable rows={[
+              { keys: '↑ / k', action: 'Move up' },
+              { keys: '↓ / j', action: 'Move down' },
+              { keys: '←', action: 'Collapse folder group' },
+              { keys: '→', action: 'Expand folder group' },
+            ]} />
+          </div>
+
+          <div id="launch-keys" class="shortcut-group">
+            <h3>Launch & Session</h3>
+            <KeyTable rows={[
+              { keys: 'Enter', action: 'Launch selected session (or toggle folder)' },
+              { keys: 'w', action: 'Launch in new window' },
+              { keys: 't', action: 'Launch in new tab' },
+              { keys: 'e', action: 'Launch in split pane (Windows Terminal)' },
+              { keys: 'h', action: 'Hide/unhide current session' },
+              { keys: 'H', action: 'Toggle visibility of hidden sessions' },
+            ]} />
+          </div>
+
+          <div id="search-filter" class="shortcut-group">
+            <h3>Search & Filter</h3>
+            <KeyTable rows={[
+              { keys: '/', action: 'Focus search bar' },
+              { keys: 'Esc', action: 'Blur search / Clear query' },
+              { keys: 'f', action: 'Open filter panel' },
+            ]} />
+          </div>
+
+          <div id="view-sort" class="shortcut-group">
+            <h3>View & Sorting</h3>
+            <KeyTable rows={[
+              { keys: 's', action: 'Cycle sort field' },
+              { keys: 'S', action: 'Toggle sort direction' },
+              { keys: 'Tab', action: 'Cycle grouping mode' },
+              { keys: 'p', action: 'Toggle preview panel' },
+              { keys: 'PgUp', action: 'Scroll preview up' },
+              { keys: 'PgDn', action: 'Scroll preview down' },
+              { keys: 'r', action: 'Reindex sessions' },
+              { keys: ',', action: 'Open settings panel' },
+            ]} />
+          </div>
+
+          <div id="time-keys" class="shortcut-group">
+            <h3>Time Range</h3>
+            <KeyTable rows={[
+              { keys: '1', action: 'Last 1 hour' },
+              { keys: '2', action: 'Last 1 day' },
+              { keys: '3', action: 'Last 7 days' },
+              { keys: '4', action: 'All time' },
+            ]} />
+            <p class="text-secondary text-sm">Time range keys work when search is not focused. When the search bar is focused, number keys type into the query.</p>
+          </div>
+
+          <div id="settings-keys" class="shortcut-group">
+            <h3>Settings & Info</h3>
+            <KeyTable rows={[
+              { keys: '?', action: 'Show help overlay' },
+              { keys: 'q', action: 'Quit' },
+              { keys: 'Ctrl+C', action: 'Force quit (any state)' },
+            ]} />
+          </div>
+
+          <div id="overlay-keys" class="shortcut-group">
+            <h3>Overlay Navigation</h3>
+            <p>Keys available inside overlay panels (filter, settings, shell picker, help):</p>
+            <KeyTable rows={[
+              { keys: '↑ / k', action: 'Move up in list' },
+              { keys: '↓ / j', action: 'Move down in list' },
+              { keys: 'Enter', action: 'Select / Apply / Toggle' },
+              { keys: 'Esc', action: 'Close overlay' },
+              { keys: 'Space', action: 'Toggle checkbox (filter panel)' },
+              { keys: '←', action: 'Collapse parent (filter panel)' },
+              { keys: '→', action: 'Expand parent (filter panel)' },
+            ]} />
+          </div>
+
+          <div id="mouse-interactions" class="shortcut-group">
+            <h3>Mouse</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Effect</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Click session</td><td>Select it</td></tr>
+                <tr><td>Click folder header</td><td>Expand or collapse</td></tr>
+                <tr><td>Double-click session</td><td>Launch it</td></tr>
+                <tr><td>Double-click folder</td><td>Launch new session in that directory</td></tr>
+                <tr><td>Ctrl + double-click</td><td>Force new window mode</td></tr>
+                <tr><td>Shift + double-click</td><td>Force new tab mode</td></tr>
+                <tr><td>Scroll wheel (on list)</td><td>Scroll session list (3 lines)</td></tr>
+                <tr><td>Scroll wheel (on preview)</td><td>Scroll preview pane (3 lines)</td></tr>
+                <tr><td>Click search area</td><td>Focus search input</td></tr>
+                <tr><td>Click time range badge</td><td>Select time range</td></tr>
+                <tr><td>Click sort indicator</td><td>Cycle sort field</td></tr>
+                <tr><td>Click pivot indicator</td><td>Cycle grouping mode</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="toc">
+          <div class="toc-title">On this page</div>
+          <ul class="toc-list">
+            <li><a href="#navigation">Navigation</a></li>
+            <li><a href="#launch-keys">Launch</a></li>
+            <li><a href="#search-filter">Search & Filter</a></li>
+            <li><a href="#view-sort">View & Sorting</a></li>
+            <li><a href="#time-keys">Time Range</a></li>
+            <li><a href="#settings-keys">Settings</a></li>
+            <li><a href="#overlay-keys">Overlays</a></li>
+            <li><a href="#mouse-interactions">Mouse</a></li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-sm {
+    font-size: var(--text-sm);
+  }
+
+  p {
+    margin-bottom: var(--space-4);
+  }
+
+  #mouse-interactions td:first-child {
+    white-space: nowrap;
+    width: 14rem;
+    font-weight: 500;
+  }
+</style>

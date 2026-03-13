@@ -1,0 +1,52 @@
+---
+interface Row {
+  keys: string;
+  action: string;
+}
+
+interface Props {
+  rows: Row[];
+}
+
+const { rows } = Astro.props;
+---
+
+<table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map(row => (
+      <tr>
+        <td>
+          {row.keys.split(' / ').map((k, i) => (
+            <>
+              {i > 0 && <span class="key-sep"> / </span>}
+              <kbd>{k.trim()}</kbd>
+            </>
+          ))}
+        </td>
+        <td>{row.action}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+<style>
+  table {
+    margin-bottom: var(--space-2);
+  }
+
+  td:first-child {
+    white-space: nowrap;
+    width: 12rem;
+  }
+
+  .key-sep {
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+  }
+</style>

@@ -1,0 +1,90 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  screenshotSrc?: string;
+  screenshotAlt?: string;
+  badge?: string;
+}
+
+const { title, description, screenshotSrc, screenshotAlt, badge } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const hasSlot = Astro.slots.has('default');
+---
+
+<div class="card feature-card">
+  {screenshotSrc && (
+    <div class="feature-card-img">
+      <a href={`#lb-${screenshotSrc.replace(/[^a-zA-Z0-9]/g, '-')}`} class="screenshot-link">
+        <img src={`${base}screenshots/${screenshotSrc}`} alt={screenshotAlt || title} loading="lazy" />
+      </a>
+    </div>
+  )}
+  {!screenshotSrc && hasSlot && (
+    <div class="feature-card-illustration">
+      <slot />
+    </div>
+  )}
+  <div class="card-body">
+    <div class="feature-card-header">
+      <h3>{title}</h3>
+      {badge && <span class="badge">{badge}</span>}
+    </div>
+    <p>{description}</p>
+  </div>
+</div>
+
+{screenshotSrc && (
+  <div class="lightbox" id={`lb-${screenshotSrc.replace(/[^a-zA-Z0-9]/g, '-')}`}>
+    <a href="#!" class="lightbox-close" aria-label="Close">&times;</a>
+    <img src={`${base}screenshots/${screenshotSrc}`} alt={screenshotAlt || title} />
+  </div>
+)}
+
+<style>
+  .feature-card {
+    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(22, 27, 34, 0.6) 100%);
+  }
+
+  .feature-card-img {
+    background: var(--bg-tertiary);
+    overflow: hidden;
+  }
+
+  .feature-card-img img {
+    width: 100%;
+    opacity: 0.9;
+    transition: opacity 0.3s, transform 0.3s;
+    cursor: zoom-in;
+  }
+
+  .feature-card:hover .feature-card-img img {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+
+  .feature-card-illustration {
+    background: var(--bg-tertiary);
+    padding: var(--space-8) var(--space-6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 9rem;
+  }
+
+  .feature-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .feature-card h3 {
+    font-size: var(--text-lg);
+  }
+
+  .feature-card p {
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+</style>
