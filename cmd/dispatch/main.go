@@ -22,6 +22,10 @@ const demoDBRel = "internal/data/testdata/fake_sessions.db"
 func main() {
 	for _, arg := range os.Args[1:] {
 		switch arg {
+		case "--version", "-v", "version":
+			fmt.Println(tui.Version)
+			return
+
 		case "--demo":
 			dbPath := findDemoDB()
 			if dbPath == "" {
