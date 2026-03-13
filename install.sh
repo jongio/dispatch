@@ -109,20 +109,24 @@ resolve_install_dir() {
         return
     fi
 
-    # Root → system-wide path.
+    # Walk a prioritised list of candidate directories and pick the first
+    # one that is already in PATH.  This avoids installing to a directory
+    # the user's shell can't see (common in WSL root shells where
+    # /usr/local/bin is absent from PATH).
+    for candidate in /usr/local/bin "${HOME}/.local/bin"; do
+        case ":${PATH}:" in
+            *":${candidate}:"*) echo "${candidate}"; return ;;
+        esac
+    done
+
+    # None of the candidates are in PATH.  Fall back to a sensible default.
     if [ "$(id -u)" -eq 0 ]; then
         echo "/usr/local/bin"
-        return
-    fi
-
-    # Non-root with sudo → system-wide path (will invoke sudo later).
-    if command -v sudo >/dev/null 2>&1; then
+    elif command -v sudo >/dev/null 2>&1; then
         echo "/usr/local/bin"
-        return
+    else
+        echo "${HOME}/.local/bin"
     fi
-
-    # Fallback → user-local path.
-    echo "${HOME}/.local/bin"
 }
 
 # ---------------------------------------------------------------------------
@@ -231,21 +235,23 @@ main() {
     pass "Installed ${install_path} (+ disp alias)"
 
     # ---- PATH advisory ---------------------------------------------------
-    if [ "${install_dir}" = "${HOME}/.local/bin" ]; then
-        case ":${PATH}:" in
-            *":${install_dir}:"*) ;;   # already in PATH
-            *)
-                echo ""
-                warn "${install_dir} is not in your PATH."
-                printf '     Add it by appending this line to your shell profile:\n'
-                printf '\n       export PATH="%s:$PATH"\n\n' "${install_dir}"
-                ;;
-        esac
-    fi
+    case ":${PATH}:" in
+        *":${install_dir}:"*) ;;   # already in PATH
+        *)
+            echo ""
+            warn "${install_dir} is not in your PATH."
+            printf '     Add it by appending this line to your shell profile:\n'
+            printf '\n       export PATH="%s:$PATH"\n\n' "${install_dir}"
+            ;;
+    esac
 
     # ---- Verify installation ---------------------------------------------
     if command -v "${BINARY}" >/dev/null 2>&1; then
         pass "Verified: ${BINARY} is in PATH"
+    else
+        warn "${BINARY} was installed to ${install_path} but is not in your PATH."
+        printf '     Run the following or add it to your shell profile (~/.bashrc, ~/.zshrc):\n'
+        printf '\n       export PATH="%s:$PATH"\n\n' "${install_dir}"
     fi
 
     printf '\n  \033[1;32m✓ Dispatch %s installed successfully!\033[0m\n\n' "${tag}"

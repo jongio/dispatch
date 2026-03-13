@@ -15,19 +15,44 @@ import (
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui"
+	"github.com/jongio/dispatch/internal/update"
 )
 
 const demoDBRel = "internal/data/testdata/fake_sessions.db"
 
 func main() {
+	// Start background update check early so it can run concurrently
+	// with argument parsing and TUI startup.
+	updateCh := make(chan *update.UpdateInfo, 1)
+	go func() {
+		updateCh <- update.CheckForUpdate(tui.Version)
+	}()
+
+	origStderr := captureOriginalStderr()
+	if origStderr == nil {
+		origStderr = os.Stderr
+	}
+	if origStderr != os.Stderr {
+		defer origStderr.Close() //nolint:errcheck // best-effort cleanup
+	}
+
 	for _, arg := range os.Args[1:] {
 		switch arg {
 		case "--help", "-h", "help":
 			printUsage()
+			showUpdateNotification(origStderr, updateCh)
 			return
 
 		case "--version", "-v", "version":
 			fmt.Println(tui.Version)
+			showUpdateNotification(origStderr, updateCh)
+			return
+
+		case "update":
+			if err := update.RunUpdate(tui.Version); err != nil {
+				fmt.Fprintf(os.Stderr, "update: %v\n", err)
+				os.Exit(1)
+			}
 			return
 
 		case "--demo":
@@ -118,9 +143,13 @@ func main() {
 	)
 
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(origStderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+
+	// After TUI exits, show update notification if the background
+	// check found a newer release.
+	showUpdateNotification(origStderr, updateCh)
 }
 
 func printUsage() {
@@ -133,6 +162,7 @@ Usage:
 Commands:
   help                    Show this help message
   version                 Print the version
+  update                  Update dispatch to the latest release
 
 Flags:
   -h, --help              Show this help message
@@ -145,6 +175,24 @@ Environment:
   DISPATCH_DB             Path to a custom session store database
   DISPATCH_LOG            Path to a log file (enables debug logging)
 `, tui.Version)
+}
+
+// showUpdateNotification prints an update notification to stderr if the
+// background version check found a newer release. It performs a non-blocking
+// read of the channel to avoid delaying program exit.
+func showUpdateNotification(w io.Writer, ch <-chan *update.UpdateInfo) {
+	if w == nil {
+		w = os.Stderr
+	}
+
+	select {
+	case info := <-ch:
+		if info != nil {
+			fmt.Fprintf(w, "\nA new version of dispatch is available: v%s → v%s\nRun \"dispatch update\" to install it.\n",
+				info.CurrentVersion, info.LatestVersion)
+		}
+	default:
+	}
 }
 
 // findDemoDB looks for the fake session store in two places:

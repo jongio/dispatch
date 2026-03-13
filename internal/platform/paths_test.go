@@ -3,6 +3,7 @@ package platform
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -43,6 +44,12 @@ func TestSessionStorePathAbsolute(t *testing.T) {
 }
 
 func TestSessionStorePathContainsHomeDir(t *testing.T) {
+	// In WSL, SessionStorePath may fall back to a Windows path under /mnt/c.
+	// Skip this prefix check when running inside WSL since the fallback is
+	// intentional.
+	if runtime.GOOS == "linux" && isWSL() {
+		t.Skip("WSL may resolve to Windows home; skipping home-prefix check")
+	}
 	path, err := SessionStorePath()
 	if err != nil {
 		t.Fatalf("SessionStorePath: %v", err)
@@ -160,5 +167,52 @@ func TestPathsAreConsistentAcrossCalls(t *testing.T) {
 	}
 	if d1 != d2 {
 		t.Errorf("ConfigDir not consistent: %q != %q", d1, d2)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// WSL helpers
+// ---------------------------------------------------------------------------
+
+func TestIsWSL_NotWSLOnWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-only test")
+	}
+	// On native Windows, isWSL must always return false.
+	if isWSL() {
+		t.Error("isWSL() = true on native Windows, want false")
+	}
+}
+
+func TestFindWindowsSessionStore_NoMatchReturnsEmpty(t *testing.T) {
+	// When no session store exists under wslMountRoot (which is /mnt/c/Users
+	// and almost certainly does not exist on native Windows or in CI), the
+	// function should return an empty string without error.
+	got := findWindowsSessionStore()
+	if runtime.GOOS == "windows" {
+		// /mnt/c/Users does not exist on native Windows.
+		if got != "" {
+			t.Errorf("findWindowsSessionStore() = %q on Windows, want empty", got)
+		}
+	}
+	// On Linux outside WSL, /mnt/c/Users is unlikely to exist either.
+}
+
+func TestWSLFallback_OverrideStillWins(t *testing.T) {
+	// DISPATCH_DB override takes priority regardless of WSL detection.
+	t.Setenv("DISPATCH_DB", "/override/session.db")
+	path, err := SessionStorePath()
+	if err != nil {
+		t.Fatalf("SessionStorePath: %v", err)
+	}
+	want := filepath.Clean("/override/session.db")
+	if path != want {
+		t.Errorf("SessionStorePath() = %q, want %q (DISPATCH_DB should win over WSL fallback)", path, want)
+	}
+}
+
+func TestWSLMountRootConstant(t *testing.T) {
+	if wslMountRoot != "/mnt/c/Users" {
+		t.Errorf("wslMountRoot = %q, want /mnt/c/Users", wslMountRoot)
 	}
 }

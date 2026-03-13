@@ -537,13 +537,16 @@ func detectUnixShells() []ShellInfo {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		if _, ok := seen[line]; ok {
-			continue
-		}
-		seen[line] = struct{}{}
 
 		if _, err := os.Stat(line); err == nil {
 			name := filepath.Base(line)
+			// Deduplicate by name so the config panel cycle doesn't get
+			// stuck when /etc/shells lists the same shell under multiple
+			// paths (e.g. /bin/bash and /usr/bin/bash).
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
 			shells = append(shells, ShellInfo{Name: name, Path: line})
 		}
 	}
