@@ -22,6 +22,10 @@ const demoDBRel = "internal/data/testdata/fake_sessions.db"
 func main() {
 	for _, arg := range os.Args[1:] {
 		switch arg {
+		case "--help", "-h", "help":
+			printUsage()
+			return
+
 		case "--version", "-v", "version":
 			fmt.Println(tui.Version)
 			return
@@ -65,6 +69,11 @@ func main() {
 			}
 			fmt.Println("Done.")
 			return
+
+		default:
+			fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
+			printUsage()
+			os.Exit(1)
 		}
 	}
 
@@ -112,6 +121,30 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func printUsage() {
+	fmt.Printf(`dispatch %s — A TUI for browsing GitHub Copilot CLI sessions.
+
+Usage:
+  dispatch                Launch the interactive TUI
+  dispatch [command]
+
+Commands:
+  help                    Show this help message
+  version                 Print the version
+
+Flags:
+  -h, --help              Show this help message
+  -v, --version           Print the version
+  --demo                  Launch with demo data
+  --clear-cache           Reset config to defaults
+  --reindex               Rebuild the session store index
+
+Environment:
+  DISPATCH_DB             Path to a custom session store database
+  DISPATCH_LOG            Path to a log file (enables debug logging)
+`, tui.Version)
 }
 
 // findDemoDB looks for the fake session store in two places:
