@@ -412,18 +412,21 @@ import Screenshot from '../components/Screenshot.astro';
     <section class="section" id="maintenance">
       <div class="feature-section reverse">
         <div class="feature-text">
-          <h2>Maintenance Commands</h2>
+          <h2>CLI Commands</h2>
           <p>
-            Two maintenance subcommands for database and configuration upkeep.
+            Built-in commands for maintenance, diagnostics, self-update, and help.
           </p>
           <ul>
+            <li><code>dispatch update</code> — Update dispatch to the latest release. Downloads the newest binary from GitHub Releases and replaces the current installation in-place.</li>
+            <li><code>dispatch --help</code> / <code>-h</code> / <code>help</code> — Show usage information with all available flags and environment variables.</li>
+            <li><code>dispatch --version</code> / <code>-v</code> / <code>version</code> — Print the installed version and exit.</li>
             <li><code>dispatch --reindex</code> — Full chronicle reindex via Copilot CLI pseudo-terminal. Rebuilds sessions, turns, checkpoints, files, and refs. Falls back to FTS5 index maintenance if the CLI binary is not found.</li>
             <li><code>dispatch --clear-cache</code> — Reset all configuration to defaults.</li>
           </ul>
         </div>
         <div class="feature-text">
           <p class="text-only-note">
-            Both commands run non-interactively and exit immediately.
+            A background update check runs on every launch and notifies you when a new version is available. All commands run non-interactively and exit immediately. Unknown flags print an error with usage help and exit with code 1.
           </p>
         </div>
       </div>

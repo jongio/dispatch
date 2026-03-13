@@ -35,6 +35,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Windows Terminal theme detection** — inherits the active terminal color scheme
 - **Refresh** (`r`) — reload the session store without restarting
 - **Demo mode** — `dispatch --demo` with synthetic data for experimentation
+- **Self-update** — `dispatch update` checks GitHub Releases and upgrades in-place; background update check notifies on new versions
 - **Maintenance** — `--reindex` (full chronicle reindex via Copilot CLI PTY), `--clear-cache` (reset config)
 - **Cross-platform** — Windows (amd64/arm64), macOS (amd64/arm64), Linux (amd64/arm64)
 
@@ -278,15 +279,23 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 
 | Flag | Description |
 |---|---|
+| `--help`, `-h`, `help` | Show usage information |
+| `--version`, `-v`, `version` | Print the version and exit |
+| `update` | Update dispatch to the latest release |
 | `--demo` | Load a demo database with synthetic sessions |
 | `--reindex` | Full chronicle reindex via Copilot CLI (falls back to FTS5 rebuild) |
 | `--clear-cache` | Reset all configuration to defaults |
+
+A background update check runs on every launch and notifies you when a new version is available.
+
+Unknown flags print an error message with usage help and exit with code 1.
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
+| `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 
 ## Shell Aliases
 
