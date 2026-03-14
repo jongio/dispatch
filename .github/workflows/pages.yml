@@ -8,6 +8,7 @@ on:
       - 'README.md'
       - 'CHANGELOG.md'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

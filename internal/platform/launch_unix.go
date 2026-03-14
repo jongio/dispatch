@@ -41,6 +41,7 @@ func filterEnv(env []string) []string {
 	return result
 }
 
+//nolint:unused // Referenced via build-tagged launch paths; Windows keeps a stub with the same symbol.
 func launchInPlaceUnix(shell ShellInfo, resumeCmd string, cwd string) error {
 	if cwd != "" {
 		// Best-effort: change directory before exec replaces the process.
@@ -48,7 +49,8 @@ func launchInPlaceUnix(shell ShellInfo, resumeCmd string, cwd string) error {
 		_ = os.Chdir(cwd)
 	}
 
-	argv := []string{shell.Path}
+	argv := make([]string, 0, 1+len(shell.Args)+2)
+	argv = append(argv, shell.Path)
 	argv = append(argv, shell.Args...)
 	argv = append(argv, "-c", resumeCmd)
 

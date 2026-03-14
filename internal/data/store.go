@@ -32,6 +32,9 @@ const (
 
 	// limitClause is the SQL fragment appended to queries with a row cap.
 	limitClause = " LIMIT ?"
+
+	// coalesceCwd normalizes NULL session directories to empty strings.
+	coalesceCwd = "COALESCE(s.cwd, '')"
 )
 
 // Store provides read-only access to the Copilot CLI session store.
@@ -288,7 +291,7 @@ func pivotExpr(p PivotField) string {
 	case PivotByDate:
 		return "SUBSTR(" + lastActiveExpr + ", 1, 10)"
 	default: // PivotByFolder and any unknown value
-		return "COALESCE(s.cwd, '')"
+		return coalesceCwd
 	}
 }
 
@@ -296,7 +299,7 @@ func pivotExpr(p PivotField) string {
 // last_active_at is computed as the most recent turn timestamp, falling
 // back to updated_at then created_at so that reindex-clobbered dates
 // don't make old sessions appear recent.
-var sessionColumns = `s.id, COALESCE(s.cwd,''), COALESCE(s.repository,''), COALESCE(s.branch,''),
+var sessionColumns = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), COALESCE(s.branch,''),
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
 	` + lastActiveExpr + ` AS last_active_at,
 	(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turn_count,

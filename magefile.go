@@ -131,26 +131,27 @@ func Build() error {
 	return nil
 }
 
-// Preflight runs all pre-commit checks: format, tidy, vet, lint, build, test,
-// race detection, WSL tests, vulnerability scan, strict formatting, dead code
-// detection, and install verification. If preflight passes, CI will pass.
+// Preflight runs all pre-commit checks: format, tidy, vet, lint, WSL lint,
+// build, test, race detection, WSL tests, vulnerability scan, strict
+// formatting, dead code detection, and install verification. If preflight
+// passes, CI will pass.
 func Preflight() error {
-	fmt.Println("\n=== 1/12 Formatting ===")
+	fmt.Println("\n=== 1/13 Formatting ===")
 	if err := fmtSources(); err != nil {
 		return fmt.Errorf("format: %w", err)
 	}
 
-	fmt.Println("\n=== 2/12 Tidying modules ===")
+	fmt.Println("\n=== 2/13 Tidying modules ===")
 	if err := run("go", "mod", "tidy"); err != nil {
 		return fmt.Errorf("mod tidy: %w", err)
 	}
 
-	fmt.Println("\n=== 3/12 Vetting ===")
+	fmt.Println("\n=== 3/13 Vetting ===")
 	if err := run("go", "vet", "./..."); err != nil {
 		return fmt.Errorf("vet: %w", err)
 	}
 
-	fmt.Println("\n=== 4/12 Linting ===")
+	fmt.Println("\n=== 4/13 Linting ===")
 	if _, err := exec.LookPath("golangci-lint"); err == nil {
 		if out, err := cmdOutput("golangci-lint", "version"); err == nil {
 			if !strings.Contains(out, "golangci-lint has version 2.") {
@@ -160,31 +161,49 @@ func Preflight() error {
 		if err := run("golangci-lint", "run"); err != nil {
 			return fmt.Errorf("lint: %w", err)
 		}
+		fmt.Println("   Attempting GOOS=linux lint to catch Linux-only files seen in CI")
+		if err := runWithEnv(map[string]string{"GOOS": "linux"}, "golangci-lint", "run"); err != nil {
+			fmt.Printf("   WARNING: GOOS=linux golangci-lint run failed on %s: %v\n", runtime.GOOS, err)
+		}
 	} else {
 		fmt.Println("   Skipped (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
 	}
 
-	fmt.Println("\n=== 5/12 Building ===")
+	fmt.Println("\n=== 5/13 Linting (WSL / Linux) ===")
+	if _, err := exec.LookPath("wsl"); err == nil {
+		wslPath, err := windowsToWSLPath(projectDir())
+		if err != nil {
+			return fmt.Errorf("WSL path conversion: %w", err)
+		}
+		cmd := fmt.Sprintf("cd %s && golangci-lint run", wslPath)
+		if err := run("wsl", "bash", "-c", cmd); err != nil {
+			return fmt.Errorf("WSL lint: %w", err)
+		}
+	} else {
+		fmt.Println("   Skipped (WSL not available)")
+	}
+
+	fmt.Println("\n=== 6/13 Building ===")
 	if err := run("go", "build", "./..."); err != nil {
 		return fmt.Errorf("build: %w", err)
 	}
 
-	fmt.Println("\n=== 6/12 Testing ===")
+	fmt.Println("\n=== 7/13 Testing ===")
 	if err := run("go", "test", "./...", "-count=1"); err != nil {
 		return fmt.Errorf("test: %w", err)
 	}
 
-	fmt.Println("\n=== 7/12 Testing (race detector) ===")
+	fmt.Println("\n=== 8/13 Testing (race detector) ===")
 	if err := run("go", "test", "-race", "./...", "-count=1"); err != nil {
 		return fmt.Errorf("race test: %w", err)
 	}
 
-	fmt.Println("\n=== 8/12 Testing (WSL) ===")
+	fmt.Println("\n=== 9/13 Testing (WSL) ===")
 	if err := TestWSL(); err != nil {
 		return fmt.Errorf("WSL test: %w", err)
 	}
 
-	fmt.Println("\n=== 9/12 Vulnerability scan ===")
+	fmt.Println("\n=== 10/13 Vulnerability scan ===")
 	if _, err := exec.LookPath("govulncheck"); err == nil {
 		if err := run("govulncheck", "./..."); err != nil {
 			return fmt.Errorf("vulncheck: %w", err)
@@ -193,7 +212,7 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install golang.org/x/vuln/cmd/govulncheck@latest)")
 	}
 
-	fmt.Println("\n=== 10/12 Strict formatting (gofumpt) ===")
+	fmt.Println("\n=== 11/13 Strict formatting (gofumpt) ===")
 	if _, err := exec.LookPath("gofumpt"); err == nil {
 		out, _ := cmdOutput("gofumpt", "-l", ".")
 		if files := strings.TrimSpace(out); files != "" {
@@ -203,7 +222,7 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install mvdan.cc/gofumpt@latest)")
 	}
 
-	fmt.Println("\n=== 11/12 Dead code detection ===")
+	fmt.Println("\n=== 12/13 Dead code detection ===")
 	if _, err := exec.LookPath("deadcode"); err == nil {
 		if err := runDeadcode(); err != nil {
 			return err
@@ -212,12 +231,12 @@ func Preflight() error {
 		fmt.Println("   Skipped (install: go install golang.org/x/tools/cmd/deadcode@latest)")
 	}
 
-	fmt.Println("\n=== 12/12 Install verification ===")
+	fmt.Println("\n=== 13/13 Install verification ===")
 	if err := Install(); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
 
-	fmt.Println("\n=== All 12/12 preflight checks passed — ready to commit ===")
+	fmt.Println("\n=== All 13/13 preflight checks passed — ready to commit ===")
 	return nil
 }
 
@@ -431,6 +450,18 @@ func run(name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = projectDir()
+	return cmd.Run()
+}
+
+func runWithEnv(env map[string]string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = projectDir()
+	cmd.Env = os.Environ()
+	for key, value := range env {
+		cmd.Env = append(cmd.Env, key+"="+value)
+	}
 	return cmd.Run()
 }
 
