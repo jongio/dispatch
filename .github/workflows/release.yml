@@ -3,10 +3,14 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Release version (e.g., 0.2.0 — without 'v' prefix)"
+      bump:
+        description: "Release type"
         required: true
-        type: string
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 concurrency:
   group: release
@@ -35,12 +39,47 @@ jobs:
 
       - uses: anchore/sbom-action/download-syft@e11c554f704a0b820cbf8c51673f6945e0731532 # v0
 
+      - name: Compute next version
+        id: version
+        run: |
+          # Get the latest semver tag, default to v0.0.0 if none exists
+          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+
+          # Strip the leading 'v'
+          CURRENT="${LATEST#v}"
+
+          # Split into major.minor.patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          # Bump based on input
+          case "${{ inputs.bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEXT="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "Bumping ${CURRENT} -> ${NEXT} (${{ inputs.bump }})"
+
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ inputs.version }}" -m "v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
 
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
