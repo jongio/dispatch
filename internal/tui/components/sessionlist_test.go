@@ -329,3 +329,158 @@ func TestSelectionClearedOnSetGroups(t *testing.T) {
 		t.Fatalf("SelectionCount after SetGroups = %d, want 0", sl.SelectionCount())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// FindNextWaiting tests
+// ---------------------------------------------------------------------------
+
+func TestFindNextWaiting_NoItems(t *testing.T) {
+	sl := NewSessionList()
+	attMap := map[string]data.AttentionStatus{}
+	if got := sl.FindNextWaiting(attMap); got != -1 {
+		t.Fatalf("FindNextWaiting on empty list = %d, want -1", got)
+	}
+}
+
+func TestFindNextWaiting_NoneWaiting(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(5)
+	sl.SetSessions(sessions)
+
+	attMap := map[string]data.AttentionStatus{
+		sessions[0].ID: data.AttentionIdle,
+		sessions[1].ID: data.AttentionActive,
+		sessions[2].ID: data.AttentionStale,
+	}
+	if got := sl.FindNextWaiting(attMap); got != -1 {
+		t.Fatalf("FindNextWaiting with no waiting sessions = %d, want -1", got)
+	}
+}
+
+func TestFindNextWaiting_ForwardWrap(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(5)
+	sl.SetSessions(sessions)
+
+	// Mark session 1 as waiting.
+	attMap := map[string]data.AttentionStatus{
+		sessions[1].ID: data.AttentionWaiting,
+	}
+
+	// Cursor at 0, next waiting should be index 1.
+	sl.MoveTo(0)
+	if got := sl.FindNextWaiting(attMap); got != 1 {
+		t.Fatalf("FindNextWaiting from 0 = %d, want 1", got)
+	}
+
+	// Cursor at 3, should wrap around to index 1.
+	sl.MoveTo(3)
+	if got := sl.FindNextWaiting(attMap); got != 1 {
+		t.Fatalf("FindNextWaiting from 3 (wrap) = %d, want 1", got)
+	}
+}
+
+func TestFindNextWaiting_SkipsFolders(t *testing.T) {
+	sl := NewSessionList()
+	groups := makeGroups(2, 3) // 2 folders × 3 sessions = 8 visible items
+	sl.SetSessions(nil)        // ensure clean state
+	sl.SetGroups(groups)
+
+	// Mark the last session in the second group as waiting.
+	lastSess := groups[1].Sessions[2]
+	attMap := map[string]data.AttentionStatus{
+		lastSess.ID: data.AttentionWaiting,
+	}
+
+	sl.MoveTo(0) // cursor on first folder
+	got := sl.FindNextWaiting(attMap)
+	if got < 0 {
+		t.Fatal("FindNextWaiting should find the waiting session, got -1")
+	}
+
+	// Verify it found the right session.
+	item := sl.allItems[sl.visItems[got]]
+	if item.isFolder {
+		t.Fatal("FindNextWaiting should not land on a folder")
+	}
+	if item.session.ID != lastSess.ID {
+		t.Errorf("found session ID = %q, want %q", item.session.ID, lastSess.ID)
+	}
+}
+
+func TestFindNextWaiting_MultipleWaiting(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(5)
+	sl.SetSessions(sessions)
+
+	// Mark sessions 1 and 3 as waiting.
+	attMap := map[string]data.AttentionStatus{
+		sessions[1].ID: data.AttentionWaiting,
+		sessions[3].ID: data.AttentionWaiting,
+	}
+
+	// From 0, should find 1 (nearest forward).
+	sl.MoveTo(0)
+	if got := sl.FindNextWaiting(attMap); got != 1 {
+		t.Fatalf("FindNextWaiting from 0 = %d, want 1", got)
+	}
+
+	// From 1, should find 3 (skip current, go forward).
+	sl.MoveTo(1)
+	if got := sl.FindNextWaiting(attMap); got != 3 {
+		t.Fatalf("FindNextWaiting from 1 = %d, want 3", got)
+	}
+
+	// From 3, should wrap to 1.
+	sl.MoveTo(3)
+	if got := sl.FindNextWaiting(attMap); got != 1 {
+		t.Fatalf("FindNextWaiting from 3 = %d, want 1", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// attentionDot tests (via SetAttentionStatuses + View)
+// ---------------------------------------------------------------------------
+
+func TestAttentionDotRendering(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(3)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	// No attention data → dots should be spaces.
+	view := sl.View()
+	if view == "" {
+		t.Fatal("View() returned empty string")
+	}
+
+	// Set attention statuses and verify View still produces correct line count.
+	attMap := map[string]data.AttentionStatus{
+		sessions[0].ID: data.AttentionWaiting,
+		sessions[1].ID: data.AttentionActive,
+		sessions[2].ID: data.AttentionIdle,
+	}
+	sl.SetAttentionStatuses(attMap)
+	view = sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("View() has %d lines, want 10", len(lines))
+	}
+}
+
+func TestAttentionDotNilMap(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(3)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	// Explicitly set nil attention map.
+	sl.SetAttentionStatuses(nil)
+
+	// Should render without panic.
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("View() with nil attentionMap has %d lines, want 10", len(lines))
+	}
+}

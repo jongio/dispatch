@@ -564,6 +564,46 @@ func TestBuildResumeCommandString_EmptyCustomCommand(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// buildStartCmdLine — default (bash) path quoting
+// ---------------------------------------------------------------------------
+
+func TestBuildStartCmdLine_DefaultPathQuotesResumeCmd(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("buildStartCmdLine is only used on Windows")
+	}
+	// Git Bash shell hits the default path in buildStartCmdLine.
+	// The resume command must be wrapped in double quotes so cmd.exe
+	// does not interpret shell metacharacters before bash receives them.
+	shell := ShellInfo{Name: "Git Bash", Path: `C:\Program Files\Git\bin\bash.exe`, Args: []string{"--login"}}
+	resumeCmd := `ghcs --resume sess-123`
+	got := buildStartCmdLine(shell, resumeCmd)
+
+	// The resume command should be double-quoted (cmdQuote) after -c.
+	expected := ` -c "` + resumeCmd + `"`
+	if !strings.Contains(got, expected) {
+		t.Errorf("buildStartCmdLine default path should cmdQuote resumeCmd;\ngot:  %s\nwant substring: %s", got, expected)
+	}
+}
+
+func TestBuildStartCmdLine_DefaultPathEscapesMetachars(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("buildStartCmdLine is only used on Windows")
+	}
+	shell := ShellInfo{Name: "WSL", Path: `C:\Windows\System32\wsl.exe`}
+	// Simulate a resume command containing cmd.exe metacharacters
+	// (this wouldn't normally happen with validated session IDs, but
+	// is a defense-in-depth test for custom commands).
+	resumeCmd := `ghcs --resume safe-id & echo injected`
+	got := buildStartCmdLine(shell, resumeCmd)
+
+	// The & must be inside double quotes so cmd.exe does not interpret it
+	// as a command separator.
+	if !strings.Contains(got, `"ghcs --resume safe-id & echo injected"`) {
+		t.Errorf("buildStartCmdLine should wrap entire resumeCmd in quotes;\ngot: %s", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
 

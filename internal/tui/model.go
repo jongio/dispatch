@@ -1847,9 +1847,19 @@ func (m *Model) launchMultipleWithMode(mode string) tea.Cmd {
 	return m.batchLaunchSessions(sessions, mode)
 }
 
+// maxBatchLaunch is the maximum number of sessions that can be launched
+// simultaneously via multi-select. This prevents accidental resource
+// exhaustion when a user selects hundreds of sessions.
+const maxBatchLaunch = 50
+
 // batchLaunchSessions builds launch commands for each session, clears the
-// selection state, and returns a tea.Batch of all commands.
+// selection state, and returns a tea.Batch of all commands. At most
+// maxBatchLaunch sessions are launched to prevent resource exhaustion.
 func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cmd {
+	if len(sessions) > maxBatchLaunch {
+		sessions = sessions[:maxBatchLaunch]
+		m.statusInfo = fmt.Sprintf("Launching first %d sessions (limit)", maxBatchLaunch)
+	}
 	var cmds []tea.Cmd
 	for _, sess := range sessions {
 		cmd := m.resolveShellAndLaunchDirect(sess.ID, sess.Cwd, mode)

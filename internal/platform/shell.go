@@ -504,8 +504,13 @@ func buildStartCmdLine(shell ShellInfo, resumeCmd string) string {
 		cmdLine.WriteString(` /k `)
 		cmdLine.WriteString(cmdEscape(resumeCmd))
 	default:
+		// For bash-like shells launched through cmd.exe /c start, wrap
+		// resumeCmd in cmdQuote (double quotes) so cmd.exe passes it as
+		// a single argument to the shell's -c flag. Without quoting,
+		// cmd.exe would interpret metacharacters (&, |, >) in the
+		// resume command before the shell receives them.
 		cmdLine.WriteString(` -c `)
-		cmdLine.WriteString(resumeCmd)
+		cmdLine.WriteString(cmdQuote(resumeCmd))
 	}
 
 	return cmdLine.String()

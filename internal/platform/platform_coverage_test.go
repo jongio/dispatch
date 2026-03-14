@@ -1228,7 +1228,7 @@ func TestCovLaunchSession_FallbackPath(t *testing.T) {
 			name:   "bash shell with args",
 			shell:  ShellInfo{Path: `/usr/bin/bash`, Name: "bash", Args: []string{"--login"}},
 			resume: "echo hello",
-			want:   `cmd.exe /c start "" "/usr/bin/bash" --login -c echo hello`,
+			want:   `cmd.exe /c start "" "/usr/bin/bash" --login -c "echo hello"`,
 		},
 	}
 	for _, tt := range tests {

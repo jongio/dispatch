@@ -625,8 +625,11 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 // the attention status of the given session. If no attention data is available
 // the dot is omitted but the space is preserved for alignment.
 func (s SessionList) attentionDot(sessionID string) string {
+	if s.attentionMap == nil {
+		return "  "
+	}
 	status, ok := s.attentionMap[sessionID]
-	if !ok || s.attentionMap == nil {
+	if !ok {
 		return "  "
 	}
 	switch status {
