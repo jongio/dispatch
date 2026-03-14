@@ -1,0 +1,40 @@
+---
+interface Row {
+  name: string;
+  description: string;
+}
+
+interface Props {
+  rows: Row[];
+}
+
+const { rows } = Astro.props;
+---
+
+<table>
+  <thead>
+    <tr>
+      <th>Command / Flag</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map(row => (
+      <tr>
+        <td><code>{row.name}</code></td>
+        <td>{row.description}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+<style>
+  table {
+    margin-bottom: var(--space-2);
+  }
+
+  td:first-child {
+    white-space: nowrap;
+    width: 14rem;
+  }
+</style>

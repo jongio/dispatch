@@ -1,0 +1,98 @@
+---
+import Base from '../layouts/Base.astro';
+import CliTable from '../components/CliTable.astro';
+---
+
+<Base title="CLI Reference — Dispatch">
+  <div class="page-header">
+    <div class="container">
+      <h1>CLI Reference</h1>
+      <p>Commands, flags, and environment variables.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="page-with-toc">
+        <div>
+          <div id="usage" class="shortcut-group">
+            <h3>Usage</h3>
+            <pre><code>dispatch [command | flag]</code></pre>
+            <p>Running <code>dispatch</code> with no arguments launches the interactive TUI.</p>
+          </div>
+
+          <div id="commands" class="shortcut-group">
+            <h3>Commands</h3>
+            <CliTable rows={[
+              { name: 'help', description: 'Show usage information and exit.' },
+              { name: 'version', description: 'Print the version number and exit.' },
+              { name: 'update', description: 'Check GitHub Releases for a newer version and upgrade in-place.' },
+            ]} />
+          </div>
+
+          <div id="flags" class="shortcut-group">
+            <h3>Flags</h3>
+            <CliTable rows={[
+              { name: '-h, --help', description: 'Show usage information and exit.' },
+              { name: '-v, --version', description: 'Print the version number and exit.' },
+              { name: '--demo', description: 'Launch with a demo database of synthetic sessions.' },
+              { name: '--clear-cache', description: 'Reset all configuration to defaults.' },
+              { name: '--reindex', description: 'Rebuild the session store index via Copilot CLI.' },
+            ]} />
+          </div>
+
+          <div id="environment" class="shortcut-group">
+            <h3>Environment Variables</h3>
+            <CliTable rows={[
+              { name: 'DISPATCH_DB', description: 'Path to a custom session store database.' },
+              { name: 'DISPATCH_LOG', description: 'Path to a log file. Enables debug logging when set.' },
+            ]} />
+          </div>
+
+          <div id="examples" class="shortcut-group">
+            <h3>Examples</h3>
+            <pre><code>{`# Launch the TUI
+dispatch
+
+# Check for updates
+dispatch update
+
+# Try with demo data
+dispatch --demo
+
+# Use a custom database
+DISPATCH_DB=~/my-sessions.db dispatch
+
+# Enable debug logging
+DISPATCH_LOG=/tmp/dispatch.log dispatch
+
+# Reset config and reindex
+dispatch --clear-cache
+dispatch --reindex`}</code></pre>
+          </div>
+        </div>
+
+        <aside class="toc">
+          <div class="toc-title">On this page</div>
+          <ul class="toc-list">
+            <li><a href="#usage">Usage</a></li>
+            <li><a href="#commands">Commands</a></li>
+            <li><a href="#flags">Flags</a></li>
+            <li><a href="#environment">Environment</a></li>
+            <li><a href="#examples">Examples</a></li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  p {
+    margin-bottom: var(--space-4);
+  }
+
+  pre {
+    margin-bottom: var(--space-4);
+  }
+</style>
