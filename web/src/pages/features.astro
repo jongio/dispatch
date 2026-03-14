@@ -189,6 +189,37 @@ import Screenshot from '../components/Screenshot.astro';
       </div>
     </section>
 
+    <!-- Multi-Session Open -->
+    <section class="section" id="multi-open">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Multi-Session Open</h2>
+          <p>
+            Select multiple sessions with <kbd>Space</kbd>, then open them all
+            at once with <kbd>Shift+Enter</kbd>. Use <kbd>Ctrl</kbd>+click for
+            mouse selection, or <kbd>Shift</kbd>+click for range select. Works
+            with folders too — <kbd>Shift+Enter</kbd> on a folder opens every
+            session under it.
+          </p>
+          <ul>
+            <li><kbd>Space</kbd> toggles selection on the current session (✓ indicator)</li>
+            <li><kbd>a</kbd> selects all visible sessions</li>
+            <li><kbd>d</kbd> deselects all</li>
+            <li><kbd>Shift+Enter</kbd> opens all selected sessions, or all in a folder</li>
+            <li>Selection count shown in footer</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Selected sessions are marked with a ✓ indicator. When no sessions
+            are explicitly selected, Shift+Enter on a folder opens every session
+            beneath it. No screenshot — the result is multiple Copilot CLI
+            sessions opening simultaneously.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- Session Hiding -->
     <section class="section" id="hiding">
       <div class="feature-section reverse">

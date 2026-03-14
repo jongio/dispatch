@@ -36,18 +36,22 @@ type keyMap struct {
 	PreviewScrollDown key.Binding
 	JumpNextAttention key.Binding
 	FilterAttention   key.Binding
+	LaunchAll         key.Binding
+	SelectAll         key.Binding
+	DeselectAll       key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
-		{k.Search, k.Escape, k.Filter, k.Space},
+		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
+		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot},
 		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.Reindex, k.Config},
 		{k.Hide, k.ToggleHidden, k.JumpNextAttention, k.FilterAttention},
@@ -62,7 +66,7 @@ var keys = keyMap{
 	Left:              key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "collapse")),
 	Right:             key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "expand")),
 	Enter:             key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "launch/toggle")),
-	Space:             key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "select")),
+	Space:             key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle select")),
 	Quit:              key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 	ForceQuit:         key.NewBinding(key.WithKeys("ctrl+c")),
 	Search:            key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
@@ -88,4 +92,7 @@ var keys = keyMap{
 	PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
 	JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
 	FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "waiting only")),
+	LaunchAll:         key.NewBinding(key.WithKeys("shift+enter"), key.WithHelp("⇧⏎", "open selected")),
+	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
+	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 }

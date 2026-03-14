@@ -146,3 +146,186 @@ func stripAnsi(s string) string {
 	}
 	return b.String()
 }
+
+// ---------------------------------------------------------------------------
+// Multi-select tests
+// ---------------------------------------------------------------------------
+
+func TestToggleSelected(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	// Cursor starts at 0; toggle should select it.
+	if !sl.ToggleSelected() {
+		t.Fatal("ToggleSelected on session should return true")
+	}
+	sess, _ := sl.Selected()
+	if !sl.IsSelected(sess.ID) {
+		t.Fatal("session should be selected after toggle")
+	}
+	if sl.SelectionCount() != 1 {
+		t.Fatalf("SelectionCount = %d, want 1", sl.SelectionCount())
+	}
+
+	// Toggle again should deselect.
+	if !sl.ToggleSelected() {
+		t.Fatal("second ToggleSelected should return true")
+	}
+	if sl.IsSelected(sess.ID) {
+		t.Fatal("session should be deselected after second toggle")
+	}
+	if sl.SelectionCount() != 0 {
+		t.Fatalf("SelectionCount = %d, want 0", sl.SelectionCount())
+	}
+}
+
+func TestToggleSelectedOnFolder(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(2, 3))
+	// Cursor starts at 0 which is a folder row.
+	if sl.ToggleSelected() {
+		t.Fatal("ToggleSelected on folder should return false")
+	}
+	if sl.SelectionCount() != 0 {
+		t.Fatal("no sessions should be selected after toggling a folder")
+	}
+}
+
+func TestSelectAll(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(2, 3))
+
+	sl.SelectAll()
+
+	// Should select all 6 sessions (2 groups × 3), NOT the 2 folder items.
+	if sl.SelectionCount() != 6 {
+		t.Fatalf("SelectionCount = %d, want 6", sl.SelectionCount())
+	}
+	// Verify no folder IDs leaked in.
+	for _, vi := range sl.visItems {
+		item := sl.allItems[vi]
+		if item.isFolder && sl.IsSelected(item.folderPath) {
+			t.Fatal("folder should not be in selected set")
+		}
+	}
+}
+
+func TestDeselectAll(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	sl.SelectAll()
+	if sl.SelectionCount() == 0 {
+		t.Fatal("precondition: should have selections")
+	}
+
+	sl.DeselectAll()
+	if sl.SelectionCount() != 0 {
+		t.Fatalf("SelectionCount after DeselectAll = %d, want 0", sl.SelectionCount())
+	}
+}
+
+func TestSelectedSessions(t *testing.T) {
+	sl := NewSessionList()
+	sessions := makeSessions(5)
+	sl.SetSessions(sessions)
+
+	// No selection → nil.
+	if got := sl.SelectedSessions(); got != nil {
+		t.Fatalf("SelectedSessions with no selection = %v, want nil", got)
+	}
+
+	// Select items 0 and 2 (by moving cursor and toggling).
+	sl.MoveTo(0)
+	sl.ToggleSelected()
+	sl.MoveTo(2)
+	sl.ToggleSelected()
+
+	got := sl.SelectedSessions()
+	if len(got) != 2 {
+		t.Fatalf("len(SelectedSessions) = %d, want 2", len(got))
+	}
+	// They should be in display order (index 0 before index 2).
+	if got[0].ID != sessions[0].ID {
+		t.Errorf("SelectedSessions[0].ID = %q, want %q", got[0].ID, sessions[0].ID)
+	}
+	if got[1].ID != sessions[2].ID {
+		t.Errorf("SelectedSessions[1].ID = %q, want %q", got[1].ID, sessions[2].ID)
+	}
+}
+
+func TestSelectionCount(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(10))
+
+	if sl.SelectionCount() != 0 {
+		t.Fatal("initial SelectionCount should be 0")
+	}
+
+	sl.MoveTo(1)
+	sl.ToggleSelected()
+	sl.MoveTo(3)
+	sl.ToggleSelected()
+	sl.MoveTo(7)
+	sl.ToggleSelected()
+
+	if sl.SelectionCount() != 3 {
+		t.Fatalf("SelectionCount = %d, want 3", sl.SelectionCount())
+	}
+}
+
+func TestFolderSessions(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(3, 4))
+
+	// Cursor at 0 → first folder.
+	sl.MoveTo(0)
+	got := sl.FolderSessions()
+	if len(got) != 4 {
+		t.Fatalf("FolderSessions for first folder: len = %d, want 4", len(got))
+	}
+
+	// Move to a session row (index 1 is first session under first folder).
+	sl.MoveTo(1)
+	if sl.FolderSessions() != nil {
+		t.Fatal("FolderSessions on session row should return nil")
+	}
+}
+
+func TestFolderSessionsEmpty(t *testing.T) {
+	sl := NewSessionList()
+	// Empty list → should not panic, return nil.
+	if sl.FolderSessions() != nil {
+		t.Fatal("FolderSessions on empty list should return nil")
+	}
+}
+
+func TestSelectionClearedOnSetSessions(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+	sl.SelectAll()
+	if sl.SelectionCount() == 0 {
+		t.Fatal("precondition: should have selections")
+	}
+
+	// Refresh data.
+	sl.SetSessions(makeSessions(3))
+	if sl.SelectionCount() != 0 {
+		t.Fatalf("SelectionCount after SetSessions = %d, want 0", sl.SelectionCount())
+	}
+}
+
+func TestSelectionClearedOnSetGroups(t *testing.T) {
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(2, 3))
+	sl.SelectAll()
+	if sl.SelectionCount() == 0 {
+		t.Fatal("precondition: should have selections")
+	}
+
+	// Refresh data.
+	sl.SetGroups(makeGroups(1, 2))
+	if sl.SelectionCount() != 0 {
+		t.Fatalf("SelectionCount after SetGroups = %d, want 0", sl.SelectionCount())
+	}
+}

@@ -868,18 +868,27 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.LaunchWindow):
 		if !m.sessionList.IsFolderSelected() {
+			if m.sessionList.SelectionCount() > 0 {
+				return m, m.launchMultipleWithMode(config.LaunchModeWindow)
+			}
 			return m, m.launchWithMode(config.LaunchModeWindow)
 		}
 		return m, nil
 
 	case key.Matches(msg, keys.LaunchTab):
 		if !m.sessionList.IsFolderSelected() {
+			if m.sessionList.SelectionCount() > 0 {
+				return m, m.launchMultipleWithMode(config.LaunchModeTab)
+			}
 			return m, m.launchWithMode(config.LaunchModeTab)
 		}
 		return m, nil
 
 	case key.Matches(msg, keys.LaunchPane):
 		if !m.sessionList.IsFolderSelected() {
+			if m.sessionList.SelectionCount() > 0 {
+				return m, m.launchMultipleWithMode(config.LaunchModePane)
+			}
 			return m, m.launchWithMode(config.LaunchModePane)
 		}
 		return m, nil
@@ -969,6 +978,24 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FilterAttention):
 		m.attentionFilter = !m.attentionFilter
 		return m, m.loadSessionsCmd()
+
+	case key.Matches(msg, keys.Space):
+		m.sessionList.ToggleSelected()
+		m.updateSelectionStatus()
+		return m, nil
+
+	case key.Matches(msg, keys.LaunchAll):
+		return m, m.launchMultiple()
+
+	case key.Matches(msg, keys.SelectAll):
+		m.sessionList.SelectAll()
+		m.updateSelectionStatus()
+		return m, nil
+
+	case key.Matches(msg, keys.DeselectAll):
+		m.sessionList.DeselectAll()
+		m.statusInfo = ""
+		return m, nil
 	}
 
 	return m, nil
@@ -1162,7 +1189,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 				return m, m.launchNewSession(cwd, mode)
 			}
-			// Double-click session: launch it.
+			// Double-click session: if it's part of a multi-selection,
+			// launch all selected. Otherwise launch just this session.
+			if m.sessionList.SelectionCount() > 0 && m.sessionList.IsSelected(m.selectedSessionID()) {
+				return m, m.launchMultiple()
+			}
 			if msg.Ctrl {
 				return m, m.launchWithMode(config.LaunchModeWindow)
 			}
@@ -1170,6 +1201,15 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				return m, m.launchWithMode(config.LaunchModeTab)
 			}
 			return m, m.launchSelected()
+		}
+
+		// Ctrl+click: toggle multi-select immediately (no deferred action).
+		if msg.Ctrl {
+			m.sessionList.MoveTo(itemIdx)
+			m.sessionList.ToggleSelected()
+			m.updateSelectionStatus()
+			m.detailVersion++
+			return m, m.loadSelectedDetailCmd()
 		}
 
 		// First click — defer the single-click action behind a timer so
@@ -1766,6 +1806,76 @@ func (m *Model) launchSelected() tea.Cmd {
 	return m.launchWithMode(m.cfg.EffectiveLaunchMode())
 }
 
+// launchMultiple opens multiple sessions at once. It resolves which sessions
+// to open based on the current state:
+//  1. If sessions are explicitly selected (checkmarked), open those.
+//  2. Else if cursor is on a folder, open all sessions under that folder.
+//  3. Else fall back to opening the single cursor session (same as Enter).
+//
+// In-place launch mode is not supported for multi-open; external mode is forced.
+func (m *Model) launchMultiple() tea.Cmd {
+	var sessions []data.Session
+
+	if sel := m.sessionList.SelectedSessions(); len(sel) > 0 {
+		sessions = sel
+	} else if m.sessionList.IsFolderSelected() {
+		sessions = m.sessionList.FolderSessions()
+	} else {
+		// No selections, not on folder — just launch cursor session.
+		return m.launchSelected()
+	}
+
+	if len(sessions) == 0 {
+		return nil
+	}
+
+	// Force external launch (never in-place for multi-open).
+	mode := m.cfg.EffectiveLaunchMode()
+	if mode == config.LaunchModeInPlace {
+		mode = config.LaunchModeTab
+	}
+
+	return m.batchLaunchSessions(sessions, mode)
+}
+
+// launchMultipleWithMode opens all selected sessions with the given launch mode.
+func (m *Model) launchMultipleWithMode(mode string) tea.Cmd {
+	sessions := m.sessionList.SelectedSessions()
+	if len(sessions) == 0 {
+		return nil
+	}
+	return m.batchLaunchSessions(sessions, mode)
+}
+
+// batchLaunchSessions builds launch commands for each session, clears the
+// selection state, and returns a tea.Batch of all commands.
+func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cmd {
+	var cmds []tea.Cmd
+	for _, sess := range sessions {
+		cmd := m.resolveShellAndLaunchDirect(sess.ID, sess.Cwd, mode)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	m.sessionList.DeselectAll()
+	m.statusInfo = ""
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+// updateSelectionStatus sets the status bar to reflect the current selection count.
+func (m *Model) updateSelectionStatus() {
+	if n := m.sessionList.SelectionCount(); n > 0 {
+		m.statusInfo = fmt.Sprintf("%d selected — ⇧⏎ to open", n)
+	} else {
+		m.statusInfo = ""
+	}
+}
+
 // launchNewSession opens a fresh copilot session (no --resume) in the given cwd.
 func (m *Model) launchNewSession(cwd, mode string) tea.Cmd {
 	if mode == config.LaunchModeInPlace {
@@ -1818,6 +1928,25 @@ func (m *Model) findShellByName(name string) platform.ShellInfo {
 		}
 	}
 	return platform.DefaultShell()
+}
+
+// resolveShellAndLaunchDirect launches a session without showing the shell
+// picker overlay. It uses the configured default shell, or the first available
+// shell, or the platform default. Used for multi-session batch launches where
+// showing an interactive picker per-session is impractical.
+func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd {
+	launchStyle := launchStyleForMode(mode)
+
+	var sh platform.ShellInfo
+	if m.cfg.DefaultShell != "" {
+		sh = m.findShellByName(m.cfg.DefaultShell)
+	} else if len(m.shells) > 0 {
+		sh = m.shells[0]
+	} else {
+		sh = platform.DefaultShell()
+	}
+
+	return m.launchExternal(sh, sessionID, cwd, launchStyle)
 }
 
 // launchInPlace creates a tea.ExecProcess command that exits alt-screen,

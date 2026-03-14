@@ -37,6 +37,17 @@ import KeyTable from '../components/KeyTable.astro';
             ]} />
           </div>
 
+          <div id="multi-select" class="shortcut-group">
+            <h3>Multi-Select</h3>
+            <KeyTable rows={[
+              { keys: 'Space', action: 'Toggle selection on current session' },
+              { keys: 'Shift+Enter', action: 'Open all selected sessions (or all in folder)' },
+              { keys: 'a', action: 'Select all visible sessions' },
+              { keys: 'd', action: 'Deselect all' },
+            ]} />
+            <p class="text-secondary text-sm">When no sessions are selected, Shift+Enter on a folder opens all sessions under it. Selected sessions show a ✓ indicator.</p>
+          </div>
+
           <div id="search-filter" class="shortcut-group">
             <h3>Search & Filter</h3>
             <KeyTable rows={[
@@ -107,6 +118,9 @@ import KeyTable from '../components/KeyTable.astro';
                 <tr><td>Click session</td><td>Select it</td></tr>
                 <tr><td>Click folder header</td><td>Expand or collapse</td></tr>
                 <tr><td>Double-click session</td><td>Launch it</td></tr>
+                <tr><td>Ctrl + click session</td><td>Toggle selection without opening</td></tr>
+                <tr><td>Shift + click session</td><td>Range select from last click</td></tr>
+                <tr><td>Double-click (with selections)</td><td>Open all selected sessions</td></tr>
                 <tr><td>Double-click folder</td><td>Launch new session in that directory</td></tr>
                 <tr><td>Ctrl + double-click</td><td>Force new window mode</td></tr>
                 <tr><td>Shift + double-click</td><td>Force new tab mode</td></tr>
@@ -126,6 +140,7 @@ import KeyTable from '../components/KeyTable.astro';
           <ul class="toc-list">
             <li><a href="#navigation">Navigation</a></li>
             <li><a href="#launch-keys">Launch</a></li>
+            <li><a href="#multi-select">Multi-Select</a></li>
             <li><a href="#search-filter">Search & Filter</a></li>
             <li><a href="#view-sort">View & Sorting</a></li>
             <li><a href="#time-keys">Time Range</a></li>

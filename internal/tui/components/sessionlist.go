@@ -32,6 +32,7 @@ type SessionList struct {
 	hiddenSet    map[string]struct{}             // session ID → hidden sessions
 	aiSet        map[string]struct{}             // session ID → AI-found sessions
 	attentionMap map[string]data.AttentionStatus // session ID → attention status
+	selected     map[string]struct{}             // session ID → selected for multi-open
 	treeMode     bool                            // true when showing grouped/tree view
 	cursor       int                             // position within visItems
 	scrollOffset int                             // first visible position within visItems
@@ -43,12 +44,14 @@ type SessionList struct {
 func NewSessionList() SessionList {
 	return SessionList{
 		expanded: make(map[string]struct{}),
+		selected: make(map[string]struct{}),
 	}
 }
 
 // SetSessions replaces the list content with a flat slice of sessions.
 func (s *SessionList) SetSessions(sessions []data.Session) {
 	s.allItems = make([]displayItem, len(sessions))
+	s.selected = make(map[string]struct{})
 	for i, sess := range sessions {
 		s.allItems[i] = displayItem{session: sess}
 	}
@@ -60,6 +63,7 @@ func (s *SessionList) SetSessions(sessions []data.Session) {
 // Folders are collapsible; initial state is expanded.
 func (s *SessionList) SetGroups(groups []data.SessionGroup) {
 	s.allItems = nil
+	s.selected = make(map[string]struct{})
 	if s.expanded == nil {
 		s.expanded = make(map[string]struct{})
 	}
@@ -323,6 +327,92 @@ func (s *SessionList) SessionCount() int {
 	return n
 }
 
+// ToggleSelected toggles the selection state of the session under the cursor.
+// Returns true if the cursor was on a session (not a folder).
+func (s *SessionList) ToggleSelected() bool {
+	if s.cursor < 0 || s.cursor >= len(s.visItems) {
+		return false
+	}
+	item := s.allItems[s.visItems[s.cursor]]
+	if item.isFolder {
+		return false
+	}
+	id := item.session.ID
+	if _, ok := s.selected[id]; ok {
+		delete(s.selected, id)
+	} else {
+		s.selected[id] = struct{}{}
+	}
+	return true
+}
+
+// SelectAll marks all visible non-folder sessions as selected.
+func (s *SessionList) SelectAll() {
+	for _, vi := range s.visItems {
+		item := s.allItems[vi]
+		if !item.isFolder {
+			s.selected[item.session.ID] = struct{}{}
+		}
+	}
+}
+
+// DeselectAll clears all selections.
+func (s *SessionList) DeselectAll() {
+	s.selected = make(map[string]struct{})
+}
+
+// IsSelected returns true if the given session ID is in the selection set.
+func (s *SessionList) IsSelected(id string) bool {
+	_, ok := s.selected[id]
+	return ok
+}
+
+// SelectionCount returns the number of currently selected sessions.
+func (s *SessionList) SelectionCount() int {
+	return len(s.selected)
+}
+
+// SelectedSessions returns all selected sessions in display order.
+// If no sessions are explicitly selected, returns nil.
+func (s *SessionList) SelectedSessions() []data.Session {
+	if len(s.selected) == 0 {
+		return nil
+	}
+	var result []data.Session
+	for _, vi := range s.visItems {
+		item := s.allItems[vi]
+		if !item.isFolder {
+			if _, ok := s.selected[item.session.ID]; ok {
+				result = append(result, item.session)
+			}
+		}
+	}
+	return result
+}
+
+// FolderSessions returns all sessions under the folder at the cursor position,
+// including children of collapsed sub-folders (it walks allItems, not visItems).
+// Returns nil if the cursor is not on a folder.
+func (s *SessionList) FolderSessions() []data.Session {
+	if s.cursor < 0 || s.cursor >= len(s.visItems) {
+		return nil
+	}
+	item := s.allItems[s.visItems[s.cursor]]
+	if !item.isFolder {
+		return nil
+	}
+	// Walk forward from cursor position in allItems to collect children.
+	startIdx := s.visItems[s.cursor]
+	var result []data.Session
+	for i := startIdx + 1; i < len(s.allItems); i++ {
+		if s.allItems[i].isFolder {
+			break // next folder starts
+		}
+		result = append(result, s.allItems[i].session)
+	}
+	return result
+}
+
 // View renders the visible portion of the list.
 func (s SessionList) View() string {
 	if len(s.visItems) == 0 {
@@ -451,6 +541,11 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	if selected {
 		indicator = styles.IconPointer() + " "
 	}
+	// Show check mark for multi-selected sessions.
+	checkMark := " "
+	if s.IsSelected(sess.ID) {
+		checkMark = styles.IconCheck()
+	}
 
 	const dotW = 2 // dot + space
 	const timeW = 9
@@ -459,8 +554,8 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-timeW-spacing)
-		line := indent + indicator + attDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-2-dotW-1-timeW-spacing) // dotW for attention, -1 for checkmark
+		line := indent + checkMark + indicator + attDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
 			return styles.SelectedStyle.Width(s.width).Render(line)
 		}
@@ -481,7 +576,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		}
 	}
 
-	summaryW := w - 2 - dotW - timeW - turnsW - 2*spacing
+	summaryW := w - 2 - dotW - 1 - timeW - turnsW - 2*spacing // dotW for attention, -1 for checkmark
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -494,6 +589,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	var b strings.Builder
 	b.WriteString(indent)
+	b.WriteString(checkMark)
 	b.WriteString(indicator)
 	b.WriteString(attDot)
 	b.WriteString(PadRight(summary, summaryW))
