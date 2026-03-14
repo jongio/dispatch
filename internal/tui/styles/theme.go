@@ -72,6 +72,11 @@ func SetTheme(t *Theme) {
 	ChatAssistantBubbleStyle = t.ChatAssistantBubble
 	ChatUserLabelStyle = t.ChatUserLabel
 	ChatAssistantLabelStyle = t.ChatAssistantLabel
+
+	AttentionWaitingStyle = t.AttentionWaitingStyle
+	AttentionActiveStyle = t.AttentionActiveStyle
+	AttentionStaleStyle = t.AttentionStaleStyle
+	AttentionIdleStyle = t.AttentionIdleStyle
 }
 
 // CurrentTheme returns the active Theme (never nil after init).
@@ -194,6 +199,18 @@ var (
 
 	// ChatAssistantLabelStyle renders the "Copilot" label above assistant messages.
 	ChatAssistantLabelStyle lipgloss.Style
+
+	// AttentionWaitingStyle renders the dot for sessions waiting for user input.
+	AttentionWaitingStyle lipgloss.Style
+
+	// AttentionActiveStyle renders the dot for sessions where AI is working.
+	AttentionActiveStyle lipgloss.Style
+
+	// AttentionStaleStyle renders the dot for running but quiet sessions.
+	AttentionStaleStyle lipgloss.Style
+
+	// AttentionIdleStyle renders the dot for sessions that are not running.
+	AttentionIdleStyle lipgloss.Style
 )
 
 // applyLegacyDefaults initialises the exported variables with the same
@@ -267,6 +284,12 @@ func applyLegacyDefaults() {
 		PaddingLeft(1).PaddingRight(1)
 	ChatUserLabelStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	ChatAssistantLabelStyle = lipgloss.NewStyle().Foreground(ld).Bold(true)
+
+	// Attention dot styles — legacy adaptive defaults.
+	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(le).Bold(true)
+	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
+	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C19C00", Dark: "#C19C00"})
+	AttentionIdleStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
 	currentTheme = &Theme{

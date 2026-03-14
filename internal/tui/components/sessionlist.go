@@ -26,14 +26,15 @@ type displayItem struct {
 // SessionList renders a vertical list of sessions with optional collapsible
 // folder tree grouping when pivoting is active.
 type SessionList struct {
-	allItems     []displayItem       // every item (folders + sessions)
-	visItems     []int               // indices into allItems that are currently visible
-	expanded     map[string]struct{} // folder path → expanded state (tree mode)
-	hiddenSet    map[string]struct{} // session ID → hidden sessions
-	aiSet        map[string]struct{} // session ID → AI-found sessions
-	treeMode     bool                // true when showing grouped/tree view
-	cursor       int                 // position within visItems
-	scrollOffset int                 // first visible position within visItems
+	allItems     []displayItem                   // every item (folders + sessions)
+	visItems     []int                           // indices into allItems that are currently visible
+	expanded     map[string]struct{}             // folder path → expanded state (tree mode)
+	hiddenSet    map[string]struct{}             // session ID → hidden sessions
+	aiSet        map[string]struct{}             // session ID → AI-found sessions
+	attentionMap map[string]data.AttentionStatus // session ID → attention status
+	treeMode     bool                            // true when showing grouped/tree view
+	cursor       int                             // position within visItems
+	scrollOffset int                             // first visible position within visItems
 	width        int
 	height       int
 }
@@ -90,6 +91,12 @@ func (s *SessionList) SetHiddenSessions(set map[string]struct{}) {
 // render those sessions with a "✦" marker.
 func (s *SessionList) SetAISessions(set map[string]struct{}) {
 	s.aiSet = set
+}
+
+// SetAttentionStatuses updates the attention status map used to render
+// colored dots next to each session.
+func (s *SessionList) SetAttentionStatuses(m map[string]data.AttentionStatus) {
+	s.attentionMap = m
 }
 
 // SetSize updates the available rendering dimensions.
@@ -168,6 +175,59 @@ func (s *SessionList) ScrollOffset() int {
 // Cursor returns the current cursor position within visible items.
 func (s *SessionList) Cursor() int {
 	return s.cursor
+}
+
+// SetCursor moves the cursor to the given visible-item index, clamping
+// to valid bounds and adjusting the scroll offset.
+func (s *SessionList) SetCursor(idx int) {
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(s.visItems) {
+		idx = len(s.visItems) - 1
+	}
+	s.cursor = idx
+	if s.cursor < s.scrollOffset {
+		s.scrollOffset = s.cursor
+	}
+	if s.height > 0 && s.cursor >= s.scrollOffset+s.height {
+		s.scrollOffset = s.cursor - s.height + 1
+	}
+}
+
+// AllSessions returns a flat slice of all sessions in display order
+// (skipping folder nodes). This is used for sequential navigation
+// (e.g. jump-to-next-waiting).
+func (s *SessionList) AllSessions() []data.Session {
+	out := make([]data.Session, 0, len(s.visItems))
+	for _, idx := range s.visItems {
+		item := s.allItems[idx]
+		if !item.isFolder {
+			out = append(out, item.session)
+		}
+	}
+	return out
+}
+
+// FindNextWaiting searches forward from the current cursor position for
+// the next visible session item with AttentionWaiting status. Returns the
+// visItems index, or -1 if none found. Wraps around to the beginning.
+func (s *SessionList) FindNextWaiting(attentionMap map[string]data.AttentionStatus) int {
+	n := len(s.visItems)
+	if n == 0 {
+		return -1
+	}
+	for i := 1; i <= n; i++ {
+		vi := (s.cursor + i) % n
+		item := s.allItems[s.visItems[vi]]
+		if item.isFolder {
+			continue
+		}
+		if status, ok := attentionMap[item.session.ID]; ok && status == data.AttentionWaiting {
+			return vi
+		}
+	}
+	return -1
 }
 
 // VisibleCount returns the number of currently visible items.
@@ -377,6 +437,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	relTime := RelativeTime(sess.LastActiveAt)
 	turns := FormatInt(sess.TurnCount) + "t"
 
+	// Attention dot — 2 chars (dot + space).
+	attDot := s.attentionDot(sess.ID)
+
 	// In tree mode, indent sessions under their folder.
 	indent := ""
 	if s.treeMode {
@@ -389,14 +452,15 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		indicator = styles.IconPointer() + " "
 	}
 
+	const dotW = 2 // dot + space
 	const timeW = 9
 	const turnsW = 5
 	const spacing = 2
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-timeW-spacing)
-		line := indent + indicator + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-2-dotW-timeW-spacing)
+		line := indent + indicator + attDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
 			return styles.SelectedStyle.Width(s.width).Render(line)
 		}
@@ -417,7 +481,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		}
 	}
 
-	summaryW := w - 2 - timeW - turnsW - 2*spacing
+	summaryW := w - 2 - dotW - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -431,6 +495,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	var b strings.Builder
 	b.WriteString(indent)
 	b.WriteString(indicator)
+	b.WriteString(attDot)
 	b.WriteString(PadRight(summary, summaryW))
 	if folderW > 0 {
 		b.WriteString("  ")
@@ -458,4 +523,24 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		return styles.HiddenStyle.Width(s.width).Render(line)
 	}
 	return lipgloss.NewStyle().Width(s.width).Render(line)
+}
+
+// attentionDot returns a styled 2-character string (dot + space) representing
+// the attention status of the given session. If no attention data is available
+// the dot is omitted but the space is preserved for alignment.
+func (s SessionList) attentionDot(sessionID string) string {
+	status, ok := s.attentionMap[sessionID]
+	if !ok || s.attentionMap == nil {
+		return "  "
+	}
+	switch status {
+	case data.AttentionWaiting:
+		return styles.AttentionWaitingStyle.Render(styles.IconAttentionWaiting()) + " "
+	case data.AttentionActive:
+		return styles.AttentionActiveStyle.Render(styles.IconAttentionActive()) + " "
+	case data.AttentionStale:
+		return styles.AttentionStaleStyle.Render(styles.IconAttentionStale()) + " "
+	default:
+		return styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()) + " "
+	}
 }

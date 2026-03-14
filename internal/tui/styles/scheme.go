@@ -159,6 +159,12 @@ type Theme struct {
 	ChatAssistantBubble lipgloss.Style
 	ChatUserLabel       lipgloss.Style
 	ChatAssistantLabel  lipgloss.Style
+
+	// Attention dot styles.
+	AttentionWaitingStyle lipgloss.Style
+	AttentionActiveStyle  lipgloss.Style
+	AttentionStaleStyle   lipgloss.Style
+	AttentionIdleStyle    lipgloss.Style
 }
 
 // DeriveTheme produces a complete Theme from a raw ColorScheme.
@@ -297,6 +303,12 @@ func (t *Theme) buildStyles() {
 		Foreground(c(t.Primary)).Bold(true)
 	t.ChatAssistantLabel = lipgloss.NewStyle().
 		Foreground(c(t.Dimmed)).Bold(true)
+
+	// Attention dot styles — colored dots for session attention status.
+	t.AttentionWaitingStyle = lipgloss.NewStyle().Foreground(c(t.Error)).Bold(true)
+	t.AttentionActiveStyle = lipgloss.NewStyle().Foreground(c(t.Success))
+	t.AttentionStaleStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[3])) // Yellow
+	t.AttentionIdleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
 }
 
 // ---------------------------------------------------------------------------

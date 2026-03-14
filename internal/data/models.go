@@ -85,6 +85,40 @@ type SearchResult struct {
 }
 
 // ---------------------------------------------------------------------------
+// Attention status — computed from session-state directory scanning
+// ---------------------------------------------------------------------------
+
+// AttentionStatus indicates whether a session needs the user's attention.
+// It is determined by scanning the Copilot CLI session-state directory
+// for lock files and events.jsonl, not from the session-store.db.
+type AttentionStatus int
+
+const (
+	// AttentionIdle means the session is not running (no lock file or PID dead).
+	AttentionIdle AttentionStatus = iota
+	// AttentionStale means the session is running but has no recent activity.
+	AttentionStale
+	// AttentionActive means the AI is currently working on a response.
+	AttentionActive
+	// AttentionWaiting means the AI has responded and is waiting for user input.
+	AttentionWaiting
+)
+
+// String returns a human-readable label for the attention status.
+func (a AttentionStatus) String() string {
+	switch a {
+	case AttentionWaiting:
+		return "waiting"
+	case AttentionActive:
+		return "active"
+	case AttentionStale:
+		return "stale"
+	default:
+		return "idle"
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Filter, sort, and pivot types
 // ---------------------------------------------------------------------------
 

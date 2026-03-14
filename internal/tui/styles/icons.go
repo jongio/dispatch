@@ -132,3 +132,24 @@ func IconCheck() string { return icon(nfCheck, fbCheck) }
 
 // IconHidden returns the hidden/eye-slash icon ("" or "⊘").
 func IconHidden() string { return icon(nfEyeSlash, fbEyeSlash) }
+
+// ---------------------------------------------------------------------------
+// Attention status dot icons
+// ---------------------------------------------------------------------------
+
+const (
+	fbAttentionDot  = "●"
+	fbAttentionIdle = "○"
+)
+
+// IconAttentionWaiting returns a filled dot for "waiting for user" status.
+func IconAttentionWaiting() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconAttentionActive returns a filled dot for "AI working" status.
+func IconAttentionActive() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconAttentionStale returns a filled dot for "running but quiet" status.
+func IconAttentionStale() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconAttentionIdle returns an open dot for "not running" status.
+func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }

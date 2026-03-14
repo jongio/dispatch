@@ -1,0 +1,239 @@
+package data
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+)
+
+func TestAttentionStatusString(t *testing.T) {
+	tests := []struct {
+		status AttentionStatus
+		want   string
+	}{
+		{AttentionIdle, "idle"},
+		{AttentionStale, "stale"},
+		{AttentionActive, "active"},
+		{AttentionWaiting, "waiting"},
+		{AttentionStatus(99), "idle"}, // unknown falls back to idle
+	}
+	for _, tt := range tests {
+		if got := tt.status.String(); got != tt.want {
+			t.Errorf("AttentionStatus(%d).String() = %q, want %q", tt.status, got, tt.want)
+		}
+	}
+}
+
+func TestReadLastEvent(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("single line", func(t *testing.T) {
+		path := filepath.Join(dir, "single.jsonl")
+		evt := sessionEvent{Type: "assistant.turn_end", Timestamp: "2025-01-01T00:00:00Z"}
+		data, _ := json.Marshal(evt)
+		os.WriteFile(path, append(data, '\n'), 0o644)
+
+		got, err := readLastEvent(path)
+		if err != nil {
+			t.Fatalf("readLastEvent: %v", err)
+		}
+		if got.Type != "assistant.turn_end" {
+			t.Errorf("Type = %q, want %q", got.Type, "assistant.turn_end")
+		}
+	})
+
+	t.Run("multiple lines", func(t *testing.T) {
+		path := filepath.Join(dir, "multi.jsonl")
+		var content []byte
+		for i, typ := range []string{"session.start", "user.message", "assistant.turn_start", "assistant.turn_end"} {
+			evt := sessionEvent{Type: typ, Timestamp: "2025-01-01T00:0" + strconv.Itoa(i) + ":00Z"}
+			line, _ := json.Marshal(evt)
+			content = append(content, line...)
+			content = append(content, '\n')
+		}
+		os.WriteFile(path, content, 0o644)
+
+		got, err := readLastEvent(path)
+		if err != nil {
+			t.Fatalf("readLastEvent: %v", err)
+		}
+		if got.Type != "assistant.turn_end" {
+			t.Errorf("Type = %q, want %q", got.Type, "assistant.turn_end")
+		}
+	})
+
+	t.Run("empty file", func(t *testing.T) {
+		path := filepath.Join(dir, "empty.jsonl")
+		os.WriteFile(path, []byte{}, 0o644)
+
+		_, err := readLastEvent(path)
+		if err == nil {
+			t.Error("expected error for empty file")
+		}
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		_, err := readLastEvent(filepath.Join(dir, "nonexistent.jsonl"))
+		if err == nil {
+			t.Error("expected error for missing file")
+		}
+	})
+}
+
+func TestParseEventTime(t *testing.T) {
+	tests := []struct {
+		input string
+		zero  bool
+	}{
+		{"2025-01-15T10:30:00Z", false},
+		{"2025-01-15T10:30:00.123Z", false},
+		{"", true},
+		{"not-a-timestamp", true},
+	}
+	for _, tt := range tests {
+		got := parseEventTime(tt.input)
+		if got.IsZero() != tt.zero {
+			t.Errorf("parseEventTime(%q).IsZero() = %v, want %v", tt.input, got.IsZero(), tt.zero)
+		}
+	}
+}
+
+func TestClassifySession(t *testing.T) {
+	threshold := 15 * time.Minute
+
+	t.Run("no lock file = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("dead PID = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		// Write a lock file with a PID that definitely doesn't exist.
+		os.WriteFile(filepath.Join(dir, "inuse.999999999.lock"), []byte("999999999"), 0o644)
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("live PID + turn_end = waiting", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("live PID + turn_start = active", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_start", time.Now())
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionActive {
+			t.Errorf("got %v, want AttentionActive", got)
+		}
+	})
+
+	t.Run("live PID + tool_execution_start = active", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution_start", time.Now())
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionActive {
+			t.Errorf("got %v, want AttentionActive", got)
+		}
+	})
+
+	t.Run("live PID + old timestamp = stale", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-1*time.Hour))
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionStale {
+			t.Errorf("got %v, want AttentionStale", got)
+		}
+	})
+
+	t.Run("live PID + shutdown = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "session.shutdown", time.Now())
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("live PID + no events = stale", func(t *testing.T) {
+		dir := t.TempDir()
+		writeLockFile(t, dir, os.Getpid())
+		if got := classifySession(dir, threshold); got != AttentionStale {
+			t.Errorf("got %v, want AttentionStale", got)
+		}
+	})
+}
+
+func TestScanAttention(t *testing.T) {
+	// Create a temp session-state directory structure.
+	stateDir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	// Session 1: waiting (live PID + turn_end).
+	s1 := filepath.Join(stateDir, "session-1")
+	os.MkdirAll(s1, 0o755)
+	writeEvent(t, s1, "assistant.turn_end", time.Now())
+	writeLockFile(t, s1, os.Getpid())
+
+	// Session 2: idle (no lock file).
+	s2 := filepath.Join(stateDir, "session-2")
+	os.MkdirAll(s2, 0o755)
+	writeEvent(t, s2, "assistant.turn_end", time.Now())
+
+	// Session 3: active (live PID + turn_start).
+	s3 := filepath.Join(stateDir, "session-3")
+	os.MkdirAll(s3, 0o755)
+	writeEvent(t, s3, "assistant.turn_start", time.Now())
+	writeLockFile(t, s3, os.Getpid())
+
+	result := ScanAttention(15 * time.Minute)
+
+	if result["session-1"] != AttentionWaiting {
+		t.Errorf("session-1: got %v, want AttentionWaiting", result["session-1"])
+	}
+	if result["session-2"] != AttentionIdle {
+		t.Errorf("session-2: got %v, want AttentionIdle", result["session-2"])
+	}
+	if result["session-3"] != AttentionActive {
+		t.Errorf("session-3: got %v, want AttentionActive", result["session-3"])
+	}
+}
+
+func TestScanAttentionMissingDir(t *testing.T) {
+	t.Setenv("DISPATCH_SESSION_STATE", filepath.Join(t.TempDir(), "nonexistent"))
+	result := ScanAttention(15 * time.Minute)
+	if result != nil {
+		t.Errorf("expected nil for nonexistent dir, got %v", result)
+	}
+}
+
+// writeEvent writes a single event line to events.jsonl in the given directory.
+func writeEvent(t *testing.T, dir, eventType string, ts time.Time) {
+	t.Helper()
+	evt := sessionEvent{
+		Type:      eventType,
+		Timestamp: ts.UTC().Format(time.RFC3339),
+	}
+	line, _ := json.Marshal(evt)
+	line = append(line, '\n')
+	os.WriteFile(filepath.Join(dir, "events.jsonl"), line, 0o644)
+}
+
+// writeLockFile creates an inuse.{PID}.lock file in the given directory.
+func writeLockFile(t *testing.T, dir string, pid int) {
+	t.Helper()
+	name := "inuse." + strconv.Itoa(pid) + ".lock"
+	os.WriteFile(filepath.Join(dir, name), []byte(strconv.Itoa(pid)), 0o644)
+}

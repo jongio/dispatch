@@ -34,11 +34,13 @@ type keyMap struct {
 	LaunchPane        key.Binding
 	PreviewScrollUp   key.Binding
 	PreviewScrollDown key.Binding
+	JumpNextAttention key.Binding
+	FilterAttention   key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -48,7 +50,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Search, k.Escape, k.Filter, k.Space},
 		{k.Sort, k.SortOrder, k.Pivot},
 		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.Reindex, k.Config},
-		{k.Hide, k.ToggleHidden},
+		{k.Hide, k.ToggleHidden, k.JumpNextAttention, k.FilterAttention},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
 	}
@@ -84,4 +86,6 @@ var keys = keyMap{
 	LaunchPane:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open in pane")),
 	PreviewScrollUp:   key.NewBinding(key.WithKeys("pgup"), key.WithHelp("PgUp", "preview ↑")),
 	PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
+	JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
+	FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "waiting only")),
 }

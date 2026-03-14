@@ -171,6 +171,10 @@ type Model struct {
 	copilotSearching     bool                // true when SDK search is in progress
 	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
 	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
+
+	// Attention status tracking — scanned from session-state directories.
+	attentionMap    map[string]data.AttentionStatus
+	attentionFilter bool // when true, only show sessions with AttentionWaiting
 }
 
 // NewModel creates the root Model with default configuration.
@@ -376,23 +380,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- Data loading ----------------------------------------------------
 	case sessionsLoadedMsg:
 		m.sessions = m.filterHiddenSessions(msg.sessions)
+		m.sessions = m.filterAttentionSessions(m.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+		m.sessionList.SetAttentionStatuses(m.attentionMap)
 		m.sessionList.SetSessions(m.sessions)
 		m.state = stateSessionList
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanAttentionCmd())
 
 	case groupsLoadedMsg:
 		m.groups = m.filterHiddenGroups(msg.groups)
+		m.groups = m.filterAttentionGroups(m.groups)
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+		m.sessionList.SetAttentionStatuses(m.attentionMap)
 		m.sessionList.SetGroups(m.groups)
 		m.state = stateSessionList
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanAttentionCmd())
 
 	case sessionDetailMsg:
 		if msg.version != m.detailVersion {
@@ -406,6 +414,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusErr = "Data: " + msg.err.Error()
 		m.state = stateSessionList
 		return m, nil
+
+	// ----- Attention scanning ---------------------------------------------
+	case attentionScannedMsg:
+		m.attentionMap = msg.statuses
+		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		// If attention filter is active, reload to apply filtering.
+		if m.attentionFilter {
+			return m, m.loadSessionsCmd()
+		}
+		return m, m.scheduleAttentionTick()
+
+	case attentionTickMsg:
+		return m, m.scanAttentionCmd()
 
 	// ----- Deep search debounce -------------------------------------------
 	case deepSearchTickMsg:
@@ -941,6 +962,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHidden = !m.showHidden
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		return m, m.loadSessionsCmd()
+
+	case key.Matches(msg, keys.JumpNextAttention):
+		return m.handleJumpNextAttention()
+
+	case key.Matches(msg, keys.FilterAttention):
+		m.attentionFilter = !m.attentionFilter
+		return m, m.loadSessionsCmd()
 	}
 
 	return m, nil
@@ -1403,6 +1431,11 @@ func (m Model) renderBadges() string {
 	}
 	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(":Pivot: "+pivotLabel))
 
+	// Attention filter indicator.
+	if m.attentionFilter {
+		parts = append(parts, styles.ActiveBadgeStyle.Render("! waiting only"))
+	}
+
 	if len(parts) == 0 {
 		return ""
 	}
@@ -1429,6 +1462,9 @@ func (m Model) renderFooter() string {
 			badge += " " + styles.IconHidden()
 		}
 		left += "  " + styles.BadgeStyle.Render(badge)
+	}
+	if wc := m.waitingCount(); wc > 0 {
+		left += "  " + styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
 	}
 	if m.statusErr != "" {
 		left += "  " + styles.ErrorStyle.Render(m.statusErr)
@@ -1602,6 +1638,44 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 		var sessions []data.Session
 		for _, s := range g.Sessions {
 			if _, ok := m.hiddenSet[s.ID]; !ok {
+				sessions = append(sessions, s)
+			}
+		}
+		if len(sessions) > 0 {
+			g.Sessions = sessions
+			g.Count = len(sessions)
+			filtered = append(filtered, g)
+		}
+	}
+	return filtered
+}
+
+// filterAttentionSessions removes sessions that don't match the attention
+// filter. When attentionFilter is false, all sessions pass through.
+func (m *Model) filterAttentionSessions(sessions []data.Session) []data.Session {
+	if !m.attentionFilter || len(m.attentionMap) == 0 {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if status, ok := m.attentionMap[s.ID]; ok && status == data.AttentionWaiting {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// filterAttentionGroups removes sessions that don't match the attention
+// filter from grouped results. Empty groups are dropped.
+func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.attentionFilter || len(m.attentionMap) == 0 {
+		return groups
+	}
+	filtered := make([]data.SessionGroup, 0, len(groups))
+	for _, g := range groups {
+		var sessions []data.Session
+		for _, s := range g.Sessions {
+			if status, ok := m.attentionMap[s.ID]; ok && status == data.AttentionWaiting {
 				sessions = append(sessions, s)
 			}
 		}
@@ -1927,6 +2001,53 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 		}
 		return sessionsLoadedMsg{sessions: sessions}
 	}
+}
+
+// attentionRefreshInterval controls how often the attention scanner polls
+// the session-state directories.
+const attentionRefreshInterval = 30 * time.Second
+
+// scanAttentionCmd runs the session-state directory scanner in the background
+// and returns an attentionScannedMsg with the results.
+func (m Model) scanAttentionCmd() tea.Cmd {
+	threshold := m.cfg.EffectiveAttentionThreshold()
+	return func() tea.Msg {
+		statuses := data.ScanAttention(threshold)
+		return attentionScannedMsg{statuses: statuses}
+	}
+}
+
+// scheduleAttentionTick schedules the next periodic attention scan.
+func (m Model) scheduleAttentionTick() tea.Cmd {
+	return tea.Tick(attentionRefreshInterval, func(time.Time) tea.Msg {
+		return attentionTickMsg{}
+	})
+}
+
+// handleJumpNextAttention moves the cursor to the next session with
+// AttentionWaiting status, wrapping around to the beginning if needed.
+func (m Model) handleJumpNextAttention() (tea.Model, tea.Cmd) {
+	if len(m.attentionMap) == 0 {
+		return m, nil
+	}
+	idx := m.sessionList.FindNextWaiting(m.attentionMap)
+	if idx < 0 {
+		return m, nil
+	}
+	m.sessionList.SetCursor(idx)
+	m.detailVersion++
+	return m, m.loadSelectedDetailCmd()
+}
+
+// waitingCount returns the number of sessions with AttentionWaiting status.
+func (m Model) waitingCount() int {
+	count := 0
+	for _, status := range m.attentionMap {
+		if status == data.AttentionWaiting {
+			count++
+		}
+	}
+	return count
 }
 
 const deepSearchDelay = 300 * time.Millisecond

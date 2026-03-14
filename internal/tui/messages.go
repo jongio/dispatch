@@ -95,3 +95,16 @@ type aiSessionsLoadedMsg struct {
 	version  int
 	sessions []data.Session
 }
+
+// ---------------------------------------------------------------------------
+// Attention scan messages
+// ---------------------------------------------------------------------------
+
+// attentionScannedMsg delivers session attention statuses from the
+// session-state directory scanner.
+type attentionScannedMsg struct {
+	statuses map[string]data.AttentionStatus
+}
+
+// attentionTickMsg fires periodically to trigger the next attention scan.
+type attentionTickMsg struct{}

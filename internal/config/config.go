@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/styles"
@@ -110,6 +111,11 @@ type Config struct {
 	// query the Copilot backend for semantically relevant sessions.
 	AISearch bool `json:"ai_search,omitempty"`
 
+	// AttentionThreshold is the duration string (e.g. "15m", "1h") after
+	// which a running session with no activity is classified as "stale"
+	// instead of "waiting" or "active". Default is "15m".
+	AttentionThreshold string `json:"attention_threshold,omitempty"`
+
 	// Theme is the active color scheme name.  "auto" (or empty) means
 	// detect from the terminal; any other value is looked up in Schemes
 	// and then the built-in scheme list.
@@ -156,6 +162,22 @@ func (c *Config) EffectivePaneDirection() string {
 		return c.PaneDirection
 	}
 	return PaneDirectionAuto
+}
+
+// defaultAttentionThreshold is used when AttentionThreshold is empty or unparseable.
+const defaultAttentionThreshold = 15 * time.Minute
+
+// EffectiveAttentionThreshold returns the configured attention threshold as
+// a time.Duration, defaulting to 15 minutes when unset or invalid.
+func (c *Config) EffectiveAttentionThreshold() time.Duration {
+	if c.AttentionThreshold == "" {
+		return defaultAttentionThreshold
+	}
+	d, err := time.ParseDuration(c.AttentionThreshold)
+	if err != nil || d <= 0 {
+		return defaultAttentionThreshold
+	}
+	return d
 }
 
 // EffectiveLaunchMode returns the active launch mode, resolving the
