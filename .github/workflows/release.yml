@@ -1,24 +1,28 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 0.2.0 — without 'v' prefix)"
+        required: true
+        type: string
 
-# Prevent concurrent releases if multiple tags are pushed rapidly.
 concurrency:
   group: release
-  cancel-in-progress: false      # Don't cancel an in-progress release
+  cancel-in-progress: false
 
 jobs:
-  # No separate validate job — tags are always on main, which already passed CI.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
-      contents: write            # Scoped to job, not workflow
-      id-token: write            # Required for cosign keyless (OIDC) signing
+      contents: write
+      id-token: write
     steps:
-      # Pin actions to full SHA for supply-chain security.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
@@ -30,6 +34,13 @@ jobs:
       - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3
 
       - uses: anchore/sbom-action/download-syft@e11c554f704a0b820cbf8c51673f6945e0731532 # v0
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
 
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:

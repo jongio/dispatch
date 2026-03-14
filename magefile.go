@@ -152,6 +152,11 @@ func Preflight() error {
 
 	fmt.Println("\n=== 4/12 Linting ===")
 	if _, err := exec.LookPath("golangci-lint"); err == nil {
+		if out, err := cmdOutput("golangci-lint", "version"); err == nil {
+			if !strings.Contains(out, "golangci-lint has version 2.") {
+				fmt.Printf("   WARNING: golangci-lint v2 expected, got: %s\n", strings.TrimSpace(out))
+			}
+		}
 		if err := run("golangci-lint", "run"); err != nil {
 			return fmt.Errorf("lint: %w", err)
 		}
