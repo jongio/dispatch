@@ -3,7 +3,6 @@
 package platform
 
 import (
-	"archive/zip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -377,98 +376,6 @@ func TestCovHasNerdFontFiles_Cases(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// extractTTF
-// ---------------------------------------------------------------------------
-
-func TestCovExtractTTF_NonZipFile(t *testing.T) {
-	dir := t.TempDir()
-	bad := filepath.Join(dir, "bad.zip")
-	_ = os.WriteFile(bad, []byte("not a zip"), 0o644)
-
-	_, err := extractTTF(bad, dir)
-	if err == nil {
-		t.Error("expected error for non-zip file")
-	}
-}
-
-func TestCovExtractTTF_MixedContent(t *testing.T) {
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "test.zip")
-	f, _ := os.Create(zipPath)
-	w := zip.NewWriter(f)
-
-	fw, _ := w.Create("font.ttf")
-	_, _ = fw.Write([]byte("ttf data"))
-
-	fw2, _ := w.Create("readme.md")
-	_, _ = fw2.Write([]byte("readme"))
-
-	fw3, _ := w.Create("OTHER.TTF")
-	_, _ = fw3.Write([]byte("ttf 2"))
-
-	_ = w.Close()
-	_ = f.Close()
-
-	destDir := t.TempDir()
-	extracted, err := extractTTF(zipPath, destDir)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	if len(extracted) != 2 {
-		t.Errorf("got %d files, want 2", len(extracted))
-	}
-}
-
-func TestCovExtractTTF_EmptyZip(t *testing.T) {
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "empty.zip")
-	f, _ := os.Create(zipPath)
-	w := zip.NewWriter(f)
-	_ = w.Close()
-	_ = f.Close()
-
-	extracted, err := extractTTF(zipPath, t.TempDir())
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	if len(extracted) != 0 {
-		t.Errorf("got %d files, want 0", len(extracted))
-	}
-}
-
-// ---------------------------------------------------------------------------
-// copyFile
-// ---------------------------------------------------------------------------
-
-func TestCovCopyFile_Success(t *testing.T) {
-	src := filepath.Join(t.TempDir(), "src.txt")
-	dst := filepath.Join(t.TempDir(), "dst.txt")
-	_ = os.WriteFile(src, []byte("hello"), 0o644)
-
-	if err := copyFile(src, dst); err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	got, _ := os.ReadFile(dst)
-	if string(got) != "hello" {
-		t.Errorf("got %q, want 'hello'", got)
-	}
-}
-
-func TestCovCopyFile_NonexistentSrc(t *testing.T) {
-	if err := copyFile("C:\\nonexistent\\file.txt", filepath.Join(t.TempDir(), "dst")); err == nil {
-		t.Error("expected error")
-	}
-}
-
-func TestCovCopyFile_InvalidDst(t *testing.T) {
-	src := filepath.Join(t.TempDir(), "src.txt")
-	_ = os.WriteFile(src, []byte("data"), 0o644)
-	if err := copyFile(src, "C:\\nonexistent\\dir\\dst.txt"); err == nil {
-		t.Error("expected error for invalid destination")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // FindCLIBinary
 // ---------------------------------------------------------------------------
 
@@ -629,65 +536,6 @@ func TestCovIsNerdFontInstalledWindows_EmptyWinDir(t *testing.T) {
 	t.Setenv("WINDIR", "")
 	// Falls back to C:\Windows
 	_ = isNerdFontInstalledWindows()
-}
-
-// ===========================================================================
-// Windows-specific: installFontsWindows
-// ===========================================================================
-
-func TestCovInstallFontsWindows_EmptyLocalAppData(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", "")
-	err := installFontsWindows([]string{"test.ttf"})
-	if err == nil {
-		t.Error("expected error when LOCALAPPDATA is empty")
-	}
-}
-
-func TestCovInstallFontsWindows_Success(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir)
-
-	srcDir := t.TempDir()
-	ttfPath := filepath.Join(srcDir, "TestCovNerdFont.ttf")
-	_ = os.WriteFile(ttfPath, []byte("fake ttf data"), 0o644)
-
-	err := installFontsWindows([]string{ttfPath})
-	if err != nil {
-		t.Fatalf("installFontsWindows: %v", err)
-	}
-
-	fontDir := filepath.Join(dir, "Microsoft", "Windows", "Fonts")
-	copied, err := os.ReadFile(filepath.Join(fontDir, "TestCovNerdFont.ttf"))
-	if err != nil {
-		t.Fatalf("font not copied: %v", err)
-	}
-	if string(copied) != "fake ttf data" {
-		t.Error("content mismatch")
-	}
-}
-
-func TestCovInstallFontsWindows_MultipleFiles(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir)
-
-	srcDir := t.TempDir()
-	files := []string{}
-	for _, name := range []string{"FontA.ttf", "FontB.ttf"} {
-		p := filepath.Join(srcDir, name)
-		_ = os.WriteFile(p, []byte("data-"+name), 0o644)
-		files = append(files, p)
-	}
-
-	if err := installFontsWindows(files); err != nil {
-		t.Fatalf("error: %v", err)
-	}
-
-	fontDir := filepath.Join(dir, "Microsoft", "Windows", "Fonts")
-	for _, name := range []string{"FontA.ttf", "FontB.ttf"} {
-		if _, err := os.Stat(filepath.Join(fontDir, name)); err != nil {
-			t.Errorf("font %s not installed: %v", name, err)
-		}
-	}
 }
 
 // ===========================================================================
@@ -967,20 +815,6 @@ func TestCovLaunchSession_EmptyCustomCommand(t *testing.T) {
 }
 
 // ===========================================================================
-// installFontsWindows — copy error path
-// ===========================================================================
-
-func TestCovInstallFontsWindows_CopyError(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir)
-
-	err := installFontsWindows([]string{"C:\\nonexistent\\file.ttf"})
-	if err == nil {
-		t.Error("expected error for non-existent source file")
-	}
-}
-
-// ===========================================================================
 // defaultWindowsShell — hit different branches via PATH manipulation
 // ===========================================================================
 
@@ -1038,57 +872,6 @@ func TestCovLaunchSession_SetupWithShellDefault(t *testing.T) {
 }
 
 // ===========================================================================
-// extractTTF — edge case: file open error (corrupt entry)
-// ===========================================================================
-
-func TestCovExtractTTF_NestedDirTTF(t *testing.T) {
-	// Deeply nested TTF should be extracted by base name
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "test.zip")
-	f, _ := os.Create(zipPath)
-	w := zip.NewWriter(f)
-	fw, _ := w.Create("a/b/c/font.ttf")
-	_, _ = fw.Write([]byte("nested"))
-	_ = w.Close()
-	_ = f.Close()
-
-	destDir := t.TempDir()
-	extracted, err := extractTTF(zipPath, destDir)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	if len(extracted) != 1 {
-		t.Fatalf("got %d files, want 1", len(extracted))
-	}
-	if filepath.Base(extracted[0]) != "font.ttf" {
-		t.Errorf("base = %q, want font.ttf", filepath.Base(extracted[0]))
-	}
-	data, _ := os.ReadFile(extracted[0])
-	if string(data) != "nested" {
-		t.Error("content mismatch")
-	}
-}
-
-// ===========================================================================
-// copyFile — write to read-only destination (cover error on Create)
-// ===========================================================================
-
-func TestCovCopyFile_ReadOnlyDir(t *testing.T) {
-	src := filepath.Join(t.TempDir(), "src.txt")
-	_ = os.WriteFile(src, []byte("data"), 0o644)
-
-	// Create a read-only directory
-	roDir := filepath.Join(t.TempDir(), "readonly")
-	_ = os.MkdirAll(roDir, 0o555)
-	dst := filepath.Join(roDir, "subdir", "dst.txt")
-
-	err := copyFile(src, dst)
-	if err == nil {
-		t.Error("expected error writing to non-existent subdir")
-	}
-}
-
-// ===========================================================================
 // IsNerdFontInstalled — cover Windows-specific branch
 // ===========================================================================
 
@@ -1136,38 +919,6 @@ func TestCovSessionStorePath_Error(t *testing.T) {
 	_, err := SessionStorePath()
 	if err == nil {
 		t.Error("expected error from SessionStorePath when home dir unavailable")
-	}
-}
-
-// ===========================================================================
-// extractTTF — skip dotfiles and empty names
-// ===========================================================================
-
-func TestCovExtractTTF_DotAndEmptyEntries(t *testing.T) {
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "dots.zip")
-	f, _ := os.Create(zipPath)
-	w := zip.NewWriter(f)
-	// Create entries that should be skipped (., .., non-ttf)
-	fw, _ := w.Create(".")
-	_, _ = fw.Write([]byte{})
-	fw, _ = w.Create("..")
-	_, _ = fw.Write([]byte{})
-	fw, _ = w.Create("readme.txt")
-	_, _ = fw.Write([]byte("readme"))
-	// One valid TTF
-	fw, _ = w.Create("good.ttf")
-	_, _ = fw.Write([]byte("ttf"))
-	_ = w.Close()
-	_ = f.Close()
-
-	dest := t.TempDir()
-	files, err := extractTTF(zipPath, dest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) != 1 {
-		t.Errorf("got %d files, want 1", len(files))
 	}
 }
 
@@ -1241,13 +992,4 @@ func TestCovLaunchSession_FallbackPath(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// copyFile — source doesn't exist (covers Open error)
-// ===========================================================================
 
-func TestCovCopyFile_NoSource(t *testing.T) {
-	err := copyFile(filepath.Join(t.TempDir(), "noexist"), filepath.Join(t.TempDir(), "dst"))
-	if err == nil {
-		t.Error("expected error for nonexistent source")
-	}
-}

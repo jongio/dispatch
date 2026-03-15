@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // emptyPlaceholder is the en-dash displayed when a value is missing or empty.
@@ -36,6 +38,10 @@ func Truncate(s string, width int) string {
 
 // PadRight returns s padded with spaces on the right to exactly width runes.
 // If s is longer than width it is truncated.
+//
+// NOTE: This function uses rune counting, which is NOT ANSI-aware. For strings
+// containing ANSI escape sequences (pre-styled inline text), use PadToWidth
+// instead.
 func PadRight(s string, width int) string {
 	if width <= 0 {
 		return ""
@@ -45,6 +51,24 @@ func PadRight(s string, width int) string {
 		return Truncate(s, width)
 	}
 	return s + strings.Repeat(" ", width-len(runes))
+}
+
+// PadToWidth pads s with trailing spaces so its visual (printed) width equals
+// exactly width columns. Unlike PadRight, this function is ANSI-aware: it uses
+// lipgloss.Width (which strips escape sequences before measuring) so pre-styled
+// inline content like attention dots is measured correctly.
+//
+// If the visual width already meets or exceeds width, s is returned unchanged
+// (no truncation — callers are expected to have pre-truncated content).
+func PadToWidth(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	visW := lipgloss.Width(s)
+	if visW >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-visW)
 }
 
 // PadLeft returns s padded with spaces on the left to exactly width runes.
@@ -88,22 +112,20 @@ func CleanSummary(s string) string {
 	return s
 }
 
-// AbbrevPath returns the last two path components, prefixed with "…" and the
-// OS path separator if the path is deeper.
+// AbbrevPath returns the path with the user's home directory replaced by "~".
+// If the path is not under the home directory, it is returned as-is (full
+// absolute path). This avoids relative-looking paths like "…\code\dispatch".
 func AbbrevPath(path string) string {
 	if path == "" {
 		return emptyPlaceholder
 	}
 	clean := filepath.FromSlash(path)
-	parts := strings.Split(clean, string(filepath.Separator))
-	// Remove empty trailing element (e.g. from trailing slash).
-	if len(parts) > 0 && parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
+	// Strip trailing separator (consistent with old behavior).
+	clean = strings.TrimRight(clean, string(filepath.Separator))
+	if clean == "" {
+		return string(filepath.Separator)
 	}
-	if len(parts) <= 2 {
-		return clean
-	}
-	return "…" + string(filepath.Separator) + strings.Join(parts[len(parts)-2:], string(filepath.Separator))
+	return AbbrevHome(clean)
 }
 
 // AbbrevHome returns the path with the user's home directory replaced by "~".

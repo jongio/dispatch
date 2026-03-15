@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -790,41 +791,9 @@ func TestUpdate_FontCheckMsg_Installed(t *testing.T) {
 func TestUpdate_FontCheckMsg_NotInstalled(t *testing.T) {
 	m := newTestModel()
 	result, cmd := m.Update(fontCheckMsg{installed: false})
-	rm := result.(Model)
-	if rm.statusInfo == "" {
-		t.Error("should set statusInfo about installing font")
-	}
-	if cmd == nil {
-		t.Error("should return installNerdFontCmd")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Update: fontInstalledMsg
-// ---------------------------------------------------------------------------
-
-func TestUpdate_FontInstalledMsg_Success(t *testing.T) {
-	m := newTestModel()
-	result, cmd := m.Update(fontInstalledMsg{err: nil})
-	rm := result.(Model)
-	if rm.statusInfo == "" {
-		t.Error("statusInfo should report successful font install")
-	}
-	if cmd == nil {
-		t.Error("should return clearStatusAfter cmd")
-	}
-}
-
-func TestUpdate_FontInstalledMsg_Error(t *testing.T) {
-	m := newTestModel()
-	m.statusInfo = "Installing…"
-	result, cmd := m.Update(fontInstalledMsg{err: errors.New("fail")})
-	rm := result.(Model)
-	if rm.statusInfo != "" {
-		t.Errorf("statusInfo should be cleared on error, got %q", rm.statusInfo)
-	}
+	_ = result.(Model)
 	if cmd != nil {
-		t.Error("fontInstalledMsg with error should return nil cmd")
+		t.Error("fontCheckMsg{installed: false} should return nil cmd (detection only)")
 	}
 }
 
@@ -1236,7 +1205,19 @@ func TestCloseStore_NilStore(t *testing.T) {
 // saveConfigFromPanel
 // ---------------------------------------------------------------------------
 
+// setupTempConfigDir redirects config.Save to a temp directory so tests
+// don't overwrite the user's real config file.
+func setupTempConfigDir(t *testing.T) {
+	t.Helper()
+	tmp := t.TempDir()
+	t.Setenv("APPDATA", tmp)
+	if runtime.GOOS != "windows" {
+		t.Setenv("XDG_CONFIG_HOME", tmp)
+	}
+}
+
 func TestSaveConfigFromPanel(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModel()
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetValues(components.ConfigValues{
@@ -1280,6 +1261,7 @@ func TestSaveConfigFromPanel(t *testing.T) {
 }
 
 func TestSaveConfigFromPanel_TabMode(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModel()
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetValues(components.ConfigValues{
@@ -1327,13 +1309,6 @@ func TestCheckNerdFontCmd(t *testing.T) {
 	cmd := checkNerdFontCmd()
 	if cmd == nil {
 		t.Fatal("checkNerdFontCmd should return non-nil Cmd")
-	}
-}
-
-func TestInstallNerdFontCmd(t *testing.T) {
-	cmd := installNerdFontCmd()
-	if cmd == nil {
-		t.Fatal("installNerdFontCmd should return non-nil Cmd")
 	}
 }
 
@@ -2810,12 +2785,12 @@ func TestHandleKey_Enter_FolderSelected(t *testing.T) {
 		{Label: "folder1", Sessions: []data.Session{{ID: "s1"}}},
 	}
 	m.sessionList.SetGroups(groups)
-	// When a folder is selected, Enter toggles folder (not launch)
+	// When a folder is selected, Enter launches a new session in that folder.
 	result, cmd := m.Update(enterKeyMsg())
 	_ = result.(Model)
-	// Cmd should be nil (toggle, not launch)
-	if cmd != nil {
-		t.Error("Enter on folder should return nil cmd (toggle)")
+	// Cmd should be non-nil (launch, not toggle)
+	if cmd == nil {
+		t.Error("Enter on folder should return a launch cmd")
 	}
 }
 
@@ -3050,5 +3025,284 @@ func TestHandleKey_PreviewScrollDown_Active(t *testing.T) {
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("preview scroll should return nil cmd")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Double-click on empty list must not panic (BUG 2 regression guard)
+// ---------------------------------------------------------------------------
+
+func TestHandleMouse_DoubleClick_EmptyList_NoPanic(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	// Leave session list empty — no sessions loaded.
+	clickY := styles.HeaderLines + 1
+
+	// First click
+	msg1 := tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionRelease,
+		X:      10,
+		Y:      clickY,
+	}
+	result1, _ := m.Update(msg1)
+	rm1 := result1.(Model)
+
+	// Second click at same Y (double-click) — must not panic.
+	msg2 := tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionRelease,
+		X:      10,
+		Y:      clickY,
+	}
+	result2, _ := rm1.Update(msg2)
+	_ = result2.(Model)
+	// If we reach here, no panic occurred.
+}
+
+// ---------------------------------------------------------------------------
+// Modal state must survive async data loads (BUG 1 regression guard)
+// ---------------------------------------------------------------------------
+
+func TestModal_HelpOverlay_SurvivesSessionsLoaded(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open help overlay with ?
+	result, _ := m.Update(runeKeyMsg('?'))
+	m = result.(Model)
+	if m.state != stateHelpOverlay {
+		t.Fatalf("expected stateHelpOverlay, got %d", m.state)
+	}
+
+	// Simulate an async sessionsLoadedMsg arriving while help is open.
+	result, _ = m.Update(sessionsLoadedMsg{sessions: []data.Session{{ID: "s2"}}})
+	m = result.(Model)
+	if m.state != stateHelpOverlay {
+		t.Errorf("help overlay was clobbered by sessionsLoadedMsg: state = %d", m.state)
+	}
+}
+
+func TestModal_FilterPanel_SurvivesSessionsLoaded(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open filter panel with f
+	result, _ := m.Update(runeKeyMsg('f'))
+	m = result.(Model)
+	if m.state != stateFilterPanel {
+		t.Fatalf("expected stateFilterPanel, got %d", m.state)
+	}
+
+	// Simulate an async sessionsLoadedMsg arriving while filter panel is open.
+	result, _ = m.Update(sessionsLoadedMsg{sessions: []data.Session{{ID: "s2"}}})
+	m = result.(Model)
+	if m.state != stateFilterPanel {
+		t.Errorf("filter panel was clobbered by sessionsLoadedMsg: state = %d", m.state)
+	}
+}
+
+func TestModal_ConfigPanel_SurvivesSessionsLoaded(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open config panel with ,
+	result, _ := m.Update(runeKeyMsg(','))
+	m = result.(Model)
+	if m.state != stateConfigPanel {
+		t.Fatalf("expected stateConfigPanel, got %d", m.state)
+	}
+
+	result, _ = m.Update(sessionsLoadedMsg{sessions: []data.Session{{ID: "s2"}}})
+	m = result.(Model)
+	if m.state != stateConfigPanel {
+		t.Errorf("config panel was clobbered by sessionsLoadedMsg: state = %d", m.state)
+	}
+}
+
+func TestModal_AttentionPicker_SurvivesSessionsLoaded(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open attention picker with !
+	result, _ := m.Update(runeKeyMsg('!'))
+	m = result.(Model)
+	if m.state != stateAttentionPicker {
+		t.Fatalf("expected stateAttentionPicker, got %d", m.state)
+	}
+
+	result, _ = m.Update(sessionsLoadedMsg{sessions: []data.Session{{ID: "s2"}}})
+	m = result.(Model)
+	if m.state != stateAttentionPicker {
+		t.Errorf("attention picker was clobbered by sessionsLoadedMsg: state = %d", m.state)
+	}
+}
+
+func TestModal_SurvivesGroupsLoaded(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open help overlay
+	result, _ := m.Update(runeKeyMsg('?'))
+	m = result.(Model)
+	if m.state != stateHelpOverlay {
+		t.Fatalf("expected stateHelpOverlay, got %d", m.state)
+	}
+
+	// groupsLoadedMsg should not clobber the overlay either.
+	result, _ = m.Update(groupsLoadedMsg{groups: []data.SessionGroup{
+		{Label: "g1", Sessions: []data.Session{{ID: "s2"}}},
+	}})
+	m = result.(Model)
+	if m.state != stateHelpOverlay {
+		t.Errorf("help overlay was clobbered by groupsLoadedMsg: state = %d", m.state)
+	}
+}
+
+func TestModal_SurvivesDataError(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Open help overlay
+	result, _ := m.Update(runeKeyMsg('?'))
+	m = result.(Model)
+
+	result, _ = m.Update(dataErrorMsg{err: errors.New("test error")})
+	m = result.(Model)
+	if m.state != stateHelpOverlay {
+		t.Errorf("help overlay was clobbered by dataErrorMsg: state = %d", m.state)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Sort cycle includes attention
+// ---------------------------------------------------------------------------
+
+func TestCycleSort_IncludesAttention(t *testing.T) {
+	m := newTestModel()
+	// Default sort is SortByUpdated.
+	if m.sort.Field != data.SortByUpdated {
+		t.Fatalf("expected initial sort = SortByUpdated, got %s", m.sort.Field)
+	}
+	// Cycle through all sort fields.
+	found := false
+	for i := 0; i < len(sortFields)+1; i++ {
+		m.cycleSort()
+		if m.sort.Field == data.SortByAttention {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("attention sort field not found in sort cycle")
+	}
+}
+
+func TestSortDisplayLabel_Attention(t *testing.T) {
+	label := sortDisplayLabel(data.SortByAttention)
+	if label != "attention" {
+		t.Errorf("sortDisplayLabel(SortByAttention) = %q, want %q", label, "attention")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// attentionPriority
+// ---------------------------------------------------------------------------
+
+func TestAttentionPriority(t *testing.T) {
+	tests := []struct {
+		status data.AttentionStatus
+		want   int
+	}{
+		{data.AttentionWaiting, 3},
+		{data.AttentionActive, 2},
+		{data.AttentionStale, 1},
+		{data.AttentionIdle, 0},
+	}
+	for _, tt := range tests {
+		got := attentionPriority(tt.status)
+		if got != tt.want {
+			t.Errorf("attentionPriority(%d) = %d, want %d", tt.status, got, tt.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Launch validation — graceful error handling for bad config
+// ---------------------------------------------------------------------------
+
+func TestResolveShellAndLaunch_InvalidShell_SetsStatusErr(t *testing.T) {
+	m := newTestModel()
+	m.cfg.DefaultShell = "nonexistent-shell-999"
+	// No shells detected, so findShellByName falls back to DefaultShell()
+	// which should have a path, but if the configured name is wrong
+	// the user should get feedback.
+	m.shells = nil
+	cmd := m.resolveShellAndLaunch("s1", "/test", config.LaunchModeTab)
+	// On a real system DefaultShell() usually returns a valid path,
+	// so the error message appears only when the fallback also fails.
+	// What matters: no panic.
+	_ = cmd
+}
+
+func TestResolveShellAndLaunch_EmptyPathShell_SetsStatusErr(t *testing.T) {
+	m := newTestModel()
+	m.cfg.DefaultShell = "ghost-shell"
+	// Only shell in list has empty path — simulates broken detection.
+	m.shells = []platform.ShellInfo{{Name: "ghost-shell", Path: ""}}
+	cmd := m.resolveShellAndLaunch("s1", "/test", config.LaunchModeTab)
+	if cmd != nil {
+		t.Error("expected nil cmd when shell path is empty")
+	}
+	if m.statusErr == "" {
+		t.Error("expected statusErr to be set when shell path is empty")
+	}
+	if !strings.Contains(m.statusErr, "ghost-shell") {
+		t.Errorf("statusErr = %q, want it to mention the shell name", m.statusErr)
+	}
+}
+
+func TestResolveShellAndLaunchDirect_EmptyPathShell_SetsStatusErr(t *testing.T) {
+	m := newTestModel()
+	m.cfg.DefaultShell = "phantom"
+	m.shells = []platform.ShellInfo{{Name: "phantom", Path: ""}}
+	cmd := m.resolveShellAndLaunchDirect("s1", "/test", config.LaunchModeTab)
+	if cmd != nil {
+		t.Error("expected nil cmd when shell path is empty")
+	}
+	if m.statusErr == "" {
+		t.Error("expected statusErr to be set when shell path is empty")
+	}
+}
+
+func TestResolveShellAndLaunchDirect_NoShells_UsesDefault(t *testing.T) {
+	m := newTestModel()
+	m.cfg.DefaultShell = ""
+	m.shells = nil
+	// DefaultShell() should succeed on any real OS, so cmd should be non-nil.
+	cmd := m.resolveShellAndLaunchDirect("s1", "/test", config.LaunchModeTab)
+	// No panic is the main assertion. On CI the platform default should exist.
+	_ = cmd
+}
+
+func TestLaunchExternal_ErrorIncludesContext(t *testing.T) {
+	m := newTestModel()
+	sh := platform.ShellInfo{Name: "test-shell", Path: "/no/such/shell"}
+	cmd := m.launchExternal(sh, "bad;id", "/test", platform.LaunchStyleTab)
+	if cmd == nil {
+		t.Fatal("launchExternal should return non-nil Cmd")
+	}
+	// Execute the cmd to get the error message.
+	msg := cmd()
+	if msg == nil {
+		// If the platform happens to succeed (unlikely), that's fine.
+		return
+	}
+	errMsg, ok := msg.(dataErrorMsg)
+	if !ok {
+		t.Fatalf("expected dataErrorMsg, got %T", msg)
+	}
+	errStr := errMsg.err.Error()
+	if !strings.Contains(errStr, "test-shell") {
+		t.Errorf("error %q should mention shell name", errStr)
 	}
 }

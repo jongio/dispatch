@@ -52,9 +52,12 @@ const (
 	nfPointer    = "\uf0da" //  nf-fa-caret_right
 	nfSession    = "\uf120" //  nf-fa-terminal
 	nfFilter     = "\uf0b0" //  nf-fa-filter
-	nfGitBranch  = "\ue0a0" //  nf-pl-branch
+	nfGitBranch  = "\uf418" //  nf-oct-git_branch
 	nfCheck      = "\uf00c" //  nf-fa-check
 	nfEyeSlash   = "\uf070" //  nf-fa-eye_slash
+	nfRepo       = "\uea62" //  nf-cod-repo
+	nfCalendar   = "\uf073" //  nf-fa-calendar
+	nfList       = "\uf03a" //  nf-fa-list
 )
 
 // ---------------------------------------------------------------------------
@@ -78,6 +81,10 @@ const (
 	fbGitBranch  = ""
 	fbCheck      = "✓"
 	fbEyeSlash   = "⊘"
+	fbRepo       = "◆"
+	fbCalendar   = "◇"
+	fbList       = "≡"
+	fbBranch     = "⎇" // branch pivot fallback (distinct from fbGitBranch)
 )
 
 // ---------------------------------------------------------------------------
@@ -133,6 +140,27 @@ func IconCheck() string { return icon(nfCheck, fbCheck) }
 // IconHidden returns the hidden/eye-slash icon ("" or "⊘").
 func IconHidden() string { return icon(nfEyeSlash, fbEyeSlash) }
 
+// IconRepo returns the repository icon ("" or "◆").
+func IconRepo() string { return icon(nfRepo+" ", fbRepo) }
+
+// IconRepoOpen returns the expanded repository icon ("" or "◆").
+func IconRepoOpen() string { return icon(nfRepo+" ", fbRepo) }
+
+// IconCalendar returns the date/calendar icon ("" or "◇").
+func IconCalendar() string { return icon(nfCalendar+" ", fbCalendar) }
+
+// IconCalendarOpen returns the expanded date/calendar icon ("" or "◇").
+func IconCalendarOpen() string { return icon(nfCalendar+" ", fbCalendar) }
+
+// IconBranch returns the collapsed git branch icon ("" or "⎇").
+func IconBranch() string { return icon(nfGitBranch+" ", fbBranch) }
+
+// IconBranchOpen returns the expanded git branch icon ("" or "⎇").
+func IconBranchOpen() string { return icon(nfGitBranch+" ", fbBranch) }
+
+// IconList returns the list icon ("" or "≡").
+func IconList() string { return icon(nfList+" ", fbList) }
+
 // ---------------------------------------------------------------------------
 // Attention status dot icons
 // ---------------------------------------------------------------------------
@@ -153,3 +181,19 @@ func IconAttentionStale() string { return icon(nfBullet, fbAttentionDot) }
 
 // IconAttentionIdle returns an open dot for "not running" status.
 func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }
+
+// PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
+// The pivot string matches data.PivotField values ("cwd", "repository",
+// "branch", "date") or the TUI pivot mode constants ("folder", "repo", etc).
+func PivotGroupIcons(pivot string) (collapsed, expanded string) {
+	switch pivot {
+	case "repository", "repo":
+		return IconRepo(), IconRepoOpen()
+	case "branch":
+		return IconBranch(), IconBranchOpen()
+	case "date":
+		return IconCalendar(), IconCalendarOpen()
+	default: // "cwd", "folder", or anything else
+		return IconFolder(), IconFolderOpen()
+	}
+}

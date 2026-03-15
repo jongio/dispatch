@@ -95,13 +95,16 @@ func classifySession(dir string, threshold time.Duration) AttentionStatus {
 		strings.HasPrefix(evt.Type, "assistant.message"):
 		return AttentionWaiting
 	case strings.HasPrefix(evt.Type, "assistant.turn_start"),
-		strings.HasPrefix(evt.Type, "tool.execution_start"),
-		strings.HasPrefix(evt.Type, "tool.execution_complete"):
+		strings.HasPrefix(evt.Type, "tool.execution"),
+		strings.HasPrefix(evt.Type, "hook."),
+		strings.HasPrefix(evt.Type, "subagent."),
+		strings.HasPrefix(evt.Type, "session.plan_changed"):
 		return AttentionActive
 	case evt.Type == "session.shutdown":
 		return AttentionIdle
 	default:
-		// user.message or unknown — AI hasn't started responding yet.
+		// user.message, session.start, or unknown — AI hasn't started
+		// responding yet, so treat as active.
 		return AttentionActive
 	}
 }

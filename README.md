@@ -25,6 +25,8 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
+- **Multi-session open** (`Space` / `O` / `a` / `d`) — select multiple sessions with Space, open all at once with O, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
+- **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), idle (gray). Jump to next waiting session with `n`, filter by status with `!`
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Settings panel** (`,`) — 9 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
@@ -46,6 +48,10 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 | ![Search](web/public/screenshots/one-half-light/search-active.png) | ![Grouping by folder](web/public/screenshots/one-half-light/pivot-folder.png) |
 | ![Preview panel](web/public/screenshots/one-half-light/preview-panel.png) | ![Filter panel](web/public/screenshots/one-half-light/filter-panel.png) |
 
+| Multi-Select | Attention Indicators |
+|---|---|
+| ![Multi-select sessions](web/public/screenshots/one-half-light/multi-select.png) | ![Attention status picker](web/public/screenshots/one-half-light/attention-picker.png) |
+
 | Settings | Help Overlay |
 |---|---|
 | ![Settings panel](web/public/screenshots/one-half-light/config-panel.png) | ![Help overlay](web/public/screenshots/one-half-light/help-overlay.png) |
@@ -63,10 +69,22 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
 ```
 
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
+```
+
 ### PowerShell (Windows)
 
 ```powershell
 irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+```
+
+To install a specific version:
+
+```powershell
+$v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
 ```
 
 ### From source
@@ -123,6 +141,22 @@ dispatch
 | `w` | Launch in new window |
 | `t` | Launch in new tab |
 | `e` | Launch in split pane (Windows Terminal) |
+
+#### Multi-Select
+
+| Key | Action |
+|---|---|
+| `Space` | Toggle selection on current session |
+| `O` | Open all selected sessions (or all in folder) |
+| `a` | Select all visible sessions |
+| `d` | Deselect all |
+
+#### Attention & Status
+
+| Key | Action |
+|---|---|
+| `n` | Jump to next waiting session |
+| `!` | Filter by attention status |
 | `h` | Hide/unhide current session |
 | `H` | Toggle visibility of hidden sessions |
 
@@ -182,6 +216,9 @@ Keys inside overlays (filter, settings, shell picker, help):
 | Click session | Select it |
 | Click folder header | Expand or collapse |
 | Double-click session | Launch it |
+| Ctrl + click session | Toggle selection without opening |
+| Shift + click session | Range select from last click |
+| Double-click (with selections) | Open all selected sessions |
 | Double-click folder | Launch new session in that directory |
 | Ctrl + double-click | Force new window |
 | Shift + double-click | Force new tab |
@@ -346,7 +383,7 @@ go build ./cmd/dispatch/
 | **Test** | `mage test` | `go test` with race detector + shuffle |
 | **TestWSL** | `mage testWSL` | Run tests under WSL Linux for Unix code path coverage |
 | **CoverageReport** | `mage coverageReport` | Generate `coverage.html` with atomic coverage profile |
-| **Preflight** | `mage preflight` | Full CI check (9 steps — see below) |
+| **Preflight** | `mage preflight` | Full CI check (11 steps — see below) |
 | **Vet** | `mage vet` | `go vet ./...` |
 | **Lint** | `mage lint` | golangci-lint (falls back to go vet) |
 | **Fmt** | `mage fmt` | Format all Go source files |
@@ -358,15 +395,17 @@ go build ./cmd/dispatch/
 `mage preflight` runs the same checks as CI — if preflight passes, CI will pass:
 
 ```
-Step 1/9  gofmt           — Auto-format source files
-Step 2/9  go mod tidy     — Clean up module dependencies
-Step 3/9  go vet          — Static analysis
-Step 4/9  golangci-lint   — Extended linter suite (20+ linters)
-Step 5/9  go build        — Compile all packages
-Step 6/9  go test         — Unit & integration tests (shuffled, race-detected)
-Step 7/9  govulncheck     — Known vulnerability scan
-Step 8/9  gofumpt         — Strict formatting enforcement
-Step 9/9  deadcode        — Unreachable code detection
+Step  1/11  gofmt           — Auto-format source files
+Step  2/11  go mod tidy     — Clean up module dependencies
+Step  3/11  go vet          — Static analysis
+Step  4/11  golangci-lint   — Extended linter suite (20+ linters)
+Step  5/11  go build        — Compile all packages
+Step  6/11  go test         — Unit & integration tests (shuffled, race-detected)
+Step  7/11  go test -race   — Race detection (requires gcc / CGO)
+Step  8/11  WSL tests       — Unix code path coverage (skipped if WSL unavailable)
+Step  9/11  govulncheck     — Known vulnerability scan
+Step 10/11  gofumpt         — Strict formatting enforcement
+Step 11/11  deadcode        — Unreachable code detection
 ```
 
 ### CI Pipeline

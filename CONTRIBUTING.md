@@ -19,6 +19,24 @@ go install golang.org/x/tools/cmd/deadcode@latest    # Dead code detection
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest  # Linter
 ```
 
+## Installing a Release
+
+To install the latest release (or test against a specific version):
+
+```sh
+# Latest — Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+
+# Specific version — Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
+
+# Latest — Windows (PowerShell)
+irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+
+# Specific version — Windows (PowerShell)
+$v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+```
+
 ## Development Setup
 
 1. **Clone and build**:

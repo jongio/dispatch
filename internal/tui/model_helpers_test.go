@@ -551,8 +551,13 @@ func TestCycleSort(t *testing.T) {
 	}
 
 	m.cycleSort()
+	if m.sort.Field != data.SortByAttention {
+		t.Errorf("after third cycle: %v, want SortByAttention", m.sort.Field)
+	}
+
+	m.cycleSort()
 	if m.sort.Field != data.SortByUpdated {
-		t.Errorf("after third cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
+		t.Errorf("after fourth cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
 	}
 }
 

@@ -1,10 +1,17 @@
 # Installer for Dispatch — a Go TUI launcher for GitHub Copilot CLI extensions.
 #
-# Usage: irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
-# Or:    $env:VERSION = "v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+# Usage:
+#   irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+#   $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+#   $env:VERSION = "v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+#   .\install.ps1 -Version v0.1.0
+#
+# Parameters:
+#   -Version     Version to install (e.g. v0.1.0, 0.1.0). Defaults to latest.
 #
 # Environment variables:
 #   VERSION  Override the version to install (e.g. v0.1.0). Defaults to latest.
+#            The -Version parameter and $v variable take precedence.
 
 $ErrorActionPreference = 'Stop'
 
@@ -53,11 +60,15 @@ function Get-DispatchArch {
 # Version resolution
 # ---------------------------------------------------------------------------
 function Get-DispatchVersion {
-    if ($env:VERSION) {
-        $v = $env:VERSION.Trim()
+    # Priority: $v variable (one-liner friendly) > $env:VERSION > latest from GitHub.
+    # $v is set by: $v="v0.1.0"; irm ... | iex
+    $requestedVersion = if ($v) { $v } elseif ($env:VERSION) { $env:VERSION } else { $null }
+
+    if ($requestedVersion) {
+        $ver = $requestedVersion.ToString().Trim()
         # Normalise: ensure the tag starts with "v".
-        if (-not $v.StartsWith('v')) { $v = "v$v" }
-        return $v
+        if (-not $ver.StartsWith('v')) { $ver = "v$ver" }
+        return $ver
     }
 
     Write-Status 'Querying GitHub for latest release...'

@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -225,39 +224,6 @@ func TestEscapeAppleScript_TabsAndNewlines(t *testing.T) {
 	// Tabs (0x09) and newlines (0x0a) are control characters, should be stripped
 	if got != "helloworldfoo" {
 		t.Errorf("escapeAppleScript(%q) = %q, want %q", input, got, "helloworldfoo")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// copyFile — large file
-// ---------------------------------------------------------------------------
-
-func TestCopyFile_LargeFile(t *testing.T) {
-	srcDir := t.TempDir()
-	dstDir := t.TempDir()
-
-	srcPath := srcDir + string(os.PathSeparator) + "large.bin"
-	dstPath := dstDir + string(os.PathSeparator) + "large_copy.bin"
-
-	// Create a 1MB file
-	data := make([]byte, 1<<20)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	if err := os.WriteFile(srcPath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := copyFile(srcPath, dstPath); err != nil {
-		t.Fatalf("copyFile() error: %v", err)
-	}
-
-	got, err := os.ReadFile(dstPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != len(data) {
-		t.Errorf("copied %d bytes, want %d", len(got), len(data))
 	}
 }
 

@@ -12,6 +12,25 @@ import Base from '../layouts/Base.astro';
 
   <section class="section">
     <div class="container">
+      <h2>Unreleased</h2>
+
+      <h3>Added</h3>
+      <ul class="changelog-list">
+        <li><strong>Multi-session open</strong> — select multiple sessions with <kbd>Space</kbd>, open all at once with <kbd>O</kbd>. <kbd>a</kbd>/<kbd>d</kbd> for select/deselect all. Ctrl+click and Shift+click for mouse selection. ✓ indicator on selected sessions.</li>
+        <li><strong>Attention indicators</strong> — colored dots showing real-time session AI activity: waiting (purple), active (green), stale (yellow), idle (gray). <kbd>n</kbd> to jump to next waiting session, <kbd>!</kbd> to filter by status.</li>
+        <li><strong>Self-update</strong> — <code>dispatch update</code> downloads the latest release and replaces in-place with SHA-256 verification. Background version check on every launch (24h cache).</li>
+        <li>Demo mode enhancements — fake attention data, timestamps relative to launch time, sessions across all time windows</li>
+        <li>WSL cross-testing for Unix code path coverage</li>
+        <li>Race detection and install verification as preflight steps (now 11 steps)</li>
+      </ul>
+
+      <h3>Fixed</h3>
+      <ul class="changelog-list">
+        <li>Demo mode 1-hour time range showing no sessions due to timestamp format mismatch (space vs RFC3339 <code>T</code> separator)</li>
+      </ul>
+
+      <hr style="margin: var(--space-8) 0; border-color: var(--border);" />
+
       <h2>0.1.0 <span class="badge">2026-03-10</span></h2>
 
       <h3>Added</h3>

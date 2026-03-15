@@ -34,6 +34,7 @@ type SessionList struct {
 	attentionMap map[string]data.AttentionStatus // session ID → attention status
 	selected     map[string]struct{}             // session ID → selected for multi-open
 	treeMode     bool                            // true when showing grouped/tree view
+	pivotField   string                          // current pivot mode (e.g. "folder", "repo")
 	cursor       int                             // position within visItems
 	scrollOffset int                             // first visible position within visItems
 	width        int
@@ -83,6 +84,12 @@ func (s *SessionList) SetGroups(groups []data.SessionGroup) {
 	}
 	s.treeMode = true
 	s.rebuildVisible()
+}
+
+// SetPivotField stores the current pivot mode so that group header icons
+// reflect the active grouping dimension (folder, repo, branch, date).
+func (s *SessionList) SetPivotField(pivot string) {
+	s.pivotField = pivot
 }
 
 // SetHiddenSessions updates the set of hidden session IDs, used to
@@ -488,9 +495,10 @@ func (s *SessionList) rebuildVisible() {
 }
 
 func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
-	arrow := styles.IconFolderOpen()
-	if _, expanded := s.expanded[item.folderPath]; !expanded {
-		arrow = styles.IconFolder()
+	collapsed, expanded := styles.PivotGroupIcons(s.pivotField)
+	arrow := expanded
+	if _, exp := s.expanded[item.folderPath]; !exp {
+		arrow = collapsed
 	}
 
 	folder := AbbrevHome(item.folderPath)
@@ -508,9 +516,9 @@ func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
 	line := prefix + folder + suffix
 
 	if selected {
-		return styles.SelectedStyle.Width(s.width).Render(line)
+		return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 	}
-	return styles.GroupHeaderStyle.Width(s.width).Render(line)
+	return styles.GroupHeaderStyle.Render(PadToWidth(line, s.width))
 }
 
 func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, aiFound bool) string {
@@ -523,12 +531,15 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	if aiFound {
 		summary = "✦ " + summary
 	}
+	if hidden {
+		summary = "[hidden] " + summary
+	}
 
 	relTime := RelativeTime(sess.LastActiveAt)
 	turns := FormatInt(sess.TurnCount) + "t"
 
 	// Attention dot — 2 chars (dot + space).
-	attDot := s.attentionDot(sess.ID)
+	attDot := s.attentionDot(sess.ID, selected)
 
 	// In tree mode, indent sessions under their folder.
 	indent := ""
@@ -542,9 +553,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		indicator = styles.IconPointer() + " "
 	}
 	// Show check mark for multi-selected sessions.
-	checkMark := " "
+	checkMark := "  "
 	if s.IsSelected(sess.ID) {
-		checkMark = styles.IconCheck()
+		checkMark = styles.IconCheck() + " "
 	}
 
 	const dotW = 2 // dot + space
@@ -554,29 +565,27 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-1-timeW-spacing) // dotW for attention, -1 for checkmark
+		summaryW := max(10, w-2-dotW-2-timeW-spacing) // dotW for attention, -2 for checkmark+space
 		line := indent + checkMark + indicator + attDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
-			return styles.SelectedStyle.Width(s.width).Render(line)
+			return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 		}
 		if hidden {
-			return styles.HiddenStyle.Width(s.width).Render(line)
+			return styles.HiddenStyle.Render(PadToWidth(line, s.width))
 		}
-		return lipgloss.NewStyle().Width(s.width).Render(line)
+		return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 	}
 
-	// In tree mode, skip folder/repo columns since context is in the header.
+	// Show folder/repo columns at wider terminals.
 	var folderW, repoW int
-	if !s.treeMode {
-		if w >= 120 {
-			folderW = 22
-			repoW = 18
-		} else if w >= 90 {
-			folderW = 18
-		}
+	if w >= 120 {
+		folderW = 22
+		repoW = 18
+	} else if w >= 90 {
+		folderW = 18
 	}
 
-	summaryW := w - 2 - dotW - 1 - timeW - turnsW - 2*spacing // dotW for attention, -1 for checkmark
+	summaryW := w - 2 - dotW - 2 - timeW - turnsW - 2*spacing // dotW for attention, -2 for checkmark+space
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -613,18 +622,21 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	line := b.String()
 
 	if selected {
-		return styles.SelectedStyle.Width(s.width).Render(line)
+		return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 	}
 	if hidden {
-		return styles.HiddenStyle.Width(s.width).Render(line)
+		return styles.HiddenStyle.Render(PadToWidth(line, s.width))
 	}
-	return lipgloss.NewStyle().Width(s.width).Render(line)
+	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 }
 
 // attentionDot returns a styled 2-character string (dot + space) representing
 // the attention status of the given session. If no attention data is available
 // the dot is omitted but the space is preserved for alignment.
-func (s SessionList) attentionDot(sessionID string) string {
+//
+// When selected is true the dot's style is merged with the SelectedStyle
+// background so the row highlight spans continuously without gaps.
+func (s SessionList) attentionDot(sessionID string, selected bool) string {
 	if s.attentionMap == nil {
 		return "  "
 	}
@@ -632,14 +644,31 @@ func (s SessionList) attentionDot(sessionID string) string {
 	if !ok {
 		return "  "
 	}
+
+	var dotStyle lipgloss.Style
+	var icon string
 	switch status {
 	case data.AttentionWaiting:
-		return styles.AttentionWaitingStyle.Render(styles.IconAttentionWaiting()) + " "
+		dotStyle = styles.AttentionWaitingStyle
+		icon = styles.IconAttentionWaiting()
 	case data.AttentionActive:
-		return styles.AttentionActiveStyle.Render(styles.IconAttentionActive()) + " "
+		dotStyle = styles.AttentionActiveStyle
+		icon = styles.IconAttentionActive()
 	case data.AttentionStale:
-		return styles.AttentionStaleStyle.Render(styles.IconAttentionStale()) + " "
+		dotStyle = styles.AttentionStaleStyle
+		icon = styles.IconAttentionStale()
 	default:
-		return styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()) + " "
+		dotStyle = styles.AttentionIdleStyle
+		icon = styles.IconAttentionIdle()
 	}
+
+	// When the row is selected, return the plain icon without lipgloss
+	// styling. lipgloss.Render appends an ANSI reset (\033[0m) that would
+	// kill the outer SelectedStyle background mid-line. Returning raw text
+	// lets the outer Render call apply a uniform highlight across the row.
+	if selected {
+		return icon + " "
+	}
+
+	return dotStyle.Render(icon + " ")
 }

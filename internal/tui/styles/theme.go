@@ -233,7 +233,7 @@ func applyLegacyDefaults() {
 
 	TitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
 	SubtitleStyle = lipgloss.NewStyle().Foreground(ld)
-	HeaderStyle = lipgloss.NewStyle().Foreground(lt).Background(lipgloss.AdaptiveColor{Light: "#F3F3F3", Dark: "#111111"})
+	HeaderStyle = lipgloss.NewStyle().Foreground(lt)
 
 	SelectedStyle = lipgloss.NewStyle().Bold(true).Background(ls).Foreground(lt)
 	NormalStyle = lipgloss.NewStyle().Foreground(lt)
@@ -286,7 +286,7 @@ func applyLegacyDefaults() {
 	ChatAssistantLabelStyle = lipgloss.NewStyle().Foreground(ld).Bold(true)
 
 	// Attention dot styles — legacy adaptive defaults.
-	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(le).Bold(true)
+	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
 	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C19C00", Dark: "#C19C00"})
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)

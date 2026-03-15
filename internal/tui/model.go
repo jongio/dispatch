@@ -67,6 +67,7 @@ const (
 	stateHelpOverlay          // help modal open
 	stateShellPicker          // shell selection overlay
 	stateConfigPanel          // settings overlay
+	stateAttentionPicker      // attention status filter overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -112,7 +113,8 @@ type Model struct {
 	filter    data.FilterOptions
 	sort      data.SortOptions
 	timeRange string // "1h", "1d", "7d", "all"
-	pivot     string // "none", "folder", "repo", "branch", "date"
+	pivot      string         // "none", "folder", "repo", "branch", "date"
+	pivotOrder data.SortOrder // group header sort direction
 
 	// Loaded data.
 	sessions []data.Session
@@ -131,6 +133,7 @@ type Model struct {
 	help        components.HelpOverlay
 	shellPicker components.ShellPicker
 	configPanel components.ConfigPanel
+	attentionPicker components.AttentionPicker
 	spinner     spinner.Model
 
 	// UI toggles.
@@ -174,7 +177,7 @@ type Model struct {
 
 	// Attention status tracking — scanned from session-state directories.
 	attentionMap    map[string]data.AttentionStatus
-	attentionFilter bool // when true, only show sessions with AttentionWaiting
+	attentionFilter map[data.AttentionStatus]struct{} // when non-empty, only show sessions with matching status
 }
 
 // NewModel creates the root Model with default configuration.
@@ -238,6 +241,8 @@ func NewModel() Model {
 		shellPicker: components.NewShellPicker(),
 		configPanel: cp,
 		spinner:     s,
+		attentionPicker: components.NewAttentionPicker(),
+		attentionFilter: make(map[data.AttentionStatus]struct{}),
 	}
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
@@ -315,7 +320,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case storeOpenedMsg:
 		m.store = msg.store
 		m.state = stateSessionList
-		return m, m.loadSessionsCmd()
+		return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionCmd())
 
 	case storeErrorMsg:
 		m.statusErr = "Store: " + msg.err.Error()
@@ -381,26 +386,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionsLoadedMsg:
 		m.sessions = m.filterHiddenSessions(msg.sessions)
 		m.sessions = m.filterAttentionSessions(m.sessions)
+		m.sortByAttention(m.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
 		m.sessionList.SetSessions(m.sessions)
-		m.state = stateSessionList
+		// Only transition from loading to session-list; never clobber an
+		// active modal/overlay state with an async data load.
+		if m.state == stateLoading {
+			m.state = stateSessionList
+		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanAttentionCmd())
+		return m, m.loadSelectedDetailCmd()
 
 	case groupsLoadedMsg:
 		m.groups = m.filterHiddenGroups(msg.groups)
 		m.groups = m.filterAttentionGroups(m.groups)
+		for i := range m.groups {
+			m.sortByAttention(m.groups[i].Sessions)
+		}
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
-		m.state = stateSessionList
+		if m.state == stateLoading {
+			m.state = stateSessionList
+		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanAttentionCmd())
+		return m, m.loadSelectedDetailCmd()
 
 	case sessionDetailMsg:
 		if msg.version != m.detailVersion {
@@ -412,18 +428,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dataErrorMsg:
 		m.statusErr = "Data: " + msg.err.Error()
-		m.state = stateSessionList
+		if m.state == stateLoading {
+			m.state = stateSessionList
+		}
 		return m, nil
 
 	// ----- Attention scanning ---------------------------------------------
 	case attentionScannedMsg:
 		m.attentionMap = msg.statuses
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		// If attention filter is active, reload to apply filtering.
-		if m.attentionFilter {
-			return m, m.loadSessionsCmd()
+		// Always schedule the next periodic scan. When the attention filter
+		// is active, also reload sessions so the list reflects updated
+		// statuses. The reload no longer fires another scan (that was an
+		// infinite loop), so the tick is the sole driver of periodic scans.
+		cmds := []tea.Cmd{m.scheduleAttentionTick()}
+		if len(m.attentionFilter) > 0 {
+			cmds = append(cmds, m.loadSessionsCmd())
 		}
-		return m, m.scheduleAttentionTick()
+		return m, tea.Batch(cmds...)
 
 	case attentionTickMsg:
 		return m, m.scanAttentionCmd()
@@ -451,9 +473,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.groups = m.filterHiddenGroups(msg.groups)
 			m.sessions = nil
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(m.groups)
 		}
-		m.state = stateSessionList
+		if m.state == stateLoading {
+			m.state = stateSessionList
+		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
 		return m, m.loadSelectedDetailCmd()
@@ -488,7 +513,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.copilotClient != nil && !m.copilotClient.Available() {
 			m.searchBar.SetAIStatus("connecting")
 		}
-		return m, m.copilotSearchCmd(msg.version)
+		cmd := m.copilotSearchCmd(msg.version)
+		return m, cmd
 
 	case copilotSearchResultMsg:
 		if msg.version != m.copilotSearchVersion {
@@ -575,25 +601,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.configPanel.SetTerminals(names)
 		return m, nil
 
-	// ----- Font check / install -------------------------------------------
+	// ----- Font check -------------------------------------------------------
 	case fontCheckMsg:
 		styles.SetNerdFontEnabled(msg.installed)
-		if msg.installed {
-			return m, nil
-		}
-		// Not installed — attempt background installation.
-		m.statusInfo = "Installing Nerd Font…"
-		return m, installNerdFontCmd()
-
-	case fontInstalledMsg:
-		if msg.err != nil {
-			// Installation failed — keep fallback icons, clear status.
-			m.statusInfo = ""
-			return m, nil
-		}
-		styles.SetNerdFontEnabled(true)
-		m.statusInfo = "Nerd Font installed " + styles.IconCheck()
-		return m, clearStatusAfter(3 * time.Second)
+		return m, nil
 
 	// ----- Session exit (in-place resume finished) -------------------------
 	case sessionExitMsg:
@@ -632,6 +643,9 @@ func (m Model) View() string {
 
 	case stateConfigPanel:
 		return m.configPanel.View()
+
+	case stateAttentionPicker:
+		return m.attentionPicker.View()
 
 	default: // stateSessionList
 		if m.reindexing && len(m.reindexLog) > 0 {
@@ -681,7 +695,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if sh, ok := m.shellPicker.Selected(); ok {
 				m.state = stateSessionList
 				launchStyle := launchStyleForMode(m.pendingLaunchMode)
-				return m, m.launchExternal(sh, m.selectedSessionID(), m.selectedSessionCwd(), launchStyle)
+				cmd := m.launchExternal(sh, m.selectedSessionID(), m.selectedSessionCwd(), launchStyle)
+				return m, cmd
 			}
 		}
 		return m, nil
@@ -715,6 +730,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case stateConfigPanel:
 		return m.handleConfigKey(msg)
+
+	case stateAttentionPicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.attentionPicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.attentionPicker.MoveDown()
+		case key.Matches(msg, keys.Space):
+			m.attentionPicker.Toggle()
+		case key.Matches(msg, keys.Enter):
+			m.attentionFilter = m.attentionPicker.Selected()
+			m.state = stateSessionList
+			return m, m.loadSessionsCmd()
+		}
+		return m, nil
 
 	default:
 		// stateLoading and stateSessionList fall through to the
@@ -861,37 +893,47 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Enter):
 		if m.sessionList.IsFolderSelected() {
-			m.sessionList.ToggleFolder()
-			return m, nil
+			cmd := m.launchNewInFolder(m.cfg.EffectiveLaunchMode())
+			return m, cmd
 		}
-		return m, m.launchSelected()
+		cmd := m.launchSelected()
+		return m, cmd
 
 	case key.Matches(msg, keys.LaunchWindow):
-		if !m.sessionList.IsFolderSelected() {
-			if m.sessionList.SelectionCount() > 0 {
-				return m, m.launchMultipleWithMode(config.LaunchModeWindow)
-			}
-			return m, m.launchWithMode(config.LaunchModeWindow)
+		if m.sessionList.IsFolderSelected() {
+			cmd := m.launchNewInFolder(config.LaunchModeWindow)
+			return m, cmd
 		}
-		return m, nil
+		if m.sessionList.SelectionCount() > 0 {
+			cmd := m.launchMultipleWithMode(config.LaunchModeWindow)
+			return m, cmd
+		}
+		cmd := m.launchWithMode(config.LaunchModeWindow)
+		return m, cmd
 
 	case key.Matches(msg, keys.LaunchTab):
-		if !m.sessionList.IsFolderSelected() {
-			if m.sessionList.SelectionCount() > 0 {
-				return m, m.launchMultipleWithMode(config.LaunchModeTab)
-			}
-			return m, m.launchWithMode(config.LaunchModeTab)
+		if m.sessionList.IsFolderSelected() {
+			cmd := m.launchNewInFolder(config.LaunchModeTab)
+			return m, cmd
 		}
-		return m, nil
+		if m.sessionList.SelectionCount() > 0 {
+			cmd := m.launchMultipleWithMode(config.LaunchModeTab)
+			return m, cmd
+		}
+		cmd := m.launchWithMode(config.LaunchModeTab)
+		return m, cmd
 
 	case key.Matches(msg, keys.LaunchPane):
-		if !m.sessionList.IsFolderSelected() {
-			if m.sessionList.SelectionCount() > 0 {
-				return m, m.launchMultipleWithMode(config.LaunchModePane)
-			}
-			return m, m.launchWithMode(config.LaunchModePane)
+		if m.sessionList.IsFolderSelected() {
+			cmd := m.launchNewInFolder(config.LaunchModePane)
+			return m, cmd
 		}
-		return m, nil
+		if m.sessionList.SelectionCount() > 0 {
+			cmd := m.launchMultipleWithMode(config.LaunchModePane)
+			return m, cmd
+		}
+		cmd := m.launchWithMode(config.LaunchModePane)
+		return m, cmd
 
 	case key.Matches(msg, keys.Left):
 		if m.sessionList.IsFolderSelected() {
@@ -915,6 +957,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Pivot):
 		m.cyclePivot()
+		return m, m.loadSessionsCmd()
+
+	case key.Matches(msg, keys.PivotOrder):
+		m.togglePivotOrder()
 		return m, m.loadSessionsCmd()
 
 	case key.Matches(msg, keys.Preview):
@@ -976,8 +1022,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleJumpNextAttention()
 
 	case key.Matches(msg, keys.FilterAttention):
-		m.attentionFilter = !m.attentionFilter
-		return m, m.loadSessionsCmd()
+		counts := m.attentionStatusCounts()
+		m.attentionPicker.SetCounts(counts)
+		m.attentionPicker.SetSelected(m.attentionFilter)
+		m.attentionPicker.SetSize(m.width, m.height)
+		m.state = stateAttentionPicker
+		return m, nil
 
 	case key.Matches(msg, keys.Space):
 		m.sessionList.ToggleSelected()
@@ -985,7 +1035,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.LaunchAll):
-		return m, m.launchMultiple()
+		cmd := m.launchMultiple()
+		return m, cmd
 
 	case key.Matches(msg, keys.SelectAll):
 		m.sessionList.SelectAll()
@@ -1054,6 +1105,7 @@ func (m Model) handleConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, keys.Enter):
 			m.configPanel.ConfirmEdit()
+			m.saveConfigFromPanel()
 			return m, nil
 		default:
 			var cmd tea.Cmd
@@ -1064,8 +1116,7 @@ func (m Model) handleConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, keys.Escape):
-		// Save config on close.
-		m.saveConfigFromPanel()
+		// Cancel — close without saving (changes already persisted per-toggle).
 		m.state = stateSessionList
 		return m, nil
 	case key.Matches(msg, keys.Up):
@@ -1074,6 +1125,10 @@ func (m Model) handleConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.configPanel.MoveDown()
 	case key.Matches(msg, keys.Enter):
 		cmd := m.configPanel.HandleEnter()
+		if cmd == nil {
+			// Toggle/cycle completed — persist immediately.
+			m.saveConfigFromPanel()
+		}
 		return m, cmd
 	}
 	return m, nil
@@ -1161,7 +1216,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Map Y coordinate to a list item.
 		listRow := msg.Y - styles.HeaderLines
 		if listRow >= m.layout.contentHeight {
-			return m, nil
+			// Footer click — check for waiting badge.
+			return m.handleFooterClick(msg.X)
 		}
 		// Only clicks within the list width (not the preview pane).
 		if m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth {
@@ -1179,28 +1235,40 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.pendingClickVersion = 0
 
 			m.sessionList.MoveTo(itemIdx)
+
+			// Guard: if the list is empty or the click resolved to a
+			// non-existent row, bail out instead of launching.
+			_, hasSession := m.sessionList.Selected()
+			if !hasSession && !m.sessionList.IsFolderSelected() {
+				return m, nil
+			}
+
 			if m.sessionList.IsFolderSelected() {
-				cwd := m.sessionList.SelectedFolderPath()
 				mode := m.cfg.EffectiveLaunchMode()
 				if msg.Ctrl {
 					mode = config.LaunchModeWindow
 				} else if msg.Shift {
 					mode = config.LaunchModeTab
 				}
-				return m, m.launchNewSession(cwd, mode)
+				cmd := m.launchNewInFolder(mode)
+				return m, cmd
 			}
 			// Double-click session: if it's part of a multi-selection,
 			// launch all selected. Otherwise launch just this session.
 			if m.sessionList.SelectionCount() > 0 && m.sessionList.IsSelected(m.selectedSessionID()) {
-				return m, m.launchMultiple()
+				cmd := m.launchMultiple()
+				return m, cmd
 			}
 			if msg.Ctrl {
-				return m, m.launchWithMode(config.LaunchModeWindow)
+				cmd := m.launchWithMode(config.LaunchModeWindow)
+				return m, cmd
 			}
 			if msg.Shift {
-				return m, m.launchWithMode(config.LaunchModeTab)
+				cmd := m.launchWithMode(config.LaunchModeTab)
+				return m, cmd
 			}
-			return m, m.launchSelected()
+			cmd := m.launchSelected()
+			return m, cmd
 		}
 
 		// Ctrl+click: toggle multi-select immediately (no deferred action).
@@ -1233,6 +1301,40 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleFooterClick dispatches left-clicks on the footer status bar.
+// Currently supports clicking the "● N waiting" badge to toggle the
+// attention filter (same as pressing !).
+func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
+	wc := m.waitingCount()
+	if wc == 0 {
+		return m, nil
+	}
+
+	// Replay the footer layout to find the "● N waiting" badge X position.
+	// This mirrors the left-side construction in renderFooter().
+	left := fmt.Sprintf(" %d sessions", m.sessionList.SessionCount())
+	if hc := m.hiddenCount(); hc > 0 {
+		badge := fmt.Sprintf("%d hidden", hc)
+		if m.showHidden {
+			badge += " " + styles.IconHidden()
+		}
+		left += "  " + styles.BadgeStyle.Render(badge)
+	}
+	badgeStart := lipgloss.Width(left) + 2 // +2 for the "  " separator before the badge
+	badgeRendered := styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
+	badgeEnd := badgeStart + lipgloss.Width(badgeRendered)
+
+	if x >= badgeStart && x < badgeEnd {
+		counts := m.attentionStatusCounts()
+		m.attentionPicker.SetCounts(counts)
+		m.attentionPicker.SetSelected(m.attentionFilter)
+		m.attentionPicker.SetSize(m.width, m.height)
+		m.state = stateAttentionPicker
+		return m, nil
+	}
+	return m, nil
+}
+
 // handleHeaderClick dispatches left-clicks that land in the header area
 // (Y=0: title/search, Y=1: badges/time/sort/pivot, Y=2: separator).
 func (m Model) handleHeaderClick(x, y int) (tea.Model, tea.Cmd) {
@@ -1254,6 +1356,9 @@ func (m Model) handleHeaderClick(x, y int) (tea.Model, tea.Cmd) {
 			return m, m.loadSessionsCmd()
 		case "pivot":
 			m.cyclePivot()
+			return m, m.loadSessionsCmd()
+		case "pivotorder":
+			m.togglePivotOrder()
 			return m, m.loadSessionsCmd()
 		default:
 			if rest, ok := strings.CutPrefix(action, "time:"); ok {
@@ -1300,27 +1405,58 @@ func (m Model) badgeClickAction(x int) string {
 		}
 	}
 
-	// Sort indicator.
+	// Sort indicator — split into arrow (order toggle) and label (cycle field).
 	arrow := styles.IconSortDown()
 	if m.sort.Order == data.Ascending {
 		arrow = styles.IconSortUp()
 	}
 	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
-	sortRendered := styles.KeyStyle.Render("s") + styles.DimmedStyle.Render(":Sort: "+sortLabel)
-	w := lipgloss.Width(sortRendered)
+	sortKeyRendered := styles.KeyStyle.Render("s")
+	sortKeyW := lipgloss.Width(sortKeyRendered)
+	sortPrefix := styles.DimmedStyle.Render(":Sort: ")
+	sortPrefixW := lipgloss.Width(sortPrefix)
+	sortArrowRendered := styles.DimmedStyle.Render(arrow)
+	sortArrowW := lipgloss.Width(sortArrowRendered)
+	sortFullRendered := sortKeyRendered + styles.DimmedStyle.Render(":Sort: "+sortLabel)
+	w := lipgloss.Width(sortFullRendered)
 	if x >= cursor && x < cursor+w {
+		// Click on the arrow portion toggles order; elsewhere cycles sort field.
+		arrowStart := cursor + sortKeyW + sortPrefixW
+		if x >= arrowStart && x < arrowStart+sortArrowW {
+			return "sortorder"
+		}
 		return "sort"
 	}
 	cursor += w + 2
 
-	// Pivot indicator (always present).
+	// Pivot indicator — split into arrow (order toggle) and label (cycle mode).
 	pivotLabel := m.pivot
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	pivotRendered := styles.KeyStyle.Render("tab") + styles.DimmedStyle.Render(":Pivot: "+pivotLabel)
+	hasPivotArrow := m.pivot != pivotNone
+	if hasPivotArrow {
+		pivotArrow := styles.IconSortDown()
+		if m.pivotOrder == data.Ascending {
+			pivotArrow = styles.IconSortUp()
+		}
+		pivotLabel = pivotArrow + " " + pivotLabel
+	}
+	pivotKeyRendered := styles.KeyStyle.Render("tab")
+	pivotKeyW := lipgloss.Width(pivotKeyRendered)
+	pivotPrefix := styles.DimmedStyle.Render(":Pivot: ")
+	pivotPrefixW := lipgloss.Width(pivotPrefix)
+	pivotRendered := pivotKeyRendered + styles.DimmedStyle.Render(":Pivot: "+pivotLabel)
 	pw := lipgloss.Width(pivotRendered)
 	if x >= cursor && x < cursor+pw {
+		if hasPivotArrow {
+			pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown())
+			pivotArrowW := lipgloss.Width(pivotArrowRendered)
+			arrowStart := cursor + pivotKeyW + pivotPrefixW
+			if x >= arrowStart && x < arrowStart+pivotArrowW {
+				return "pivotorder"
+			}
+		}
 		return "pivot"
 	}
 
@@ -1469,12 +1605,14 @@ func (m Model) renderBadges() string {
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(":Pivot: "+pivotLabel))
-
-	// Attention filter indicator.
-	if m.attentionFilter {
-		parts = append(parts, styles.ActiveBadgeStyle.Render("! waiting only"))
+	if m.pivot != pivotNone {
+		pivotArrow := styles.IconSortDown()
+		if m.pivotOrder == data.Ascending {
+			pivotArrow = styles.IconSortUp()
+		}
+		pivotLabel = pivotArrow + " " + pivotLabel
 	}
+	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(":Pivot: "+pivotLabel))
 
 	if len(parts) == 0 {
 		return ""
@@ -1505,6 +1643,22 @@ func (m Model) renderFooter() string {
 	}
 	if wc := m.waitingCount(); wc > 0 {
 		left += "  " + styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
+	}
+	if len(m.attentionFilter) > 0 {
+		var names []string
+		if _, ok := m.attentionFilter[data.AttentionWaiting]; ok {
+			names = append(names, "waiting")
+		}
+		if _, ok := m.attentionFilter[data.AttentionActive]; ok {
+			names = append(names, "active")
+		}
+		if _, ok := m.attentionFilter[data.AttentionStale]; ok {
+			names = append(names, "stale")
+		}
+		if _, ok := m.attentionFilter[data.AttentionIdle]; ok {
+			names = append(names, "idle")
+		}
+		left += "  " + styles.ActiveBadgeStyle.Render("! "+strings.Join(names, ", "))
 	}
 	if m.statusErr != "" {
 		left += "  " + styles.ErrorStyle.Render(m.statusErr)
@@ -1691,14 +1845,15 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 }
 
 // filterAttentionSessions removes sessions that don't match the attention
-// filter. When attentionFilter is false, all sessions pass through.
+// filter. When attentionFilter is empty, all sessions pass through.
 func (m *Model) filterAttentionSessions(sessions []data.Session) []data.Session {
-	if !m.attentionFilter || len(m.attentionMap) == 0 {
+	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return sessions
 	}
 	filtered := make([]data.Session, 0, len(sessions))
 	for _, s := range sessions {
-		if status, ok := m.attentionMap[s.ID]; ok && status == data.AttentionWaiting {
+		status := m.attentionMap[s.ID]
+		if _, ok := m.attentionFilter[status]; ok {
 			filtered = append(filtered, s)
 		}
 	}
@@ -1708,14 +1863,15 @@ func (m *Model) filterAttentionSessions(sessions []data.Session) []data.Session 
 // filterAttentionGroups removes sessions that don't match the attention
 // filter from grouped results. Empty groups are dropped.
 func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.SessionGroup {
-	if !m.attentionFilter || len(m.attentionMap) == 0 {
+	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return groups
 	}
 	filtered := make([]data.SessionGroup, 0, len(groups))
 	for _, g := range groups {
 		var sessions []data.Session
 		for _, s := range g.Sessions {
-			if status, ok := m.attentionMap[s.ID]; ok && status == data.AttentionWaiting {
+			status := m.attentionMap[s.ID]
+			if _, ok := m.attentionFilter[status]; ok {
 				sessions = append(sessions, s)
 			}
 		}
@@ -1726,6 +1882,39 @@ func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.Session
 		}
 	}
 	return filtered
+}
+
+// sortByAttention re-sorts the session slice by attention status when the
+// current sort field is SortByAttention. Attention priority is:
+// Waiting (3) > Active (2) > Stale (1) > Idle (0). Sessions with higher
+// attention priority sort first (descending by default).
+func (m *Model) sortByAttention(sessions []data.Session) {
+	if m.sort.Field != data.SortByAttention || len(m.attentionMap) == 0 {
+		return
+	}
+	slices.SortStableFunc(sessions, func(a, b data.Session) int {
+		pa := attentionPriority(m.attentionMap[a.ID])
+		pb := attentionPriority(m.attentionMap[b.ID])
+		if m.sort.Order == data.Ascending {
+			return cmp.Compare(pa, pb)
+		}
+		return cmp.Compare(pb, pa) // descending: higher priority first
+	})
+}
+
+// attentionPriority returns a numeric priority for sorting. Higher values
+// represent statuses that need more urgent attention.
+func attentionPriority(status data.AttentionStatus) int {
+	switch status {
+	case data.AttentionWaiting:
+		return 3
+	case data.AttentionActive:
+		return 2
+	case data.AttentionStale:
+		return 1
+	default: // AttentionIdle
+		return 0
+	}
 }
 
 // hiddenCount returns the total number of hidden sessions.
@@ -1741,6 +1930,7 @@ var sortFields = []data.SortField{
 	data.SortByUpdated,
 	data.SortByFolder,
 	data.SortByName,
+	data.SortByAttention,
 }
 
 func (m *Model) cycleSort() {
@@ -1767,10 +1957,29 @@ func (m *Model) cyclePivot() {
 	for i, p := range pivotModes {
 		if p == m.pivot {
 			m.pivot = pivotModes[(i+1)%len(pivotModes)]
+			m.pivotOrder = defaultPivotOrder(m.pivot)
 			return
 		}
 	}
 	m.pivot = pivotNone
+	m.pivotOrder = data.Ascending
+}
+
+// defaultPivotOrder returns the natural default sort direction for a pivot.
+// Date defaults to descending (newest first); others to ascending (A-Z).
+func defaultPivotOrder(pivot string) data.SortOrder {
+	if pivot == pivotDate {
+		return data.Descending
+	}
+	return data.Ascending
+}
+
+func (m *Model) togglePivotOrder() {
+	if m.pivotOrder == data.Descending {
+		m.pivotOrder = data.Ascending
+	} else {
+		m.pivotOrder = data.Descending
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1793,6 +2002,8 @@ func sortDisplayLabel(f data.SortField) string {
 		return pivotFolder
 	case data.SortByName:
 		return "name"
+	case data.SortByAttention:
+		return "attention"
 	default:
 		return "updated"
 	}
@@ -1880,7 +2091,7 @@ func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cm
 // updateSelectionStatus sets the status bar to reflect the current selection count.
 func (m *Model) updateSelectionStatus() {
 	if n := m.sessionList.SelectionCount(); n > 0 {
-		m.statusInfo = fmt.Sprintf("%d selected — ⇧⏎ to open", n)
+		m.statusInfo = fmt.Sprintf("%d selected — O to open", n)
 	} else {
 		m.statusInfo = ""
 	}
@@ -1906,6 +2117,16 @@ func (m *Model) launchWithMode(mode string) tea.Cmd {
 	return m.resolveShellAndLaunch(sess.ID, sess.Cwd, mode)
 }
 
+// launchNewInFolder starts a fresh Copilot session (no session ID) with the
+// working directory set to the selected folder's path.
+func (m *Model) launchNewInFolder(mode string) tea.Cmd {
+	cwd := m.sessionList.SelectedFolderPath()
+	if cwd == "" {
+		return nil
+	}
+	return m.resolveShellAndLaunch("", cwd, mode)
+}
+
 // resolveShellAndLaunch picks the right shell (configured, single, or picker)
 // and launches the session externally. Shared by launchWithMode and
 // launchNewSession to avoid duplicating shell-resolution logic.
@@ -1914,12 +2135,20 @@ func (m *Model) resolveShellAndLaunch(sessionID, cwd, mode string) tea.Cmd {
 
 	if m.cfg.DefaultShell != "" {
 		sh := m.findShellByName(m.cfg.DefaultShell)
+		if sh.Path == "" {
+			m.statusErr = fmt.Sprintf("Cannot launch: shell %q not found", m.cfg.DefaultShell)
+			return nil
+		}
 		return m.launchExternal(sh, sessionID, cwd, launchStyle)
 	}
 	if len(m.shells) <= 1 {
 		sh := platform.DefaultShell()
 		if len(m.shells) == 1 {
 			sh = m.shells[0]
+		}
+		if sh.Path == "" {
+			m.statusErr = "Cannot launch: no shell detected on this system"
+			return nil
 		}
 		return m.launchExternal(sh, sessionID, cwd, launchStyle)
 	}
@@ -1954,6 +2183,11 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 		sh = m.shells[0]
 	} else {
 		sh = platform.DefaultShell()
+	}
+
+	if sh.Path == "" {
+		m.statusErr = "Cannot launch: no shell detected on this system"
+		return nil
 	}
 
 	return m.launchExternal(sh, sessionID, cwd, launchStyle)
@@ -2006,7 +2240,9 @@ func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchS
 	}
 	return func() tea.Msg {
 		if err := platform.LaunchSession(shell, sessionID, cfg); err != nil {
-			return dataErrorMsg{err: fmt.Errorf("launching session: %w", err)}
+			detail := fmt.Sprintf("launch failed: %v (shell=%s, terminal=%s)",
+				err, shell.Name, cfg.Terminal)
+			return dataErrorMsg{err: errors.New(detail)}
 		}
 		return nil
 	}
@@ -2061,6 +2297,7 @@ func (m *Model) recalcLayout() {
 	m.shellPicker.SetSize(m.width, m.height)
 	m.filterPanel.SetSize(m.width, m.height)
 	m.configPanel.SetSize(m.width, m.height)
+	m.attentionPicker.SetSize(m.width, m.height)
 }
 
 // ---------------------------------------------------------------------------
@@ -2116,6 +2353,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
 	pivot := m.pivot
+	pivotOrd := m.pivotOrder
 
 	return func() tea.Msg {
 		if store == nil {
@@ -2132,6 +2370,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 			if sortOpts.Field == data.SortByUpdated {
 				sortGroupsByLatest(groups, sortOpts.Order)
 			}
+			sortGroupsByLabel(groups, pivotOrd)
 			return groupsLoadedMsg{groups: groups}
 		}
 		sessions, err := store.ListSessions(filter, sortOpts, limit)
@@ -2189,6 +2428,15 @@ func (m Model) waitingCount() int {
 	return count
 }
 
+// attentionStatusCounts returns the number of sessions per attention status.
+func (m Model) attentionStatusCounts() map[data.AttentionStatus]int {
+	counts := make(map[data.AttentionStatus]int)
+	for _, status := range m.attentionMap {
+		counts[status]++
+	}
+	return counts
+}
+
 const deepSearchDelay = 300 * time.Millisecond
 
 // scheduleDeepSearch returns a tea.Cmd that fires a deepSearchTickMsg after
@@ -2208,6 +2456,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
 	pivot := m.pivot
+	pivotOrd := m.pivotOrder
 
 	return func() tea.Msg {
 		if store == nil {
@@ -2222,6 +2471,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 			if sortOpts.Field == data.SortByUpdated {
 				sortGroupsByLatest(groups, sortOpts.Order)
 			}
+			sortGroupsByLabel(groups, pivotOrd)
 			return deepSearchResultMsg{version: version, groups: groups}
 		}
 		sessions, err := store.ListSessions(filter, sortOpts, limit)
@@ -2271,13 +2521,6 @@ func loadFilterDataCmd(store *data.Store) tea.Cmd {
 func checkNerdFontCmd() tea.Cmd {
 	return func() tea.Msg {
 		return fontCheckMsg{installed: platform.IsNerdFontInstalled()}
-	}
-}
-
-func installNerdFontCmd() tea.Cmd {
-	return func() tea.Msg {
-		err := platform.InstallNerdFont()
-		return fontInstalledMsg{err: err}
 	}
 }
 
@@ -2376,6 +2619,18 @@ func latestUpdate(sessions []data.Session) string {
 		}
 	}
 	return latest
+}
+
+// sortGroupsByLabel sorts groups alphabetically by their label.
+// Descending reverses the order (e.g. newest date first).
+func sortGroupsByLabel(groups []data.SessionGroup, order data.SortOrder) {
+	slices.SortFunc(groups, func(a, b data.SessionGroup) int {
+		c := cmp.Compare(a.Label, b.Label)
+		if order == data.Descending {
+			return -c
+		}
+		return c
+	})
 }
 
 // ---------------------------------------------------------------------------

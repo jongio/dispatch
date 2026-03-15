@@ -895,3 +895,118 @@ func TestLoad_ClampsNegativeMaxSessions(t *testing.T) {
 		t.Errorf("MaxSessions = %d, want 0 (clamped)", cfg.MaxSessions)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// sanitize / sanitizeConfigValue tests
+// ---------------------------------------------------------------------------
+
+func TestSanitizeConfigValue_SafeValues(t *testing.T) {
+	safe := []string{
+		"",
+		"bash",
+		"pwsh",
+		"Windows Terminal",
+		"iTerm2",
+		"PowerShell 7",
+		"my-custom-shell",
+		"C:/Program Files/Git/bin/bash.exe",
+	}
+	for _, v := range safe {
+		if got := sanitizeConfigValue(v); got != v {
+			t.Errorf("sanitizeConfigValue(%q) = %q, want %q", v, got, v)
+		}
+	}
+}
+
+func TestSanitizeConfigValue_UnsafeValues(t *testing.T) {
+	unsafe := []string{
+		"bash; rm -rf /",
+		"pwsh$(evil)",
+		"cmd & calc",
+		"shell|pipe",
+		"sh`whoami`",
+		"term\ninjection",
+		`shell"quoted`,
+		"shell'quoted",
+		"shell\\escaped",
+		"term<redirect",
+		"term>redirect",
+	}
+	for _, v := range unsafe {
+		if got := sanitizeConfigValue(v); got != "" {
+			t.Errorf("sanitizeConfigValue(%q) = %q, want empty", v, got)
+		}
+	}
+}
+
+func TestSanitize_ClearsUnsafeFields(t *testing.T) {
+	cfg := Default()
+	cfg.DefaultShell = "bash; rm -rf /"
+	cfg.DefaultTerminal = "term$(evil)"
+	cfg.Agent = "agent&calc"
+	cfg.Model = "model|pipe"
+	cfg.sanitize()
+
+	if cfg.DefaultShell != "" {
+		t.Errorf("DefaultShell = %q, want empty after sanitize", cfg.DefaultShell)
+	}
+	if cfg.DefaultTerminal != "" {
+		t.Errorf("DefaultTerminal = %q, want empty after sanitize", cfg.DefaultTerminal)
+	}
+	if cfg.Agent != "" {
+		t.Errorf("Agent = %q, want empty after sanitize", cfg.Agent)
+	}
+	if cfg.Model != "" {
+		t.Errorf("Model = %q, want empty after sanitize", cfg.Model)
+	}
+}
+
+func TestSanitize_PreservesSafeFields(t *testing.T) {
+	cfg := Default()
+	cfg.DefaultShell = "zsh"
+	cfg.DefaultTerminal = "Windows Terminal"
+	cfg.Agent = "copilot"
+	cfg.Model = "gpt-4o"
+	cfg.sanitize()
+
+	if cfg.DefaultShell != "zsh" {
+		t.Errorf("DefaultShell = %q, want 'zsh'", cfg.DefaultShell)
+	}
+	if cfg.DefaultTerminal != "Windows Terminal" {
+		t.Errorf("DefaultTerminal = %q, want 'Windows Terminal'", cfg.DefaultTerminal)
+	}
+	if cfg.Agent != "copilot" {
+		t.Errorf("Agent = %q, want 'copilot'", cfg.Agent)
+	}
+	if cfg.Model != "gpt-4o" {
+		t.Errorf("Model = %q, want 'gpt-4o'", cfg.Model)
+	}
+}
+
+func TestLoad_SanitizesUnsafeShellOnDisk(t *testing.T) {
+	withTempConfigDir(t)
+
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"default_shell": "bash; rm -rf /", "default_terminal": "term$(evil)"}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.DefaultShell != "" {
+		t.Errorf("DefaultShell = %q, want empty after sanitize", cfg.DefaultShell)
+	}
+	if cfg.DefaultTerminal != "" {
+		t.Errorf("DefaultTerminal = %q, want empty after sanitize", cfg.DefaultTerminal)
+	}
+}

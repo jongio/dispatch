@@ -51,6 +51,7 @@ type captureCtx struct {
 	flatSort      data.SortOptions
 	configVals    components.ConfigValues
 	themeNames    []string
+	attentionMap  map[string]data.AttentionStatus
 }
 
 // captureFeatures captures the full set of feature screenshots using the
@@ -81,7 +82,9 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.store = c.store
 		m.pivot = pivotFolder
 		m.groups = c.folderGroups
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
+		m.sessionList.SetAttentionStatuses(c.attentionMap)
 		m.timeRange = "7d"
 		m.recalcLayout()
 		return m
@@ -136,6 +139,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		if sorted, err := c.store.GroupSessions(data.PivotByFolder, c.flatFilter, m.sort, 0); err == nil {
 			sortGroupsByLatest(sorted, data.Ascending)
 			m.groups = sorted
+			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(sorted)
 		}
 		add("sort-folder", m)
@@ -165,6 +169,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.pivot = tc.pivot
 		m.sessions = nil
 		m.groups = tc.groups
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(tc.groups)
 		m.recalcLayout()
 		add(tc.name, m)
@@ -185,6 +190,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		if trGroups, err := c.store.GroupSessions(data.PivotByFolder, trFilter, c.flatSort, 0); err == nil {
 			sortGroupsByLatest(trGroups, data.Descending)
 			m.groups = trGroups
+			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(trGroups)
 		}
 		add(tc.name, m)
@@ -231,9 +237,40 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 			m.hiddenSet[id] = struct{}{}
 		}
 		m.sessionList.SetHiddenSessions(m.hiddenSet)
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.recalcLayout()
 		add("hidden-sessions", m)
+	}
+
+	// ── Multi-select ─────────────────────────────────────────────────
+	{
+		m := newBase()
+		// Select a few sessions to show ✓ indicators by toggling at
+		// different cursor positions.
+		m.sessionList.MoveDown() // skip folder header
+		m.sessionList.ToggleSelected()
+		m.sessionList.MoveDown()
+		m.sessionList.ToggleSelected()
+		m.sessionList.MoveDown()
+		m.sessionList.MoveDown() // skip one to show partial selection
+		m.sessionList.ToggleSelected()
+		m.recalcLayout()
+		add("multi-select", m)
+	}
+
+	// ── Attention picker overlay ─────────────────────────────────────
+	{
+		m := newBase()
+		m.state = stateAttentionPicker
+		m.attentionPicker.SetCounts(map[data.AttentionStatus]int{
+			data.AttentionWaiting: 2,
+			data.AttentionActive:  2,
+			data.AttentionStale:   2,
+			data.AttentionIdle:    2,
+		})
+		m.recalcLayout()
+		addOverlay("attention-picker", m)
 	}
 
 	// ── Tree collapsed / expanded ─────────────────────────────────────
@@ -242,6 +279,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.pivot = pivotFolder
 		m.sessions = nil
 		m.groups = c.folderGroups
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.sessionList.CollapseAll()
 		m.recalcLayout()
@@ -252,6 +290,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.pivot = pivotFolder
 		m.sessions = nil
 		m.groups = c.folderGroups
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.recalcLayout()
 		add("tree-expanded", m)
@@ -312,6 +351,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m := newBase()
 		m.sessions = nil
 		m.groups = nil
+		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(nil)
 		m.recalcLayout()
 		add("empty-state", m)
@@ -388,6 +428,19 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		}
 	}
 
+	// Build a fake attention map so screenshots show all four status
+	// circle colors (waiting=purple, active=green, stale=yellow, idle=gray).
+	attentionMap := map[string]data.AttentionStatus{
+		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": data.AttentionWaiting, // Death Star API auth (5 min ago)
+		"ses-026":                                data.AttentionActive,  // Fleet dashboard (12 min ago)
+		"ses-002":                                data.AttentionActive,  // Superlaser refactor (22 min ago)
+		"ses-003":                                data.AttentionStale,   // Warp metrics (38 min ago)
+		"ses-004":                                data.AttentionWaiting, // Cake promise API (52 min ago)
+		"ses-005":                                data.AttentionStale,   // Sith login fix (95 min ago)
+		"ses-006":                                data.AttentionIdle,    // Sorting hat GPT (175 min ago)
+		"ses-027":                                data.AttentionIdle,    // Auth middleware (250 min ago)
+	}
+
 	ctx := &captureCtx{
 		width: width, height: height,
 		store:        store,
@@ -400,6 +453,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		detail:       detail,
 		flatFilter:   flatFilter,
 		flatSort:     flatSort,
+		attentionMap: attentionMap,
 		configVals: components.ConfigValues{
 			YoloMode:   false,
 			Agent:      "copilot",

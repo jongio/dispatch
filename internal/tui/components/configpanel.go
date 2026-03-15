@@ -313,7 +313,7 @@ func (c ConfigPanel) View() string {
 	if c.editing {
 		body.WriteString(styles.DimmedStyle.Render("Enter confirm · Esc cancel"))
 	} else {
-		body.WriteString(styles.DimmedStyle.Render("Enter toggle/edit · Esc save & close"))
+		body.WriteString(styles.DimmedStyle.Render("Enter toggle/edit · Esc close"))
 	}
 
 	maxW := min(65, c.width-4)

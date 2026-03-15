@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
@@ -241,7 +242,35 @@ func Load() (*Config, error) {
 	if cfg.MaxSessions < 0 {
 		cfg.MaxSessions = 0
 	}
+	cfg.sanitize()
 	return cfg, nil
+}
+
+// shellUnsafe contains characters that must never appear in shell or terminal
+// names because they could be interpreted by command interpreters (cmd.exe,
+// bash, PowerShell, AppleScript). Values containing any of these are cleared
+// to the empty string, which makes the launch path fall back to auto-detection.
+const shellUnsafe = "&|;<>()$`\\\"'\n\r\t"
+
+// sanitize cleans string config values to prevent command injection and
+// removes control characters that could break terminal commands. It does
+// NOT reject the config — it silently clears unsafe values to their zero
+// value so the rest of the application falls back to safe defaults.
+func (c *Config) sanitize() {
+	c.DefaultShell = sanitizeConfigValue(c.DefaultShell)
+	c.DefaultTerminal = sanitizeConfigValue(c.DefaultTerminal)
+	c.Agent = sanitizeConfigValue(c.Agent)
+	c.Model = sanitizeConfigValue(c.Model)
+}
+
+// sanitizeConfigValue returns the value unchanged if it contains only safe
+// characters. If it contains shell metacharacters or control characters, the
+// empty string is returned so the caller falls back to defaults.
+func sanitizeConfigValue(v string) string {
+	if strings.ContainsAny(v, shellUnsafe) {
+		return ""
+	}
+	return v
 }
 
 // Save writes the given Config to disk as a JSON file.

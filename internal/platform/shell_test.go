@@ -671,3 +671,27 @@ func TestPsQuoteEscapesMetachars(t *testing.T) {
 		t.Errorf("psQuote should replace \" with ', got %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// LaunchSession — validation
+// ---------------------------------------------------------------------------
+
+func TestLaunchSession_EmptyShellPath_AfterDefault(t *testing.T) {
+	// On any real OS, DefaultShell() returns a valid path, so LaunchSession
+	// with empty shell.Path won't hit the "no shell available" error.
+	// This test verifies the function does not panic regardless.
+	err := LaunchSession(ShellInfo{}, "test-session-id", ResumeConfig{})
+	// err may or may not be nil depending on whether copilot CLI is present.
+	// The key assertion is: no panic.
+	_ = err
+}
+
+func TestLaunchSession_DefaultShell_AlwaysHasPath(t *testing.T) {
+	sh := DefaultShell()
+	if sh.Path == "" {
+		t.Error("DefaultShell() returned empty Path — launch would fail")
+	}
+	if sh.Name == "" {
+		t.Error("DefaultShell() returned empty Name — display would be unclear")
+	}
+}

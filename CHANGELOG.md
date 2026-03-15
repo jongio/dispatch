@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Multi-session open** — select multiple sessions with `Space`, open all at once with `O`
+  - `a` / `d` to select all / deselect all
+  - Ctrl+click for mouse selection, Shift+click for range select
+  - Selection count displayed in footer
+  - ✓ indicator on selected sessions
+
+- **Attention indicators** — colored dots showing real-time session AI activity status
+  - Four states: waiting (purple), active (green), stale (yellow), idle (gray)
+  - Determined by scanning session-state lock files and event logs
+  - `n` to jump to next waiting session
+  - `!` to open attention status filter picker
+  - Auto-refreshes on every reindex
+
+- **Self-update** (`dispatch update`) — downloads latest release from GitHub and replaces in-place
+  - SHA-256 checksum verification
+  - Interprocess lock prevents concurrent updates
+  - Background version check on every launch with 24-hour cache
+  - Post-exit notification when a new version is available
+
+- Demo mode enhancements
+  - Fake attention status data showing all four indicator states
+  - Session timestamps shifted relative to launch time for realistic time ranges
+  - Sessions distributed across 1h, 1d, and 7d time windows
+
+- WSL cross-testing (`mage testWSL`) for Unix code path coverage
+- Race detection as separate preflight step (step 7/11)
+- Install verification as preflight step
+
+### Fixed
+
+- Demo mode timestamp format mismatch — timestamps now use RFC3339 format matching the TUI filter, fixing 1-hour time range showing no sessions
+
 ## [0.1.0] - 2026-03-10
 
 ### Added

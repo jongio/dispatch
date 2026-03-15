@@ -41,11 +41,11 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Multi-Select</h3>
             <KeyTable rows={[
               { keys: 'Space', action: 'Toggle selection on current session' },
-              { keys: 'Shift+Enter', action: 'Open all selected sessions (or all in folder)' },
+              { keys: 'O', action: 'Open all selected sessions (or all in folder)' },
               { keys: 'a', action: 'Select all visible sessions' },
               { keys: 'd', action: 'Deselect all' },
             ]} />
-            <p class="text-secondary text-sm">When no sessions are selected, Shift+Enter on a folder opens all sessions under it. Selected sessions show a ✓ indicator.</p>
+            <p class="text-secondary text-sm">When no sessions are selected, O on a folder opens all sessions under it. Selected sessions show a ✓ indicator.</p>
           </div>
 
           <div id="search-filter" class="shortcut-group">
@@ -83,6 +83,17 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="settings-keys" class="shortcut-group">
+            <h3>Attention & Status</h3>
+            <KeyTable rows={[
+              { keys: 'n', action: 'Jump to next waiting session' },
+              { keys: '!', action: 'Filter by attention status' },
+              { keys: 'h', action: 'Hide/unhide current session' },
+              { keys: 'H', action: 'Toggle visibility of hidden sessions' },
+            ]} />
+            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses.</p>
+          </div>
+
+          <div id="general-keys" class="shortcut-group">
             <h3>Settings & Info</h3>
             <KeyTable rows={[
               { keys: '?', action: 'Show help overlay' },
@@ -144,7 +155,8 @@ import KeyTable from '../components/KeyTable.astro';
             <li><a href="#search-filter">Search & Filter</a></li>
             <li><a href="#view-sort">View & Sorting</a></li>
             <li><a href="#time-keys">Time Range</a></li>
-            <li><a href="#settings-keys">Settings</a></li>
+            <li><a href="#settings-keys">Attention & Status</a></li>
+            <li><a href="#general-keys">Settings</a></li>
             <li><a href="#overlay-keys">Overlays</a></li>
             <li><a href="#mouse-interactions">Mouse</a></li>
           </ul>

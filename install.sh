@@ -1,14 +1,27 @@
 #!/bin/sh
 # Installer for Dispatch — a Go TUI launcher for GitHub Copilot CLI extensions.
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
-# Or:    VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
+#   VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+#
+# Arguments:
+#   [version]    Version to install (e.g. v0.1.0, 0.1.0). Defaults to latest.
 #
 # Environment variables:
 #   VERSION      Override the version to install (e.g. v0.1.0). Defaults to latest.
+#                A positional argument takes precedence over this variable.
 #   INSTALL_DIR  Override the installation directory. Defaults to /usr/local/bin or ~/.local/bin.
 
 set -eu
+
+# ---------------------------------------------------------------------------
+# Argument parsing — positional version overrides $VERSION env var
+# ---------------------------------------------------------------------------
+if [ $# -ge 1 ] && [ -n "$1" ]; then
+    VERSION="$1"
+fi
 
 # ---------------------------------------------------------------------------
 # Configuration

@@ -46,6 +46,22 @@ func shortcutRow(key1, desc1, key2, desc2 string) string {
 	return left
 }
 
+// legendRow renders a pair of icon+description entries on a single line,
+// used for the attention status dot legend in the help overlay.
+func legendRow(icon1, desc1, icon2, desc2 string) string {
+	iconStyle := lipgloss.NewStyle().Width(3).Align(lipgloss.Right)
+	descStyle := lipgloss.NewStyle().
+		Foreground(styles.ColorText).
+		Width(16)
+
+	left := iconStyle.Render(icon1) + " " + descStyle.Render(desc1)
+	if icon2 != "" {
+		right := iconStyle.Render(icon2) + " " + descStyle.Render(desc2)
+		return left + right
+	}
+	return left
+}
+
 // View renders the full help overlay centred on screen.
 func (h HelpOverlay) View() string {
 	catStyle := lipgloss.NewStyle().
@@ -63,6 +79,10 @@ func (h HelpOverlay) View() string {
 	sb.WriteString(shortcutRow("←", "Collapse", "→", "Expand"))
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("Enter", "Launch/Toggle", "", ""))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("w", "Open in window", "t", "Open in tab"))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("e", "Open in pane", "", ""))
 
 	// Search & Filter
 	sb.WriteByte('\n')
@@ -71,6 +91,14 @@ func (h HelpOverlay) View() string {
 	sb.WriteString(shortcutRow("/", "Search", "Esc", "Clear"))
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("f", "Filter dirs", "Space", "Toggle item"))
+
+	// Multi-Select
+	sb.WriteByte('\n')
+	sb.WriteString(catStyle.Render("Multi-Select"))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("Space", "Toggle select", "O", "Open selected"))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("a", "Select all", "d", "Deselect all"))
 
 	// View
 	sb.WriteByte('\n')
@@ -92,10 +120,35 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("3", "7 days", "4", "All time"))
 
+	// Session Status (attention dot legend)
+	sb.WriteByte('\n')
+	sb.WriteString(catStyle.Render("Session Status"))
+	sb.WriteByte('\n')
+	sb.WriteString(legendRow(
+		styles.AttentionWaitingStyle.Render(styles.IconAttentionWaiting()), "Needs input",
+		styles.AttentionActiveStyle.Render(styles.IconAttentionActive()), "AI working",
+	))
+	sb.WriteByte('\n')
+	sb.WriteString(legendRow(
+		styles.AttentionStaleStyle.Render(styles.IconAttentionStale()), "Running, quiet",
+		styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()), "Not running",
+	))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("n", "Next waiting", "!", "Filter by status"))
+
 	// General
 	sb.WriteByte('\n')
 	sb.WriteString(catStyle.PaddingTop(1).Render(""))
 	sb.WriteString(shortcutRow("?", "Toggle help", "q", "Quit"))
+
+	// Nerd Font hint — only shown when no Nerd Font is detected.
+	if !styles.NerdFontEnabled() {
+		sb.WriteByte('\n')
+		sb.WriteString(lipgloss.NewStyle().
+			Foreground(styles.ColorDimmed).
+			Italic(true).
+			Render("For rich icons, install a Nerd Font: nerdfonts.com"))
+	}
 
 	title := styles.OverlayTitleStyle.Render(styles.IconKeyboard() + "  Keyboard Shortcuts")
 	body := title + "\n" + sb.String() + "\n\n" +

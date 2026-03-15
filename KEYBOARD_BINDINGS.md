@@ -80,9 +80,9 @@
     - Behavior: Toggles the ✓ selection indicator on the currently highlighted session. Does not open it.
     - Condition: Only when a session (not folder) is selected in session list view
 
-11. **Shift+Enter** → Open All Selected Sessions (or All in Folder)
+11. **O** → Open All Selected Sessions (or All in Folder)
     - File: D:\code\dispatch\internal\tui\keys.go (multi-select handler)
-    - Code: key.NewBinding(key.WithKeys("shift+enter"))
+    - Code: key.NewBinding(key.WithKeys("O"))
     - Handler: D:\code\dispatch\internal\tui\model.go (multi-select handler)
     - Behavior: Opens every session that has a ✓ selection indicator. If no sessions are selected and cursor is on a folder, opens all sessions under that folder. Each session opens via the configured launch mode.
     - Condition: In session list view; requires at least one selected session OR cursor on a folder

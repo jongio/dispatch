@@ -196,26 +196,47 @@ import Screenshot from '../components/Screenshot.astro';
           <h2>Multi-Session Open</h2>
           <p>
             Select multiple sessions with <kbd>Space</kbd>, then open them all
-            at once with <kbd>Shift+Enter</kbd>. Use <kbd>Ctrl</kbd>+click for
+            at once with <kbd>O</kbd>. Use <kbd>Ctrl</kbd>+click for
             mouse selection, or <kbd>Shift</kbd>+click for range select. Works
-            with folders too — <kbd>Shift+Enter</kbd> on a folder opens every
+            with folders too — <kbd>O</kbd> on a folder opens every
             session under it.
           </p>
           <ul>
             <li><kbd>Space</kbd> toggles selection on the current session (✓ indicator)</li>
             <li><kbd>a</kbd> selects all visible sessions</li>
             <li><kbd>d</kbd> deselects all</li>
-            <li><kbd>Shift+Enter</kbd> opens all selected sessions, or all in a folder</li>
+            <li><kbd>O</kbd> opens all selected sessions, or all in a folder</li>
             <li>Selection count shown in footer</li>
           </ul>
         </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/multi-select.png" alt="Session list with multiple sessions selected showing checkmarks" caption="Multi-select with ✓ indicators" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Attention Indicators -->
+    <section class="section" id="attention">
+      <div class="feature-section">
         <div class="feature-text">
-          <p class="text-only-note">
-            Selected sessions are marked with a ✓ indicator. When no sessions
-            are explicitly selected, Shift+Enter on a folder opens every session
-            beneath it. No screenshot — the result is multiple Copilot CLI
-            sessions opening simultaneously.
+          <h2>Attention Indicators</h2>
+          <p>
+            Colored dots next to each session show real-time AI activity status.
+            Dispatch scans session-state directories for lock files and event
+            logs to determine which sessions need your input, which are actively
+            working, and which have gone quiet.
           </p>
+          <ul>
+            <li><strong>Waiting</strong> (purple ●) — AI finished, waiting for your input</li>
+            <li><strong>Active</strong> (green ●) — AI is currently working</li>
+            <li><strong>Stale</strong> (yellow ●) — running but no activity for 5+ minutes</li>
+            <li><strong>Idle</strong> (gray ○) — session not running</li>
+            <li><kbd>n</kbd> to jump to next waiting session</li>
+            <li><kbd>!</kbd> to open the attention status filter picker</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/attention-picker.png" alt="Attention status filter picker showing waiting, active, stale, and idle options" caption="Filter by attention status" />
         </div>
       </div>
     </section>

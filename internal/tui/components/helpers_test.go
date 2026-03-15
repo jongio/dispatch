@@ -188,9 +188,11 @@ func TestAbbrevPath(t *testing.T) {
 		{"empty path", "", "–"},
 		{"single component", "leaf", "leaf"},
 		{"two components", "parent/leaf", "parent" + sep + "leaf"},
-		{"three components abbreviated", "a/b/c", "…" + sep + "b" + sep + "c"},
-		{"deep path", "a/b/c/d/e", "…" + sep + "d" + sep + "e"},
-		{"trailing slash stripped", "a/b/c/", "…" + sep + "b" + sep + "c"},
+		// AbbrevPath now delegates to AbbrevHome — full paths are preserved
+		// (no truncation to last two components).
+		{"three components full", "a/b/c", "a" + sep + "b" + sep + "c"},
+		{"deep path full", "a/b/c/d/e", "a" + sep + "b" + sep + "c" + sep + "d" + sep + "e"},
+		{"trailing slash stripped", "a/b/c/", "a" + sep + "b" + sep + "c"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,20 +205,20 @@ func TestAbbrevPath(t *testing.T) {
 }
 
 func TestAbbrevPathPlatformSpecific(t *testing.T) {
-	sep := string(filepath.Separator)
-
 	if runtime.GOOS == "windows" {
 		// On Windows, forward slashes are converted to backslashes.
+		// Path not under home dir should be shown in full.
 		got := AbbrevPath(`C:\Users\alice\projects`)
-		want := "…" + sep + "alice" + sep + "projects"
-		if got != want {
-			t.Errorf("AbbrevPath(Windows) = %q, want %q", got, want)
+		// If alice is not the current user, the path should be returned
+		// in full (OS-normalised). We just verify it's not truncated.
+		if strings.HasPrefix(got, "…") {
+			t.Errorf("AbbrevPath(Windows) = %q, should not start with ellipsis", got)
 		}
 	} else {
-		got := AbbrevPath("/home/alice/projects")
-		want := "…" + sep + "alice" + sep + "projects"
-		if got != want {
-			t.Errorf("AbbrevPath(Unix) = %q, want %q", got, want)
+		got := AbbrevPath("/opt/alice/projects")
+		// Non-home path should be shown in full.
+		if strings.HasPrefix(got, "…") {
+			t.Errorf("AbbrevPath(Unix) = %q, should not start with ellipsis", got)
 		}
 	}
 }

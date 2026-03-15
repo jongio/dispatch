@@ -478,8 +478,8 @@ func TestCovCycleSortFullCycle(t *testing.T) {
 	m := newTestModel()
 	m.sort.Field = data.SortByUpdated
 
-	// sortFields = [SortByUpdated, SortByFolder, SortByName]
-	expected := []data.SortField{data.SortByFolder, data.SortByName, data.SortByUpdated}
+	// sortFields = [SortByUpdated, SortByFolder, SortByName, SortByAttention]
+	expected := []data.SortField{data.SortByFolder, data.SortByName, data.SortByAttention, data.SortByUpdated}
 	for _, exp := range expected {
 		m.cycleSort()
 		if m.sort.Field != exp {

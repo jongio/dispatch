@@ -239,7 +239,7 @@ func (t *Theme) buildStyles() {
 	// Title / header.
 	t.TitleStyle = lipgloss.NewStyle().Bold(true).Foreground(c(t.Primary))
 	t.SubtitleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed))
-	t.HeaderStyle = lipgloss.NewStyle().Foreground(c(t.Text)).Background(c(t.HeaderBg))
+	t.HeaderStyle = lipgloss.NewStyle().Foreground(c(t.Text))
 
 	// Session list.
 	t.SelectedStyle = lipgloss.NewStyle().Bold(true).Background(c(t.Selected)).Foreground(c(t.Text))
@@ -305,7 +305,7 @@ func (t *Theme) buildStyles() {
 		Foreground(c(t.Dimmed)).Bold(true)
 
 	// Attention dot styles — colored dots for session attention status.
-	t.AttentionWaitingStyle = lipgloss.NewStyle().Foreground(c(t.Error)).Bold(true)
+	t.AttentionWaitingStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
 	t.AttentionActiveStyle = lipgloss.NewStyle().Foreground(c(t.Success))
 	t.AttentionStaleStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[3])) // Yellow
 	t.AttentionIdleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)

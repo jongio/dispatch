@@ -351,6 +351,9 @@ func LaunchSession(shell ShellInfo, sessionID string, cfg ResumeConfig) error {
 	if shell.Path == "" {
 		shell = DefaultShell()
 	}
+	if shell.Path == "" {
+		return errors.New("no shell available: could not find any shell executable on this system")
+	}
 	if cfg.Terminal == "" {
 		cfg.Terminal = DefaultTerminal()
 	}

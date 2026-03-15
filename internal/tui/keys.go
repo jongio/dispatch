@@ -19,6 +19,7 @@ type keyMap struct {
 	Sort              key.Binding
 	SortOrder         key.Binding
 	Pivot             key.Binding
+	PivotOrder        key.Binding
 	Preview           key.Binding
 	Reindex           key.Binding
 	Help              key.Binding
@@ -52,7 +53,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
-		{k.Sort, k.SortOrder, k.Pivot},
+		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
 		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.Reindex, k.Config},
 		{k.Hide, k.ToggleHidden, k.JumpNextAttention, k.FilterAttention},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
@@ -75,6 +76,7 @@ var keys = keyMap{
 	Sort:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "cycle sort")),
 	SortOrder:         key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "toggle sort order")),
 	Pivot:             key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "cycle pivot")),
+	PivotOrder:        key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "reverse pivot order")),
 	Preview:           key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "toggle preview")),
 	Reindex:           key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reindex")),
 	Help:              key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
@@ -91,8 +93,8 @@ var keys = keyMap{
 	PreviewScrollUp:   key.NewBinding(key.WithKeys("pgup"), key.WithHelp("PgUp", "preview ↑")),
 	PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
 	JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
-	FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "waiting only")),
-	LaunchAll:         key.NewBinding(key.WithKeys("shift+enter"), key.WithHelp("⇧⏎", "open selected")),
+	FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "filter by status")),
+	LaunchAll:         key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open selected")),
 	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 }

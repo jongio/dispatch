@@ -75,10 +75,19 @@ release:
 
     **Linux / macOS:**
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
     ```
 
     **Windows (PowerShell):**
     ```powershell
     irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+    ```
+
+    **Install this specific version:**
+    ```bash
+    # Linux / macOS
+    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- {{ .Tag }}
+
+    # Windows (PowerShell)
+    $v="{{ .Tag }}"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
     ```

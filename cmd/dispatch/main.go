@@ -56,12 +56,12 @@ func main() {
 			return
 
 		case "--demo":
-			dbPath := findDemoDB()
-			if dbPath == "" {
-				fmt.Fprintln(os.Stderr, "demo db not found; set DISPATCH_DB or run from the repo root")
+			demoCleanup, demoErr := setupDemo()
+			if demoErr != nil {
+				fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
 				os.Exit(1)
 			}
-			_ = os.Setenv("DISPATCH_DB", dbPath)
+			defer demoCleanup()
 
 		case "--clear-cache":
 			if err := config.Reset(); err != nil {

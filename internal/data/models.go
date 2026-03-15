@@ -155,6 +155,10 @@ const (
 	SortByName SortField = "summary"
 	// SortByFolder sorts sessions alphabetically by working directory.
 	SortByFolder SortField = "cwd"
+	// SortByAttention sorts sessions by attention status priority
+	// (Waiting > Active > Stale > Idle). This is applied post-load
+	// in the TUI layer since attention status is computed at runtime.
+	SortByAttention SortField = "attention"
 )
 
 // SortOrder indicates ascending or descending sort direction.

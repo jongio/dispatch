@@ -40,11 +40,8 @@ type terminalsDetectedMsg struct{ terminals []platform.TerminalInfo }
 // Session resume lifecycle — sent after tea.ExecProcess completes.
 type sessionExitMsg struct{ err error }
 
-// Font installation lifecycle.
-type (
-	fontCheckMsg     struct{ installed bool }
-	fontInstalledMsg struct{ err error }
-)
+// Font detection lifecycle.
+type fontCheckMsg struct{ installed bool }
 
 // Transient status clear.
 type clearStatusMsg struct{}

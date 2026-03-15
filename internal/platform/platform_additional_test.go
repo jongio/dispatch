@@ -1,168 +1,11 @@
 package platform
 
 import (
-	"archive/zip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
-
-// ---------------------------------------------------------------------------
-// extractTTF — additional edge cases for coverage
-// ---------------------------------------------------------------------------
-
-// createZipWithRawEntries creates a zip file with entries that have
-// specific raw names (useful for testing path traversal guards).
-func createZipWithRawEntries(t *testing.T, entries map[string][]byte) string {
-	t.Helper()
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "test.zip")
-	f, err := os.Create(zipPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := zip.NewWriter(f)
-	for name, content := range entries {
-		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write(content); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return zipPath
-}
-
-func TestExtractTTF_SkipsDirectoryEntries(t *testing.T) {
-	// Directories in zip files should be skipped.
-	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "test.zip")
-	f, err := os.Create(zipPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := zip.NewWriter(f)
-	// Add a directory entry.
-	header := &zip.FileHeader{Name: "fonts/"}
-	header.SetMode(os.ModeDir | 0o755)
-	if _, err := w.CreateHeader(header); err != nil {
-		t.Fatal(err)
-	}
-	// Add a real .ttf file.
-	fw, err := w.Create("fonts/real.ttf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fw.Write([]byte("ttf data")); err != nil {
-		t.Fatal(err)
-	}
-	_ = w.Close()
-	_ = f.Close()
-
-	destDir := t.TempDir()
-	extracted, err := extractTTF(zipPath, destDir)
-	if err != nil {
-		t.Fatalf("extractTTF() error: %v", err)
-	}
-	if len(extracted) != 1 {
-		t.Errorf("extracted %d files, want 1 (directory should be skipped)", len(extracted))
-	}
-}
-
-func TestExtractTTF_MultipleFilesPreservedContent(t *testing.T) {
-	files := map[string][]byte{
-		"font-a.ttf": []byte("content-a"),
-		"font-b.ttf": []byte("content-b"),
-		"font-c.ttf": []byte("content-c"),
-		"readme.md":  []byte("ignored"),
-	}
-	zipPath := createZipWithRawEntries(t, files)
-
-	destDir := t.TempDir()
-	extracted, err := extractTTF(zipPath, destDir)
-	if err != nil {
-		t.Fatalf("extractTTF() error: %v", err)
-	}
-	if len(extracted) != 3 {
-		t.Errorf("extracted %d files, want 3", len(extracted))
-	}
-
-	// Verify each extracted file exists and has content.
-	for _, path := range extracted {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Errorf("reading %s: %v", path, err)
-			continue
-		}
-		if len(data) == 0 {
-			t.Errorf("extracted file %s has zero length", path)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// copyFile — additional edge cases
-// ---------------------------------------------------------------------------
-
-func TestCopyFile_LargeContent(t *testing.T) {
-	srcDir := t.TempDir()
-	dstDir := t.TempDir()
-
-	// Create a 1KB file.
-	content := make([]byte, 1024)
-	for i := range content {
-		content[i] = byte(i % 256)
-	}
-
-	srcPath := filepath.Join(srcDir, "large.bin")
-	dstPath := filepath.Join(dstDir, "large_copy.bin")
-
-	if err := os.WriteFile(srcPath, content, 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := copyFile(srcPath, dstPath); err != nil {
-		t.Fatalf("copyFile() error: %v", err)
-	}
-
-	got, err := os.ReadFile(dstPath)
-	if err != nil {
-		t.Fatalf("reading dest: %v", err)
-	}
-	if len(got) != len(content) {
-		t.Errorf("copied file size = %d, want %d", len(got), len(content))
-	}
-}
-
-func TestCopyFile_OverwriteExisting(t *testing.T) {
-	dir := t.TempDir()
-	srcPath := filepath.Join(dir, "src.txt")
-	dstPath := filepath.Join(dir, "dst.txt")
-
-	if err := os.WriteFile(dstPath, []byte("old content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(srcPath, []byte("new content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := copyFile(srcPath, dstPath); err != nil {
-		t.Fatalf("copyFile() error: %v", err)
-	}
-	got, _ := os.ReadFile(dstPath)
-	if string(got) != "new content" {
-		t.Errorf("copyFile did not overwrite: got %q", string(got))
-	}
-}
 
 // ---------------------------------------------------------------------------
 // hasNerdFontFiles — additional edge cases
@@ -466,23 +309,6 @@ func TestSessionStorePath_DispatchDBOverride(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// extractTTF — invalid destination directory (os.Create error)
-// ---------------------------------------------------------------------------
-
-func TestExtractTTF_InvalidDestDir(t *testing.T) {
-	files := map[string][]byte{
-		"font.ttf": []byte("ttf content"),
-	}
-	zipPath := createZipWithRawEntries(t, files)
-
-	// Use a non-existent directory as destination.
-	_, err := extractTTF(zipPath, filepath.Join(t.TempDir(), "nonexistent", "deep"))
-	if err == nil {
-		t.Error("expected error when destination directory does not exist")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // buildResumeCommandString — with CWD for resolvedCwd coverage
 // ---------------------------------------------------------------------------
 
@@ -661,21 +487,6 @@ func TestResolvedCwd_FileNotDirReturnsEmpty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// copyFile — invalid destination path
-// ---------------------------------------------------------------------------
-
-func TestCopyFile_InvalidDestPath(t *testing.T) {
-	srcPath := filepath.Join(t.TempDir(), "src.txt")
-	_ = os.WriteFile(srcPath, []byte("data"), 0o644)
-	err := copyFile(srcPath, filepath.Join(t.TempDir(), "nonexistent", "subdir", "file.txt"))
-	if err != nil {
-		// Covers the os.Create error path
-		return
-	}
-	t.Error("expected error for invalid dest path")
-}
-
-// ---------------------------------------------------------------------------
 // BuildResumeArgs — additional coverage
 // ---------------------------------------------------------------------------
 
@@ -727,38 +538,6 @@ func TestBuildResumeArgs_EmptySession(t *testing.T) {
 	// With no session ID and no flags, args should be empty.
 	if len(args) != 0 {
 		t.Errorf("expected empty args, got %v", args)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// installFontsWindows — safe edge cases (no actual font installation)
-// ---------------------------------------------------------------------------
-
-func TestInstallFontsWindows_EmptyList(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows-only: requires LOCALAPPDATA")
-	}
-	// With empty file list, the function just creates the font dir (which
-	// already exists on Windows) and returns nil. This is safe.
-	err := installFontsWindows(nil)
-	if err != nil {
-		t.Errorf("installFontsWindows(nil) error: %v", err)
-	}
-}
-
-func TestInstallFontsWindows_NoLocalAppData(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", "")
-	err := installFontsWindows(nil)
-	if err == nil {
-		t.Error("expected error when LOCALAPPDATA is not set")
-	}
-}
-
-func TestInstallFontsWindows_CopyError(t *testing.T) {
-	// Pass a nonexistent source file to trigger copyFile error.
-	err := installFontsWindows([]string{filepath.Join(t.TempDir(), "nonexistent.ttf")})
-	if err == nil {
-		t.Error("expected error for nonexistent source file")
 	}
 }
 
