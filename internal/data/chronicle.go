@@ -92,8 +92,7 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		defer close(outCh)
 		defer func() {
 			if r := recover(); r != nil {
-				// PTY was closed while reading — expected during cancel.
-				// Swallow the panic so it doesn't crash the program.
+				_ = r // intentional: swallow panics from reading a closed PTY
 			}
 		}()
 		buf := make([]byte, chronicleReadBuf)
