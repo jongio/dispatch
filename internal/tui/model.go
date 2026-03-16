@@ -47,6 +47,30 @@ const (
 	// statusReindexCancelled is the status message shown when the user
 	// cancels an in-flight reindex operation.
 	statusReindexCancelled = "Reindex cancelled"
+
+	// headerRightReserve is the default column reserve on the right side
+	// of the header row (accounts for a potential trailing space or cursor).
+	headerRightReserve = 4
+
+	// headerReindexReserve is the wider column reserve when the reindex
+	// spinner is active (" ⣾ Reindexing…" ≈ 15 chars + padding).
+	headerReindexReserve = 16
+
+	// minSearchBarWidth is the minimum width for the search bar to remain
+	// usable when the header is cramped.
+	minSearchBarWidth = 15
+
+	// footerGapReserve is the minimum column count reserved for spacing
+	// between the footer's left content, right hints, and version label.
+	footerGapReserve = 4
+
+	// gapWidth is the number of columns between the session list and the
+	// preview panel.
+	gapWidth = 2
+
+	// overlayBorderPadding is the total horizontal overhead added by the
+	// OverlayStyle (border 1 + padding 2 on each side = 6).
+	overlayBorderPadding = 6
 )
 
 // timeRanges defines the time-range filter options shown in the header.
@@ -150,8 +174,6 @@ type Model struct {
 	pendingClickVersion int
 	pendingClickY       int
 	pendingClickItemIdx int
-	pendingClickCtrl    bool
-	pendingClickShift   bool
 
 	// Launch mode requested when showing the shell picker.
 	pendingLaunchMode string
@@ -1341,8 +1363,6 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.pendingClickVersion++
 		m.pendingClickY = msg.Y
 		m.pendingClickItemIdx = itemIdx
-		m.pendingClickCtrl = msg.Ctrl
-		m.pendingClickShift = msg.Shift
 
 		// Immediately move selection so the highlight follows the cursor,
 		// but do NOT toggle folders or load details yet.
@@ -1554,7 +1574,6 @@ func (m Model) renderMainView() string {
 	if m.showPreview && m.width >= styles.PreviewMinWidth {
 		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
 	}
-	const gapWidth = 2
 	listW := m.width - previewW
 	if previewW > 0 {
 		listW -= gapWidth
@@ -1583,13 +1602,13 @@ func (m Model) renderHeader() string {
 
 	// Search bar (always visible).
 	// Reserve space for the right side (reindex spinner) only when active.
-	rightReserve := 4
+	rightReserve := headerRightReserve
 	if m.reindexing {
-		rightReserve = 16 // " ⣾ Reindexing…" ≈ 15 chars
+		rightReserve = headerReindexReserve
 	}
 	searchW := m.width - lipgloss.Width(title) - rightReserve
-	if searchW < 15 {
-		searchW = 15
+	if searchW < minSearchBarWidth {
+		searchW = minSearchBarWidth
 	}
 	m.searchBar.SetWidth(searchW)
 	search := m.searchBar.View()
@@ -1722,7 +1741,7 @@ func (m Model) renderFooter() string {
 
 	// If hints + left + version exceed width, drop the hints entirely
 	// to avoid wrapping. Byte-level truncation corrupts ANSI codes.
-	usedWidth := lipgloss.Width(left) + lipgloss.Width(version) + 4
+	usedWidth := lipgloss.Width(left) + lipgloss.Width(version) + footerGapReserve
 	if usedWidth+lipgloss.Width(right) > m.width {
 		right = ""
 	}
@@ -1762,8 +1781,7 @@ func (m Model) cancelReindex() (tea.Model, tea.Cmd) {
 // in the reindex overlay and cancels if so.
 func (m *Model) handleReindexClick(msg tea.MouseMsg) {
 	innerW := m.reindexInnerWidth()
-	// OverlayStyle: RoundedBorder (1 each side) + Padding(1,2) (2 each side) = 6 horizontal, 4 vertical
-	overlayW := innerW + 6
+	overlayW := innerW + overlayBorderPadding
 	// title (with bottom padding 1) + viewport + cancel row + padding top/bottom from border
 	overlayH := 1 + 1 + reindexOverlayHeight + 1 + 4
 
@@ -2321,7 +2339,6 @@ func (m *Model) recalcLayout() {
 	if m.showPreview && m.width >= styles.PreviewMinWidth {
 		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
 	}
-	const gapWidth = 2
 	listW := m.width - previewW
 	if previewW > 0 {
 		listW -= gapWidth
