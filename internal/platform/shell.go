@@ -332,6 +332,13 @@ func DefaultTerminal() string {
 	case "darwin":
 		return "Terminal.app"
 	default:
+		// Inside WSL, prefer Windows Terminal when wt.exe is available
+		// since it's the terminal the user is actually sitting in.
+		if isWSL() {
+			if _, err := exec.LookPath("wt.exe"); err == nil {
+				return termWindowsTerminal
+			}
+		}
 		if terms := detectLinuxTerminals(); len(terms) > 0 {
 			return terms[0].Name
 		}
@@ -371,7 +378,7 @@ func LaunchSession(shell ShellInfo, sessionID string, cfg ResumeConfig) error {
 	case "darwin":
 		return launchDarwinSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle == LaunchStyleWindow)
 	default:
-		return launchLinuxSession(shell, resumeCmd, cfg.Terminal, cwd)
+		return launchLinuxSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
 	}
 }
 
@@ -672,7 +679,12 @@ func escapeAppleScript(s string) string {
 	return s
 }
 
-func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd string) error {
+func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {
+	// Inside WSL, route to Windows Terminal when configured.
+	if terminal == termWindowsTerminal && isWSL() {
+		return launchWSLWindowsTerminal(shell, resumeCmd, cwd, launchStyle, paneDirection)
+	}
+
 	// Supported terminal emulators and their argument patterns.
 	terminals := []struct {
 		name string
@@ -705,6 +717,13 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 		}
 	}
 
+	// Auto-detect: try Windows Terminal first if running under WSL.
+	if isWSL() {
+		if _, err := exec.LookPath("wt.exe"); err == nil {
+			return launchWSLWindowsTerminal(shell, resumeCmd, cwd, launchStyle, paneDirection)
+		}
+	}
+
 	// Auto-detect: try terminals in order of popularity.
 	for _, t := range terminals {
 		if p, err := exec.LookPath(t.name); err == nil {
@@ -717,6 +736,76 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 	}
 
 	return errors.New("no supported terminal emulator found; tried alacritty, kitty, wezterm, gnome-terminal, konsole, xfce4-terminal, xterm")
+}
+
+// launchWSLWindowsTerminal launches a session via wt.exe from within WSL.
+// It translates the working directory from a Linux path to a Windows path
+// using wslpath and constructs wt.exe arguments for the requested launch
+// style (tab, window, or pane).
+func launchWSLWindowsTerminal(shell ShellInfo, resumeCmd string, cwd string, launchStyle string, paneDirection string) error {
+	p, err := exec.LookPath("wt.exe")
+	if err != nil {
+		return fmt.Errorf("wt.exe not found on PATH: %w", err)
+	}
+
+	// Translate cwd to a Windows path (empty string on failure).
+	var winCwd string
+	if cwd != "" {
+		winCwd, _ = wslToWindowsPath(cwd)
+	}
+
+	distro := os.Getenv("WSL_DISTRO_NAME")
+	args := buildWSLWTArgs(shell, resumeCmd, winCwd, distro, launchStyle, paneDirection)
+
+	cmd := exec.Command(p, args...)
+	return cmd.Start()
+}
+
+// buildWSLWTArgs constructs the wt.exe argument list for launching a WSL
+// session inside Windows Terminal. It is separated from launchWSLWindowsTerminal
+// so it can be tested without requiring wt.exe or a WSL environment.
+func buildWSLWTArgs(shell ShellInfo, resumeCmd, winCwd, distro, launchStyle, paneDirection string) []string {
+	var args []string
+	switch launchStyle {
+	case LaunchStyleWindow:
+		args = append(args, "-w", "new", "new-tab")
+	case LaunchStylePane:
+		args = append(args, "-w", "0", "split-pane")
+		if paneDirection != "" && paneDirection != "auto" {
+			args = append(args, "--direction", paneDirection)
+		}
+	default:
+		args = append(args, "-w", "0", "new-tab")
+	}
+
+	if winCwd != "" {
+		args = append(args, "--startingDirectory", winCwd)
+	}
+
+	// wt.exe wsl.exe -d <distro> -- <shell> -c <resumeCmd>
+	if distro != "" {
+		args = append(args, "wsl.exe", "-d", distro, "--", shell.Path, "-c", resumeCmd)
+	} else {
+		args = append(args, "wsl.exe", "--", shell.Path, "-c", resumeCmd)
+	}
+
+	return args
+}
+
+// wslToWindowsPath translates a Linux filesystem path to a Windows path
+// using the wslpath utility available inside WSL.
+func wslToWindowsPath(linuxPath string) (string, error) {
+	cmd := exec.Command("wslpath", "-w", linuxPath)
+	out, err := cmd.Output()
+	if err != nil {
+		// Include stderr from wslpath for better diagnostics.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("wslpath: %s: %w", strings.TrimSpace(string(exitErr.Stderr)), err)
+		}
+		return "", fmt.Errorf("wslpath: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -758,6 +847,15 @@ func detectDarwinTerminals() []TerminalInfo {
 
 func detectLinuxTerminals() []TerminalInfo {
 	var terms []TerminalInfo
+
+	// Inside WSL, include Windows Terminal when wt.exe is available
+	// via the WSL-Windows interop PATH.
+	if isWSL() {
+		if _, err := exec.LookPath("wt.exe"); err == nil {
+			terms = append(terms, TerminalInfo{Name: termWindowsTerminal})
+		}
+	}
+
 	candidates := []string{
 		"alacritty", "kitty", "wezterm",
 		"gnome-terminal", "konsole", "xfce4-terminal", "xterm",

@@ -166,9 +166,10 @@ func TestLastReindexTime_EmptyWAL(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFindCopilotBinary_NoCandidates(t *testing.T) {
-	// Set environment to non-existent paths.
+	// Set environment to non-existent paths and isolate PATH.
 	t.Setenv("ProgramFiles", filepath.Join(t.TempDir(), "nonexistent"))
 	t.Setenv("APPDATA", "")
+	t.Setenv("PATH", t.TempDir())
 
 	got := findCopilotBinary()
 	if got != "" {
@@ -179,6 +180,7 @@ func TestFindCopilotBinary_NoCandidates(t *testing.T) {
 func TestFindCopilotBinary_WithAPPDATA(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("ProgramFiles", filepath.Join(tmp, "nonexistent"))
+	t.Setenv("PATH", filepath.Join(tmp, "emptypath"))
 
 	// Create the APPDATA candidate path.
 	appdata := filepath.Join(tmp, "appdata")
@@ -206,6 +208,7 @@ func TestFindCopilotBinary_WithProgramFiles(t *testing.T) {
 	progFiles := filepath.Join(tmp, "Program Files")
 	t.Setenv("ProgramFiles", progFiles)
 	t.Setenv("APPDATA", "")
+	t.Setenv("PATH", filepath.Join(tmp, "emptypath"))
 
 	candidatePath := filepath.Join(progFiles, "nodejs", "node_modules",
 		"@github", "copilot", "node_modules", "@github", "copilot-win32-x64")
@@ -220,6 +223,28 @@ func TestFindCopilotBinary_WithProgramFiles(t *testing.T) {
 	got := findCopilotBinary()
 	if got != binaryPath {
 		t.Errorf("findCopilotBinary() = %q, want %q", got, binaryPath)
+	}
+}
+
+func TestFindCopilotBinary_ViaPath(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("ProgramFiles", filepath.Join(tmp, "nonexistent"))
+	t.Setenv("APPDATA", "")
+
+	// Place a copilot.exe on PATH.
+	binDir := filepath.Join(tmp, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("creating bin dir: %v", err)
+	}
+	fakeBinary := filepath.Join(binDir, "copilot.exe")
+	if err := os.WriteFile(fakeBinary, []byte("fake"), 0o755); err != nil {
+		t.Fatalf("writing fake binary: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
+	got := findCopilotBinary()
+	if got != fakeBinary {
+		t.Errorf("findCopilotBinary() = %q, want %q", got, fakeBinary)
 	}
 }
 
