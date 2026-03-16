@@ -402,3 +402,114 @@ func TestPreviewPanelViewCheckpoints(t *testing.T) {
 		t.Error("View should show checkpoint titles")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// HitConversationSort / ScrollOffset / convHeaderLine
+// ---------------------------------------------------------------------------
+
+func TestPreviewPanelHitConversationSort_NoTurns(t *testing.T) {
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test"},
+	})
+	// No turns → convHeaderLine should be -1 → no hit.
+	for row := 0; row < 30; row++ {
+		if p.HitConversationSort(row) {
+			t.Errorf("HitConversationSort(%d) = true, want false when no turns", row)
+		}
+	}
+}
+
+func TestPreviewPanelHitConversationSort_WithTurns(t *testing.T) {
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", TurnCount: 1},
+		Turns: []data.Turn{
+			{UserMessage: "hello", AssistantResponse: "world"},
+		},
+	})
+	// convHeaderLine should be positive (after fields + separator).
+	if p.convHeaderLine < 0 {
+		t.Fatalf("convHeaderLine = %d, want >= 0 when turns present", p.convHeaderLine)
+	}
+	// Exact line should hit.
+	if !p.HitConversationSort(p.convHeaderLine) {
+		t.Error("HitConversationSort should return true on the conversation header line")
+	}
+	// One line above and below should miss.
+	if p.HitConversationSort(p.convHeaderLine - 1) {
+		t.Error("HitConversationSort should return false one line above")
+	}
+	if p.HitConversationSort(p.convHeaderLine + 1) {
+		t.Error("HitConversationSort should return false one line below")
+	}
+}
+
+func TestPreviewPanelHitConversationSort_NoDetail(t *testing.T) {
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	// No detail set → convHeaderLine stays -1.
+	if p.HitConversationSort(0) {
+		t.Error("HitConversationSort should return false when no detail is set")
+	}
+}
+
+func TestPreviewPanelScrollOffset(t *testing.T) {
+	p := NewPreviewPanel()
+	if p.ScrollOffset() != 0 {
+		t.Errorf("initial ScrollOffset = %d, want 0", p.ScrollOffset())
+	}
+	p.SetSize(80, 20)
+	turns := make([]data.Turn, 10)
+	for i := range turns {
+		turns[i] = data.Turn{
+			UserMessage:       "Question " + FormatInt(i),
+			AssistantResponse: "Answer " + FormatInt(i),
+		}
+	}
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", TurnCount: 10},
+		Turns:   turns,
+	})
+	p.ScrollDown(5)
+	if p.ScrollOffset() != p.scroll {
+		t.Errorf("ScrollOffset() = %d, want %d", p.ScrollOffset(), p.scroll)
+	}
+}
+
+func TestPreviewPanelConvHeaderLineUpdatesOnResize(t *testing.T) {
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", TurnCount: 1},
+		Turns:   []data.Turn{{UserMessage: "q", AssistantResponse: "a"}},
+	})
+	line1 := p.convHeaderLine
+
+	// Resizing may shift the line (due to word wrap changes).
+	p.SetSize(40, 40)
+	line2 := p.convHeaderLine
+
+	// Both should be valid (>= 0), though possibly different values.
+	if line1 < 0 || line2 < 0 {
+		t.Errorf("convHeaderLine should be >= 0 with turns: got %d and %d", line1, line2)
+	}
+}
+
+func TestPreviewPanelConvHeaderLineResetOnNilDetail(t *testing.T) {
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", TurnCount: 1},
+		Turns:   []data.Turn{{UserMessage: "q", AssistantResponse: "a"}},
+	})
+	if p.convHeaderLine < 0 {
+		t.Fatal("convHeaderLine should be >= 0 with turns")
+	}
+	p.SetDetail(nil)
+	if p.convHeaderLine != -1 {
+		t.Errorf("convHeaderLine = %d after nil detail, want -1", p.convHeaderLine)
+	}
+}

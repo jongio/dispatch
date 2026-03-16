@@ -11,22 +11,47 @@ import (
 
 // PreviewPanel renders a right-side detail panel for the selected session.
 type PreviewPanel struct {
-	detail     *data.SessionDetail
-	width      int
-	height     int
-	scroll     int
-	totalLines int // cached line count for scroll clamping
+	detail          *data.SessionDetail
+	attentionStatus data.AttentionStatus
+	width           int
+	height          int
+	scroll          int
+	totalLines      int  // cached line count for scroll clamping
+	newestFirst     bool // conversation turn display order
+	convHeaderLine  int  // content line where "Conversation" label is rendered (-1 = none)
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
 func NewPreviewPanel() PreviewPanel {
-	return PreviewPanel{}
+	return PreviewPanel{convHeaderLine: -1}
+}
+
+// SetConversationSort sets the conversation turn display order.
+// When newestFirst is true, turns are shown in descending order (newest
+// at the top). When false, turns are shown in ascending order (oldest first).
+func (p *PreviewPanel) SetConversationSort(newestFirst bool) {
+	p.newestFirst = newestFirst
+	p.updateTotalLines()
+}
+
+// ToggleConversationSort flips the conversation sort order and returns the
+// new value.
+func (p *PreviewPanel) ToggleConversationSort() bool {
+	p.newestFirst = !p.newestFirst
+	p.updateTotalLines()
+	return p.newestFirst
 }
 
 // SetDetail updates the displayed session detail.
 func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
+	p.updateTotalLines()
+}
+
+// SetAttentionStatus updates the attention status shown in the preview.
+func (p *PreviewPanel) SetAttentionStatus(status data.AttentionStatus) {
+	p.attentionStatus = status
 	p.updateTotalLines()
 }
 
@@ -65,14 +90,28 @@ func (p *PreviewPanel) PageDown() {
 	p.ScrollDown(max(1, (p.height-2)/2))
 }
 
+// ScrollOffset returns the current scroll position.
+func (p *PreviewPanel) ScrollOffset() int {
+	return p.scroll
+}
+
+// HitConversationSort reports whether contentRow (a 0-indexed line in the
+// full rendered content) falls on the "Conversation" header label. This is
+// used by the mouse handler to detect clicks on the sort toggle.
+func (p *PreviewPanel) HitConversationSort(contentRow int) bool {
+	return p.convHeaderLine >= 0 && contentRow == p.convHeaderLine
+}
+
 // updateTotalLines recomputes the cached total line count for scroll clamping.
 func (p *PreviewPanel) updateTotalLines() {
 	if p.width <= 0 || p.height <= 0 || p.detail == nil {
 		p.totalLines = 0
+		p.convHeaderLine = -1
 		return
 	}
-	content := p.renderContent()
+	content, convLine := p.renderContent()
 	p.totalLines = strings.Count(content, "\n") + 1
+	p.convHeaderLine = convLine
 }
 
 // View renders the preview panel content.
@@ -81,7 +120,7 @@ func (p PreviewPanel) View() string {
 		return ""
 	}
 
-	content := p.renderContent()
+	content, _ := p.renderContent()
 
 	// innerW = content+padding width passed to lipgloss Width() (excludes border).
 	// lipgloss Width() includes padding; text wraps at innerW - hPadding(2) = p.width-4.
@@ -139,20 +178,21 @@ func (p PreviewPanel) View() string {
 // shown before truncation with a "… N more" indicator.
 const maxPreviewItems = 5
 
-func (p PreviewPanel) renderContent() string {
+func (p PreviewPanel) renderContent() (string, int) {
 	if p.detail == nil {
 		// Use height-2 to account for the border added by View().
 		return lipgloss.Place(
 			max(1, p.width-4), max(1, p.height-2),
 			lipgloss.Center, lipgloss.Center,
 			styles.DimmedStyle.Render("Select a session"),
-		)
+		), -1
 	}
 
 	s := p.detail.Session
 	contentW := max(1, p.width-4) // text area = total - border(2) - padding(2)
 
 	var b strings.Builder
+	convLine := -1
 
 	// ── Title ──
 	b.WriteString(styles.PreviewTitleStyle.Render(styles.IconSession()+"Session Detail") + "\n")
@@ -171,7 +211,7 @@ func (p PreviewPanel) renderContent() string {
 		b.WriteString(l + v + "\n")
 	}
 
-	field("ID", Truncate(s.ID, 12))
+	field("ID", s.ID)
 	field("Folder", AbbrevPath(s.Cwd))
 
 	if s.Repository != "" {
@@ -183,8 +223,14 @@ func (p PreviewPanel) renderContent() string {
 
 	// ── Timing & stats ──
 	b.WriteString("\n")
-	field(styles.IconClock()+"Created", RelativeTime(s.CreatedAt))
-	field(styles.IconClock()+"Active", RelativeTime(s.LastActiveAt))
+	field(styles.IconClock()+"Created", FormatTimestamp(s.CreatedAt))
+	field(styles.IconClock()+"Active", FormatTimestamp(s.LastActiveAt))
+
+	// ── Attention status ──
+	statusIcon, statusLabel, statusStyle := attentionStatusDisplay(p.attentionStatus)
+	l := styles.PreviewLabelStyle.Render("Status: ")
+	b.WriteString(l + statusStyle.Render(statusIcon+" "+statusLabel) + "\n")
+
 	field("Turns", FormatInt(s.TurnCount))
 	field("Files", FormatInt(s.FileCount))
 
@@ -217,8 +263,27 @@ func (p PreviewPanel) renderContent() string {
 		b.WriteString("\n")
 		sep := styles.SeparatorStyle.Render(strings.Repeat("─", max(1, contentW)))
 		b.WriteString(sep + "\n")
-		b.WriteString(styles.PreviewLabelStyle.Render("Conversation") + "\n\n")
-		b.WriteString(RenderConversation(p.detail.Turns, contentW))
+
+		// Record the content line where the "Conversation" label appears.
+		convLine = strings.Count(b.String(), "\n")
+
+		sortArrow := styles.IconSortUp()
+		if p.newestFirst {
+			sortArrow = styles.IconSortDown()
+		}
+		b.WriteString(styles.PreviewLabelStyle.Render("Conversation "+sortArrow) + "\n\n")
+
+		turns := p.detail.Turns
+		if p.newestFirst {
+			// Reverse a copy — never mutate the original slice.
+			turns = make([]data.Turn, len(p.detail.Turns))
+			copy(turns, p.detail.Turns)
+			for i, j := 0, len(turns)-1; i < j; i, j = i+1, j-1 {
+				turns[i], turns[j] = turns[j], turns[i]
+			}
+		}
+
+		b.WriteString(RenderConversation(turns, contentW))
 	}
 
 	// ── Checkpoints ──
@@ -258,7 +323,7 @@ func (p PreviewPanel) renderContent() string {
 		}
 	}
 
-	return b.String()
+	return b.String(), convLine
 }
 
 // uniqueFilePaths returns deduplicated file paths preserving order.
@@ -404,4 +469,21 @@ func RenderChatBubble(msg, label string, contentWidth int, isUser bool) string {
 		bubbleLines[i] = pad + line
 	}
 	return pad + styledLabel + "\n" + strings.Join(bubbleLines, "\n")
+}
+
+// attentionStatusDisplay returns the icon, label, and style for an attention
+// status, matching the colors used by attentionDot in the session list.
+// For idle status, PreviewValueStyle is used instead of AttentionIdleStyle
+// (which uses Faint) so the text remains readable in the preview pane.
+func attentionStatusDisplay(status data.AttentionStatus) (icon, label string, style lipgloss.Style) {
+	switch status {
+	case data.AttentionWaiting:
+		return styles.IconAttentionWaiting(), "Waiting", styles.AttentionWaitingStyle
+	case data.AttentionActive:
+		return styles.IconAttentionActive(), "Active", styles.AttentionActiveStyle
+	case data.AttentionStale:
+		return styles.IconAttentionStale(), "Stale", styles.AttentionStaleStyle
+	default:
+		return styles.IconAttentionIdle(), "Idle", styles.PreviewValueStyle
+	}
 }

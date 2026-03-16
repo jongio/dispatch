@@ -330,6 +330,116 @@ func TestSplitDirLeafPlatform(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// FormatTimestamp
+// ---------------------------------------------------------------------------
+
+func TestFormatTimestampEmpty(t *testing.T) {
+	got := FormatTimestamp("")
+	if got != "–" {
+		t.Errorf("FormatTimestamp(%q) = %q, want %q", "", got, "–")
+	}
+}
+
+func TestFormatTimestampInvalidReturnRaw(t *testing.T) {
+	raw := "not-a-timestamp"
+	got := FormatTimestamp(raw)
+	if got != raw {
+		t.Errorf("FormatTimestamp(%q) = %q, want raw string %q", raw, got, raw)
+	}
+}
+
+func TestFormatTimestampRFC3339(t *testing.T) {
+	// Use a fixed UTC time so we can predict the local rendering.
+	utc := time.Date(2026, time.March, 15, 22, 23, 0, 0, time.UTC)
+	input := utc.Format(time.RFC3339)
+	got := FormatTimestamp(input)
+
+	// The result should be the local representation of that UTC instant.
+	want := utc.Local().Format("Jan 2 3:04 PM MST")
+	if got != want {
+		t.Errorf("FormatTimestamp(%q) = %q, want %q", input, got, want)
+	}
+}
+
+func TestFormatTimestampAlternateFormats(t *testing.T) {
+	ts := time.Date(2025, time.June, 1, 14, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name   string
+		format string
+	}{
+		{"RFC3339", time.RFC3339},
+		{"datetime T", "2006-01-02T15:04:05"},
+		{"datetime space", "2006-01-02 15:04:05"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := ts.Format(tt.format)
+			got := FormatTimestamp(input)
+			if got == "–" || got == input {
+				// Should not be placeholder or raw string for valid input.
+				// (datetime T/space have no timezone, parsed as UTC by Go.)
+				t.Errorf("FormatTimestamp(%q) = %q, want formatted timestamp", input, got)
+			}
+			// Must contain a timezone abbreviation (letters after time).
+			if !strings.ContainsAny(got, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+				t.Errorf("FormatTimestamp(%q) = %q, missing timezone abbreviation", input, got)
+			}
+		})
+	}
+}
+
+func TestFormatTimestampContainsTimezone(t *testing.T) {
+	input := "2026-01-15T10:00:00Z"
+	got := FormatTimestamp(input)
+	// The output must end with a timezone abbreviation.
+	parts := strings.Fields(got)
+	if len(parts) < 4 {
+		t.Fatalf("FormatTimestamp(%q) = %q, expected at least 4 space-separated parts", input, got)
+	}
+	tz := parts[len(parts)-1]
+	// Timezone abbreviations are uppercase letters (e.g. UTC, PST, EST).
+	for _, r := range tz {
+		if r < 'A' || r > 'Z' {
+			t.Errorf("FormatTimestamp(%q) timezone part %q contains non-uppercase char %c", input, tz, r)
+			break
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseTimestamp (unexported)
+// ---------------------------------------------------------------------------
+
+func TestParseTimestampValid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"RFC3339 UTC", "2026-03-15T22:23:00Z"},
+		{"RFC3339 offset", "2026-03-15T14:23:00-08:00"},
+		{"datetime T", "2026-03-15T22:23:00"},
+		{"datetime space", "2026-03-15 22:23:00"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseTimestamp(tt.input)
+			if err != nil {
+				t.Errorf("parseTimestamp(%q) returned error: %v", tt.input, err)
+			}
+		})
+	}
+}
+
+func TestParseTimestampInvalid(t *testing.T) {
+	for _, input := range []string{"", "garbage", "2026/03/15", "March 15 2026"} {
+		_, err := parseTimestamp(input)
+		if err == nil {
+			t.Errorf("parseTimestamp(%q) expected error, got nil", input)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // RelativeTime
 // ---------------------------------------------------------------------------
 

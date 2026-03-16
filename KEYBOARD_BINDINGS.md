@@ -155,6 +155,13 @@
     - Behavior: Shows/hides detailed session info preview on the right
     - Condition: In session list view
 
+20b. **o** → Toggle Conversation Sort Order
+     - File: D:\code\dispatch\internal\tui\keys.go (line 101)
+     - Code: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order"))
+     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1009-1011)
+     - Behavior: Toggles conversation display order between oldest-first and newest-first in the preview pane. Also clickable via the sort arrow in the conversation header. Persisted in config.
+     - Condition: Only when preview panel is visible (showPreview=true)
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: D:\code\dispatch\internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))

@@ -52,8 +52,8 @@ func TestFilterPanel_SetFolders_WithExclusions(t *testing.T) {
 		t.Error("SetFolders with exclusions should set HasActive() to true")
 	}
 	badges := fp.ActiveBadges()
-	if len(badges) != 1 {
-		t.Errorf("expected 1 badge, got %d", len(badges))
+	if len(badges) != 0 {
+		t.Errorf("expected 0 badges (badge removed), got %d", len(badges))
 	}
 }
 
@@ -263,11 +263,8 @@ func TestFilterPanel_ActiveBadges_WithExclusions(t *testing.T) {
 	fp.SetFolders([]string{"/a/x", "/a/y"}, []string{"/a/x", "/a/y"})
 
 	badges := fp.ActiveBadges()
-	if len(badges) != 1 {
-		t.Fatalf("expected 1 badge, got %d", len(badges))
-	}
-	if !strings.Contains(badges[0], "-2 dirs") {
-		t.Errorf("badge = %q, expected to contain '-2 dirs'", badges[0])
+	if len(badges) != 0 {
+		t.Fatalf("expected 0 badges (badge removed), got %d", len(badges))
 	}
 }
 

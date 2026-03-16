@@ -40,6 +40,7 @@ type keyMap struct {
 	LaunchAll         key.Binding
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
+	ConversationSort  key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
@@ -54,7 +55,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
-		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.Reindex, k.Config},
+		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.Reindex, k.Config},
 		{k.Hide, k.ToggleHidden, k.JumpNextAttention, k.FilterAttention},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
@@ -97,4 +98,5 @@ var keys = keyMap{
 	LaunchAll:         key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open selected")),
 	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
+	ConversationSort:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order")),
 }

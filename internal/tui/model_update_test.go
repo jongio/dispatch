@@ -2561,6 +2561,89 @@ func TestHandleMouse_LeftClick_InPreviewPane(t *testing.T) {
 	}
 }
 
+func TestHandleMouse_LeftClick_PreviewConversationSort(t *testing.T) {
+	m := newTestModelWithSize(120, 60) // tall enough to show conversation
+	m.showPreview = true
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "s1", TurnCount: 1},
+		Turns:   []data.Turn{{UserMessage: "q", AssistantResponse: "a"}},
+	}
+	m.preview.SetDetail(m.detail)
+	m.recalcLayout()
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	// Determine the content row of the "Conversation" header.
+	convLine := m.preview.ScrollOffset() // should be 0
+	_ = convLine
+	// The convHeaderLine is internal; use HitConversationSort to find it.
+	// Find the content row that hits — we know it must exist.
+	hitRow := -1
+	for row := 0; row < 50; row++ {
+		if m.preview.HitConversationSort(row) {
+			hitRow = row
+			break
+		}
+	}
+	if hitRow < 0 {
+		t.Fatal("could not find conversation header line in preview")
+	}
+
+	// Map content row back to screen Y:
+	// contentRow = (msg.Y - HeaderLines - 1) + scrollOffset
+	// scrollOffset is 0, so msg.Y = hitRow + HeaderLines + 1
+	clickY := hitRow + styles.HeaderLines + 1
+
+	origSort := m.cfg.ConversationNewestFirst
+	msg := tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionRelease,
+		X:      m.layout.listWidth + 5,
+		Y:      clickY,
+	}
+	result, cmd := m.Update(msg)
+	rm := result.(Model)
+	if cmd != nil {
+		t.Error("preview click should return nil cmd")
+	}
+	if rm.cfg.ConversationNewestFirst == origSort {
+		t.Error("clicking conversation header should toggle sort order")
+	}
+
+	// Click again to toggle back.
+	result2, _ := rm.Update(msg)
+	rm2 := result2.(Model)
+	if rm2.cfg.ConversationNewestFirst != origSort {
+		t.Error("second click should toggle sort back to original")
+	}
+}
+
+func TestHandleMouse_LeftClick_PreviewNonConversationLine(t *testing.T) {
+	m := newTestModelWithSize(120, 60)
+	m.showPreview = true
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "s1", TurnCount: 1},
+		Turns:   []data.Turn{{UserMessage: "q", AssistantResponse: "a"}},
+	}
+	m.preview.SetDetail(m.detail)
+	m.recalcLayout()
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
+
+	origSort := m.cfg.ConversationNewestFirst
+
+	// Click on the very first content line (title area, not conversation).
+	msg := tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionRelease,
+		X:      m.layout.listWidth + 5,
+		Y:      styles.HeaderLines + 1, // first line of preview content
+	}
+	result, _ := m.Update(msg)
+	rm := result.(Model)
+	if rm.cfg.ConversationNewestFirst != origSort {
+		t.Error("clicking non-conversation line should not toggle sort")
+	}
+}
+
 func TestHandleMouse_LeftClick_NotRelease_ContentArea(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})

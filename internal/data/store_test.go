@@ -1220,6 +1220,43 @@ func TestGroupSessionsByDate(t *testing.T) {
 	}
 }
 
+// TestGroupSessionsByDateRespectsLocalTimezone verifies that the date pivot
+// groups sessions by the LOCAL calendar date, not the UTC date.
+//
+// Scenario: a session whose latest turn timestamp is 2024-03-15T02:00:00Z
+// (2 AM UTC on Mar 15).  In UTC-5 that is still Mar 14 at 9 PM, so the
+// date group label must be "2024-03-14", not "2024-03-15".
+func TestGroupSessionsByDateRespectsLocalTimezone(t *testing.T) {
+	// Set time.Local to a fixed UTC-5 zone for the duration of the test.
+	origLocal := time.Local
+	time.Local = time.FixedZone("TEST-5", -5*60*60)
+	defer func() { time.Local = origLocal }()
+
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	db := st.db
+
+	// Session whose turn is at 2024-03-15T02:00:00Z → local 2024-03-14T21:00:00-05:00
+	seedSession(t, db, "tz-1", "/home/user/tz", "owner/tz", "main",
+		"Timezone test session", "2024-03-15T01:00:00Z", "2024-03-15T02:00:00Z")
+	seedTurn(t, db, "tz-1", 0, "hello", "hi", "2024-03-15T02:00:00Z")
+
+	groups, err := st.GroupSessions(PivotByDate, FilterOptions{},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("GroupSessions: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+
+	want := "2024-03-14" // local date in UTC-5, NOT "2024-03-15" (UTC)
+	if groups[0].Label != want {
+		t.Errorf("date group label = %q, want %q (local date in UTC-5)", groups[0].Label, want)
+	}
+}
+
 func TestGroupSessionsWithFilter(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
@@ -1298,7 +1335,7 @@ func TestPivotExpr(t *testing.T) {
 		{PivotByFolder, "COALESCE(s.cwd, '')"},
 		{PivotByRepo, "COALESCE(s.repository, '')"},
 		{PivotByBranch, "COALESCE(s.branch, '')"},
-		{PivotByDate, "SUBSTR(" + lastActiveExpr + ", 1, 10)"},
+		{PivotByDate, lastActiveExpr},
 		{PivotField("unknown"), "COALESCE(s.cwd, '')"}, // defaults to folder
 	}
 	for _, tt := range tests {

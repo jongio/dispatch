@@ -125,6 +125,12 @@ type Config struct {
 	// Schemes is a list of user-defined color schemes in Windows Terminal
 	// format.  Users can paste any WT scheme JSON directly here.
 	Schemes []styles.ColorScheme `json:"schemes,omitempty"`
+
+	// ConversationNewestFirst controls the turn display order in the
+	// preview panel's Conversation section. When false (default), turns
+	// are shown oldest-first (ascending by TurnIndex). When true, turns
+	// are shown newest-first (descending).
+	ConversationNewestFirst bool `json:"conversation_newest_first,omitempty"`
 }
 
 // LaunchMode describes how sessions are opened in the terminal.

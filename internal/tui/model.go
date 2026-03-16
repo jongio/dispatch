@@ -247,6 +247,7 @@ func NewModel() Model {
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
+	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
 	return m
 }
 
@@ -320,7 +321,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case storeOpenedMsg:
 		m.store = msg.store
 		m.state = stateSessionList
-		return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionCmd())
+		// Quick scan first (lock files only), then full scan follows.
+		return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionQuickCmd())
 
 	case storeErrorMsg:
 		m.statusErr = "Store: " + msg.err.Error()
@@ -329,6 +331,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ----- Reindex ---------------------------------------------------------
 	case components.ReindexLogPump:
+		if !m.reindexing {
+			return m, nil // Discard stale log pump after cancel.
+		}
 		m.reindexLog = append(m.reindexLog, msg.Lines...)
 		// Cap log to prevent unbounded growth.
 		if len(m.reindexLog) > maxReindexLogLines {
@@ -373,8 +378,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Timer fired — no second click arrived, so this is a single click.
 		// Reset pending state so the next click isn't mistaken for a double.
 		m.pendingClickVersion = 0
+		// Normal click clears multi-selection (Windows Explorer behavior).
+		if m.sessionList.SelectionCount() > 0 {
+			m.sessionList.DeselectAll()
+			m.statusInfo = ""
+		}
 		// Execute deferred single-click action.
 		m.sessionList.MoveTo(m.pendingClickItemIdx)
+		m.sessionList.SetAnchor()
 		if m.sessionList.IsFolderSelected() {
 			m.sessionList.ToggleFolder()
 			return m, nil
@@ -424,6 +435,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.detail = msg.detail
 		m.preview.SetDetail(m.detail)
+		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
 		return m, nil
 
 	case dataErrorMsg:
@@ -434,9 +446,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	// ----- Attention scanning ---------------------------------------------
+	case attentionQuickScannedMsg:
+		m.attentionMap = msg.statuses
+		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		// Quick scan done — immediately fire full (deep) scan.
+		return m, m.scanAttentionCmd()
+
 	case attentionScannedMsg:
 		m.attentionMap = msg.statuses
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		// Update preview panel status if a session is selected.
+		if m.detail != nil {
+			m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
+		}
 		// Always schedule the next periodic scan. When the attention filter
 		// is active, also reload sessions so the list reflects updated
 		// statuses. The reload no longer fires another scan (that was an
@@ -984,6 +1006,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.ConversationSort):
+		if m.showPreview && m.detail != nil {
+			newVal := m.preview.ToggleConversationSort()
+			m.cfg.ConversationNewestFirst = newVal
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Reindex):
 		if !m.reindexing {
 			m.reindexing = true
@@ -1219,8 +1251,17 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			// Footer click — check for waiting badge.
 			return m.handleFooterClick(msg.X)
 		}
-		// Only clicks within the list width (not the preview pane).
+		// Preview pane click — check conversation sort toggle.
 		if m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth {
+			previewRow := msg.Y - styles.HeaderLines - 1 // -1 for top border
+			contentRow := previewRow + m.preview.ScrollOffset()
+			if m.preview.HitConversationSort(contentRow) {
+				newVal := m.preview.ToggleConversationSort()
+				m.cfg.ConversationNewestFirst = newVal
+				if err := config.Save(m.cfg); err != nil {
+					m.statusErr = "config save: " + err.Error()
+				}
+			}
 			return m, nil
 		}
 		itemIdx := m.sessionList.ScrollOffset() + listRow
@@ -1272,9 +1313,24 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Ctrl+click: toggle multi-select immediately (no deferred action).
+		// If nothing is selected yet, auto-select the previously focused
+		// item first so it stays in the set (Windows Explorer behavior).
 		if msg.Ctrl {
+			if m.sessionList.SelectionCount() == 0 {
+				m.sessionList.ToggleSelected() // select current cursor item
+			}
 			m.sessionList.MoveTo(itemIdx)
 			m.sessionList.ToggleSelected()
+			m.sessionList.SetAnchor()
+			m.updateSelectionStatus()
+			m.detailVersion++
+			return m, m.loadSelectedDetailCmd()
+		}
+
+		// Shift+click: range select from anchor to clicked item.
+		if msg.Shift {
+			m.sessionList.MoveTo(itemIdx)
+			m.sessionList.SelectRange(m.sessionList.Anchor(), itemIdx)
 			m.updateSelectionStatus()
 			m.detailVersion++
 			return m, m.loadSelectedDetailCmd()
@@ -1313,13 +1369,6 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 	// Replay the footer layout to find the "● N waiting" badge X position.
 	// This mirrors the left-side construction in renderFooter().
 	left := fmt.Sprintf(" %d sessions", m.sessionList.SessionCount())
-	if hc := m.hiddenCount(); hc > 0 {
-		badge := fmt.Sprintf("%d hidden", hc)
-		if m.showHidden {
-			badge += " " + styles.IconHidden()
-		}
-		left += "  " + styles.BadgeStyle.Render(badge)
-	}
 	badgeStart := lipgloss.Width(left) + 2 // +2 for the "  " separator before the badge
 	badgeRendered := styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
 	badgeEnd := badgeStart + lipgloss.Width(badgeRendered)
@@ -1632,15 +1681,8 @@ func (m Model) renderSeparator() string {
 func (m Model) renderFooter() string {
 	count := m.sessionList.SessionCount()
 
-	// Left: session count + hidden count + active filter summary.
+	// Left: session count + active filter summary.
 	left := fmt.Sprintf(" %d sessions", count)
-	if hc := m.hiddenCount(); hc > 0 {
-		badge := fmt.Sprintf("%d hidden", hc)
-		if m.showHidden {
-			badge += " " + styles.IconHidden()
-		}
-		left += "  " + styles.BadgeStyle.Render(badge)
-	}
 	if wc := m.waitingCount(); wc > 0 {
 		left += "  " + styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
 	}
@@ -1759,12 +1801,16 @@ func (m Model) reindexInnerWidth() int {
 func (m *Model) updateReindexViewport() {
 	innerW := m.reindexInnerWidth()
 
+	// Derive a width-constrained style so each log line is
+	// left-aligned and fills the viewport instead of floating.
+	lineStyle := styles.DimStyle.Width(innerW)
+
 	var sb strings.Builder
 	for i, l := range m.reindexLog {
 		if i > 0 {
 			sb.WriteByte('\n')
 		}
-		sb.WriteString(styles.DimStyle.Render(l))
+		sb.WriteString(lineStyle.Render(l))
 	}
 
 	m.reindexVP.Width = innerW
@@ -2079,7 +2125,7 @@ func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cm
 		}
 	}
 
-	m.sessionList.DeselectAll()
+	// Keep selections intact after launch — user can deselect with 'd'.
 	m.statusInfo = ""
 
 	if len(cmds) == 0 {
@@ -2385,14 +2431,37 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 // the session-state directories.
 const attentionRefreshInterval = 30 * time.Second
 
-// scanAttentionCmd runs the session-state directory scanner in the background
-// and returns an attentionScannedMsg with the results.
+// scanAttentionQuickCmd runs a fast first-pass scan that only checks lock
+// files for live sessions. Dead sessions get AttentionIdle without reading
+// events.jsonl. This gets dots visible immediately on startup.
+func (m Model) scanAttentionQuickCmd() tea.Cmd {
+	threshold := m.cfg.EffectiveAttentionThreshold()
+	return func() tea.Msg {
+		statuses := data.ScanAttentionQuick(threshold)
+		return attentionQuickScannedMsg{statuses: statuses}
+	}
+}
+
+// scanAttentionCmd runs the full session-state directory scanner in the
+// background and returns an attentionScannedMsg with the results.
 func (m Model) scanAttentionCmd() tea.Cmd {
 	threshold := m.cfg.EffectiveAttentionThreshold()
 	return func() tea.Msg {
 		statuses := data.ScanAttention(threshold)
 		return attentionScannedMsg{statuses: statuses}
 	}
+}
+
+// attentionStatusForSession returns the attention status for a given session
+// ID, defaulting to AttentionIdle if not in the map.
+func (m Model) attentionStatusForSession(sessionID string) data.AttentionStatus {
+	if m.attentionMap == nil {
+		return data.AttentionIdle
+	}
+	if status, ok := m.attentionMap[sessionID]; ok {
+		return status
+	}
+	return data.AttentionIdle
 }
 
 // scheduleAttentionTick schedules the next periodic attention scan.

@@ -302,7 +302,7 @@ func TestCovPivotExpr_AllFields(t *testing.T) {
 	}{
 		{PivotByRepo, "COALESCE(s.repository, '')"},
 		{PivotByBranch, "COALESCE(s.branch, '')"},
-		{PivotByDate, "SUBSTR(" + lastActiveExpr + ", 1, 10)"},
+		{PivotByDate, lastActiveExpr},
 		{PivotByFolder, "COALESCE(s.cwd, '')"},
 		{"unknown", "COALESCE(s.cwd, '')"},
 	}

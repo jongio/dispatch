@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -251,10 +250,7 @@ func (f *FilterPanel) ClearAll() {
 // ActiveBadges returns a slice of short badge strings representing the
 // currently applied exclusions.
 func (f *FilterPanel) ActiveBadges() []string {
-	if len(f.applied) == 0 {
-		return nil
-	}
-	return []string{fmt.Sprintf("%s -%d dirs", styles.IconFilter(), len(f.applied))}
+	return nil
 }
 
 // View renders the filter panel as a centred overlay.

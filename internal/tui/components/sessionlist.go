@@ -36,6 +36,7 @@ type SessionList struct {
 	treeMode     bool                            // true when showing grouped/tree view
 	pivotField   string                          // current pivot mode (e.g. "folder", "repo")
 	cursor       int                             // position within visItems
+	anchor       int                             // anchor for Shift+click range selection
 	scrollOffset int                             // first visible position within visItems
 	width        int
 	height       int
@@ -366,6 +367,36 @@ func (s *SessionList) SelectAll() {
 // DeselectAll clears all selections.
 func (s *SessionList) DeselectAll() {
 	s.selected = make(map[string]struct{})
+}
+
+// SetAnchor records the current cursor position as the anchor for
+// Shift+click range selection (mirrors Windows Explorer behavior).
+func (s *SessionList) SetAnchor() {
+	s.anchor = s.cursor
+}
+
+// Anchor returns the anchor index for range selection.
+func (s *SessionList) Anchor() int {
+	return s.anchor
+}
+
+// SelectRange selects all visible non-folder sessions between indices
+// from and to (inclusive), clearing any previous selections first.
+// This implements Shift+click range selection.
+func (s *SessionList) SelectRange(from, to int) {
+	if from > to {
+		from, to = to, from
+	}
+	s.selected = make(map[string]struct{})
+	for i := from; i <= to && i < len(s.visItems); i++ {
+		if i < 0 {
+			continue
+		}
+		item := s.allItems[s.visItems[i]]
+		if !item.isFolder {
+			s.selected[item.session.ID] = struct{}{}
+		}
+	}
 }
 
 // IsSelected returns true if the given session ID is in the selection set.

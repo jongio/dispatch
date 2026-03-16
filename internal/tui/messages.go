@@ -97,8 +97,14 @@ type aiSessionsLoadedMsg struct {
 // Attention scan messages
 // ---------------------------------------------------------------------------
 
+// attentionQuickScannedMsg delivers session attention statuses from the
+// fast first-pass scanner (lock files only, no events.jsonl for dead sessions).
+type attentionQuickScannedMsg struct {
+	statuses map[string]data.AttentionStatus
+}
+
 // attentionScannedMsg delivers session attention statuses from the
-// session-state directory scanner.
+// full session-state directory scanner (includes events.jsonl analysis).
 type attentionScannedMsg struct {
 	statuses map[string]data.AttentionStatus
 }

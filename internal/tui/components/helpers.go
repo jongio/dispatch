@@ -156,21 +156,44 @@ func SplitDirLeaf(path string) (parent, leaf string) {
 	return clean[:idx], clean[idx+1:]
 }
 
+// FormatTimestamp parses a timestamp string (RFC3339 or common variants) and
+// returns a human-readable local time with timezone, e.g. "Jan 2 3:04 PM MST".
+// On parse failure, the raw string is returned as-is.
+func FormatTimestamp(timestamp string) string {
+	if timestamp == "" {
+		return emptyPlaceholder
+	}
+	t, err := parseTimestamp(timestamp)
+	if err != nil {
+		return timestamp
+	}
+	return t.Local().Format("Jan 2 3:04 PM MST")
+}
+
+// parseTimestamp tries several common timestamp layouts and returns the
+// parsed time or an error.
+func parseTimestamp(timestamp string) (time.Time, error) {
+	for _, layout := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+	} {
+		if t, err := time.Parse(layout, timestamp); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, &time.ParseError{} // non-nil sentinel error
+}
+
 // RelativeTime parses a timestamp string and returns a human-friendly
 // relative time such as "2h ago" or "3d ago".
 func RelativeTime(timestamp string) string {
 	if timestamp == "" {
 		return emptyPlaceholder
 	}
-	t, err := time.Parse(time.RFC3339, timestamp)
+	t, err := parseTimestamp(timestamp)
 	if err != nil {
-		t, err = time.Parse("2006-01-02T15:04:05", timestamp)
-		if err != nil {
-			t, err = time.Parse("2006-01-02 15:04:05", timestamp)
-			if err != nil {
-				return emptyPlaceholder
-			}
-		}
+		return emptyPlaceholder
 	}
 
 	d := time.Since(t)

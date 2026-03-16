@@ -34,6 +34,11 @@ type sessionEvent struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// deadSessionMaxAge is the maximum age of the last event for a dead session
+// to be classified as AttentionWaiting. Older dead sessions are always Idle
+// to avoid noise from long-abandoned sessions.
+const deadSessionMaxAge = 24 * time.Hour
+
 // ScanAttention reads the Copilot CLI session-state directories and returns
 // a map of session ID → AttentionStatus. The threshold parameter controls
 // how long a running session can be quiet before it is classified as stale.
@@ -67,15 +72,80 @@ func ScanAttention(threshold time.Duration) map[string]AttentionStatus {
 	return result
 }
 
+// ScanAttentionQuick performs a fast first pass that only checks lock files
+// for live sessions. Dead sessions are classified as AttentionIdle without
+// reading events.jsonl. Use this for the initial scan to get dots visible
+// immediately, then follow up with ScanAttention for full classification.
+func ScanAttentionQuick(threshold time.Duration) map[string]AttentionStatus {
+	stateDir := sessionStatePath()
+	if stateDir == "" {
+		return nil
+	}
+
+	entries, err := os.ReadDir(stateDir)
+	if err != nil {
+		return nil
+	}
+
+	result := make(map[string]AttentionStatus, len(entries))
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		sessionID := e.Name()
+		dir := filepath.Join(stateDir, sessionID)
+
+		pid := findLivePID(dir)
+		if pid <= 0 {
+			// Dead session — skip events.jsonl for speed.
+			result[sessionID] = AttentionIdle
+			continue
+		}
+
+		// Live session — full classification (fast since events.jsonl
+		// is typically small for active sessions).
+		result[sessionID] = classifyLiveSession(dir, threshold)
+	}
+
+	return result
+}
+
 // classifySession determines the attention status of a single session
 // by checking its lock file and last event.
 func classifySession(dir string, threshold time.Duration) AttentionStatus {
 	// Check for a lock file indicating the session is running.
 	pid := findLivePID(dir)
 	if pid <= 0 {
-		return AttentionIdle
+		// No live process — check last event to detect sessions that
+		// were waiting for user input when the process exited.
+		eventsPath := filepath.Join(dir, "events.jsonl")
+		evt, err := readLastEvent(eventsPath)
+		if err != nil {
+			return AttentionIdle
+		}
+
+		// Only flag dead sessions as waiting if they are recent enough
+		// to be actionable. Stale dead sessions → Idle.
+		eventTime := parseEventTime(evt.Timestamp)
+		if eventTime.IsZero() || time.Since(eventTime) > deadSessionMaxAge {
+			return AttentionIdle
+		}
+
+		switch {
+		case strings.HasPrefix(evt.Type, "assistant.turn_end"),
+			strings.HasPrefix(evt.Type, "assistant.message"):
+			return AttentionWaiting
+		default:
+			return AttentionIdle
+		}
 	}
 
+	return classifyLiveSession(dir, threshold)
+}
+
+// classifyLiveSession classifies a session that has a live process.
+func classifyLiveSession(dir string, threshold time.Duration) AttentionStatus {
 	// Session has a live process — read the last event to classify.
 	eventsPath := filepath.Join(dir, "events.jsonl")
 	evt, err := readLastEvent(eventsPath)

@@ -289,7 +289,7 @@ func pivotExpr(p PivotField) string {
 	case PivotByBranch:
 		return "COALESCE(s.branch, '')"
 	case PivotByDate:
-		return "SUBSTR(" + lastActiveExpr + ", 1, 10)"
+		return lastActiveExpr
 	default: // PivotByFolder and any unknown value
 		return coalesceCwd
 	}
@@ -603,6 +603,20 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 			&sess.LastActiveAt, &sess.TurnCount, &sess.FileCount); err != nil {
 			return nil, fmt.Errorf("scanning grouped session row: %w", err)
 		}
+		// For date pivots the SQL returns a full RFC 3339 timestamp
+		// (UTC). Convert to the local timezone before extracting the
+		// calendar date so groups reflect the user's wall-clock day.
+		if pivot == PivotByDate {
+			if t, err := time.Parse(time.RFC3339, label); err == nil {
+				label = t.Local().Format("2006-01-02")
+			} else {
+				// Fallback: if the value is already YYYY-MM-DD (10 chars) keep it.
+				if len(label) > 10 {
+					label = label[:10]
+				}
+			}
+		}
+
 		g, ok := groupMap[label]
 		if !ok {
 			g = &SessionGroup{Label: label}

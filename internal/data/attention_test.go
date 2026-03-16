@@ -104,21 +104,92 @@ func TestParseEventTime(t *testing.T) {
 func TestClassifySession(t *testing.T) {
 	threshold := 15 * time.Minute
 
-	t.Run("no lock file = idle", func(t *testing.T) {
+	t.Run("no lock file + turn_end = waiting", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		if got := classifySession(dir, threshold); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("dead PID + turn_end = waiting", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		// Write a lock file with a PID that definitely doesn't exist.
+		os.WriteFile(filepath.Join(dir, "inuse.999999999.lock"), []byte("999999999"), 0o644)
+		if got := classifySession(dir, threshold); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("no lock file + assistant.message = waiting", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.message", time.Now())
+		if got := classifySession(dir, threshold); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("no lock file + shutdown = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "session.shutdown", time.Now())
 		if got := classifySession(dir, threshold); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
 
-	t.Run("dead PID = idle", func(t *testing.T) {
+	t.Run("no lock file + tool.execution = idle", func(t *testing.T) {
 		dir := t.TempDir()
-		writeEvent(t, dir, "assistant.turn_end", time.Now())
-		// Write a lock file with a PID that definitely doesn't exist.
-		os.WriteFile(filepath.Join(dir, "inuse.999999999.lock"), []byte("999999999"), 0o644)
+		writeEvent(t, dir, "tool.execution", time.Now())
 		if got := classifySession(dir, threshold); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("no lock file + user.message = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "user.message", time.Now())
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("no lock file + no events = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("no lock file + empty events = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte{}, 0o644)
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle", got)
+		}
+	})
+
+	t.Run("no lock file + turn_end older than 24h = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-25*time.Hour))
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (age-based decay)", got)
+		}
+	})
+
+	t.Run("no lock file + assistant.message older than 24h = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.message", time.Now().Add(-48*time.Hour))
+		if got := classifySession(dir, threshold); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (age-based decay)", got)
+		}
+	})
+
+	t.Run("no lock file + turn_end within 24h = waiting", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-12*time.Hour))
+		if got := classifySession(dir, threshold); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting (within decay window)", got)
 		}
 	})
 
@@ -187,7 +258,7 @@ func TestScanAttention(t *testing.T) {
 	writeEvent(t, s1, "assistant.turn_end", time.Now())
 	writeLockFile(t, s1, os.Getpid())
 
-	// Session 2: idle (no lock file).
+	// Session 2: waiting (no lock file, but last event is turn_end).
 	s2 := filepath.Join(stateDir, "session-2")
 	os.MkdirAll(s2, 0o755)
 	writeEvent(t, s2, "assistant.turn_end", time.Now())
@@ -203,8 +274,8 @@ func TestScanAttention(t *testing.T) {
 	if result["session-1"] != AttentionWaiting {
 		t.Errorf("session-1: got %v, want AttentionWaiting", result["session-1"])
 	}
-	if result["session-2"] != AttentionIdle {
-		t.Errorf("session-2: got %v, want AttentionIdle", result["session-2"])
+	if result["session-2"] != AttentionWaiting {
+		t.Errorf("session-2: got %v, want AttentionWaiting", result["session-2"])
 	}
 	if result["session-3"] != AttentionActive {
 		t.Errorf("session-3: got %v, want AttentionActive", result["session-3"])
@@ -216,6 +287,40 @@ func TestScanAttentionMissingDir(t *testing.T) {
 	result := ScanAttention(15 * time.Minute)
 	if result != nil {
 		t.Errorf("expected nil for nonexistent dir, got %v", result)
+	}
+}
+
+func TestScanAttentionQuick(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	// Session 1: live PID + turn_end → Waiting (quick scan classifies live sessions fully).
+	s1 := filepath.Join(stateDir, "quick-1")
+	os.MkdirAll(s1, 0o755)
+	writeEvent(t, s1, "assistant.turn_end", time.Now())
+	writeLockFile(t, s1, os.Getpid())
+
+	// Session 2: dead (no lock) + turn_end → Idle (quick scan skips dead sessions).
+	s2 := filepath.Join(stateDir, "quick-2")
+	os.MkdirAll(s2, 0o755)
+	writeEvent(t, s2, "assistant.turn_end", time.Now())
+
+	// Session 3: live PID + turn_start → Active.
+	s3 := filepath.Join(stateDir, "quick-3")
+	os.MkdirAll(s3, 0o755)
+	writeEvent(t, s3, "assistant.turn_start", time.Now())
+	writeLockFile(t, s3, os.Getpid())
+
+	result := ScanAttentionQuick(15 * time.Minute)
+
+	if result["quick-1"] != AttentionWaiting {
+		t.Errorf("quick-1: got %v, want AttentionWaiting", result["quick-1"])
+	}
+	if result["quick-2"] != AttentionIdle {
+		t.Errorf("quick-2: got %v, want AttentionIdle (quick scan skips dead)", result["quick-2"])
+	}
+	if result["quick-3"] != AttentionActive {
+		t.Errorf("quick-3: got %v, want AttentionActive", result["quick-3"])
 	}
 }
 

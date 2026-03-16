@@ -27,6 +27,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Background version check on every launch with 24-hour cache
   - Post-exit notification when a new version is available
 
+- Preview pane shows absolute local timestamps with timezone (e.g. `Jan 2 3:04 PM PST`) for Created and Active fields instead of relative time
+- Preview pane shows full session ID (no longer truncated)
+- **Conversation sort toggle** (`o` key or click) — switch between oldest-first and newest-first, persisted in config
+  - Sort arrow clickable in preview pane conversation header
+
 - Demo mode enhancements
   - Fake attention status data showing all four indicator states
   - Session timestamps shifted relative to launch time for realistic time ranges
@@ -36,9 +41,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Race detection as separate preflight step (step 7/11)
 - Install verification as preflight step
 
+### Changed
+
+- Auto-version release workflow with patch/minor/major dropdown
+
 ### Fixed
 
 - Demo mode timestamp format mismatch — timestamps now use RFC3339 format matching the TUI filter, fixing 1-hour time range showing no sessions
+- Date pivot now groups sessions by local timezone instead of UTC (fixes #5)
+- Reindex cancel crash — stale log pump messages discarded after cancel
+- Reindex overlay log text left-alignment fixed
+- Removed excluded directory count from header badges
+- Removed hidden session count from footer
 
 ## [0.1.0] - 2026-03-10
 
