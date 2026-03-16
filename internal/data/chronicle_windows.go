@@ -5,6 +5,7 @@ package data
 import (
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 
@@ -51,6 +52,11 @@ func startPTY(binary string) (io.ReadWriteCloser, error) {
 
 // findCopilotBinary returns the path to copilot.exe on Windows.
 func findCopilotBinary() string {
+	// Try PATH first (matches Unix behavior).
+	if p, err := exec.LookPath("copilot"); err == nil {
+		return p
+	}
+
 	candidates := []string{
 		filepath.Join(os.Getenv("ProgramFiles"), "nodejs", "node_modules",
 			"@github", "copilot", "node_modules", "@github", "copilot-win32-x64", "copilot.exe"),

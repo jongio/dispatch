@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 const (
@@ -58,19 +59,29 @@ func SessionStorePath() (string, error) {
 const wslMountRoot = "/mnt/c/Users"
 
 // isWSL reports whether the current process is running inside Windows
-// Subsystem for Linux.
+// Subsystem for Linux. The result is cached after the first call since
+// the WSL status cannot change during a process lifetime.
 func isWSL() bool {
-	// WSL2 (and recent WSL1) always set WSL_DISTRO_NAME.
-	if os.Getenv("WSL_DISTRO_NAME") != "" {
-		return true
-	}
-	// Older WSL1 may not set the env var; fall back to /proc/version.
-	data, err := os.ReadFile("/proc/version")
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(string(data)), "microsoft")
+	wslOnce.Do(func() {
+		// WSL2 (and recent WSL1) always set WSL_DISTRO_NAME.
+		if os.Getenv("WSL_DISTRO_NAME") != "" {
+			wslCached = true
+			return
+		}
+		// Older WSL1 may not set the env var; fall back to /proc/version.
+		data, err := os.ReadFile("/proc/version")
+		if err != nil {
+			return
+		}
+		wslCached = strings.Contains(strings.ToLower(string(data)), "microsoft")
+	})
+	return wslCached
 }
+
+var (
+	wslOnce   sync.Once
+	wslCached bool
+)
 
 // findWindowsSessionStore scans Windows user-profile directories under the
 // default WSL mount for a Copilot session store database.
