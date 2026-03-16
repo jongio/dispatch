@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"github.com/creack/pty"
 )
@@ -19,14 +20,23 @@ const (
 	ptyDimRows = 40
 )
 
-// ptyHandle wraps a Unix PTY file descriptor.
+// ptyHandle wraps a Unix PTY file descriptor. Close is idempotent:
+// the underlying file is closed exactly once even if Close is called
+// multiple times (e.g. explicit cancel close + deferred cleanup).
 type ptyHandle struct {
-	ptmx *os.File
+	ptmx      *os.File
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func (p *ptyHandle) Read(buf []byte) (int, error)  { return p.ptmx.Read(buf) }
 func (p *ptyHandle) Write(buf []byte) (int, error) { return p.ptmx.Write(buf) }
-func (p *ptyHandle) Close() error                  { return p.ptmx.Close() }
+func (p *ptyHandle) Close() error {
+	p.closeOnce.Do(func() {
+		p.closeErr = p.ptmx.Close()
+	})
+	return p.closeErr
+}
 
 // startPTY launches the Copilot CLI binary inside a Unix PTY so it
 // believes it has an interactive terminal.

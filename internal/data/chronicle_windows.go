@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -17,14 +18,25 @@ const (
 	ptyDimRows = 40
 )
 
-// ptyHandle wraps a Windows ConPTY pseudo-console.
+// ptyHandle wraps a Windows ConPTY pseudo-console. Close is idempotent:
+// the underlying ConPTY is closed exactly once even if Close is called
+// multiple times (e.g. explicit cancel close + deferred cleanup).
+// This prevents access-violation panics from double-closing the HPCON
+// handle via win32 ClosePseudoConsole.
 type ptyHandle struct {
-	cpty *conpty.ConPty
+	cpty      *conpty.ConPty
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func (p *ptyHandle) Read(buf []byte) (int, error)  { return p.cpty.Read(buf) }
 func (p *ptyHandle) Write(buf []byte) (int, error) { return p.cpty.Write(buf) }
-func (p *ptyHandle) Close() error                  { return p.cpty.Close() }
+func (p *ptyHandle) Close() error {
+	p.closeOnce.Do(func() {
+		p.closeErr = p.cpty.Close()
+	})
+	return p.closeErr
+}
 
 // startPTY launches the Copilot CLI binary inside a Windows ConPTY
 // pseudo-console so it believes it has an interactive terminal.

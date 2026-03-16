@@ -89,6 +89,13 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 	// Pump PTY output into a channel so we can read with timeouts.
 	outCh := make(chan string, 1000)
 	go func() {
+		defer close(outCh)
+		defer func() {
+			if r := recover(); r != nil {
+				// PTY was closed while reading — expected during cancel.
+				// Swallow the panic so it doesn't crash the program.
+			}
+		}()
 		buf := make([]byte, chronicleReadBuf)
 		for {
 			n, rErr := ptty.Read(buf)
@@ -96,7 +103,6 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 				outCh <- string(buf[:n])
 			}
 			if rErr != nil {
-				close(outCh)
 				return
 			}
 		}
