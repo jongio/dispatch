@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -15,9 +16,9 @@ import (
 // demoAttention describes a fake attention state for a demo session.
 type demoAttention struct {
 	sessionID string
-	eventType string    // last event type (determines waiting/active/stale)
-	stale     bool      // if true, event timestamp is old (→ stale status)
-	idle      bool      // if true, no lock file created (→ idle status)
+	eventType string // last event type (determines waiting/active/stale)
+	stale     bool   // if true, event timestamp is old (→ stale status)
+	idle      bool   // if true, no lock file created (→ idle status)
 }
 
 // demoAttentionSessions defines which sessions get attention status
@@ -118,7 +119,8 @@ func shiftDemoTimestamps(dbPath string) error {
 
 	// Find the newest updated_at.
 	var maxTS string
-	err = db.QueryRow(`SELECT MAX(updated_at) FROM sessions`).Scan(&maxTS)
+	ctx := context.Background()
+	err = db.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM sessions`).Scan(&maxTS)
 	if err != nil {
 		return fmt.Errorf("demo db max ts: %w", err)
 	}
@@ -146,7 +148,7 @@ func shiftDemoTimestamps(dbPath string) error {
 	}
 
 	// Update all timestamp columns in one transaction.
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -160,7 +162,7 @@ func shiftDemoTimestamps(dbPath string) error {
 	}
 
 	for _, q := range updates {
-		if _, err := tx.Exec(q); err != nil {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("demo db shift: %w", err)
 		}

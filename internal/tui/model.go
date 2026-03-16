@@ -85,13 +85,13 @@ var timeRanges = []struct{ key, label string }{
 type appState int
 
 const (
-	stateLoading     appState = iota
-	stateSessionList          // main view
-	stateFilterPanel          // filter overlay open
-	stateHelpOverlay          // help modal open
-	stateShellPicker          // shell selection overlay
-	stateConfigPanel          // settings overlay
-	stateAttentionPicker      // attention status filter overlay
+	stateLoading         appState = iota
+	stateSessionList              // main view
+	stateFilterPanel              // filter overlay open
+	stateHelpOverlay              // help modal open
+	stateShellPicker              // shell selection overlay
+	stateConfigPanel              // settings overlay
+	stateAttentionPicker          // attention status filter overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -134,9 +134,9 @@ type Model struct {
 	cfg   *config.Config
 
 	// Query parameters.
-	filter    data.FilterOptions
-	sort      data.SortOptions
-	timeRange string // "1h", "1d", "7d", "all"
+	filter     data.FilterOptions
+	sort       data.SortOptions
+	timeRange  string         // "1h", "1d", "7d", "all"
 	pivot      string         // "none", "folder", "repo", "branch", "date"
 	pivotOrder data.SortOrder // group header sort direction
 
@@ -150,15 +150,15 @@ type Model struct {
 	terminals []platform.TerminalInfo
 
 	// Sub-components.
-	sessionList components.SessionList
-	searchBar   components.SearchBar
-	filterPanel components.FilterPanel
-	preview     components.PreviewPanel
-	help        components.HelpOverlay
-	shellPicker components.ShellPicker
-	configPanel components.ConfigPanel
+	sessionList     components.SessionList
+	searchBar       components.SearchBar
+	filterPanel     components.FilterPanel
+	preview         components.PreviewPanel
+	help            components.HelpOverlay
+	shellPicker     components.ShellPicker
+	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
-	spinner     spinner.Model
+	spinner         spinner.Model
 
 	// UI toggles.
 	showPreview   bool
@@ -255,14 +255,14 @@ func NewModel() Model {
 		showPreview: cfg.ShowPreview,
 		hiddenSet:   hiddenSet,
 
-		sessionList: components.NewSessionList(),
-		searchBar:   components.NewSearchBar(),
-		filterPanel: components.NewFilterPanel(),
-		preview:     components.NewPreviewPanel(),
-		help:        components.NewHelpOverlay(),
-		shellPicker: components.NewShellPicker(),
-		configPanel: cp,
-		spinner:     s,
+		sessionList:     components.NewSessionList(),
+		searchBar:       components.NewSearchBar(),
+		filterPanel:     components.NewFilterPanel(),
+		preview:         components.NewPreviewPanel(),
+		help:            components.NewHelpOverlay(),
+		shellPicker:     components.NewShellPicker(),
+		configPanel:     cp,
+		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 	}

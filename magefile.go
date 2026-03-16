@@ -30,6 +30,10 @@ var deadcodeAllowlist = []string{
 	"keyMap.ShortHelp",             // key.Map interface impl
 	"keyMap.FullHelp",              // key.Map interface impl
 	"CurrentTheme",                 // called from screenshot.go (//go:build screenshots)
+	"Model.hiddenCount",            // tested API surface, pending production use
+	"Model.launchNewSession",       // tested API surface, pending production use
+	"IconHidden",                   // tested icon helper, pending production use
+	"IconList",                     // tested icon helper, pending production use
 }
 
 const (
@@ -171,13 +175,20 @@ func Preflight() error {
 
 	fmt.Println("\n=== 5/13 Linting (WSL / Linux) ===")
 	if _, err := exec.LookPath("wsl"); err == nil {
-		wslPath, err := windowsToWSLPath(projectDir())
-		if err != nil {
-			return fmt.Errorf("WSL path conversion: %w", err)
-		}
-		cmd := fmt.Sprintf("cd %s && golangci-lint run", wslPath)
-		if err := run("wsl", "bash", "-c", cmd); err != nil {
-			return fmt.Errorf("WSL lint: %w", err)
+		// Check whether golangci-lint is installed inside WSL before
+		// attempting to run it, mirroring the skip pattern used by
+		// govulncheck, gofumpt, and deadcode.
+		if checkErr := run("wsl", "bash", "-c", "command -v golangci-lint >/dev/null 2>&1"); checkErr != nil {
+			fmt.Println("   Skipped (golangci-lint not installed in WSL)")
+		} else {
+			wslPath, err := windowsToWSLPath(projectDir())
+			if err != nil {
+				return fmt.Errorf("WSL path conversion: %w", err)
+			}
+			cmd := fmt.Sprintf("cd %s && golangci-lint run", wslPath)
+			if err := run("wsl", "bash", "-c", cmd); err != nil {
+				return fmt.Errorf("WSL lint: %w", err)
+			}
 		}
 	} else {
 		fmt.Println("   Skipped (WSL not available)")

@@ -432,13 +432,13 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	// circle colors (waiting=purple, active=green, stale=yellow, idle=gray).
 	attentionMap := map[string]data.AttentionStatus{
 		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": data.AttentionWaiting, // Death Star API auth (5 min ago)
-		"ses-026":                                data.AttentionActive,  // Fleet dashboard (12 min ago)
-		"ses-002":                                data.AttentionActive,  // Superlaser refactor (22 min ago)
-		"ses-003":                                data.AttentionStale,   // Warp metrics (38 min ago)
-		"ses-004":                                data.AttentionWaiting, // Cake promise API (52 min ago)
-		"ses-005":                                data.AttentionStale,   // Sith login fix (95 min ago)
-		"ses-006":                                data.AttentionIdle,    // Sorting hat GPT (175 min ago)
-		"ses-027":                                data.AttentionIdle,    // Auth middleware (250 min ago)
+		"ses-026":                              data.AttentionActive,  // Fleet dashboard (12 min ago)
+		"ses-002":                              data.AttentionActive,  // Superlaser refactor (22 min ago)
+		"ses-003":                              data.AttentionStale,   // Warp metrics (38 min ago)
+		"ses-004":                              data.AttentionWaiting, // Cake promise API (52 min ago)
+		"ses-005":                              data.AttentionStale,   // Sith login fix (95 min ago)
+		"ses-006":                              data.AttentionIdle,    // Sorting hat GPT (175 min ago)
+		"ses-027":                              data.AttentionIdle,    // Auth middleware (250 min ago)
 	}
 
 	ctx := &captureCtx{

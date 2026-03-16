@@ -991,5 +991,3 @@ func TestCovLaunchSession_FallbackPath(t *testing.T) {
 		})
 	}
 }
-
-
