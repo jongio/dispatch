@@ -502,7 +502,7 @@ func replaceUnix(newBinaryPath, exePath string) error {
 }
 
 // replaceWindows renames the running exe to .old, then copies the new
-// binary and updates the disp.exe alias if present.
+// binary and updates the companion (dispatch↔disp) if present.
 func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 	exePath := filepath.Join(exeDir, exeName)
 	oldPath := exePath + oldBinarySuffix
@@ -526,14 +526,30 @@ func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 	// Best-effort cleanup of old binary.
 	_ = os.Remove(oldPath)
 
-	// Update disp.exe alias if it exists.
-	aliasPath := filepath.Join(exeDir, aliasName+".exe")
-	if _, err := os.Stat(aliasPath); err == nil {
-		oldAlias := aliasPath + oldBinarySuffix
-		_ = os.Remove(oldAlias)
-		_ = os.Rename(aliasPath, oldAlias)
-		_ = copyFile(exePath, aliasPath)
-		_ = os.Remove(oldAlias)
+	// Update companion binaries (dispatch.exe ↔ disp.exe). Skip the
+	// binary we just replaced to avoid a self-referencing rename that
+	// would destroy the freshly installed file. Copy directly from the
+	// extracted newBinaryPath to avoid Windows file-locking issues on
+	// the just-written exe.
+	companions := []string{binaryName + ".exe", aliasName + ".exe"}
+	for _, name := range companions {
+		if strings.EqualFold(name, exeName) {
+			continue
+		}
+		companionPath := filepath.Join(exeDir, name)
+		if _, err := os.Stat(companionPath); err != nil {
+			continue
+		}
+		oldCompanion := companionPath + oldBinarySuffix
+		_ = os.Remove(oldCompanion)
+		if err := os.Rename(companionPath, oldCompanion); err != nil {
+			continue
+		}
+		if err := copyFile(newBinaryPath, companionPath); err != nil {
+			_ = os.Rename(oldCompanion, companionPath) // restore on failure
+			continue
+		}
+		_ = os.Remove(oldCompanion)
 	}
 
 	return nil
