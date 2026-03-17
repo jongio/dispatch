@@ -1,7 +1,10 @@
 package platform
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -693,5 +696,153 @@ func TestLaunchSession_DefaultShell_AlwaysHasPath(t *testing.T) {
 	}
 	if sh.Name == "" {
 		t.Error("DefaultShell() returned empty Name — display would be unclear")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// startAndWaitBriefly
+// ---------------------------------------------------------------------------
+
+// TestHelperProcess is a test helper process used by startAndWaitBriefly tests.
+// It is invoked as a subprocess by the test and exits based on env vars.
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_TEST_HELPER_PROCESS") != "1" {
+		return
+	}
+	switch os.Getenv("GO_TEST_HELPER_MODE") {
+	case "exit0":
+		os.Exit(0)
+	case "exit1":
+		fmt.Fprintln(os.Stderr, "helper: something went wrong")
+		os.Exit(1)
+	case "exit1_escape":
+		fmt.Fprintln(os.Stderr, "error\x1b[2Jhidden\x07bell")
+		os.Exit(1)
+	default:
+		os.Exit(0)
+	}
+}
+
+func helperCmd(mode string) *exec.Cmd {
+	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
+	cmd.Env = append(os.Environ(),
+		"GO_TEST_HELPER_PROCESS=1",
+		"GO_TEST_HELPER_MODE="+mode,
+	)
+	return cmd
+}
+
+func TestStartAndWaitBriefly_SuccessfulExit(t *testing.T) {
+	err := startAndWaitBriefly(helperCmd("exit0"))
+	if err != nil {
+		t.Errorf("expected nil error for exit 0, got %v", err)
+	}
+}
+
+func TestStartAndWaitBriefly_ImmediateFailure(t *testing.T) {
+	err := startAndWaitBriefly(helperCmd("exit1"))
+	if err == nil {
+		t.Fatal("expected error for exit 1, got nil")
+	}
+	if !strings.Contains(err.Error(), "something went wrong") {
+		t.Errorf("expected stderr in error message, got %q", err.Error())
+	}
+}
+
+func TestStartAndWaitBriefly_StderrEscapeSequencesStripped(t *testing.T) {
+	err := startAndWaitBriefly(helperCmd("exit1_escape"))
+	if err == nil {
+		t.Fatal("expected error for exit 1, got nil")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "\x1b") || strings.Contains(msg, "\x07") {
+		t.Errorf("stderr contains unstripped control chars: %q", msg)
+	}
+	if !strings.Contains(msg, "error") {
+		t.Errorf("expected error content in message, got %q", msg)
+	}
+}
+
+func TestStartAndWaitBriefly_StartFailure(t *testing.T) {
+	cmd := exec.Command("/nonexistent/binary/that/does/not/exist")
+	err := startAndWaitBriefly(cmd)
+	if err == nil {
+		t.Fatal("expected error for nonexistent binary, got nil")
+	}
+}
+
+func TestStartAndWaitBriefly_PresetStderrNotOverwritten(t *testing.T) {
+	cmd := helperCmd("exit1")
+	var custom bytes.Buffer
+	cmd.Stderr = &custom
+	err := startAndWaitBriefly(cmd)
+	if err == nil {
+		t.Fatal("expected error for exit 1, got nil")
+	}
+	// stderr output should go to the custom writer, not the internal one.
+	if custom.Len() == 0 {
+		t.Error("custom stderr writer should have received output")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// limitedWriter
+// ---------------------------------------------------------------------------
+
+func TestLimitedWriter_CapsOutput(t *testing.T) {
+	var buf bytes.Buffer
+	lw := &limitedWriter{buf: &buf, max: 10}
+	input := []byte("hello world, this is too long")
+	n, err := lw.Write(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != len(input) {
+		t.Errorf("Write should report full input length %d, got %d", len(input), n)
+	}
+	if buf.Len() != 10 {
+		t.Errorf("buffer should be capped at 10 bytes, got %d", buf.Len())
+	}
+}
+
+func TestLimitedWriter_ExactFit(t *testing.T) {
+	var buf bytes.Buffer
+	lw := &limitedWriter{buf: &buf, max: 5}
+	lw.Write([]byte("hello"))
+	if buf.String() != "hello" {
+		t.Errorf("expected 'hello', got %q", buf.String())
+	}
+	// Further writes should be discarded.
+	lw.Write([]byte(" world"))
+	if buf.String() != "hello" {
+		t.Errorf("expected 'hello' after overflow, got %q", buf.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// sanitizeStderr
+// ---------------------------------------------------------------------------
+
+func TestSanitizeStderr_StripsControlChars(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"clean", "normal error", "normal error"},
+		{"with newline and tab", "line1\nline2\ttab", "line1\nline2\ttab"},
+		{"escape sequences", "err\x1b[2Jhidden", "err[2Jhidden"},
+		{"bell", "alert\x07end", "alertend"},
+		{"null", "has\x00null", "hasnull"},
+		{"DEL", "has\x7Fdel", "hasdel"},
+		{"carriage return", "over\rwrite", "overwrite"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeStderr(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeStderr(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
 	}
 }

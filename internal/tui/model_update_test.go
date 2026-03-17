@@ -811,6 +811,22 @@ func TestUpdate_SessionExitMsg(t *testing.T) {
 	}
 }
 
+func TestUpdate_SessionExitMsgWithError(t *testing.T) {
+	m := newTestModel()
+	result, cmd := m.Update(sessionExitMsg{err: errors.New("command not found")})
+	updated := result.(Model)
+	// Should NOT quit — stay in TUI so user sees the error.
+	if cmd != nil {
+		t.Error("sessionExitMsg with error should not return quit cmd")
+	}
+	if updated.statusErr == "" {
+		t.Error("sessionExitMsg with error should set statusErr")
+	}
+	if !strings.Contains(updated.statusErr, "command not found") {
+		t.Errorf("statusErr = %q, want it to contain %q", updated.statusErr, "command not found")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Render functions
 // ---------------------------------------------------------------------------

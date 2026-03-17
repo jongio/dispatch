@@ -652,6 +652,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ----- Session exit (in-place resume finished) -------------------------
 	case sessionExitMsg:
+		if msg.err != nil {
+			m.statusErr = fmt.Sprintf("Session failed: %v", msg.err)
+			return m, nil
+		}
 		m.closeStore()
 		return m, tea.Quit
 

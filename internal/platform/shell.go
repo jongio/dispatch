@@ -3,6 +3,7 @@ package platform
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // ShellInfo describes a shell that can be used to launch Copilot CLI sessions.
@@ -346,6 +348,76 @@ func DefaultTerminal() string {
 	}
 }
 
+// maxStderrCapture is the maximum number of bytes captured from a launched
+// process's stderr. This prevents unbounded memory growth if a subprocess
+// floods stderr within the grace window (CWE-400).
+const maxStderrCapture = 64 * 1024 // 64 KB
+
+// limitedWriter wraps a bytes.Buffer and stops writing after max bytes.
+type limitedWriter struct {
+	buf *bytes.Buffer
+	max int
+}
+
+func (lw *limitedWriter) Write(p []byte) (int, error) {
+	n := len(p) // report full input as consumed
+	remaining := lw.max - lw.buf.Len()
+	if remaining <= 0 {
+		return n, nil // discard silently
+	}
+	if len(p) > remaining {
+		p = p[:remaining]
+	}
+	lw.buf.Write(p)
+	return n, nil
+}
+
+// sanitizeStderr strips control characters from stderr output before it is
+// displayed in the TUI. This prevents terminal escape sequence injection
+// (CWE-150) from a malicious or buggy subprocess.
+func sanitizeStderr(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 && r != '\n' && r != '\t' {
+			return -1
+		}
+		if r == 0x7F {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// startAndWaitBriefly starts a command and waits briefly for it to exit.
+// If the process exits with an error within the grace period, the error is
+// returned so the caller can surface it to the user (e.g., broken custom
+// commands, unreachable terminal emulators). If the process is still running
+// after the grace period, it is assumed to have launched successfully.
+func startAndWaitBriefly(cmd *exec.Cmd) error {
+	var stderr bytes.Buffer
+	if cmd.Stderr == nil {
+		cmd.Stderr = &limitedWriter{buf: &stderr, max: maxStderrCapture}
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	const grace = 3 * time.Second
+	select {
+	case err := <-done:
+		if err != nil {
+			if msg := strings.TrimSpace(sanitizeStderr(stderr.String())); msg != "" {
+				return fmt.Errorf("%w: %s", err, msg)
+			}
+			return err
+		}
+		return nil
+	case <-time.After(grace):
+		return nil
+	}
+}
+
 // LaunchSession opens a new terminal window running the Copilot CLI session
 // resume command for the given sessionID. The detected CLI binary ("ghcs" or
 // "copilot") is used with "session resume <sessionID>" plus any flags from cfg.
@@ -469,7 +541,7 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 				args = append(args, shell.Path, "-c", resumeCmd)
 			}
 			cmd := exec.Command(p, args...)
-			return cmd.Start()
+			return startAndWaitBriefly(cmd)
 		}
 	}
 
@@ -481,7 +553,7 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
-	return cmd.Start()
+	return startAndWaitBriefly(cmd)
 }
 
 // buildStartCmdLine constructs the raw command line for cmd /c start.
@@ -622,14 +694,14 @@ func launchDarwinSession(shell ShellInfo, resumeCmd string, terminal string, cwd
 			)
 		}
 		cmd := exec.Command("osascript", "-e", script)
-		return cmd.Start()
+		return startAndWaitBriefly(cmd)
 	case "WezTerm":
 		if p, err := exec.LookPath("wezterm"); err == nil {
 			cmd := exec.Command(p, "start", "--", shell.Path, "-c", resumeCmd)
 			if cwd != "" {
 				cmd.Dir = cwd
 			}
-			return cmd.Start()
+			return startAndWaitBriefly(cmd)
 		}
 	}
 	// Default: Terminal.app
@@ -657,7 +729,7 @@ func launchDarwinSession(shell ShellInfo, resumeCmd string, terminal string, cwd
 		)
 	}
 	cmd := exec.Command("osascript", "-e", script)
-	return cmd.Start()
+	return startAndWaitBriefly(cmd)
 }
 
 // escapeAppleScript escapes a string for safe embedding within AppleScript
@@ -711,7 +783,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 					if cwd != "" {
 						cmd.Dir = cwd
 					}
-					return cmd.Start()
+					return startAndWaitBriefly(cmd)
 				}
 			}
 		}
@@ -731,7 +803,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 			if cwd != "" {
 				cmd.Dir = cwd
 			}
-			return cmd.Start()
+			return startAndWaitBriefly(cmd)
 		}
 	}
 
@@ -758,7 +830,7 @@ func launchWSLWindowsTerminal(shell ShellInfo, resumeCmd string, cwd string, lau
 	args := buildWSLWTArgs(shell, resumeCmd, winCwd, distro, launchStyle, paneDirection)
 
 	cmd := exec.Command(p, args...)
-	return cmd.Start()
+	return startAndWaitBriefly(cmd)
 }
 
 // buildWSLWTArgs constructs the wt.exe argument list for launching a WSL
