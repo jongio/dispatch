@@ -286,6 +286,111 @@ func TestConfig_CustomCommandWithShellMetachars(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// FavoriteSessions — null safety
+// ---------------------------------------------------------------------------
+
+func TestLoadMalformedJSON_FavoriteSessionsNull(t *testing.T) {
+	withTempConfigDir(t)
+
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Explicit null for favoriteSessions — must not panic.
+	nullFavJSON := `{"favoriteSessions": null}`
+	if err := os.WriteFile(path, []byte(nullFavJSON), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load with null favoriteSessions: %v", err)
+	}
+	if cfg.FavoriteSessions != nil {
+		t.Errorf("FavoriteSessions = %v after null override, want nil", cfg.FavoriteSessions)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// FavoriteSessions — hostile / malicious IDs
+// ---------------------------------------------------------------------------
+
+func TestConfig_FavoriteSessionsHostileIDs(t *testing.T) {
+	hostile := []string{
+		"../../../etc/passwd",
+		"; rm -rf /",
+		"<script>alert(1)</script>",
+		"session\x00nullbyte",
+		"' OR 1=1 --",
+		"$(whoami)",
+	}
+
+	cfg := Default()
+	cfg.FavoriteSessions = hostile
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal hostile favorites: %v", err)
+	}
+
+	var restored Config
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("Unmarshal hostile favorites: %v", err)
+	}
+
+	if len(restored.FavoriteSessions) != len(hostile) {
+		t.Fatalf("len = %d, want %d", len(restored.FavoriteSessions), len(hostile))
+	}
+	for i, got := range restored.FavoriteSessions {
+		if got != hostile[i] {
+			t.Errorf("FavoriteSessions[%d] = %q, want %q", i, got, hostile[i])
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// FavoriteSessions — round-trip persistence
+// ---------------------------------------------------------------------------
+
+func TestConfig_FavoriteSessionsRoundTrip(t *testing.T) {
+	withTempConfigDir(t)
+
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Save config with favorites.
+	cfg := Default()
+	cfg.FavoriteSessions = []string{"sess-alpha", "sess-beta", "sess-gamma"}
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// Reload and verify.
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load after Save: %v", err)
+	}
+	if len(loaded.FavoriteSessions) != 3 {
+		t.Fatalf("FavoriteSessions len = %d, want 3", len(loaded.FavoriteSessions))
+	}
+	want := []string{"sess-alpha", "sess-beta", "sess-gamma"}
+	for i, id := range loaded.FavoriteSessions {
+		if id != want[i] {
+			t.Errorf("FavoriteSessions[%d] = %q, want %q", i, id, want[i])
+		}
+	}
+}
+
 func TestConfig_AgentModelWithSpecialChars(t *testing.T) {
 	// Agent and Model are passed as --agent/--model flags. Verify they
 	// round-trip cleanly even with hostile content.

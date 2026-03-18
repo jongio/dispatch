@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Session favorites** (`*` / `F`) — star sessions with `*` key, filter to show only favorites with `F`, persistent in config
 - **Multi-session open** — select multiple sessions with `Space`, open all at once with `O`
   - `a` / `d` to select all / deselect all
   - Ctrl+click for mouse selection, Shift+click for range select

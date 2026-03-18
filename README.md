@@ -28,6 +28,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Multi-session open** (`Space` / `O` / `a` / `d`) — select multiple sessions with Space, open all at once with O, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), idle (gray). Jump to next waiting session with `n`, filter by status with `!`
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
+- **Session favorites** (`*` / `F`) — star sessions as favorites, filter to show only favorites, persistent state
 - **Settings panel** (`,`) — 9 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -159,6 +160,8 @@ dispatch
 | `!` | Filter by attention status |
 | `h` | Hide/unhide current session |
 | `H` | Toggle visibility of hidden sessions |
+| `*` | Toggle favorite on current session |
+| `F` | Filter to show only favorites |
 
 #### Search & Filter
 
@@ -255,6 +258,7 @@ Configuration is stored in the platform-specific config directory:
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
 | `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
 | `hiddenSessions` | array | `[]` | Session IDs hidden from the main list |
+| `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
 
 ### Example config.json
 
@@ -276,7 +280,8 @@ Configuration is stored in the platform-specific config directory:
   "excluded_dirs": [],
   "theme": "auto",
   "ai_search": false,
-  "hiddenSessions": []
+  "hiddenSessions": [],
+  "favoriteSessions": []
 }
 ```
 

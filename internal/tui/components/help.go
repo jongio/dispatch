@@ -110,6 +110,8 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("h", "Hide session", "H", "Show hidden"))
 	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("*", "Toggle favorite", "F", "Filter favorites"))
+	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("r", "Reindex", "", ""))
 
 	// Time Range

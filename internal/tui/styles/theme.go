@@ -43,6 +43,7 @@ func SetTheme(t *Theme) {
 	NormalStyle = t.NormalStyle
 	DimmedStyle = t.DimmedStyle
 	HiddenStyle = t.HiddenStyle
+	FavoritedStyle = t.FavoritedStyle
 	GroupHeaderStyle = t.GroupHeaderStyle
 
 	BadgeStyle = t.BadgeStyle
@@ -127,6 +128,9 @@ var (
 
 	// HiddenStyle renders sessions the user has marked as hidden.
 	HiddenStyle lipgloss.Style
+
+	// FavoritedStyle renders sessions the user has starred as favorites.
+	FavoritedStyle lipgloss.Style
 
 	// GroupHeaderStyle renders collapsible folder/group headers in tree view.
 	GroupHeaderStyle lipgloss.Style
@@ -239,6 +243,7 @@ func applyLegacyDefaults() {
 	NormalStyle = lipgloss.NewStyle().Foreground(lt)
 	DimmedStyle = lipgloss.NewStyle().Foreground(ld)
 	HiddenStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
+	FavoritedStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
 
 	BadgeStyle = lipgloss.NewStyle().Foreground(lbdg).Background(lbbg).Padding(0, 1)

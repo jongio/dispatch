@@ -371,31 +371,28 @@ func TestVersionDefault(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// hiddenSetToSlice
+// sortedKeys
 // ---------------------------------------------------------------------------
 
-func TestHiddenSetToSlice_Empty(t *testing.T) {
-	m := newTestModel()
-	m.hiddenSet = make(map[string]struct{})
-	got := m.hiddenSetToSlice()
+func TestSortedKeys_Empty(t *testing.T) {
+	got := sortedKeys(make(map[string]struct{}))
 	if got != nil {
-		t.Errorf("hiddenSetToSlice empty = %v, want nil", got)
+		t.Errorf("sortedKeys empty = %v, want nil", got)
 	}
 }
 
-func TestHiddenSetToSlice_Sorted(t *testing.T) {
-	m := newTestModel()
-	m.hiddenSet = map[string]struct{}{
+func TestSortedKeys_Sorted(t *testing.T) {
+	m := map[string]struct{}{
 		"charlie": {},
 		"alpha":   {},
 		"bravo":   {},
 	}
-	got := m.hiddenSetToSlice()
+	got := sortedKeys(m)
 	if len(got) != 3 {
 		t.Fatalf("len = %d, want 3", len(got))
 	}
 	if got[0] != "alpha" || got[1] != "bravo" || got[2] != "charlie" {
-		t.Errorf("hiddenSetToSlice = %v, want sorted", got)
+		t.Errorf("sortedKeys = %v, want sorted", got)
 	}
 }
 
@@ -513,6 +510,118 @@ func TestFilterHiddenGroups_ShowHiddenBypass(t *testing.T) {
 	got := m.filterHiddenGroups(groups)
 	if len(got) != 1 {
 		t.Error("showHidden=true → all groups returned")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// filterFavoritedSessions
+// ---------------------------------------------------------------------------
+
+func TestFilterFavoritedSessions_Off(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"a": {}}
+	m.showFavorited = false
+	sessions := []data.Session{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	got := m.filterFavoritedSessions(sessions)
+	if len(got) != 3 {
+		t.Errorf("showFavorited=false → all sessions returned, got %d", len(got))
+	}
+}
+
+func TestFilterFavoritedSessions_OnWithMatches(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"a": {}, "c": {}}
+	m.showFavorited = true
+	sessions := []data.Session{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	got := m.filterFavoritedSessions(sessions)
+	if len(got) != 2 {
+		t.Fatalf("showFavorited=true with 2 matches → 2, got %d", len(got))
+	}
+	if got[0].ID != "a" || got[1].ID != "c" {
+		t.Errorf("expected [a c], got [%s %s]", got[0].ID, got[1].ID)
+	}
+}
+
+func TestFilterFavoritedSessions_OnWithNoMatches(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"x": {}, "y": {}}
+	m.showFavorited = true
+	sessions := []data.Session{{ID: "a"}, {ID: "b"}}
+	got := m.filterFavoritedSessions(sessions)
+	if len(got) != 0 {
+		t.Errorf("no matching favorites → 0, got %d", len(got))
+	}
+}
+
+func TestFilterFavoritedSessions_EmptySet(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.showFavorited = true
+	sessions := []data.Session{{ID: "a"}, {ID: "b"}}
+	got := m.filterFavoritedSessions(sessions)
+	if len(got) != 0 {
+		t.Errorf("empty favoritedSet → 0, got %d", len(got))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// filterFavoritedGroups
+// ---------------------------------------------------------------------------
+
+func TestFilterFavoritedGroups_Off(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"a": {}}
+	m.showFavorited = false
+	groups := []data.SessionGroup{
+		{Label: "g1", Sessions: []data.Session{{ID: "a"}, {ID: "b"}}, Count: 2},
+		{Label: "g2", Sessions: []data.Session{{ID: "c"}}, Count: 1},
+	}
+	got := m.filterFavoritedGroups(groups)
+	if len(got) != 2 {
+		t.Errorf("showFavorited=false → all groups returned, got %d", len(got))
+	}
+}
+
+func TestFilterFavoritedGroups_OnPrunesEmpty(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"a": {}}
+	m.showFavorited = true
+	groups := []data.SessionGroup{
+		{Label: "g1", Sessions: []data.Session{{ID: "a"}, {ID: "b"}}, Count: 2},
+		{Label: "g2", Sessions: []data.Session{{ID: "c"}, {ID: "d"}}, Count: 2},
+	}
+	got := m.filterFavoritedGroups(groups)
+	if len(got) != 1 {
+		t.Fatalf("only g1 has favorites → 1 group, got %d", len(got))
+	}
+	if got[0].Label != "g1" {
+		t.Errorf("remaining group should be 'g1', got %q", got[0].Label)
+	}
+	if got[0].Count != 1 {
+		t.Errorf("Count should be updated to 1, got %d", got[0].Count)
+	}
+	if len(got[0].Sessions) != 1 || got[0].Sessions[0].ID != "a" {
+		t.Errorf("only session 'a' should remain in group")
+	}
+}
+
+func TestFilterFavoritedGroups_OnKeepsFavorited(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = map[string]struct{}{"a": {}, "c": {}, "e": {}}
+	m.showFavorited = true
+	groups := []data.SessionGroup{
+		{Label: "g1", Sessions: []data.Session{{ID: "a"}, {ID: "b"}}, Count: 2},
+		{Label: "g2", Sessions: []data.Session{{ID: "c"}, {ID: "d"}, {ID: "e"}}, Count: 3},
+	}
+	got := m.filterFavoritedGroups(groups)
+	if len(got) != 2 {
+		t.Fatalf("both groups have favorites → 2 groups, got %d", len(got))
+	}
+	if got[0].Count != 1 {
+		t.Errorf("g1 Count = %d, want 1", got[0].Count)
+	}
+	if got[1].Count != 2 {
+		t.Errorf("g2 Count = %d, want 2", got[1].Count)
 	}
 }
 
