@@ -107,6 +107,10 @@ type Config struct {
 	// "show hidden" toggle and unhidden individually.
 	HiddenSessions []string `json:"hiddenSessions,omitempty"`
 
+	// FavoriteSessions is a list of session IDs that the user has starred
+	// as favorites. They can be filtered with the "filter favorites" toggle.
+	FavoriteSessions []string `json:"favoriteSessions,omitempty"`
+
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
 	// query the Copilot backend for semantically relevant sessions.

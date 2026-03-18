@@ -133,6 +133,7 @@ type Theme struct {
 	NormalStyle       lipgloss.Style
 	DimmedStyle       lipgloss.Style
 	HiddenStyle       lipgloss.Style
+	FavoritedStyle    lipgloss.Style
 	GroupHeaderStyle  lipgloss.Style
 	BadgeStyle        lipgloss.Style
 	ActiveBadgeStyle  lipgloss.Style
@@ -246,6 +247,7 @@ func (t *Theme) buildStyles() {
 	t.NormalStyle = lipgloss.NewStyle().Foreground(c(t.Text))
 	t.DimmedStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed))
 	t.HiddenStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
+	t.FavoritedStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
 	t.GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(c(t.Primary))
 
 	// Filter badges.

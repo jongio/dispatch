@@ -30,6 +30,8 @@ type keyMap struct {
 	TimeRange4        key.Binding
 	Hide              key.Binding
 	ToggleHidden      key.Binding
+	Star              key.Binding
+	FilterFavorites   key.Binding
 	LaunchWindow      key.Binding
 	LaunchTab         key.Binding
 	LaunchPane        key.Binding
@@ -45,7 +47,7 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.Star, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -56,7 +58,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
 		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.Reindex, k.Config},
-		{k.Hide, k.ToggleHidden, k.JumpNextAttention, k.FilterAttention},
+		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
 	}
@@ -88,6 +90,8 @@ var keys = keyMap{
 	TimeRange4:        key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "all time")),
 	Hide:              key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "hide session")),
 	ToggleHidden:      key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "show hidden")),
+	Star:              key.NewBinding(key.WithKeys("*"), key.WithHelp("*", "toggle favorite")),
+	FilterFavorites:   key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "filter favorites")),
 	LaunchWindow:      key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "open in window")),
 	LaunchTab:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "open in tab")),
 	LaunchPane:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open in pane")),

@@ -30,6 +30,7 @@ type SessionList struct {
 	visItems     []int                           // indices into allItems that are currently visible
 	expanded     map[string]struct{}             // folder path → expanded state (tree mode)
 	hiddenSet    map[string]struct{}             // session ID → hidden sessions
+	favoritedSet map[string]struct{}             // session ID → favorited sessions
 	aiSet        map[string]struct{}             // session ID → AI-found sessions
 	attentionMap map[string]data.AttentionStatus // session ID → attention status
 	selected     map[string]struct{}             // session ID → selected for multi-open
@@ -97,6 +98,12 @@ func (s *SessionList) SetPivotField(pivot string) {
 // render hidden sessions with a dimmed style.
 func (s *SessionList) SetHiddenSessions(set map[string]struct{}) {
 	s.hiddenSet = set
+}
+
+// SetFavoritedSessions updates the set of favorited session IDs, used to
+// render those sessions with a "★" marker.
+func (s *SessionList) SetFavoritedSessions(set map[string]struct{}) {
+	s.favoritedSet = set
 }
 
 // SetAISessions updates the set of AI-found session IDs, used to
@@ -470,7 +477,8 @@ func (s SessionList) View() string {
 		} else {
 			_, hidden := s.hiddenSet[item.session.ID]
 			_, aiFound := s.aiSet[item.session.ID]
-			lines = append(lines, s.renderSessionRow(item.session, selected, hidden, aiFound))
+			_, favorited := s.favoritedSet[item.session.ID]
+			lines = append(lines, s.renderSessionRow(item.session, selected, hidden, aiFound, favorited))
 		}
 	}
 	// Pad to full height.
@@ -552,13 +560,16 @@ func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
 	return styles.GroupHeaderStyle.Render(PadToWidth(line, s.width))
 }
 
-func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, aiFound bool) string {
+func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, aiFound bool, favorited bool) string {
 	w := s.width
 	if w <= 0 {
 		return ""
 	}
 
 	summary := CleanSummary(sess.Summary)
+	if favorited {
+		summary = "★ " + summary
+	}
 	if aiFound {
 		summary = "✦ " + summary
 	}
@@ -603,6 +614,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		}
 		if hidden {
 			return styles.HiddenStyle.Render(PadToWidth(line, s.width))
+		}
+		if favorited && !hidden {
+			return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
 		}
 		return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 	}
@@ -657,6 +671,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	}
 	if hidden {
 		return styles.HiddenStyle.Render(PadToWidth(line, s.width))
+	}
+	if favorited && !hidden {
+		return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
 	}
 	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 }

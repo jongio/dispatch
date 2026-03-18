@@ -164,6 +164,8 @@ type Model struct {
 	showPreview   bool
 	showHidden    bool
 	hiddenSet     map[string]struct{} // session ID → struct{} for fast hidden-session lookup
+	favoritedSet  map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	showFavorited bool
 	reindexing    bool
 	reindexLog    []string                  // log lines streamed from chronicle reindex
 	reindexVP     viewport.Model            // scrollable viewport for reindex overlay
@@ -242,6 +244,11 @@ func NewModel() Model {
 		hiddenSet[id] = struct{}{}
 	}
 
+	favoritedSet := make(map[string]struct{}, len(cfg.FavoriteSessions))
+	for _, id := range cfg.FavoriteSessions {
+		favoritedSet[id] = struct{}{}
+	}
+
 	m := Model{
 		state: stateLoading,
 		cfg:   cfg,
@@ -253,7 +260,8 @@ func NewModel() Model {
 		timeRange:   cfg.DefaultTimeRange,
 		pivot:       cfg.DefaultPivot,
 		showPreview: cfg.ShowPreview,
-		hiddenSet:   hiddenSet,
+		hiddenSet:    hiddenSet,
+		favoritedSet: favoritedSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
@@ -418,10 +426,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- Data loading ----------------------------------------------------
 	case sessionsLoadedMsg:
 		m.sessions = m.filterHiddenSessions(msg.sessions)
+		m.sessions = m.filterFavoritedSessions(m.sessions)
 		m.sessions = m.filterAttentionSessions(m.sessions)
 		m.sortByAttention(m.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
 		m.sessionList.SetSessions(m.sessions)
 		// Only transition from loading to session-list; never clobber an
@@ -435,12 +445,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case groupsLoadedMsg:
 		m.groups = m.filterHiddenGroups(msg.groups)
+		m.groups = m.filterFavoritedGroups(m.groups)
 		m.groups = m.filterAttentionGroups(m.groups)
 		for i := range m.groups {
 			m.sortByAttention(m.groups[i].Sessions)
 		}
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
@@ -510,13 +522,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.searchBar.SetSearching(false)
 		if msg.sessions != nil {
 			m.sessions = m.filterHiddenSessions(msg.sessions)
+			m.sessions = m.filterFavoritedSessions(m.sessions)
 			m.groups = nil
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.sessionList.SetSessions(m.sessions)
 		} else if msg.groups != nil {
 			m.groups = m.filterHiddenGroups(msg.groups)
+			m.groups = m.filterFavoritedGroups(m.groups)
 			m.sessions = nil
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(m.groups)
 		}
@@ -604,6 +620,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Filter out hidden/excluded sessions before merging.
 		incoming := m.filterHiddenSessions(msg.sessions)
+		incoming = m.filterFavoritedSessions(incoming)
 		if len(incoming) == 0 {
 			return m, nil
 		}
@@ -619,6 +636,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.sessionList.SetSessions(m.sessions)
 			m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		}
@@ -1076,6 +1094,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		return m, m.loadSessionsCmd()
 
+	case key.Matches(msg, keys.Star):
+		return m.handleToggleFavorite()
+
+	case key.Matches(msg, keys.FilterFavorites):
+		m.showFavorited = !m.showFavorited
+		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		cmd := m.loadSessionsCmd()
+		return m, cmd
+
 	case key.Matches(msg, keys.JumpNextAttention):
 		return m.handleJumpNextAttention()
 
@@ -1135,6 +1162,33 @@ func (m Model) handleHideSession() (tea.Model, tea.Cmd) {
 	return m, m.loadSessionsCmd()
 }
 
+// handleToggleFavorite toggles the favorited state of the currently selected session.
+func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+
+	if _, hidden := m.hiddenSet[sess.ID]; hidden {
+		return m, nil // don't favorite hidden sessions
+	}
+
+	if _, ok := m.favoritedSet[sess.ID]; ok {
+		delete(m.favoritedSet, sess.ID)
+	} else {
+		m.favoritedSet[sess.ID] = struct{}{}
+	}
+
+	m.cfg.FavoriteSessions = m.favoritedSetToSlice()
+	if err := config.Save(m.cfg); err != nil {
+		m.statusErr = "config save: " + err.Error()
+	}
+
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	cmd := m.loadSessionsCmd()
+	return m, cmd
+}
+
 // hiddenSetToSlice converts the hiddenSet map back to a sorted slice for
 // deterministic config serialisation.
 func (m *Model) hiddenSetToSlice() []string {
@@ -1142,6 +1196,16 @@ func (m *Model) hiddenSetToSlice() []string {
 		return nil
 	}
 	ids := slices.Sorted(maps.Keys(m.hiddenSet))
+	return ids
+}
+
+// favoritedSetToSlice converts the favoritedSet map back to a sorted slice for
+// deterministic config serialisation.
+func (m *Model) favoritedSetToSlice() []string {
+	if len(m.favoritedSet) == 0 {
+		return nil
+	}
+	ids := slices.Sorted(maps.Keys(m.favoritedSet))
 	return ids
 }
 
@@ -1686,6 +1750,11 @@ func (m Model) renderBadges() string {
 	}
 	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(":Pivot: "+pivotLabel))
 
+	// Favorites filter indicator.
+	if m.showFavorited {
+		parts = append(parts, styles.ActiveBadgeStyle.Render("★ Favorites"))
+	}
+
 	if len(parts) == 0 {
 		return ""
 	}
@@ -1900,6 +1969,49 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 		var sessions []data.Session
 		for _, s := range g.Sessions {
 			if _, ok := m.hiddenSet[s.ID]; !ok {
+				sessions = append(sessions, s)
+			}
+		}
+		if len(sessions) > 0 {
+			g.Sessions = sessions
+			g.Count = len(sessions)
+			filtered = append(filtered, g)
+		}
+	}
+	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Favorited session filtering
+// ---------------------------------------------------------------------------
+
+// filterFavoritedSessions returns only favorited sessions when showFavorited
+// mode is active. When the filter is off or no favorites exist, all sessions
+// pass through.
+func (m *Model) filterFavoritedSessions(sessions []data.Session) []data.Session {
+	if !m.showFavorited || len(m.favoritedSet) == 0 {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if _, ok := m.favoritedSet[s.ID]; ok {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// filterFavoritedGroups returns only favorited sessions within each group
+// when showFavorited mode is active. Empty groups are dropped.
+func (m *Model) filterFavoritedGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.showFavorited || len(m.favoritedSet) == 0 {
+		return groups
+	}
+	filtered := make([]data.SessionGroup, 0, len(groups))
+	for _, g := range groups {
+		var sessions []data.Session
+		for _, s := range g.Sessions {
+			if _, ok := m.favoritedSet[s.ID]; ok {
 				sessions = append(sessions, s)
 			}
 		}
