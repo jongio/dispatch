@@ -243,6 +243,32 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		add("hidden-sessions", m)
 	}
 
+	// ── Favorites ────────────────────────────────────────────────────
+	{
+		m := newBase()
+		var favIDs []string
+		for _, g := range c.folderGroups {
+			for _, s := range g.Sessions {
+				favIDs = append(favIDs, s.ID)
+				if len(favIDs) >= 3 {
+					break
+				}
+			}
+			if len(favIDs) >= 3 {
+				break
+			}
+		}
+		m.favoritedSet = make(map[string]struct{})
+		for _, id := range favIDs {
+			m.favoritedSet[id] = struct{}{}
+		}
+		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		m.sessionList.SetPivotField(m.pivot)
+		m.sessionList.SetGroups(c.folderGroups)
+		m.recalcLayout()
+		add("favorites", m)
+	}
+
 	// ── Multi-select ─────────────────────────────────────────────────
 	{
 		m := newBase()

@@ -89,6 +89,8 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: '!', action: 'Filter by attention status' },
               { keys: 'h', action: 'Hide/unhide current session' },
               { keys: 'H', action: 'Toggle visibility of hidden sessions' },
+              { keys: '*', action: 'Toggle favorite on current session' },
+              { keys: 'F', action: 'Filter to show only favorites' },
             ]} />
             <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses.</p>
           </div>

@@ -40,6 +40,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'pane_direction', type: 'string', default: '"auto"', description: 'Split direction for pane mode: auto, right, down, left, up.' },
         { key: 'custom_command', type: 'string', default: '""', description: 'Custom launch command. {sessionId} is replaced with the session ID.' },
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
+        { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
         { key: 'theme', type: 'string', default: '"auto"', description: 'Color scheme: auto or a named scheme.' },
       ]} />
     </div>
@@ -63,6 +64,7 @@ import ConfigTable from '../components/ConfigTable.astro';
   "pane_direction": "auto",
   "custom_command": "",
   "excluded_dirs": [],
+  "favoriteSessions": [],
   "theme": "auto"
 }`}</code></pre>
     </div>

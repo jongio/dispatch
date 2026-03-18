@@ -198,29 +198,43 @@
     - Behavior: Shows/hides all sessions marked as hidden
     - Condition: In session list view
 
+26. **\*** → Toggle Favorite on Current Session
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("*"))
+    - Handler: D:\code\dispatch\internal\tui\model.go
+    - Behavior: Stars or unstars the currently selected session (persisted to config as favoriteSessions)
+    - Condition: Only when a session is selected (not a folder)
+
+27. **F** (Shift+F) → Filter to Favorites Only
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("F"))
+    - Handler: D:\code\dispatch\internal\tui\model.go
+    - Behavior: Toggles filter to show only sessions starred as favorites
+    - Condition: In session list view
+
 ### Time Range Filter
-26. **1** → Set Time Range to 1 Hour
+28. **1** → Set Time Range to 1 Hour
     - File: D:\code\dispatch\internal\tui\keys.go (line 76)
     - Code: key.NewBinding(key.WithKeys("1"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 924-926)
     - Behavior: Filters sessions to last 1 hour
     - Condition: In session list view
 
-27. **2** → Set Time Range to 1 Day
+29. **2** → Set Time Range to 1 Day
     - File: D:\code\dispatch\internal\tui\keys.go (line 77)
     - Code: key.NewBinding(key.WithKeys("2"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 927-929)
     - Behavior: Filters sessions to last 1 day
     - Condition: In session list view
 
-28. **3** → Set Time Range to 7 Days
+30. **3** → Set Time Range to 7 Days
     - File: D:\code\dispatch\internal\tui\keys.go (line 78)
     - Code: key.NewBinding(key.WithKeys("3"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 930-932)
     - Behavior: Filters sessions to last 7 days
     - Condition: In session list view
 
-29. **4** → Set Time Range to All Time
+31. **4** → Set Time Range to All Time
     - File: D:\code\dispatch\internal\tui\keys.go (line 79)
     - Code: key.NewBinding(key.WithKeys("4"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 933-935)
@@ -228,21 +242,21 @@
     - Condition: In session list view
 
 ### Info and Settings
-30. **?** → Toggle Help Overlay
+32. **?** → Toggle Help Overlay
     - File: D:\code\dispatch\internal\tui\keys.go (line 74)
     - Code: key.NewBinding(key.WithKeys("?"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 804-806)
     - Behavior: Opens/closes comprehensive help modal
     - Condition: Can open from session list; closed by ? or Esc
 
-31. **,** → Open Settings/Config Panel
+33. **,** → Open Settings/Config Panel
     - File: D:\code\dispatch\internal\tui\keys.go (line 75)
     - Code: key.NewBinding(key.WithKeys(","))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 808-821)
     - Behavior: Opens configuration panel to modify settings
     - Condition: In session list view
 
-32. **q** → Quit (Graceful)
+34. **q** → Quit (Graceful)
     - File: D:\code\dispatch\internal\tui\keys.go (line 64)
     - Code: key.NewBinding(key.WithKeys("q"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 784-786)
@@ -253,27 +267,27 @@
 
 When the search bar is focused (after pressing /):
 
-33. **Up Arrow / k** → Blur Search and Move Selection Up
+35. **Up Arrow / k** → Blur Search and Move Selection Up
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 740-744)
     - Behavior: Unfocuses search bar and moves list selection up
     - Condition: Only when search bar is focused
 
-34. **Down Arrow / j** → Blur Search and Move Selection Down
+36. **Down Arrow / j** → Blur Search and Move Selection Down
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 745-749)
     - Behavior: Unfocuses search bar and moves list selection down
     - Condition: Only when search bar is focused
 
-35. **Esc** → Blur Search Bar
+37. **Esc** → Blur Search Bar
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 706-725)
     - Behavior: Unfocuses search bar; query stays active if non-empty
     - Condition: Only when search bar is focused
 
-36. **Enter** → Confirm Search
+38. **Enter** → Confirm Search
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 726-739)
     - Behavior: Triggers deep search if pending; unfocuses bar
     - Condition: Only when search bar is focused
 
-37. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
+39. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 750-779)
     - Behavior: Adds character to query; triggers quick search immediately and deep search after delay
     - Condition: Only when search bar is focused
@@ -282,37 +296,37 @@ When the search bar is focused (after pressing /):
 
 When filter panel is open (after pressing f):
 
-38. **↑ (Up Arrow)** → Move Up in Filter List
+40. **↑ (Up Arrow)** → Move Up in Filter List
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 673-674)
     - Behavior: Moves selection up in directory filter tree
     - Condition: Only in stateFilterPanel
 
-39. **↓ (Down Arrow)** → Move Down in Filter List
+41. **↓ (Down Arrow)** → Move Down in Filter List
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 675-676)
     - Behavior: Moves selection down in directory filter tree
     - Condition: Only in stateFilterPanel
 
-40. **← (Left Arrow)** → Collapse Filter Group
+42. **← (Left Arrow)** → Collapse Filter Group
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 677-678)
     - Behavior: Collapses expanded directory group
     - Condition: Only in stateFilterPanel
 
-41. **→ (Right Arrow)** → Expand Filter Group
+43. **→ (Right Arrow)** → Expand Filter Group
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 679-680)
     - Behavior: Expands directory group to show subdirectories
     - Condition: Only in stateFilterPanel
 
-42. **Space** → Toggle Filter Exclusion
+44. **Space** → Toggle Filter Exclusion
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 681-682)
     - Behavior: Toggles whether selected directory is excluded from results
     - Condition: Only in stateFilterPanel
 
-43. **Enter** → Apply Filters and Close Panel
+45. **Enter** → Apply Filters and Close Panel
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 683-692)
     - Behavior: Saves exclusion settings to config and reloads session list
     - Condition: Only in stateFilterPanel
 
-44. **Esc** → Cancel and Close Filter Panel
+46. **Esc** → Cancel and Close Filter Panel
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 670-672)
     - Behavior: Discards changes and returns to session list
     - Condition: Only in stateFilterPanel
@@ -321,22 +335,22 @@ When filter panel is open (after pressing f):
 
 When shell picker is open (shown after selecting launch mode):
 
-45. **↑ (Up Arrow)** → Move Up in Shell List
+47. **↑ (Up Arrow)** → Move Up in Shell List
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 655-656)
     - Behavior: Moves selection up in available shells list
     - Condition: Only in stateShellPicker
 
-46. **↓ (Down Arrow)** → Move Down in Shell List
+48. **↓ (Down Arrow)** → Move Down in Shell List
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 657-658)
     - Behavior: Moves selection down in available shells list
     - Condition: Only in stateShellPicker
 
-47. **Enter** → Select Shell and Launch
+49. **Enter** → Select Shell and Launch
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 659-665)
     - Behavior: Launches session with selected shell
     - Condition: Only in stateShellPicker
 
-48. **Esc** → Cancel and Return to List
+50. **Esc** → Cancel and Return to List
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 653-654)
     - Behavior: Closes shell picker without launching
     - Condition: Only in stateShellPicker
@@ -346,38 +360,38 @@ When shell picker is open (shown after selecting launch mode):
 When config panel is open (after pressing ,):
 
 ### Non-Edit Mode
-49. **↑ (Up Arrow)** → Move Up in Config Options
+51. **↑ (Up Arrow)** → Move Up in Config Options
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1016-1017)
     - Behavior: Moves selection up through config options
     - Condition: When NOT in edit mode within config panel
 
-50. **↓ (Down Arrow)** → Move Down in Config Options
+52. **↓ (Down Arrow)** → Move Down in Config Options
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1018-1019)
     - Behavior: Moves selection down through config options
     - Condition: When NOT in edit mode
 
-51. **Enter** → Select/Edit Config Option
+53. **Enter** → Select/Edit Config Option
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1020-1022)
     - Behavior: Enters edit mode for selected option
     - Condition: When NOT in edit mode
 
-52. **Esc** → Save and Close Config Panel
+54. **Esc** → Save and Close Config Panel
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1011-1015)
     - Behavior: Saves all config changes and returns to session list
     - Condition: When NOT in edit mode
 
 ### Edit Mode (Inside Text Field)
-53. **Esc** → Cancel Edit of Current Field
+55. **Esc** → Cancel Edit of Current Field
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 997-998)
     - Behavior: Discards changes to current field, returns to option selection
     - Condition: When in edit mode for a field
 
-54. **Enter** → Confirm Edit of Current Field
+56. **Enter** → Confirm Edit of Current Field
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1000-1001)
     - Behavior: Accepts changes to field and returns to option selection
     - Condition: When in edit mode for a field
 
-55. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
+57. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1003-1006)
     - Behavior: Types character into text field (delegated to textinput)
     - Condition: When in edit mode for a text field
@@ -386,12 +400,12 @@ When config panel is open (after pressing ,):
 
 When help overlay is open (after pressing ?):
 
-56. **?** → Toggle Help (Close)
+58. **?** → Toggle Help (Close)
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 646-649)
     - Behavior: Closes help overlay and returns to session list
     - Condition: In stateHelpOverlay
 
-57. **Esc** → Close Help
+59. **Esc** → Close Help
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 646-649)
     - Behavior: Closes help overlay and returns to session list
     - Condition: In stateHelpOverlay
@@ -399,87 +413,87 @@ When help overlay is open (after pressing ?):
 ## MOUSE INTERACTIONS
 
 ### Left Mouse Button (Click)
-58. **Single Click on Session** → Select Session
+60. **Single Click on Session** → Select Session
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1096-1163)
     - Behavior: Moves selection to clicked item; deferred timer allows double-click detection
     - Timing: Single click fires after 300ms (doubleClickTimeout constant at line 40)
     - Condition: Only in stateSessionList, within list area (not preview pane)
 
-59. **Double Click on Session** → Launch Session
+61. **Double Click on Session** → Launch Session
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1122-1144)
     - Behavior: Launches selected session with default or override mode
     - Ctrl Modifier: Forces window launch (config.LaunchModeWindow)
     - Shift Modifier: Forces tab launch (config.LaunchModeTab)
     - Condition: Only in stateSessionList, within list area
 
-60. **Double Click on Folder + Ctrl** → Launch New Session in Window
+62. **Double Click on Folder + Ctrl** → Launch New Session in Window
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1127-1135)
     - Behavior: Creates new session in folder's path, opens in new window
     - Condition: Double-click on folder item + Ctrl modifier pressed
 
-61. **Double Click on Folder + Shift** → Launch New Session in Tab
+63. **Double Click on Folder + Shift** → Launch New Session in Tab
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1127-1135)
     - Behavior: Creates new session in folder's path, opens in new tab
     - Condition: Double-click on folder item + Shift modifier pressed
 
-62. **Double Click on Folder** → Launch New Session with Default Mode
+64. **Double Click on Folder** → Launch New Session with Default Mode
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1127-1135)
     - Behavior: Creates new session in folder's path
     - Condition: Double-click on folder item (no modifiers)
 
-63. **Ctrl + Click on Session** → Toggle Selection Without Opening
+65. **Ctrl + Click on Session** → Toggle Selection Without Opening
     - Handler: D:\code\dispatch\internal\tui\model.go (multi-select handler)
     - Behavior: Toggles the ✓ selection indicator on the clicked session without changing the primary cursor. Allows building a selection set with the mouse.
     - Condition: Only in stateSessionList, clicking on a session item (not folder)
 
-64. **Shift + Click on Session** → Range Select
+66. **Shift + Click on Session** → Range Select
     - Handler: D:\code\dispatch\internal\tui\model.go (multi-select handler)
     - Behavior: Selects all sessions between the last-clicked session and the current click target (inclusive). Folders in the range are skipped.
     - Condition: Only in stateSessionList, requires a prior click anchor point
 
-65. **Double-Click (with selections active)** → Open All Selected Sessions
+67. **Double-Click (with selections active)** → Open All Selected Sessions
     - Handler: D:\code\dispatch\internal\tui\model.go (multi-select handler)
     - Behavior: When one or more sessions have the ✓ indicator, double-clicking any session opens all selected sessions instead of just the double-clicked one. Each opens via the configured launch mode.
     - Condition: Only in stateSessionList, when selectedSessions set is non-empty
 
-66. **Click on Header Area (Search Bar)** → Focus Search
+68. **Click on Header Area (Search Bar)** → Focus Search
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1101-1103, 1168-1230)
     - Behavior: Focuses search bar for typing; click position determines if on search area
     - Condition: Click on Y=0 (title line), X >= title width
 
 ### Header Badge Clicks
-67. **Click Time Range Badge** → Set Time Range
+69. **Click Time Range Badge** → Set Time Range
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1170-1198, 1216-1230)
     - Behavior: Sets time range filter to clicked option (1h, 1d, 7d, all)
     - Condition: Click on Y=1 (badge line), within time range segment
 
-68. **Click Sort Indicator** → Cycle Sort Order
+70. **Click Sort Indicator** → Cycle Sort Order
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1170-1198)
     - Behavior: Cycles sort field to next option
     - Condition: Click on Y=1, within sort indicator area
 
-69. **Click Pivot Indicator** → Cycle Pivot Mode
+71. **Click Pivot Indicator** → Cycle Pivot Mode
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1170-1198)
     - Behavior: Cycles pivot grouping mode
     - Condition: Click on Y=1, within pivot area
 
 ### Scroll Wheel (Mouse)
-70. **Mouse Wheel Up (List Area)** → Scroll List Up
+72. **Mouse Wheel Up (List Area)** → Scroll List Up
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1076-1084)
     - Behavior: Scrolls session list up by 3 items
     - Condition: Only in stateSessionList, when mouse is over list (not preview)
 
-71. **Mouse Wheel Down (List Area)** → Scroll List Down
+73. **Mouse Wheel Down (List Area)** → Scroll List Down
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1086-1094)
     - Behavior: Scrolls session list down by 3 items
     - Condition: Only in stateSessionList, when mouse is over list
 
-72. **Mouse Wheel Up (Preview Area)** → Scroll Preview Up
+74. **Mouse Wheel Up (Preview Area)** → Scroll Preview Up
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1076-1084)
     - Behavior: Scrolls preview panel content up by 3 lines
     - Condition: Only in stateSessionList, when mouse is over preview pane
 
-73. **Mouse Wheel Down (Preview Area)** → Scroll Preview Down
+75. **Mouse Wheel Down (Preview Area)** → Scroll Preview Down
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1086-1094)
     - Behavior: Scrolls preview panel content down by 3 lines
     - Condition: Only in stateSessionList, when mouse is over preview pane

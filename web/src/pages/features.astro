@@ -264,6 +264,29 @@ import Screenshot from '../components/Screenshot.astro';
       </div>
     </section>
 
+    <!-- Session Favorites -->
+    <section class="section" id="favorites">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Session Favorites</h2>
+          <p>
+            <kbd>*</kbd> stars or unstars the currently selected session.
+            <kbd>F</kbd> (Shift+F) filters the list to show only favorited sessions.
+            Starred sessions display a ★ indicator. Favorites are persisted
+            in config as <code>favoriteSessions</code>.
+          </p>
+          <ul>
+            <li>Per-session persistence — favorite state saved to config</li>
+            <li>Star indicator (★) on favorited sessions in the list</li>
+            <li>Quick filter to show only starred sessions</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/favorites.png" alt="Session list with starred favorite sessions showing star indicator" caption="Favorited sessions with star indicator" />
+        </div>
+      </div>
+    </section>
+
     <!-- Tree View Navigation -->
     <section class="section" id="tree">
       <div class="feature-section">

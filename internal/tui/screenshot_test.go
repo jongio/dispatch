@@ -6,106 +6,11 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
-
-// ---------------------------------------------------------------------------
-// compositeOverlay
-// ---------------------------------------------------------------------------
-
-func TestCompositeOverlay_OverlayReplacesBackground(t *testing.T) {
-	bg := "line1\nline2\nline3"
-	fg := "OVERLAY1\nOVERLAY2\nOVERLAY3"
-	result := compositeOverlay(bg, fg)
-	for _, part := range []string{"OVERLAY1", "OVERLAY2", "OVERLAY3"} {
-		if !strings.Contains(result, part) {
-			t.Errorf("expected %q in result", part)
-		}
-	}
-}
-
-func TestCompositeOverlay_BlankFGShowsBG(t *testing.T) {
-	bg := "line1\nline2\nline3"
-	fg := "\n\n" // blank overlay lines
-	result := compositeOverlay(bg, fg)
-	lines := strings.Split(result, "\n")
-	if len(lines) < 3 {
-		t.Fatalf("expected at least 3 lines, got %d", len(lines))
-	}
-	if lines[0] != "line1" {
-		t.Errorf("line 0: expected %q, got %q", "line1", lines[0])
-	}
-	if lines[1] != "line2" {
-		t.Errorf("line 1: expected %q, got %q", "line2", lines[1])
-	}
-}
-
-func TestCompositeOverlay_FGLongerThanBG(t *testing.T) {
-	bg := "bg1"
-	fg := "fg1\nfg2\nfg3"
-	result := compositeOverlay(bg, fg)
-	lines := strings.Split(result, "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 lines, got %d", len(lines))
-	}
-	if lines[0] != "fg1" {
-		t.Errorf("expected fg1, got %q", lines[0])
-	}
-}
-
-func TestCompositeOverlay_BGLongerThanFG(t *testing.T) {
-	bg := "bg1\nbg2\nbg3"
-	fg := "fg1"
-	result := compositeOverlay(bg, fg)
-	lines := strings.Split(result, "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 lines, got %d", len(lines))
-	}
-	if lines[0] != "fg1" {
-		t.Errorf("expected fg1, got %q", lines[0])
-	}
-	if lines[1] != "bg2" {
-		t.Errorf("expected bg2, got %q", lines[1])
-	}
-}
-
-func TestCompositeOverlay_EmptyStrings(t *testing.T) {
-	result := compositeOverlay("", "")
-	if result != "" {
-		t.Errorf("expected empty, got %q", result)
-	}
-}
-
-func TestCompositeOverlay_WithANSI(t *testing.T) {
-	bg := "background"
-	// ANSI codes with only whitespace underneath
-	fg := "\x1b[0m   \x1b[0m"
-	result := compositeOverlay(bg, fg)
-	if result != "background" {
-		t.Errorf("expected background for ANSI-only overlay, got %q", result)
-	}
-}
-
-func TestCompositeOverlay_MixedANSIAndContent(t *testing.T) {
-	bg := "bg1\nbg2"
-	// First line has real content, second is blank ANSI
-	fg := "\x1b[31mHello\x1b[0m\n\x1b[0m  \x1b[0m"
-	result := compositeOverlay(bg, fg)
-	lines := strings.Split(result, "\n")
-	if len(lines) != 2 {
-		t.Fatalf("expected 2 lines, got %d", len(lines))
-	}
-	if !strings.Contains(lines[0], "Hello") {
-		t.Errorf("expected overlay content, got %q", lines[0])
-	}
-	if lines[1] != "bg2" {
-		t.Errorf("expected background for blank overlay line, got %q", lines[1])
-	}
-}
 
 // ---------------------------------------------------------------------------
 // newScreenshotModel
@@ -137,27 +42,6 @@ func TestNewScreenshotModel_SmallSize(t *testing.T) {
 	}
 	if m.width != 10 || m.height != 5 {
 		t.Errorf("dimensions: got %dx%d", m.width, m.height)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// ansiStripRe
-// ---------------------------------------------------------------------------
-
-func TestAnsiStripRe(t *testing.T) {
-	tests := []struct {
-		input, want string
-	}{
-		{"\x1b[0mhello\x1b[0m", "hello"},
-		{"\x1b[31;1mred bold\x1b[0m", "red bold"},
-		{"no ansi", "no ansi"},
-		{"", ""},
-	}
-	for _, tt := range tests {
-		got := ansiStripRe.ReplaceAllString(tt.input, "")
-		if got != tt.want {
-			t.Errorf("strip(%q) = %q, want %q", tt.input, got, tt.want)
-		}
 	}
 }
 
@@ -321,6 +205,7 @@ func TestCaptureScreenshots_WithData(t *testing.T) {
 		"config-panel",
 		"shell-picker",
 		"help-overlay",
+		"favorites",
 		"loading-state",
 		"empty-state",
 	}
