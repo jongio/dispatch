@@ -2,6 +2,7 @@ package tui
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -525,25 +526,22 @@ func TestCovToggleSortOrderRoundTrip(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// hiddenSetToSlice — deterministic ordering
+// sortedKeys — deterministic ordering
 // ---------------------------------------------------------------------------
 
-func TestCovHiddenSetToSlice_Nil(t *testing.T) {
-	m := newTestModel()
-	m.hiddenSet = nil
+func TestCovSortedKeys_Nil(t *testing.T) {
 	// Avoid panic on nil map.
-	got := m.hiddenSetToSlice()
+	got := sortedKeys(nil)
 	if got != nil {
-		t.Errorf("nil hiddenSet → nil, got %v", got)
+		t.Errorf("nil map → nil, got %v", got)
 	}
 }
 
-func TestCovHiddenSetToSlice_Large(t *testing.T) {
-	m := newTestModel()
-	m.hiddenSet = map[string]struct{}{
+func TestCovSortedKeys_Large(t *testing.T) {
+	m := map[string]struct{}{
 		"z": {}, "m": {}, "a": {}, "f": {},
 	}
-	got := m.hiddenSetToSlice()
+	got := sortedKeys(m)
 	if len(got) != 4 {
 		t.Fatalf("len = %d, want 4", len(got))
 	}
@@ -659,5 +657,132 @@ func TestCovSearchPreservedAcrossPivotCycle(t *testing.T) {
 	}
 	if rm.pivot != pivotFolder {
 		t.Errorf("pivot should have cycled, got %q", rm.pivot)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// handleToggleFavorite — add and remove
+// ---------------------------------------------------------------------------
+
+func TestCovHandleToggleFavorite_AddAndRemove(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.state = stateSessionList
+	m.sessions = []data.Session{{ID: "sess-1"}, {ID: "sess-2"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.sessionList.MoveTo(0) // select "sess-1"
+
+	// Toggle ON — should add to favoritedSet.
+	result, _ := m.Update(runeKeyMsg('*'))
+	rm := result.(Model)
+
+	if _, ok := rm.favoritedSet["sess-1"]; !ok {
+		t.Error("toggle ON: sess-1 should be in favoritedSet")
+	}
+	if len(rm.cfg.FavoriteSessions) != 1 || rm.cfg.FavoriteSessions[0] != "sess-1" {
+		t.Errorf("toggle ON: cfg.FavoriteSessions = %v, want [sess-1]", rm.cfg.FavoriteSessions)
+	}
+
+	// Toggle OFF — should remove from favoritedSet.
+	result, _ = rm.Update(runeKeyMsg('*'))
+	rm = result.(Model)
+
+	if _, ok := rm.favoritedSet["sess-1"]; ok {
+		t.Error("toggle OFF: sess-1 should NOT be in favoritedSet")
+	}
+	if len(rm.cfg.FavoriteSessions) != 0 {
+		t.Errorf("toggle OFF: cfg.FavoriteSessions = %v, want empty", rm.cfg.FavoriteSessions)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// handleToggleFavorite — hidden sessions are no-op
+// ---------------------------------------------------------------------------
+
+func TestCovHandleToggleFavorite_SkipsHidden(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.state = stateSessionList
+	m.sessions = []data.Session{{ID: "hidden-sess"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.sessionList.MoveTo(0)
+	m.hiddenSet["hidden-sess"] = struct{}{}
+
+	result, _ := m.Update(runeKeyMsg('*'))
+	rm := result.(Model)
+
+	if _, ok := rm.favoritedSet["hidden-sess"]; ok {
+		t.Error("hidden session should NOT be favorited")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// handleToggleFavorite — no selection returns nil
+// ---------------------------------------------------------------------------
+
+func TestCovHandleToggleFavorite_NoSelection(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.state = stateSessionList
+	// No sessions loaded → no selection possible.
+
+	result, _ := m.Update(runeKeyMsg('*'))
+	rm := result.(Model)
+
+	if len(rm.favoritedSet) != 0 {
+		t.Error("no selection → favoritedSet should remain empty")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Key handler: 'F' toggles showFavorited filter
+// ---------------------------------------------------------------------------
+
+func TestCovFilterFavorites_ToggleShowFavorited(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.state = stateSessionList
+	m.showFavorited = false
+
+	// Toggle ON.
+	result, _ := m.Update(runeKeyMsg('F'))
+	rm := result.(Model)
+
+	if !rm.showFavorited {
+		t.Error("pressing 'F' should enable showFavorited")
+	}
+
+	// Toggle OFF.
+	result, _ = rm.Update(runeKeyMsg('F'))
+	rm = result.(Model)
+
+	if rm.showFavorited {
+		t.Error("pressing 'F' again should disable showFavorited")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// renderBadges — favorites badge appears when showFavorited=true
+// ---------------------------------------------------------------------------
+
+func TestCovRenderBadges_FavoritesBadge(t *testing.T) {
+	m := testModelWithLayout()
+	m.favoritedSet = make(map[string]struct{})
+	m.width = 120
+	m.height = 40
+	m.recalcLayout()
+
+	// Badge should NOT appear when showFavorited is false.
+	m.showFavorited = false
+	output := m.renderBadges()
+	if strings.Contains(output, "Favorites") {
+		t.Error("showFavorited=false → badge should NOT contain 'Favorites'")
+	}
+
+	// Badge should appear when showFavorited is true.
+	m.showFavorited = true
+	output = m.renderBadges()
+	if !strings.Contains(output, "Favorites") {
+		t.Error("showFavorited=true → badge should contain 'Favorites'")
 	}
 }

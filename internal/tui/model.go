@@ -257,9 +257,9 @@ func NewModel() Model {
 			Field: sortFieldFromConfig(cfg.DefaultSort),
 			Order: data.Descending,
 		},
-		timeRange:   cfg.DefaultTimeRange,
-		pivot:       cfg.DefaultPivot,
-		showPreview: cfg.ShowPreview,
+		timeRange:    cfg.DefaultTimeRange,
+		pivot:        cfg.DefaultPivot,
+		showPreview:  cfg.ShowPreview,
 		hiddenSet:    hiddenSet,
 		favoritedSet: favoritedSet,
 
@@ -1092,7 +1092,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.ToggleHidden):
 		m.showHidden = !m.showHidden
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 
 	case key.Matches(msg, keys.Star):
 		return m.handleToggleFavorite()
@@ -1152,14 +1153,22 @@ func (m Model) handleHideSession() (tea.Model, tea.Cmd) {
 		m.hiddenSet[sess.ID] = struct{}{}
 	}
 
+	// If hiding a favorited session, also remove it from favorites.
+	if _, fav := m.favoritedSet[sess.ID]; fav {
+		delete(m.favoritedSet, sess.ID)
+		m.cfg.FavoriteSessions = sortedKeys(m.favoritedSet)
+	}
+
 	// Sync config and persist.
-	m.cfg.HiddenSessions = m.hiddenSetToSlice()
+	m.cfg.HiddenSessions = sortedKeys(m.hiddenSet)
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
 
 	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-	return m, m.loadSessionsCmd()
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	cmd := m.loadSessionsCmd()
+	return m, cmd
 }
 
 // handleToggleFavorite toggles the favorited state of the currently selected session.
@@ -1179,7 +1188,7 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 		m.favoritedSet[sess.ID] = struct{}{}
 	}
 
-	m.cfg.FavoriteSessions = m.favoritedSetToSlice()
+	m.cfg.FavoriteSessions = sortedKeys(m.favoritedSet)
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
@@ -1189,24 +1198,13 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// hiddenSetToSlice converts the hiddenSet map back to a sorted slice for
-// deterministic config serialisation.
-func (m *Model) hiddenSetToSlice() []string {
-	if len(m.hiddenSet) == 0 {
+// sortedKeys converts a string set to a sorted slice for deterministic
+// config serialisation. Returns nil for empty sets.
+func sortedKeys(m map[string]struct{}) []string {
+	if len(m) == 0 {
 		return nil
 	}
-	ids := slices.Sorted(maps.Keys(m.hiddenSet))
-	return ids
-}
-
-// favoritedSetToSlice converts the favoritedSet map back to a sorted slice for
-// deterministic config serialisation.
-func (m *Model) favoritedSetToSlice() []string {
-	if len(m.favoritedSet) == 0 {
-		return nil
-	}
-	ids := slices.Sorted(maps.Keys(m.favoritedSet))
-	return ids
+	return slices.Sorted(maps.Keys(m))
 }
 
 // visibleHiddenSet returns the hiddenSet when showHidden is true (so the
@@ -1986,10 +1984,9 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 // ---------------------------------------------------------------------------
 
 // filterFavoritedSessions returns only favorited sessions when showFavorited
-// mode is active. When the filter is off or no favorites exist, all sessions
-// pass through.
+// mode is active. When the filter is off, all sessions pass through.
 func (m *Model) filterFavoritedSessions(sessions []data.Session) []data.Session {
-	if !m.showFavorited || len(m.favoritedSet) == 0 {
+	if !m.showFavorited {
 		return sessions
 	}
 	filtered := make([]data.Session, 0, len(sessions))
@@ -2004,7 +2001,7 @@ func (m *Model) filterFavoritedSessions(sessions []data.Session) []data.Session 
 // filterFavoritedGroups returns only favorited sessions within each group
 // when showFavorited mode is active. Empty groups are dropped.
 func (m *Model) filterFavoritedGroups(groups []data.SessionGroup) []data.SessionGroup {
-	if !m.showFavorited || len(m.favoritedSet) == 0 {
+	if !m.showFavorited {
 		return groups
 	}
 	filtered := make([]data.SessionGroup, 0, len(groups))

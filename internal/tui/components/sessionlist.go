@@ -615,7 +615,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		if hidden {
 			return styles.HiddenStyle.Render(PadToWidth(line, s.width))
 		}
-		if favorited && !hidden {
+		if favorited {
 			return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
 		}
 		return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
@@ -672,7 +672,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	if hidden {
 		return styles.HiddenStyle.Render(PadToWidth(line, s.width))
 	}
-	if favorited && !hidden {
+	if favorited {
 		return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
 	}
 	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
