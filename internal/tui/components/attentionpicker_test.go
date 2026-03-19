@@ -85,6 +85,10 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 	if p.cursor != 3 {
 		t.Errorf("after 3rd MoveDown cursor = %d, want 3", p.cursor)
 	}
+	p.MoveDown()
+	if p.cursor != 4 {
+		t.Errorf("after 4th MoveDown cursor = %d, want 4", p.cursor)
+	}
 
 	// Wrap to top.
 	p.MoveDown()
@@ -94,13 +98,13 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 
 	// Wrap to bottom.
 	p.MoveUp()
-	if p.cursor != 3 {
-		t.Errorf("MoveUp should wrap: cursor = %d, want 3", p.cursor)
+	if p.cursor != 4 {
+		t.Errorf("MoveUp should wrap: cursor = %d, want 4", p.cursor)
 	}
 
 	p.MoveUp()
-	if p.cursor != 2 {
-		t.Errorf("after MoveUp cursor = %d, want 2", p.cursor)
+	if p.cursor != 3 {
+		t.Errorf("after MoveUp cursor = %d, want 3", p.cursor)
 	}
 }
 
@@ -193,7 +197,7 @@ func TestAttentionPicker_View_ContainsLabels(t *testing.T) {
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
-	for _, label := range []string{"Needs input", "AI working", "Running, quiet", "Not running"} {
+	for _, label := range []string{"Needs input", "AI working", "Running, quiet", "Interrupted", "Not running"} {
 		if !strings.Contains(view, label) {
 			t.Errorf("View should contain label %q", label)
 		}

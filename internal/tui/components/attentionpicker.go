@@ -14,15 +14,33 @@ type attentionEntry struct {
 	status data.AttentionStatus
 	label  string
 	dot    func() string // icon renderer
-	style  lipgloss.Style
 }
 
 // attentionEntries is the fixed list of statuses presented in the picker.
 var attentionEntries = []attentionEntry{
-	{data.AttentionWaiting, "Needs input", styles.IconAttentionWaiting, styles.AttentionWaitingStyle},
-	{data.AttentionActive, "AI working", styles.IconAttentionActive, styles.AttentionActiveStyle},
-	{data.AttentionStale, "Running, quiet", styles.IconAttentionStale, styles.AttentionStaleStyle},
-	{data.AttentionIdle, "Not running", styles.IconAttentionIdle, styles.AttentionIdleStyle},
+	{data.AttentionWaiting, "Needs input", styles.IconAttentionWaiting},
+	{data.AttentionActive, "AI working", styles.IconAttentionActive},
+	{data.AttentionStale, "Running, quiet", styles.IconAttentionStale},
+	{data.AttentionInterrupted, "Interrupted", styles.IconAttentionInterrupted},
+	{data.AttentionIdle, "Not running", styles.IconAttentionIdle},
+}
+
+// attentionDotStyle returns the current lipgloss style for an attention
+// status, reading from the package-level variables that are updated by
+// styles.SetTheme(). This avoids capturing stale style snapshots at init.
+func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
+	switch status {
+	case data.AttentionWaiting:
+		return styles.AttentionWaitingStyle
+	case data.AttentionActive:
+		return styles.AttentionActiveStyle
+	case data.AttentionStale:
+		return styles.AttentionStaleStyle
+	case data.AttentionInterrupted:
+		return styles.AttentionInterruptedStyle
+	default:
+		return styles.AttentionIdleStyle
+	}
 }
 
 // AttentionPicker renders a compact overlay for selecting which attention
@@ -117,8 +135,8 @@ func (p AttentionPicker) View() string {
 			check = "[✓]"
 		}
 
-		// Coloured dot.
-		dot := entry.style.Render(entry.dot())
+		// Coloured dot — resolve style dynamically for theme changes.
+		dot := attentionDotStyle(entry.status).Render(entry.dot())
 
 		// Count.
 		count := p.counts[entry.status]

@@ -705,6 +705,9 @@ func (s SessionList) attentionDot(sessionID string, selected bool) string {
 	case data.AttentionStale:
 		dotStyle = styles.AttentionStaleStyle
 		icon = styles.IconAttentionStale()
+	case data.AttentionInterrupted:
+		dotStyle = styles.AttentionInterruptedStyle
+		icon = styles.IconAttentionInterrupted()
 	default:
 		dotStyle = styles.AttentionIdleStyle
 		icon = styles.IconAttentionIdle()

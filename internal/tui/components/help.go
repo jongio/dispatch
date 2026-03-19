@@ -136,7 +136,14 @@ func (h HelpOverlay) View() string {
 		styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()), "Not running",
 	))
 	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("n", "Next waiting", "!", "Filter by status"))
+	sb.WriteString(legendRow(
+		styles.AttentionInterruptedStyle.Render(styles.IconAttentionInterrupted()), "Interrupted",
+		"", "",
+	))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("n", "Next waiting", "R", "Resume interrupted"))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("!", "Filter by status", "", ""))
 
 	// General
 	sb.WriteByte('\n')

@@ -29,6 +29,7 @@ const (
 	cfgShell
 	cfgCustomCommand
 	cfgTheme
+	cfgWorkspaceRecovery
 	cfgFieldCount
 )
 
@@ -48,6 +49,7 @@ type ConfigPanel struct {
 	shell         string
 	customCommand string
 	theme         string // active color scheme name ("auto" or a scheme name)
+	workspaceRecovery bool
 
 	// Available options for cycling.
 	terminals  []string
@@ -77,15 +79,16 @@ func NewConfigPanel() ConfigPanel {
 // ConfigValues bundles the editable fields exchanged between the config
 // panel and the rest of the application.
 type ConfigValues struct {
-	YoloMode      bool
-	Agent         string
-	Model         string
-	LaunchMode    string
-	PaneDirection string
-	Terminal      string
-	Shell         string
-	CustomCommand string
-	Theme         string
+	YoloMode          bool
+	Agent             string
+	Model             string
+	LaunchMode        string
+	PaneDirection     string
+	Terminal          string
+	Shell             string
+	CustomCommand     string
+	Theme             string
+	WorkspaceRecovery bool
 }
 
 // SetValues loads the config panel state from external values.
@@ -99,20 +102,22 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.shell = v.Shell
 	c.customCommand = v.CustomCommand
 	c.theme = v.Theme
+	c.workspaceRecovery = v.WorkspaceRecovery
 }
 
 // Values returns the current state of all editable fields.
 func (c *ConfigPanel) Values() ConfigValues {
 	return ConfigValues{
-		YoloMode:      c.yoloMode,
-		Agent:         c.agent,
-		Model:         c.model,
-		LaunchMode:    c.launchMode,
-		PaneDirection: c.paneDirection,
-		Terminal:      c.terminal,
-		Shell:         c.shell,
-		CustomCommand: c.customCommand,
-		Theme:         c.theme,
+		YoloMode:          c.yoloMode,
+		Agent:             c.agent,
+		Model:             c.model,
+		LaunchMode:        c.launchMode,
+		PaneDirection:     c.paneDirection,
+		Terminal:          c.terminal,
+		Shell:             c.shell,
+		CustomCommand:     c.customCommand,
+		Theme:             c.theme,
+		WorkspaceRecovery: c.workspaceRecovery,
 	}
 }
 
@@ -199,6 +204,8 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		return c.textInput.Focus()
 	case cfgTheme:
 		c.theme = c.cycleTheme(c.theme)
+	case cfgWorkspaceRecovery:
+		c.workspaceRecovery = !c.workspaceRecovery
 	default:
 		// cfgFieldCount is a sentinel; no action needed.
 	}
@@ -269,6 +276,7 @@ func (c ConfigPanel) View() string {
 		{"Shell", stringDisplay(c.shell), false},
 		{"Custom Command", stringDisplay(c.customCommand), false},
 		{"Theme", themeDisplay(c.theme), false},
+		{"Crash Recovery", boolDisplay(c.workspaceRecovery), false},
 	}
 
 	var body strings.Builder

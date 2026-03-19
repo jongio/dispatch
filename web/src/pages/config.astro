@@ -42,6 +42,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
         { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
         { key: 'theme', type: 'string', default: '"auto"', description: 'Color scheme: auto or a named scheme.' },
+        { key: 'workspace_recovery', type: 'bool', default: 'true', description: 'Detect sessions interrupted by crash/reboot. Disable if you see false positives.' },
       ]} />
     </div>
   </section>
@@ -65,7 +66,8 @@ import ConfigTable from '../components/ConfigTable.astro';
   "custom_command": "",
   "excluded_dirs": [],
   "favoriteSessions": [],
-  "theme": "auto"
+  "theme": "auto",
+  "workspace_recovery": true
 }`}</code></pre>
     </div>
   </section>

@@ -57,6 +57,9 @@ func TestDefaultValues(t *testing.T) {
 	if len(cfg.HiddenSessions) != 0 {
 		t.Errorf("HiddenSessions = %v, want empty", cfg.HiddenSessions)
 	}
+	if !cfg.WorkspaceRecovery {
+		t.Error("WorkspaceRecovery should default to true")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +145,28 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		if restored.HiddenSessions[i] != original.HiddenSessions[i] {
 			t.Errorf("HiddenSessions[%d] = %q, want %q", i, restored.HiddenSessions[i], original.HiddenSessions[i])
 		}
+	}
+}
+
+func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
+	jsonData := `{"workspace_recovery": false}`
+	cfg := Default()
+	if err := json.Unmarshal([]byte(jsonData), cfg); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if cfg.WorkspaceRecovery {
+		t.Error("WorkspaceRecovery should be false when explicitly set in JSON")
+	}
+}
+
+func TestWorkspaceRecoveryJSONTrue(t *testing.T) {
+	jsonData := `{"workspace_recovery": true}`
+	cfg := Default()
+	if err := json.Unmarshal([]byte(jsonData), cfg); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if !cfg.WorkspaceRecovery {
+		t.Error("WorkspaceRecovery should be true when explicitly set in JSON")
 	}
 }
 

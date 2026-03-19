@@ -78,6 +78,7 @@ func SetTheme(t *Theme) {
 	AttentionActiveStyle = t.AttentionActiveStyle
 	AttentionStaleStyle = t.AttentionStaleStyle
 	AttentionIdleStyle = t.AttentionIdleStyle
+	AttentionInterruptedStyle = t.AttentionInterruptedStyle
 }
 
 // CurrentTheme returns the active Theme (never nil after init).
@@ -215,6 +216,9 @@ var (
 
 	// AttentionIdleStyle renders the dot for sessions that are not running.
 	AttentionIdleStyle lipgloss.Style
+
+	// AttentionInterruptedStyle renders the dot for sessions interrupted by crash.
+	AttentionInterruptedStyle lipgloss.Style
 )
 
 // applyLegacyDefaults initialises the exported variables with the same
@@ -295,6 +299,7 @@ func applyLegacyDefaults() {
 	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
 	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C19C00", Dark: "#C19C00"})
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
+	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#EA580C", Dark: "#F97316"}).Bold(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
 	currentTheme = &Theme{

@@ -18,6 +18,7 @@ func TestAttentionStatusString(t *testing.T) {
 		{AttentionStale, "stale"},
 		{AttentionActive, "active"},
 		{AttentionWaiting, "waiting"},
+		{AttentionInterrupted, "interrupted"},
 		{AttentionStatus(99), "idle"}, // unknown falls back to idle
 	}
 	for _, tt := range tests {
@@ -107,7 +108,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + turn_end = waiting", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now())
-		if got := classifySession(dir, threshold); got != AttentionWaiting {
+		if got := classifySession(dir, threshold, false); got != AttentionWaiting {
 			t.Errorf("got %v, want AttentionWaiting", got)
 		}
 	})
@@ -116,8 +117,8 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now())
 		// Write a lock file with a PID that definitely doesn't exist.
-		os.WriteFile(filepath.Join(dir, "inuse.999999999.lock"), []byte("999999999"), 0o644)
-		if got := classifySession(dir, threshold); got != AttentionWaiting {
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, false); got != AttentionWaiting {
 			t.Errorf("got %v, want AttentionWaiting", got)
 		}
 	})
@@ -125,7 +126,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + assistant.message = waiting", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.message", time.Now())
-		if got := classifySession(dir, threshold); got != AttentionWaiting {
+		if got := classifySession(dir, threshold, false); got != AttentionWaiting {
 			t.Errorf("got %v, want AttentionWaiting", got)
 		}
 	})
@@ -133,7 +134,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + shutdown = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "session.shutdown", time.Now())
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
@@ -141,7 +142,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + tool.execution = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "tool.execution", time.Now())
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
@@ -149,14 +150,14 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + user.message = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "user.message", time.Now())
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
 
 	t.Run("no lock file + no events = idle", func(t *testing.T) {
 		dir := t.TempDir()
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
@@ -164,7 +165,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + empty events = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte{}, 0o644)
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
@@ -172,7 +173,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + turn_end older than 24h = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-25*time.Hour))
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle (age-based decay)", got)
 		}
 	})
@@ -180,7 +181,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + assistant.message older than 24h = idle", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.message", time.Now().Add(-48*time.Hour))
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle (age-based decay)", got)
 		}
 	})
@@ -188,7 +189,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("no lock file + turn_end within 24h = waiting", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-12*time.Hour))
-		if got := classifySession(dir, threshold); got != AttentionWaiting {
+		if got := classifySession(dir, threshold, false); got != AttentionWaiting {
 			t.Errorf("got %v, want AttentionWaiting (within decay window)", got)
 		}
 	})
@@ -197,7 +198,7 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionWaiting {
+		if got := classifySession(dir, threshold, false); got != AttentionWaiting {
 			t.Errorf("got %v, want AttentionWaiting", got)
 		}
 	})
@@ -206,7 +207,7 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_start", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionActive {
+		if got := classifySession(dir, threshold, false); got != AttentionActive {
 			t.Errorf("got %v, want AttentionActive", got)
 		}
 	})
@@ -215,7 +216,7 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "tool.execution_start", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionActive {
+		if got := classifySession(dir, threshold, false); got != AttentionActive {
 			t.Errorf("got %v, want AttentionActive", got)
 		}
 	})
@@ -224,7 +225,7 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_end", time.Now().Add(-1*time.Hour))
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionStale {
+		if got := classifySession(dir, threshold, false); got != AttentionStale {
 			t.Errorf("got %v, want AttentionStale", got)
 		}
 	})
@@ -233,7 +234,7 @@ func TestClassifySession(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "session.shutdown", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionIdle {
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle", got)
 		}
 	})
@@ -241,7 +242,7 @@ func TestClassifySession(t *testing.T) {
 	t.Run("live PID + no events = stale", func(t *testing.T) {
 		dir := t.TempDir()
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold); got != AttentionStale {
+		if got := classifySession(dir, threshold, false); got != AttentionStale {
 			t.Errorf("got %v, want AttentionStale", got)
 		}
 	})
@@ -269,7 +270,7 @@ func TestScanAttention(t *testing.T) {
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
 	writeLockFile(t, s3, os.Getpid())
 
-	result := ScanAttention(15 * time.Minute)
+	result := ScanAttention(15 * time.Minute, false)
 
 	if result["session-1"] != AttentionWaiting {
 		t.Errorf("session-1: got %v, want AttentionWaiting", result["session-1"])
@@ -284,7 +285,7 @@ func TestScanAttention(t *testing.T) {
 
 func TestScanAttentionMissingDir(t *testing.T) {
 	t.Setenv("DISPATCH_SESSION_STATE", filepath.Join(t.TempDir(), "nonexistent"))
-	result := ScanAttention(15 * time.Minute)
+	result := ScanAttention(15 * time.Minute, false)
 	if result != nil {
 		t.Errorf("expected nil for nonexistent dir, got %v", result)
 	}
@@ -311,7 +312,7 @@ func TestScanAttentionQuick(t *testing.T) {
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
 	writeLockFile(t, s3, os.Getpid())
 
-	result := ScanAttentionQuick(15 * time.Minute)
+	result := ScanAttentionQuick(15 * time.Minute, false)
 
 	if result["quick-1"] != AttentionWaiting {
 		t.Errorf("quick-1: got %v, want AttentionWaiting", result["quick-1"])
@@ -341,4 +342,211 @@ func writeLockFile(t *testing.T, dir string, pid int) {
 	t.Helper()
 	name := "inuse." + strconv.Itoa(pid) + ".lock"
 	os.WriteFile(filepath.Join(dir, name), []byte(strconv.Itoa(pid)), 0o644)
+}
+
+// deadPID is a PID that is within the valid range (<=maxPID) but guaranteed
+// not to be running on any real system. 4194000 is well under maxPID (4194304)
+// and extremely unlikely to be in use.
+const deadPID = 4194000
+
+func TestInterruptedDetection(t *testing.T) {
+	threshold := 15 * time.Minute
+
+	t.Run("stale lock + tool.execution + recent = interrupted", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionInterrupted {
+			t.Errorf("got %v, want AttentionInterrupted", got)
+		}
+	})
+
+	t.Run("stale lock + assistant.turn_start + recent = interrupted", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_start", time.Now())
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionInterrupted {
+			t.Errorf("got %v, want AttentionInterrupted", got)
+		}
+	})
+
+	t.Run("stale lock + tool.execution + >72h = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now().Add(-73*time.Hour))
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (expired)", got)
+		}
+	})
+
+	t.Run("stale lock + assistant.turn_end + recent = waiting (not interrupted)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.turn_end", time.Now())
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("stale lock + assistant.message + recent = waiting (not interrupted)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "assistant.message", time.Now())
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionWaiting {
+			t.Errorf("got %v, want AttentionWaiting", got)
+		}
+	})
+
+	t.Run("no lock + tool.execution + recent = idle (unchanged)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (no lock = no interrupted)", got)
+		}
+	})
+
+	t.Run("multiple stale locks (different dead PIDs) = interrupted", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		writeLockFile(t, dir, deadPID)
+		// Write a second lock with a different dead PID.
+		secondPID := deadPID - 1
+		os.WriteFile(filepath.Join(dir, "inuse."+strconv.Itoa(secondPID)+".lock"), []byte(strconv.Itoa(secondPID)), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionInterrupted {
+			t.Errorf("got %v, want AttentionInterrupted (multiple stale locks)", got)
+		}
+	})
+
+	t.Run("stale lock + empty events.jsonl = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "events.jsonl"), []byte{}, 0o644)
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (no parseable events)", got)
+		}
+	})
+
+	t.Run("stale lock + missing events.jsonl = idle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (no events file)", got)
+		}
+	})
+
+	t.Run("malformed lock file (non-numeric) = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		os.WriteFile(filepath.Join(dir, "inuse.abc.lock"), []byte("not-a-pid"), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (malformed lock ignored)", got)
+		}
+	})
+
+	t.Run("oversized lock file (>32 bytes) = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		// Write a 64-byte lock file.
+		os.WriteFile(filepath.Join(dir, "inuse.12345.lock"), make([]byte, 64), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (oversized lock ignored)", got)
+		}
+	})
+
+	t.Run("lock with negative PID = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		os.WriteFile(filepath.Join(dir, "inuse.neg.lock"), []byte("-1"), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (negative PID ignored)", got)
+		}
+	})
+
+	t.Run("workspace_recovery=false + stale lock = idle (feature disabled)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		writeLockFile(t, dir, deadPID)
+		if got := classifySession(dir, threshold, false); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (recovery disabled)", got)
+		}
+	})
+
+	t.Run("lock with PID exceeding maxPID = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		hugePID := maxPID + 1
+		os.WriteFile(filepath.Join(dir, "inuse.huge.lock"), []byte(strconv.Itoa(hugePID)), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (PID > maxPID ignored)", got)
+		}
+	})
+
+	t.Run("lock with PID zero = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		os.WriteFile(filepath.Join(dir, "inuse.0.lock"), []byte("0"), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (PID 0 ignored)", got)
+		}
+	})
+
+	t.Run("lock file exactly maxLockFileSize bytes = idle (boundary)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		// Exactly maxLockFileSize bytes — rejected by >= check.
+		os.WriteFile(filepath.Join(dir, "inuse.boundary.lock"), make([]byte, maxLockFileSize), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (boundary-sized lock rejected)", got)
+		}
+	})
+
+	t.Run("lock file with whitespace-only content = idle (graceful)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		os.WriteFile(filepath.Join(dir, "inuse.ws.lock"), []byte("  \n\t "), 0o644)
+		if got := classifySession(dir, threshold, true); got != AttentionIdle {
+			t.Errorf("got %v, want AttentionIdle (whitespace-only lock rejected)", got)
+		}
+	})
+
+	t.Run("excess lock files are capped without hang", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "tool.execution", time.Now())
+		// Create more lock files than the per-session cap.
+		for i := 0; i < maxLockFilesPerSession+5; i++ {
+			pid := deadPID - i
+			name := "inuse." + strconv.Itoa(pid) + ".lock"
+			os.WriteFile(filepath.Join(dir, name), []byte(strconv.Itoa(pid)), 0o644)
+		}
+		// Should still classify (not crash or hang). All PIDs are dead,
+		// so hasStale=true + recovery=true → Interrupted.
+		got := classifySession(dir, threshold, true)
+		if got != AttentionInterrupted {
+			t.Errorf("got %v, want AttentionInterrupted (capped lock processing)", got)
+		}
+	})
+}
+
+func TestScanAttentionQuickWithStale(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	// Session with stale lock + recovery enabled → AttentionInterrupted.
+	s1 := filepath.Join(stateDir, "stale-1")
+	os.MkdirAll(s1, 0o755)
+	writeEvent(t, s1, "tool.execution", time.Now())
+	writeLockFile(t, s1, deadPID)
+
+	result := ScanAttentionQuick(15*time.Minute, true)
+
+	if result["stale-1"] != AttentionInterrupted {
+		t.Errorf("stale-1: got %v, want AttentionInterrupted (quick scan with stale lock)", result["stale-1"])
+	}
+
+	// Same session with recovery disabled → AttentionIdle.
+	result2 := ScanAttentionQuick(15*time.Minute, false)
+
+	if result2["stale-1"] != AttentionIdle {
+		t.Errorf("stale-1 (disabled): got %v, want AttentionIdle", result2["stale-1"])
+	}
 }

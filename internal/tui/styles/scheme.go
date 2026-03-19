@@ -162,10 +162,11 @@ type Theme struct {
 	ChatAssistantLabel  lipgloss.Style
 
 	// Attention dot styles.
-	AttentionWaitingStyle lipgloss.Style
-	AttentionActiveStyle  lipgloss.Style
-	AttentionStaleStyle   lipgloss.Style
-	AttentionIdleStyle    lipgloss.Style
+	AttentionWaitingStyle     lipgloss.Style
+	AttentionActiveStyle      lipgloss.Style
+	AttentionStaleStyle       lipgloss.Style
+	AttentionIdleStyle        lipgloss.Style
+	AttentionInterruptedStyle lipgloss.Style
 }
 
 // DeriveTheme produces a complete Theme from a raw ColorScheme.
@@ -311,6 +312,7 @@ func (t *Theme) buildStyles() {
 	t.AttentionActiveStyle = lipgloss.NewStyle().Foreground(c(t.Success))
 	t.AttentionStaleStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[3])) // Yellow
 	t.AttentionIdleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
+	t.AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[1])).Bold(true) // Red — interrupted/crashed
 }
 
 // ---------------------------------------------------------------------------

@@ -220,14 +220,15 @@ func NewModel() Model {
 
 	cp := components.NewConfigPanel()
 	cp.SetValues(components.ConfigValues{
-		YoloMode:      cfg.YoloMode,
-		Agent:         cfg.Agent,
-		Model:         cfg.Model,
-		LaunchMode:    cfg.EffectiveLaunchMode(),
-		Terminal:      cfg.DefaultTerminal,
-		Shell:         cfg.DefaultShell,
-		CustomCommand: cfg.CustomCommand,
-		Theme:         cfg.Theme,
+		YoloMode:          cfg.YoloMode,
+		Agent:             cfg.Agent,
+		Model:             cfg.Model,
+		LaunchMode:        cfg.EffectiveLaunchMode(),
+		Terminal:          cfg.DefaultTerminal,
+		Shell:             cfg.DefaultShell,
+		CustomCommand:     cfg.CustomCommand,
+		Theme:             cfg.Theme,
+		WorkspaceRecovery: cfg.WorkspaceRecovery,
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -926,15 +927,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Config):
 		m.configPanel.SetValues(components.ConfigValues{
-			YoloMode:      m.cfg.YoloMode,
-			Agent:         m.cfg.Agent,
-			Model:         m.cfg.Model,
-			LaunchMode:    m.cfg.EffectiveLaunchMode(),
-			PaneDirection: m.cfg.EffectivePaneDirection(),
-			Terminal:      m.cfg.DefaultTerminal,
-			Shell:         m.cfg.DefaultShell,
-			CustomCommand: m.cfg.CustomCommand,
-			Theme:         m.cfg.Theme,
+			YoloMode:          m.cfg.YoloMode,
+			Agent:             m.cfg.Agent,
+			Model:             m.cfg.Model,
+			LaunchMode:        m.cfg.EffectiveLaunchMode(),
+			PaneDirection:     m.cfg.EffectivePaneDirection(),
+			Terminal:          m.cfg.DefaultTerminal,
+			Shell:             m.cfg.DefaultShell,
+			CustomCommand:     m.cfg.CustomCommand,
+			Theme:             m.cfg.Theme,
+			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -1124,6 +1126,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmd := m.launchMultiple()
 		return m, cmd
 
+	case key.Matches(msg, keys.ResumeInterrupted):
+		return m.handleResumeInterrupted()
+
 	case key.Matches(msg, keys.SelectAll):
 		m.sessionList.SelectAll()
 		m.updateSelectionStatus()
@@ -1267,6 +1272,7 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.DefaultShell = v.Shell
 	m.cfg.CustomCommand = v.CustomCommand
 	m.cfg.Theme = v.Theme
+	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
@@ -1776,6 +1782,9 @@ func (m Model) renderFooter() string {
 	if wc := m.waitingCount(); wc > 0 {
 		left += "  " + styles.AttentionWaitingStyle.Render(fmt.Sprintf("● %d waiting", wc))
 	}
+	if ic := m.interruptedCount(); ic > 0 {
+		left += "  " + styles.AttentionInterruptedStyle.Render(fmt.Sprintf("⚡ %d interrupted", ic))
+	}
 	if len(m.attentionFilter) > 0 {
 		var names []string
 		if _, ok := m.attentionFilter[data.AttentionWaiting]; ok {
@@ -1789,6 +1798,9 @@ func (m Model) renderFooter() string {
 		}
 		if _, ok := m.attentionFilter[data.AttentionIdle]; ok {
 			names = append(names, "idle")
+		}
+		if _, ok := m.attentionFilter[data.AttentionInterrupted]; ok {
+			names = append(names, "interrupted")
 		}
 		left += "  " + styles.ActiveBadgeStyle.Render("! "+strings.Join(names, ", "))
 	}
@@ -2566,8 +2578,9 @@ const attentionRefreshInterval = 30 * time.Second
 // events.jsonl. This gets dots visible immediately on startup.
 func (m Model) scanAttentionQuickCmd() tea.Cmd {
 	threshold := m.cfg.EffectiveAttentionThreshold()
+	wr := m.cfg.WorkspaceRecovery
 	return func() tea.Msg {
-		statuses := data.ScanAttentionQuick(threshold)
+		statuses := data.ScanAttentionQuick(threshold, wr)
 		return attentionQuickScannedMsg{statuses: statuses}
 	}
 }
@@ -2576,8 +2589,9 @@ func (m Model) scanAttentionQuickCmd() tea.Cmd {
 // background and returns an attentionScannedMsg with the results.
 func (m Model) scanAttentionCmd() tea.Cmd {
 	threshold := m.cfg.EffectiveAttentionThreshold()
+	wr := m.cfg.WorkspaceRecovery
 	return func() tea.Msg {
-		statuses := data.ScanAttention(threshold)
+		statuses := data.ScanAttention(threshold, wr)
 		return attentionScannedMsg{statuses: statuses}
 	}
 }
@@ -2625,6 +2639,61 @@ func (m Model) waitingCount() int {
 		}
 	}
 	return count
+}
+
+// interruptedCount returns the number of sessions with AttentionInterrupted status.
+func (m Model) interruptedCount() int {
+	count := 0
+	for _, status := range m.attentionMap {
+		if status == data.AttentionInterrupted {
+			count++
+		}
+	}
+	return count
+}
+
+// handleResumeInterrupted collects all interrupted sessions and batch-launches them.
+func (m Model) handleResumeInterrupted() (tea.Model, tea.Cmd) {
+	if len(m.attentionMap) == 0 {
+		return m, nil
+	}
+
+	// Collect interrupted session IDs.
+	var ids []string
+	for id, status := range m.attentionMap {
+		if status == data.AttentionInterrupted {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		m.statusInfo = "No interrupted sessions"
+		return m, nil
+	}
+
+	// Match to loaded sessions (need Cwd for launch).
+	var sessions []data.Session
+	for _, sess := range m.sessions {
+		for _, id := range ids {
+			if sess.ID == id {
+				sessions = append(sessions, sess)
+				break
+			}
+		}
+	}
+	if len(sessions) == 0 {
+		m.statusInfo = "No interrupted sessions in current view"
+		return m, nil
+	}
+
+	// Force external mode (never in-place for batch).
+	mode := m.cfg.EffectiveLaunchMode()
+	if mode == config.LaunchModeInPlace {
+		mode = config.LaunchModeTab
+	}
+
+	m.statusInfo = fmt.Sprintf("Resuming %d interrupted sessions", len(sessions))
+	cmd := m.batchLaunchSessions(sessions, mode)
+	return m, cmd
 }
 
 // attentionStatusCounts returns the number of sessions per attention status.

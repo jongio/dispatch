@@ -102,6 +102,9 @@ const (
 	AttentionActive
 	// AttentionWaiting means the AI has responded and is waiting for user input.
 	AttentionWaiting
+	// AttentionInterrupted means the session was interrupted by crash or reboot
+	// (stale lock file with dead PID, last event not a turn-end).
+	AttentionInterrupted
 )
 
 // String returns a human-readable label for the attention status.
@@ -113,6 +116,8 @@ func (a AttentionStatus) String() string {
 		return "active"
 	case AttentionStale:
 		return "stale"
+	case AttentionInterrupted:
+		return "interrupted"
 	default:
 		return "idle"
 	}

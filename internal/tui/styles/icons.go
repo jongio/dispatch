@@ -182,6 +182,9 @@ func IconAttentionStale() string { return icon(nfBullet, fbAttentionDot) }
 // IconAttentionIdle returns an open dot for "not running" status.
 func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }
 
+// IconAttentionInterrupted returns a lightning bolt for "crashed/interrupted" status.
+func IconAttentionInterrupted() string { return icon("\uf0e7", "⚡") }
+
 // PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
 // The pivot string matches data.PivotField values ("cwd", "repository",
 // "branch", "date") or the TUI pivot mode constants ("folder", "repo", etc).

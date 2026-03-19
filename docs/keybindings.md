@@ -212,8 +212,37 @@
     - Behavior: Toggles filter to show only sessions starred as favorites
     - Condition: In session list view
 
+### Attention & Session Status
+28. **n** → Jump to Next Waiting Session
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("n"))
+    - Handler: D:\code\dispatch\internal\tui\model.go
+    - Behavior: Cycles to the next session with AttentionWaiting status
+    - Condition: In session list view
+
+29. **R** (Shift+R) → Resume All Interrupted Sessions
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("R"))
+    - Handler: D:\code\dispatch\internal\tui\model.go (handleResumeInterrupted)
+    - Behavior: Batch-resumes all sessions with AttentionInterrupted status via `ghcs --resume`
+    - Condition: In session list view; requires at least one interrupted session
+
+30. **!** → Filter by Attention Status
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("!"))
+    - Handler: D:\code\dispatch\internal\tui\model.go
+    - Behavior: Opens the attention picker overlay to filter sessions by one or more attention states (waiting, active, stale, interrupted, idle)
+    - Condition: In session list view
+
+**Attention Status Indicators:**
+- ● Waiting (purple) — session needs user input (`assistant.turn_end` or `assistant.message`)
+- ● Active (green) — AI is working (live PID + `assistant.turn_start` or `tool_execution`)
+- ● Stale (yellow) — running but quiet (live PID, no recent events)
+- ⚡ Interrupted (orange) — killed mid-work by crash/reboot (stale lock file + active event)
+- ○ Idle (gray) — not running
+
 ### Time Range Filter
-28. **1** → Set Time Range to 1 Hour
+31. **1** → Set Time Range to 1 Hour
     - File: D:\code\dispatch\internal\tui\keys.go (line 76)
     - Code: key.NewBinding(key.WithKeys("1"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 924-926)
@@ -506,6 +535,7 @@ When help overlay is open (after pressing ?):
 - **stateHelpOverlay** → Help modal; only ? and Esc close it
 - **stateShellPicker** → Shell selection; up/down/enter/esc only
 - **stateFilterPanel** → Filter overlay; navigation and select/apply
+- **stateAttentionPicker** → Attention status filter; up/down/enter/esc, space to toggle
 - **stateConfigPanel** → Config editor; navigation, enter to edit, esc to save
 
 ### Key Binding Implementation

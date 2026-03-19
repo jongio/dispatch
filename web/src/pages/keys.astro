@@ -86,13 +86,14 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Attention & Status</h3>
             <KeyTable rows={[
               { keys: 'n', action: 'Jump to next waiting session' },
+              { keys: 'R', action: 'Resume all interrupted sessions' },
               { keys: '!', action: 'Filter by attention status' },
               { keys: 'h', action: 'Hide/unhide current session' },
               { keys: 'H', action: 'Toggle visibility of hidden sessions' },
               { keys: '*', action: 'Toggle favorite on current session' },
               { keys: 'F', action: 'Filter to show only favorites' },
             ]} />
-            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses.</p>
+            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses. Press <kbd>R</kbd> to batch-resume all interrupted sessions.</p>
           </div>
 
           <div id="general-keys" class="shortcut-group">

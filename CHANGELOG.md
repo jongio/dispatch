@@ -16,11 +16,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - ✓ indicator on selected sessions
 
 - **Attention indicators** — colored dots showing real-time session AI activity status
-  - Four states: waiting (purple), active (green), stale (yellow), idle (gray)
+  - Five states: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray)
   - Determined by scanning session-state lock files and event logs
   - `n` to jump to next waiting session
   - `!` to open attention status filter picker
   - Auto-refreshes on every reindex
+
+- **Workspace recovery** — detect sessions interrupted by crash/reboot and resume them
+  - New "interrupted" attention status (orange ⚡) for sessions killed mid-work
+  - Stale lock file detection with 72-hour window (covers weekend crashes)
+  - `R` to batch-resume all interrupted sessions
+  - `workspace_recovery` config toggle (default: on)
+  - Defensive lock file parsing with graceful degradation
 
 - **Self-update** (`dispatch update`) — downloads latest release from GitHub and replaces in-place
   - SHA-256 checksum verification

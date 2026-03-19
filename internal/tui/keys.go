@@ -43,11 +43,12 @@ type keyMap struct {
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
 	ConversationSort  key.Binding
+	ResumeInterrupted key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.Star, k.JumpNextAttention, k.FilterAttention, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.Hide, k.Star, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -58,7 +59,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
 		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.Reindex, k.Config},
-		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention},
+		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
 	}
@@ -103,4 +104,5 @@ var keys = keyMap{
 	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 	ConversationSort:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order")),
+	ResumeInterrupted: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resume interrupted")),
 }

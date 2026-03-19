@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,10 +35,26 @@ type sessionEvent struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// maxLockFileSize is the maximum size in bytes accepted for a lock file.
+// Lock files contain a PID as an ASCII decimal string, which for the
+// maximum PID of 4194304 is 7 bytes. 32 provides generous margin for
+// whitespace/newlines while rejecting anything suspiciously large.
+const maxLockFileSize = 32
+
+// maxLockFilesPerSession caps the number of lock files checked per session
+// directory to prevent resource exhaustion from adversarial lock file
+// proliferation. Normal sessions have 0–1 lock files.
+const maxLockFilesPerSession = 10
+
 // deadSessionMaxAge is the maximum age of the last event for a dead session
 // to be classified as AttentionWaiting. Older dead sessions are always Idle
 // to avoid noise from long-abandoned sessions.
 const deadSessionMaxAge = 24 * time.Hour
+
+// interruptedMaxAge is the maximum age of the last event for a dead session
+// with a stale lock to be classified as AttentionInterrupted. Older sessions
+// are always Idle to avoid surfacing long-abandoned crashes.
+const interruptedMaxAge = 72 * time.Hour
 
 // ScanAttention reads the Copilot CLI session-state directories and returns
 // a map of session ID → AttentionStatus. The threshold parameter controls
@@ -45,7 +62,7 @@ const deadSessionMaxAge = 24 * time.Hour
 //
 // The scan is read-only and does not modify any files. It completes in
 // under 50 ms for 100 sessions on typical hardware.
-func ScanAttention(threshold time.Duration) map[string]AttentionStatus {
+func ScanAttention(threshold time.Duration, workspaceRecovery bool) map[string]AttentionStatus {
 	stateDir := sessionStatePath()
 	if stateDir == "" {
 		return nil
@@ -65,7 +82,7 @@ func ScanAttention(threshold time.Duration) map[string]AttentionStatus {
 		sessionID := e.Name()
 		dir := filepath.Join(stateDir, sessionID)
 
-		status := classifySession(dir, threshold)
+		status := classifySession(dir, threshold, workspaceRecovery)
 		result[sessionID] = status
 	}
 
@@ -76,7 +93,7 @@ func ScanAttention(threshold time.Duration) map[string]AttentionStatus {
 // for live sessions. Dead sessions are classified as AttentionIdle without
 // reading events.jsonl. Use this for the initial scan to get dots visible
 // immediately, then follow up with ScanAttention for full classification.
-func ScanAttentionQuick(threshold time.Duration) map[string]AttentionStatus {
+func ScanAttentionQuick(threshold time.Duration, workspaceRecovery bool) map[string]AttentionStatus {
 	stateDir := sessionStatePath()
 	if stateDir == "" {
 		return nil
@@ -96,10 +113,16 @@ func ScanAttentionQuick(threshold time.Duration) map[string]AttentionStatus {
 		sessionID := e.Name()
 		dir := filepath.Join(stateDir, sessionID)
 
-		pid := findLivePID(dir)
-		if pid <= 0 {
-			// Dead session — skip events.jsonl for speed.
-			result[sessionID] = AttentionIdle
+		pidRes := findSessionPID(dir)
+		if pidRes.pid <= 0 {
+			if pidRes.hasStale && workspaceRecovery {
+				// Preliminary: mark interrupted so dots appear immediately.
+				// Full scan refines this (e.g., turn_end → Waiting).
+				result[sessionID] = AttentionInterrupted
+			} else {
+				// Dead session — skip events.jsonl for speed.
+				result[sessionID] = AttentionIdle
+			}
 			continue
 		}
 
@@ -113,35 +136,49 @@ func ScanAttentionQuick(threshold time.Duration) map[string]AttentionStatus {
 
 // classifySession determines the attention status of a single session
 // by checking its lock file and last event.
-func classifySession(dir string, threshold time.Duration) AttentionStatus {
-	// Check for a lock file indicating the session is running.
-	pid := findLivePID(dir)
-	if pid <= 0 {
-		// No live process — check last event to detect sessions that
-		// were waiting for user input when the process exited.
-		eventsPath := filepath.Join(dir, "events.jsonl")
-		evt, err := readLastEvent(eventsPath)
-		if err != nil {
+func classifySession(dir string, threshold time.Duration, workspaceRecovery bool) AttentionStatus {
+	result := findSessionPID(dir)
+	if result.pid > 0 {
+		return classifyLiveSession(dir, threshold)
+	}
+
+	// No live process — check last event.
+	eventsPath := filepath.Join(dir, "events.jsonl")
+	evt, err := readLastEvent(eventsPath)
+	if err != nil {
+		return AttentionIdle
+	}
+
+	eventTime := parseEventTime(evt.Timestamp)
+	if eventTime.IsZero() {
+		return AttentionIdle
+	}
+
+	// Stale lock (dead PID) with workspace recovery enabled.
+	if result.hasStale && workspaceRecovery {
+		if time.Since(eventTime) > interruptedMaxAge {
 			return AttentionIdle
 		}
-
-		// Only flag dead sessions as waiting if they are recent enough
-		// to be actionable. Stale dead sessions → Idle.
-		eventTime := parseEventTime(evt.Timestamp)
-		if eventTime.IsZero() || time.Since(eventTime) > deadSessionMaxAge {
-			return AttentionIdle
-		}
-
 		switch {
 		case strings.HasPrefix(evt.Type, "assistant.turn_end"),
 			strings.HasPrefix(evt.Type, "assistant.message"):
 			return AttentionWaiting
 		default:
-			return AttentionIdle
+			return AttentionInterrupted
 		}
 	}
 
-	return classifyLiveSession(dir, threshold)
+	// No stale lock (or feature disabled) — original dead-session logic.
+	if time.Since(eventTime) > deadSessionMaxAge {
+		return AttentionIdle
+	}
+	switch {
+	case strings.HasPrefix(evt.Type, "assistant.turn_end"),
+		strings.HasPrefix(evt.Type, "assistant.message"):
+		return AttentionWaiting
+	default:
+		return AttentionIdle
+	}
 }
 
 // classifyLiveSession classifies a session that has a live process.
@@ -179,31 +216,82 @@ func classifyLiveSession(dir string, threshold time.Duration) AttentionStatus {
 	}
 }
 
-// findLivePID looks for an inuse.*.lock file in the session directory and
-// returns the PID if the process is still alive. Returns 0 if no live
-// process is found.
-func findLivePID(dir string) int {
+// pidResult carries the outcome of a session lock-file check.
+type pidResult struct {
+	pid      int  // >0 if a live process owns the session
+	hasStale bool // true if at least one lock file exists with a dead PID
+}
+
+// maxPID is a conservative upper bound for valid process IDs.
+const maxPID = 4194304
+
+// findSessionPID looks for inuse.*.lock files in the session directory.
+// It returns a pidResult with the live PID if found, or hasStale=true
+// if at least one lock file references a dead process.
+func findSessionPID(dir string) pidResult {
 	pattern := filepath.Join(dir, "inuse.*.lock")
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
-		return 0
+		return pidResult{}
 	}
 
-	for _, lockPath := range matches {
+	hasStale := false
+	for i, lockPath := range matches {
+		if i >= maxLockFilesPerSession {
+			slog.Warn("attention: too many lock files, skipping rest", "dir", dir, "count", len(matches))
+			break
+		}
+
+		// Use Lstat to avoid following symlinks to FIFOs/devices that
+		// could block ReadFile indefinitely (DoS vector).
+		info, err := os.Lstat(lockPath)
+		if err != nil || !info.Mode().IsRegular() {
+			if err == nil {
+				slog.Warn("attention: skipping non-regular lock file", "path", lockPath)
+			}
+			continue
+		}
+		if info.Size() >= maxLockFileSize {
+			slog.Warn("attention: oversized lock file", "path", lockPath, "size", info.Size())
+			continue
+		}
+
 		raw, err := os.ReadFile(lockPath)
 		if err != nil {
 			continue
 		}
+
 		pidStr := strings.TrimSpace(string(raw))
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil || pid <= 0 {
+
+		// Validate: non-empty, pure ASCII digits only.
+		if len(pidStr) == 0 {
+			slog.Warn("attention: empty lock file", "path", lockPath)
 			continue
 		}
-		if platform.IsProcessAlive(pid) {
-			return pid
+		valid := true
+		for _, b := range pidStr {
+			if b < '0' || b > '9' {
+				valid = false
+				break
+			}
 		}
+		if !valid {
+			slog.Warn("attention: non-numeric lock content", "path", lockPath, "content", pidStr)
+			continue
+		}
+
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil || pid <= 0 || pid > maxPID {
+			slog.Warn("attention: invalid PID in lock", "path", lockPath, "pid", pid)
+			continue
+		}
+
+		if platform.IsProcessAlive(pid) {
+			return pidResult{pid: pid}
+		}
+		hasStale = true
 	}
-	return 0
+	return pidResult{hasStale: hasStale}
 }
 
 // readLastEvent reads the last complete JSON line from an events.jsonl file

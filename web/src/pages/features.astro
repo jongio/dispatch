@@ -230,13 +230,15 @@ import Screenshot from '../components/Screenshot.astro';
             <li><strong>Waiting</strong> (purple ●) — AI finished, waiting for your input</li>
             <li><strong>Active</strong> (green ●) — AI is currently working</li>
             <li><strong>Stale</strong> (yellow ●) — running but no activity for 5+ minutes</li>
+            <li><strong>Interrupted</strong> (orange ⚡) — session was killed by crash/reboot mid-work</li>
             <li><strong>Idle</strong> (gray ○) — session not running</li>
             <li><kbd>n</kbd> to jump to next waiting session</li>
+            <li><kbd>R</kbd> to resume all interrupted sessions</li>
             <li><kbd>!</kbd> to open the attention status filter picker</li>
           </ul>
         </div>
         <div class="feature-screenshots">
-          <Screenshot src="one-half-light/attention-picker.png" alt="Attention status filter picker showing waiting, active, stale, and idle options" caption="Filter by attention status" />
+          <Screenshot src="one-half-light/attention-picker.png" alt="Attention status filter picker showing waiting, active, stale, interrupted, and idle options" caption="Filter by attention status" />
         </div>
       </div>
     </section>

@@ -290,13 +290,42 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m := newBase()
 		m.state = stateAttentionPicker
 		m.attentionPicker.SetCounts(map[data.AttentionStatus]int{
-			data.AttentionWaiting: 2,
-			data.AttentionActive:  2,
-			data.AttentionStale:   2,
-			data.AttentionIdle:    2,
+			data.AttentionWaiting:     2,
+			data.AttentionActive:      2,
+			data.AttentionStale:       1,
+			data.AttentionInterrupted: 2,
+			data.AttentionIdle:        2,
 		})
 		m.recalcLayout()
 		addOverlay("attention-picker", m)
+	}
+
+	// ── Attention filtered to interrupted only ──────────────────────
+	{
+		m := newBase()
+		m.attentionFilter = map[data.AttentionStatus]struct{}{
+			data.AttentionInterrupted: {},
+		}
+		m.showPreview = false
+		// Rebuild the session list with the filter applied
+		var filtered []data.SessionGroup
+		for _, g := range c.folderGroups {
+			var sessions []data.Session
+			for _, s := range g.Sessions {
+				if status, ok := c.attentionMap[s.ID]; ok && status == data.AttentionInterrupted {
+					sessions = append(sessions, s)
+				}
+			}
+			if len(sessions) > 0 {
+				g.Sessions = sessions
+				g.Count = len(sessions)
+				filtered = append(filtered, g)
+			}
+		}
+		m.groups = filtered
+		m.sessionList.SetGroups(filtered)
+		m.recalcLayout()
+		add("attention-filtered-interrupted", m)
 	}
 
 	// ── Tree collapsed / expanded ─────────────────────────────────────
@@ -454,17 +483,18 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		}
 	}
 
-	// Build a fake attention map so screenshots show all four status
-	// circle colors (waiting=purple, active=green, stale=yellow, idle=gray).
+	// Build a fake attention map so screenshots show all five status
+	// indicators (waiting=purple, active=green, stale=yellow, interrupted=orange ⚡, idle=gray).
 	attentionMap := map[string]data.AttentionStatus{
-		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": data.AttentionWaiting, // Death Star API auth (5 min ago)
-		"ses-026":                              data.AttentionActive,  // Fleet dashboard (12 min ago)
-		"ses-002":                              data.AttentionActive,  // Superlaser refactor (22 min ago)
-		"ses-003":                              data.AttentionStale,   // Warp metrics (38 min ago)
-		"ses-004":                              data.AttentionWaiting, // Cake promise API (52 min ago)
-		"ses-005":                              data.AttentionStale,   // Sith login fix (95 min ago)
-		"ses-006":                              data.AttentionIdle,    // Sorting hat GPT (175 min ago)
-		"ses-027":                              data.AttentionIdle,    // Auth middleware (250 min ago)
+		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": data.AttentionWaiting,     // Death Star API auth (5 min ago)
+		"ses-026":                              data.AttentionActive,       // Fleet dashboard (12 min ago)
+		"ses-002":                              data.AttentionActive,       // Superlaser refactor (22 min ago)
+		"ses-003":                              data.AttentionStale,        // Warp metrics (38 min ago)
+		"ses-004":                              data.AttentionWaiting,      // Cake promise API (52 min ago)
+		"ses-005":                              data.AttentionInterrupted,  // Sith login fix (95 min ago)
+		"ses-006":                              data.AttentionIdle,         // Sorting hat GPT (175 min ago)
+		"ses-007":                              data.AttentionInterrupted,  // Kimoyo bead sync (340 min ago)
+		"ses-027":                              data.AttentionIdle,         // Auth middleware (250 min ago)
 	}
 
 	ctx := &captureCtx{
@@ -481,13 +511,14 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		flatSort:     flatSort,
 		attentionMap: attentionMap,
 		configVals: components.ConfigValues{
-			YoloMode:   false,
-			Agent:      "copilot",
-			Model:      "claude-sonnet-4",
-			LaunchMode: "in-place",
-			Terminal:   "Windows Terminal",
-			Shell:      "pwsh",
-			Theme:      "Dispatch Dark",
+			YoloMode:          false,
+			Agent:             "copilot",
+			Model:             "claude-sonnet-4",
+			LaunchMode:        "in-place",
+			Terminal:          "Windows Terminal",
+			Shell:             "pwsh",
+			Theme:             "Dispatch Dark",
+			WorkspaceRecovery: true,
 		},
 		themeNames: append([]string{"auto"}, styles.BuiltinSchemeNames()...),
 	}
