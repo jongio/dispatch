@@ -270,7 +270,7 @@ func TestScanAttention(t *testing.T) {
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
 	writeLockFile(t, s3, os.Getpid())
 
-	result := ScanAttention(15 * time.Minute, false)
+	result := ScanAttention(15*time.Minute, false)
 
 	if result["session-1"] != AttentionWaiting {
 		t.Errorf("session-1: got %v, want AttentionWaiting", result["session-1"])
@@ -285,7 +285,7 @@ func TestScanAttention(t *testing.T) {
 
 func TestScanAttentionMissingDir(t *testing.T) {
 	t.Setenv("DISPATCH_SESSION_STATE", filepath.Join(t.TempDir(), "nonexistent"))
-	result := ScanAttention(15 * time.Minute, false)
+	result := ScanAttention(15*time.Minute, false)
 	if result != nil {
 		t.Errorf("expected nil for nonexistent dir, got %v", result)
 	}
@@ -312,7 +312,7 @@ func TestScanAttentionQuick(t *testing.T) {
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
 	writeLockFile(t, s3, os.Getpid())
 
-	result := ScanAttentionQuick(15 * time.Minute, false)
+	result := ScanAttentionQuick(15*time.Minute, false)
 
 	if result["quick-1"] != AttentionWaiting {
 		t.Errorf("quick-1: got %v, want AttentionWaiting", result["quick-1"])
@@ -402,6 +402,18 @@ func TestInterruptedDetection(t *testing.T) {
 		writeEvent(t, dir, "tool.execution", time.Now())
 		if got := classifySession(dir, threshold, true); got != AttentionIdle {
 			t.Errorf("got %v, want AttentionIdle (no lock = no interrupted)", got)
+		}
+	})
+
+	t.Run("stale lock + session.shutdown + recent = interrupted (lock not cleaned)", func(t *testing.T) {
+		dir := t.TempDir()
+		writeEvent(t, dir, "session.shutdown", time.Now())
+		writeLockFile(t, dir, deadPID)
+		// Shutdown event + stale lock = process crashed during shutdown
+		// before cleaning up the lock file. Classified as interrupted
+		// because the lock was never released.
+		if got := classifySession(dir, threshold, true); got != AttentionInterrupted {
+			t.Errorf("got %v, want AttentionInterrupted (shutdown + stale lock)", got)
 		}
 	})
 

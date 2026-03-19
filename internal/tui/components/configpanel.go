@@ -40,15 +40,15 @@ const themeAuto = "auto"
 // settings (yolo mode, agent, model, launch-in-place, terminal, shell,
 // custom command).
 type ConfigPanel struct {
-	yoloMode      bool
-	agent         string
-	model         string
-	launchMode    string // "in-place", "tab", "window", or "pane"
-	paneDirection string // "auto", "right", "down", "left", "up"
-	terminal      string
-	shell         string
-	customCommand string
-	theme         string // active color scheme name ("auto" or a scheme name)
+	yoloMode          bool
+	agent             string
+	model             string
+	launchMode        string // "in-place", "tab", "window", or "pane"
+	paneDirection     string // "auto", "right", "down", "left", "up"
+	terminal          string
+	shell             string
+	customCommand     string
+	theme             string // active color scheme name ("auto" or a scheme name)
 	workspaceRecovery bool
 
 	// Available options for cycling.

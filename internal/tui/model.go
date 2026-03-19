@@ -44,6 +44,10 @@ const (
 	// Must be generous: Init ~1s + Search ~10s + retries (3 × [0.5s + 1s + 10s]) ≈ 45s.
 	copilotSearchTimeout = 45 * time.Second
 
+	// statusReindexDone is the status message shown when a reindex
+	// completes successfully.
+	statusReindexDone = "Reindexed ✓"
+
 	// statusReindexCancelled is the status message shown when the user
 	// cancels an in-flight reindex operation.
 	statusReindexCancelled = "Reindex cancelled"
@@ -385,7 +389,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statusErr = "Reindex: " + msg.Err.Error()
 			}
 		} else {
-			m.statusInfo = "Reindexed ✓"
+			m.statusInfo = statusReindexDone
 		}
 		m.reindexLog = nil
 		// Reload sessions to pick up changes from chronicle reindex.

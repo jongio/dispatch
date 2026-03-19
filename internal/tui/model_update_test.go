@@ -215,8 +215,8 @@ func TestUpdate_ReindexFinished_Success(t *testing.T) {
 	if rm.reindexing {
 		t.Error("reindexing should be false after finish")
 	}
-	if rm.statusInfo != "Reindexed ✓" {
-		t.Errorf("statusInfo = %q, want 'Reindexed ✓'", rm.statusInfo)
+	if rm.statusInfo != statusReindexDone {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusReindexDone)
 	}
 	if cmd == nil {
 		t.Error("should return clearStatus cmd")
@@ -937,7 +937,7 @@ func TestRenderFooter_WithStatus(t *testing.T) {
 
 func TestRenderFooter_WithStatusInfo(t *testing.T) {
 	m := newTestModelWithSize(100, 25)
-	m.statusInfo = "Reindexed ✓"
+	m.statusInfo = statusReindexDone
 	v := m.renderFooter()
 	if v == "" {
 		t.Error("renderFooter with statusInfo should return non-empty string")

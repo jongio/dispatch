@@ -976,7 +976,7 @@ func TestCoverage_Search_nilContext(t *testing.T) {
 			return fmt.Errorf("no store configured")
 		},
 	}
-	ids, err := c.Search(nil, "test") //nolint:staticcheck
+	ids, err := c.Search(context.TODO(), "test")
 	if err != nil {
 		t.Errorf("expected nil error for unavailable client, got %v", err)
 	}

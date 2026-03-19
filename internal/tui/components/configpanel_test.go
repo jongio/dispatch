@@ -34,6 +34,7 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	cp.SetValues(ConfigValues{
 		YoloMode: true, Agent: "myagent", Model: "gpt-4", LaunchMode: "tab",
 		Terminal: "Windows Terminal", Shell: "pwsh", CustomCommand: "my-cmd {sessionId}", Theme: "Campbell",
+		WorkspaceRecovery: true,
 	})
 
 	v := cp.Values()
@@ -60,6 +61,9 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	}
 	if v.Theme != "Campbell" {
 		t.Errorf("theme = %q, want %q", v.Theme, "Campbell")
+	}
+	if !v.WorkspaceRecovery {
+		t.Error("workspaceRecovery should be true")
 	}
 }
 
@@ -131,6 +135,20 @@ func TestConfigPanel_HandleEnter_YoloToggle(t *testing.T) {
 	cp.HandleEnter()
 	if cp.Values().YoloMode {
 		t.Error("second HandleEnter on yoloMode should toggle back to false")
+	}
+}
+
+func TestConfigPanel_HandleEnter_WorkspaceRecoveryToggle(t *testing.T) {
+	cp := NewConfigPanel()
+	cp.SetValues(ConfigValues{WorkspaceRecovery: true})
+	cp.cursor = cfgWorkspaceRecovery
+	cp.HandleEnter()
+	if cp.Values().WorkspaceRecovery {
+		t.Error("HandleEnter on workspaceRecovery should toggle to false")
+	}
+	cp.HandleEnter()
+	if !cp.Values().WorkspaceRecovery {
+		t.Error("second HandleEnter on workspaceRecovery should toggle back to true")
 	}
 }
 
@@ -287,7 +305,7 @@ func TestConfigPanel_View_ContainsFields(t *testing.T) {
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	view := cp.View()
-	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Custom Command", "Theme"} {
+	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Custom Command", "Theme", "Crash Recovery"} {
 		if !strings.Contains(view, field) {
 			t.Errorf("View should contain field %q", field)
 		}
