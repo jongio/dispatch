@@ -630,7 +630,7 @@ func truncateForTestName(s string) string {
 
 func TestIsGitBash(t *testing.T) {
 	tests := []struct {
-		name string
+		name  string
 		shell ShellInfo
 		want  bool
 	}{

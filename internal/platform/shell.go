@@ -230,7 +230,7 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 
 // shellQuote wraps s in POSIX single quotes if it contains whitespace or
 // shell metacharacters. Single quotes suppress all shell interpretation;
-// embedded single quotes are escaped with the '\” idiom (end quote,
+// embedded single quotes are escaped with the POSIX end-escape-reopen idiom (end quote,
 // escaped literal quote, restart quote).
 func shellQuote(s string) string {
 	// Strip null bytes — they can truncate strings in C-based shell
@@ -312,8 +312,8 @@ func isGitBash(shell ShellInfo) bool {
 // bashifyCmd converts a Windows-style resume command for use with bash -c.
 // It performs three transformations:
 //  1. Backslash → forward slash (MSYS path compatibility).
-//  2. Escape existing single quotes with the '\'' idiom so they survive
-//     inside the POSIX single-quoted tokens produced by step 3.
+//  2. Escape existing single quotes with the POSIX end-escape-reopen
+//     idiom so they survive inside the single-quoted tokens from step 3.
 //  3. Double quote → single quote. Double quotes can be stripped by
 //     intermediate launchers (cmd.exe, wt.exe) before bash sees them,
 //     causing space-in-path breakage. Single quotes survive intact and
