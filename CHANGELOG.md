@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-03-19
+
 ### Added
 
 - **Session favorites** (`*` / `F`) — star sessions with `*` key, filter to show only favorites with `F`, persistent in config
