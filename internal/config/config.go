@@ -130,6 +130,12 @@ type Config struct {
 	// format.  Users can paste any WT scheme JSON directly here.
 	Schemes []styles.ColorScheme `json:"schemes,omitempty"`
 
+	// PreviewPosition controls where the session detail/preview panel
+	// is displayed relative to the session list.
+	// Valid values: "right", "bottom", "left", "top".
+	// Default is "right" when unset.
+	PreviewPosition string `json:"preview_position,omitempty"`
+
 	// ConversationNewestFirst controls the turn display order in the
 	// preview panel's Conversation section. When false (default), turns
 	// are shown oldest-first (ascending by TurnIndex). When true, turns
@@ -170,6 +176,18 @@ const (
 	PaneDirectionUp = "up"
 )
 
+// PreviewPosition constants control where the preview panel is displayed.
+const (
+	// PreviewPositionRight places the preview to the right of the session list.
+	PreviewPositionRight = "right"
+	// PreviewPositionBottom places the preview below the session list.
+	PreviewPositionBottom = "bottom"
+	// PreviewPositionLeft places the preview to the left of the session list.
+	PreviewPositionLeft = "left"
+	// PreviewPositionTop places the preview above the session list.
+	PreviewPositionTop = "top"
+)
+
 // EffectivePaneDirection returns the configured pane direction, defaulting
 // to "auto" when unset.
 func (c *Config) EffectivePaneDirection() string {
@@ -177,6 +195,17 @@ func (c *Config) EffectivePaneDirection() string {
 		return c.PaneDirection
 	}
 	return PaneDirectionAuto
+}
+
+// EffectivePreviewPosition returns the configured preview panel position,
+// defaulting to "right" when unset or invalid.
+func (c *Config) EffectivePreviewPosition() string {
+	switch c.PreviewPosition {
+	case PreviewPositionRight, PreviewPositionBottom, PreviewPositionLeft, PreviewPositionTop:
+		return c.PreviewPosition
+	default:
+		return PreviewPositionRight
+	}
 }
 
 // defaultAttentionThreshold is used when AttentionThreshold is empty or unparseable.

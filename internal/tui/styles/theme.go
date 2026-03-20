@@ -333,8 +333,16 @@ const (
 	PreviewMinWidth = 80
 
 	// PreviewWidthRatio is the fraction of the total width allocated to
-	// the preview panel when it is visible.
+	// the preview panel when it is visible (used for left/right positions).
 	PreviewWidthRatio = 0.38
+
+	// PreviewHeightRatio is the fraction of the total height allocated to
+	// the preview panel when displayed at the top or bottom.
+	PreviewHeightRatio = 0.40
+
+	// PreviewMinHeight is the minimum terminal height at which the preview
+	// panel becomes visible for top/bottom positions.
+	PreviewMinHeight = 20
 
 	// HeaderLines is the number of lines reserved for the header area
 	// (title + badges + separator).

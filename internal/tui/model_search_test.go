@@ -15,15 +15,16 @@ import (
 func newTestModel() Model {
 	cfg := config.Default()
 	return Model{
-		state:       stateSessionList,
-		cfg:         cfg,
-		filter:      data.FilterOptions{},
-		sort:        data.SortOptions{Field: data.SortByUpdated, Order: data.Descending},
-		timeRange:   "all",
-		pivot:       pivotNone,
-		searchBar:   components.NewSearchBar(),
-		sessionList: components.NewSessionList(),
-		hiddenSet:   make(map[string]struct{}),
+		state:           stateSessionList,
+		cfg:             cfg,
+		filter:          data.FilterOptions{},
+		sort:            data.SortOptions{Field: data.SortByUpdated, Order: data.Descending},
+		timeRange:       "all",
+		pivot:           pivotNone,
+		previewPosition: cfg.EffectivePreviewPosition(),
+		searchBar:       components.NewSearchBar(),
+		sessionList:     components.NewSessionList(),
+		hiddenSet:       make(map[string]struct{}),
 	}
 }
 

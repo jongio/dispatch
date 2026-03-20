@@ -34,7 +34,7 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	cp.SetValues(ConfigValues{
 		YoloMode: true, Agent: "myagent", Model: "gpt-4", LaunchMode: "tab",
 		Terminal: "Windows Terminal", Shell: "pwsh", CustomCommand: "my-cmd {sessionId}", Theme: "Campbell",
-		WorkspaceRecovery: true,
+		WorkspaceRecovery: true, PreviewPosition: "bottom",
 	})
 
 	v := cp.Values()
@@ -64,6 +64,9 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	}
 	if !v.WorkspaceRecovery {
 		t.Error("workspaceRecovery should be true")
+	}
+	if v.PreviewPosition != "bottom" {
+		t.Errorf("previewPosition = %q, want %q", v.PreviewPosition, "bottom")
 	}
 }
 
@@ -149,6 +152,36 @@ func TestConfigPanel_HandleEnter_WorkspaceRecoveryToggle(t *testing.T) {
 	cp.HandleEnter()
 	if !cp.Values().WorkspaceRecovery {
 		t.Error("second HandleEnter on workspaceRecovery should toggle back to true")
+	}
+}
+
+func TestConfigPanel_HandleEnter_PreviewPositionCycle(t *testing.T) {
+	cp := NewConfigPanel()
+	cp.SetValues(ConfigValues{PreviewPosition: "right"})
+	cp.cursor = cfgPreviewPosition
+
+	// right → bottom
+	cp.HandleEnter()
+	if pos := cp.Values().PreviewPosition; pos != "bottom" {
+		t.Errorf("after cycling from right, pos = %q, want %q", pos, "bottom")
+	}
+
+	// bottom → left
+	cp.HandleEnter()
+	if pos := cp.Values().PreviewPosition; pos != "left" {
+		t.Errorf("after cycling from bottom, pos = %q, want %q", pos, "left")
+	}
+
+	// left → top
+	cp.HandleEnter()
+	if pos := cp.Values().PreviewPosition; pos != "top" {
+		t.Errorf("after cycling from left, pos = %q, want %q", pos, "top")
+	}
+
+	// top → right (wraps around)
+	cp.HandleEnter()
+	if pos := cp.Values().PreviewPosition; pos != "right" {
+		t.Errorf("after cycling from top, pos = %q, want %q", pos, "right")
 	}
 }
 
@@ -305,7 +338,7 @@ func TestConfigPanel_View_ContainsFields(t *testing.T) {
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	view := cp.View()
-	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Custom Command", "Theme", "Crash Recovery"} {
+	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Custom Command", "Theme", "Crash Recovery", "Preview Position"} {
 		if !strings.Contains(view, field) {
 			t.Errorf("View should contain field %q", field)
 		}
@@ -408,6 +441,50 @@ func TestThemeDisplay(t *testing.T) {
 		got := themeDisplay(tt.theme)
 		if !strings.Contains(got, tt.want) {
 			t.Errorf("themeDisplay(%q) = %q, want to contain %q", tt.theme, got, tt.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Preview position helpers
+// ---------------------------------------------------------------------------
+
+func TestCyclePreviewPosition(t *testing.T) {
+	tests := []struct {
+		current string
+		want    string
+	}{
+		{"right", "bottom"},
+		{"bottom", "left"},
+		{"left", "top"},
+		{"top", "right"},
+		{"", "bottom"},        // default/empty cycles to bottom
+		{"invalid", "bottom"}, // invalid cycles to bottom
+	}
+	for _, tt := range tests {
+		got := cyclePreviewPosition(tt.current)
+		if got != tt.want {
+			t.Errorf("cyclePreviewPosition(%q) = %q, want %q", tt.current, got, tt.want)
+		}
+	}
+}
+
+func TestPreviewPositionDisplay(t *testing.T) {
+	tests := []struct {
+		pos  string
+		want string
+	}{
+		{"right", "Right"},
+		{"bottom", "Bottom"},
+		{"left", "Left"},
+		{"top", "Top"},
+		{"", "Right"},        // default shows Right
+		{"invalid", "Right"}, // invalid shows Right
+	}
+	for _, tt := range tests {
+		got := previewPositionDisplay(tt.pos)
+		if !strings.Contains(got, tt.want) {
+			t.Errorf("previewPositionDisplay(%q) = %q, want to contain %q", tt.pos, got, tt.want)
 		}
 	}
 }

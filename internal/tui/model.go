@@ -112,13 +112,16 @@ const (
 // ---------------------------------------------------------------------------
 
 type layout struct {
-	totalWidth    int
-	totalHeight   int
-	headerHeight  int
-	footerHeight  int
-	contentHeight int
-	listWidth     int
-	previewWidth  int
+	totalWidth      int
+	totalHeight     int
+	headerHeight    int
+	footerHeight    int
+	contentHeight   int
+	listWidth       int
+	previewWidth    int
+	listHeight      int // for vertical splits: height allocated to the session list
+	previewHeight   int // for vertical splits: height allocated to the preview panel
+	previewPosition string
 }
 
 // ---------------------------------------------------------------------------
@@ -165,8 +168,9 @@ type Model struct {
 	spinner         spinner.Model
 
 	// UI toggles.
-	showPreview   bool
-	showHidden    bool
+	showPreview     bool
+	previewPosition string // "right", "bottom", "left", "top"
+	showHidden      bool
 	hiddenSet     map[string]struct{} // session ID → struct{} for fast hidden-session lookup
 	favoritedSet  map[string]struct{} // session ID → struct{} for fast favorited-session lookup
 	showFavorited bool
@@ -233,6 +237,7 @@ func NewModel() Model {
 		CustomCommand:     cfg.CustomCommand,
 		Theme:             cfg.Theme,
 		WorkspaceRecovery: cfg.WorkspaceRecovery,
+		PreviewPosition:   cfg.EffectivePreviewPosition(),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -264,8 +269,9 @@ func NewModel() Model {
 		},
 		timeRange:    cfg.DefaultTimeRange,
 		pivot:        cfg.DefaultPivot,
-		showPreview:  cfg.ShowPreview,
-		hiddenSet:    hiddenSet,
+		showPreview:     cfg.ShowPreview,
+		previewPosition: cfg.EffectivePreviewPosition(),
+		hiddenSet:       hiddenSet,
 		favoritedSet: favoritedSet,
 
 		sessionList:     components.NewSessionList(),
@@ -1044,6 +1050,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.PreviewPosition):
+		m.cyclePreviewPosition()
+		m.recalcLayout()
+		m.cfg.PreviewPosition = m.previewPosition
+		if err := config.Save(m.cfg); err != nil {
+			m.statusErr = "config save: " + err.Error()
+		}
+		if m.showPreview {
+			m.detailVersion++
+			return m, m.loadSelectedDetailCmd()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.PreviewScrollUp):
 		if m.showPreview {
 			m.preview.PageUp()
@@ -1277,6 +1296,9 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.CustomCommand = v.CustomCommand
 	m.cfg.Theme = v.Theme
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
+	m.cfg.PreviewPosition = v.PreviewPosition
+	m.previewPosition = v.PreviewPosition
+	m.recalcLayout()
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
@@ -1310,7 +1332,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Determine which pane the mouse is over.
-	overPreview := m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth
+	overPreview := m.isOverPreview(msg.X, msg.Y)
 
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
@@ -1350,8 +1372,13 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return m.handleFooterClick(msg.X)
 		}
 		// Preview pane click — check conversation sort toggle.
-		if m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth {
+		if m.isOverPreview(msg.X, msg.Y) {
 			previewRow := msg.Y - styles.HeaderLines - 1 // -1 for top border
+			if m.layout.previewPosition == config.PreviewPositionTop {
+				previewRow = msg.Y - styles.HeaderLines - 1
+			} else if m.layout.previewPosition == config.PreviewPositionBottom {
+				previewRow = msg.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+			}
 			contentRow := previewRow + m.preview.ScrollOffset()
 			if m.preview.HitConversationSort(contentRow) {
 				newVal := m.preview.ToggleConversationSort()
@@ -1645,27 +1672,64 @@ func (m Model) renderMainView() string {
 		contentH = 1
 	}
 
-	// Compute preview width.
+	pos := m.previewPosition
+	isHorizontal := pos == config.PreviewPositionRight || pos == config.PreviewPositionLeft
+	isVertical := pos == config.PreviewPositionTop || pos == config.PreviewPositionBottom
+
+	// Compute preview dimensions based on position.
 	previewW := 0
-	if m.showPreview && m.width >= styles.PreviewMinWidth {
-		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-	}
-	listW := m.width - previewW
-	if previewW > 0 {
-		listW -= gapWidth
+	previewH := 0
+	listW := m.width
+	listH := contentH
+
+	if m.showPreview {
+		if isHorizontal && m.width >= styles.PreviewMinWidth {
+			previewW = int(float64(m.width) * styles.PreviewWidthRatio)
+			previewH = contentH
+			listW = m.width - previewW - gapWidth
+			listH = contentH
+		} else if isVertical && m.height >= styles.PreviewMinHeight {
+			previewH = int(float64(contentH) * styles.PreviewHeightRatio)
+			previewW = m.width
+			listW = m.width
+			listH = contentH - previewH - 1 // 1-line gap
+		}
 	}
 
-	m.sessionList.SetSize(listW, contentH)
-	m.preview.SetSize(previewW, contentH)
+	m.sessionList.SetSize(listW, listH)
+	m.preview.SetSize(previewW, previewH)
 
 	var content string
-	if previewW > 0 {
+	hasPreview := previewW > 0 && previewH > 0
+
+	if hasPreview {
 		gap := strings.Repeat(" ", gapWidth)
-		content = lipgloss.JoinHorizontal(lipgloss.Top,
-			m.sessionList.View(),
-			gap,
-			m.preview.View(),
-		)
+		switch pos {
+		case config.PreviewPositionLeft:
+			content = lipgloss.JoinHorizontal(lipgloss.Top,
+				m.preview.View(),
+				gap,
+				m.sessionList.View(),
+			)
+		case config.PreviewPositionTop:
+			content = lipgloss.JoinVertical(lipgloss.Left,
+				m.preview.View(),
+				"",
+				m.sessionList.View(),
+			)
+		case config.PreviewPositionBottom:
+			content = lipgloss.JoinVertical(lipgloss.Left,
+				m.sessionList.View(),
+				"",
+				m.preview.View(),
+			)
+		default: // right
+			content = lipgloss.JoinHorizontal(lipgloss.Top,
+				m.sessionList.View(),
+				gap,
+				m.preview.View(),
+			)
+		}
 	} else {
 		content = m.sessionList.View()
 	}
@@ -2464,32 +2528,88 @@ func (m *Model) recalcLayout() {
 	if contentH < 1 {
 		contentH = 1
 	}
+
+	pos := m.previewPosition
 	previewW := 0
-	if m.showPreview && m.width >= styles.PreviewMinWidth {
-		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-	}
-	listW := m.width - previewW
-	if previewW > 0 {
-		listW -= gapWidth
+	previewH := 0
+	listW := m.width
+	listH := contentH
+
+	isHorizontal := pos == config.PreviewPositionRight || pos == config.PreviewPositionLeft
+	isVertical := pos == config.PreviewPositionTop || pos == config.PreviewPositionBottom
+
+	if m.showPreview {
+		if isHorizontal && m.width >= styles.PreviewMinWidth {
+			previewW = int(float64(m.width) * styles.PreviewWidthRatio)
+			previewH = contentH
+			listW = m.width - previewW - gapWidth
+			listH = contentH
+		} else if isVertical && m.height >= styles.PreviewMinHeight {
+			previewH = int(float64(contentH) * styles.PreviewHeightRatio)
+			previewW = m.width
+			listW = m.width
+			listH = contentH - previewH - 1 // 1-line gap
+		}
 	}
 
 	m.layout = layout{
-		totalWidth:    m.width,
-		totalHeight:   m.height,
-		headerHeight:  styles.HeaderLines,
-		footerHeight:  styles.FooterLines,
-		contentHeight: contentH,
-		listWidth:     listW,
-		previewWidth:  previewW,
+		totalWidth:      m.width,
+		totalHeight:     m.height,
+		headerHeight:    styles.HeaderLines,
+		footerHeight:    styles.FooterLines,
+		contentHeight:   contentH,
+		listWidth:       listW,
+		previewWidth:    previewW,
+		listHeight:      listH,
+		previewHeight:   previewH,
+		previewPosition: pos,
 	}
 
-	m.sessionList.SetSize(listW, contentH)
-	m.preview.SetSize(previewW, contentH)
+	m.sessionList.SetSize(listW, listH)
+	m.preview.SetSize(previewW, previewH)
 	m.help.SetSize(m.width, m.height)
 	m.shellPicker.SetSize(m.width, m.height)
 	m.filterPanel.SetSize(m.width, m.height)
 	m.configPanel.SetSize(m.width, m.height)
 	m.attentionPicker.SetSize(m.width, m.height)
+}
+
+// isOverPreview returns true when the mouse coordinates fall within the
+// preview panel area, accounting for the current preview position.
+func (m *Model) isOverPreview(x, y int) bool {
+	if m.layout.previewWidth == 0 || m.layout.previewHeight == 0 {
+		return false
+	}
+	contentY := y - styles.HeaderLines
+	if contentY < 0 {
+		return false
+	}
+	switch m.layout.previewPosition {
+	case config.PreviewPositionLeft:
+		return x < m.layout.previewWidth
+	case config.PreviewPositionTop:
+		return contentY < m.layout.previewHeight
+	case config.PreviewPositionBottom:
+		return contentY >= m.layout.listHeight+1 // +1 for gap line
+	default: // right
+		return x >= m.layout.listWidth+gapWidth
+	}
+}
+
+// cyclePreviewPosition advances the preview position: right → bottom → left → top → right.
+func (m *Model) cyclePreviewPosition() {
+	switch m.previewPosition {
+	case config.PreviewPositionRight:
+		m.previewPosition = config.PreviewPositionBottom
+	case config.PreviewPositionBottom:
+		m.previewPosition = config.PreviewPositionLeft
+	case config.PreviewPositionLeft:
+		m.previewPosition = config.PreviewPositionTop
+	case config.PreviewPositionTop:
+		m.previewPosition = config.PreviewPositionRight
+	default:
+		m.previewPosition = config.PreviewPositionBottom
+	}
 }
 
 // ---------------------------------------------------------------------------
