@@ -167,6 +167,9 @@ type Theme struct {
 	AttentionStaleStyle       lipgloss.Style
 	AttentionIdleStyle        lipgloss.Style
 	AttentionInterruptedStyle lipgloss.Style
+
+	// Plan indicator style.
+	PlanIndicatorStyle lipgloss.Style
 }
 
 // DeriveTheme produces a complete Theme from a raw ColorScheme.
@@ -313,6 +316,9 @@ func (t *Theme) buildStyles() {
 	t.AttentionStaleStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[3])) // Yellow
 	t.AttentionIdleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
 	t.AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[1])).Bold(true) // Red — interrupted/crashed
+
+	// Plan indicator — BrightCyan from the ANSI palette.
+	t.PlanIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14])).Bold(true)
 }
 
 // ---------------------------------------------------------------------------
