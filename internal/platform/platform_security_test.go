@@ -572,16 +572,20 @@ func TestBuildStartCmdLine_DefaultPathQuotesResumeCmd(t *testing.T) {
 		t.Skip("buildStartCmdLine is only used on Windows")
 	}
 	// Git Bash shell hits the default path in buildStartCmdLine.
-	// The resume command must be wrapped in double quotes so cmd.exe
-	// does not interpret shell metacharacters before bash receives them.
+	// The resume command must be wrapped in double quotes after -c,
+	// and for Git Bash specifically, backslashes must be converted to
+	// forward slashes so bash does not consume them as escape chars.
 	shell := ShellInfo{Name: "Git Bash", Path: `C:\Program Files\Git\bin\bash.exe`, Args: []string{"--login"}}
-	resumeCmd := `ghcs --resume sess-123`
+	resumeCmd := `"C:\Users\user\copilot.cmd" "--resume" "sess-123"`
 	got := buildStartCmdLine(shell, resumeCmd)
 
-	// The resume command should be double-quoted (cmdQuote) after -c.
-	expected := ` -c "` + resumeCmd + `"`
+	// Backslashes should be converted to forward slashes for Git Bash,
+	// and double quotes should become single quotes so bash treats paths
+	// literally (protecting spaces in paths like "Program Files").
+	// cmdQuote wraps the result in double quotes for cmd.exe.
+	expected := ` -c "'C:/Users/user/copilot.cmd' '--resume' 'sess-123'"`
 	if !strings.Contains(got, expected) {
-		t.Errorf("buildStartCmdLine default path should cmdQuote resumeCmd;\ngot:  %s\nwant substring: %s", got, expected)
+		t.Errorf("buildStartCmdLine Git Bash should convert to single-quoted forward-slash paths;\ngot:  %s\nwant substring: %s", got, expected)
 	}
 }
 
@@ -618,4 +622,117 @@ func truncateForTestName(s string) string {
 		safe = safe[:40]
 	}
 	return safe
+}
+
+// ---------------------------------------------------------------------------
+// isGitBash detection
+// ---------------------------------------------------------------------------
+
+func TestIsGitBash(t *testing.T) {
+	tests := []struct {
+		name string
+		shell ShellInfo
+		want  bool
+	}{
+		{"Git Bash by path", ShellInfo{Name: "Git Bash", Path: `C:\Program Files\Git\bin\bash.exe`}, true},
+		{"Git Bash by name only", ShellInfo{Name: "Git Bash", Path: `C:\some\bash.exe`}, true},
+		{"Git Bash lowercase", ShellInfo{Name: "something", Path: `c:\program files\git\bin\bash.exe`}, true},
+		{"Git Bash name case insensitive", ShellInfo{Name: "git bash", Path: `C:\some\bash.exe`}, true},
+		{"Git Bash name mixed case", ShellInfo{Name: "GIT BASH", Path: `C:\some\bash.exe`}, true},
+		{"WSL not Git Bash", ShellInfo{Name: "WSL", Path: `C:\Windows\System32\wsl.exe`}, false},
+		{"PowerShell", ShellInfo{Name: "PowerShell 7", Path: `C:\pwsh.exe`}, false},
+		{"cmd", ShellInfo{Name: "Command Prompt", Path: `C:\Windows\System32\cmd.exe`}, false},
+		{"Unix bash", ShellInfo{Name: "bash", Path: "/bin/bash"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isGitBash(tt.shell)
+			if got != tt.want {
+				t.Errorf("isGitBash(%+v) = %v, want %v", tt.shell, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// bashifyCmd path conversion
+// ---------------------------------------------------------------------------
+
+func TestBashifyCmd(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"Windows path with backslashes",
+			`"C:\Users\user\AppData\Roaming\npm\copilot.cmd" "--resume" "sess-123"`,
+			`'C:/Users/user/AppData/Roaming/npm/copilot.cmd' '--resume' 'sess-123'`,
+		},
+		{
+			"No backslashes unchanged",
+			`"ghcs" "--resume" "sess-123"`,
+			`'ghcs' '--resume' 'sess-123'`,
+		},
+		{
+			"Multiple backslash segments",
+			`"C:\Program Files\Git\bin\ghcs.exe" "--resume" "abc"`,
+			`'C:/Program Files/Git/bin/ghcs.exe' '--resume' 'abc'`,
+		},
+		{
+			"Space in path preserved by single quotes",
+			`"C:\Program Files\nodejs\copilot.cmd" "--resume" "abc"`,
+			`'C:/Program Files/nodejs/copilot.cmd' '--resume' 'abc'`,
+		},
+		{
+			"Single quote in path escaped",
+			`"C:\Program Files\Bob's Tools\ghcs.exe" "--resume" "sess-123"`,
+			`'C:/Program Files/Bob'\''s Tools/ghcs.exe' '--resume' 'sess-123'`,
+		},
+		{
+			"Multiple single quotes in path",
+			`"C:\It's\Bob's\file.exe" "--resume" "abc"`,
+			`'C:/It'\''s/Bob'\''s/file.exe' '--resume' 'abc'`,
+		},
+		{
+			"UNC path",
+			`"\\server\share\copilot.cmd" "--resume" "sess-123"`,
+			`'//server/share/copilot.cmd' '--resume' 'sess-123'`,
+		},
+		{
+			"Empty string",
+			"",
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := bashifyCmd(tt.input)
+			if got != tt.want {
+				t.Errorf("bashifyCmd() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// buildStartCmdLine — WSL should NOT convert backslashes
+// ---------------------------------------------------------------------------
+
+func TestBuildStartCmdLine_WSLNoBackslashConversion(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("buildStartCmdLine is only used on Windows")
+	}
+	shell := ShellInfo{Name: "WSL", Path: `C:\Windows\System32\wsl.exe`}
+	resumeCmd := `"C:\Users\user\copilot.cmd" "--resume" "sess-123"`
+	got := buildStartCmdLine(shell, resumeCmd)
+
+	// WSL is not Git Bash, so backslashes should be preserved.
+	if strings.Contains(got, "C:/Users") {
+		t.Errorf("buildStartCmdLine should NOT convert backslashes for WSL;\ngot: %s", got)
+	}
+	// Original backslash path should be present (inside cmdQuote wrapping).
+	if !strings.Contains(got, `C:\Users\user\copilot.cmd`) {
+		t.Errorf("buildStartCmdLine should preserve backslash path for WSL;\ngot: %s", got)
+	}
 }

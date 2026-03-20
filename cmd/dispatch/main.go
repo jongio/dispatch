@@ -136,6 +136,14 @@ func main() {
 		Level: slog.LevelDebug,
 	})))
 
+	// Detect incompatible terminal environments (e.g. MSYS/Git Bash without
+	// a real Windows console handle) and bail out with a helpful message
+	// rather than showing a blank screen.
+	if msg := checkTerminalCompat(); msg != "" {
+		fmt.Fprintln(origStderr, msg)
+		os.Exit(1)
+	}
+
 	p := tea.NewProgram(
 		tui.NewModel(),
 		tea.WithAltScreen(),

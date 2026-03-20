@@ -301,6 +301,34 @@ func cmdEscape(s string) string {
 	return r.Replace(s)
 }
 
+// isGitBash reports whether the given shell is Git Bash (MSYS).
+// Git Bash is an MSYS/MinGW bash that lives under the Git install directory.
+func isGitBash(shell ShellInfo) bool {
+	lower := strings.ToLower(shell.Path)
+	return strings.Contains(lower, "bash") &&
+		(strings.Contains(lower, "git") || strings.EqualFold(shell.Name, "Git Bash"))
+}
+
+// bashifyCmd converts a Windows-style resume command for use with bash -c.
+// It performs three transformations:
+//  1. Backslash → forward slash (MSYS path compatibility).
+//  2. Escape existing single quotes with the '\'' idiom so they survive
+//     inside the POSIX single-quoted tokens produced by step 3.
+//  3. Double quote → single quote. Double quotes can be stripped by
+//     intermediate launchers (cmd.exe, wt.exe) before bash sees them,
+//     causing space-in-path breakage. Single quotes survive intact and
+//     bash treats their contents as literal strings.
+func bashifyCmd(resumeCmd string) string {
+	s := strings.ReplaceAll(resumeCmd, `\`, `/`)
+	// Escape any pre-existing single quotes BEFORE converting double
+	// quotes, so paths like "Bob's Tools" become 'Bob'\''s Tools' —
+	// the POSIX idiom for a literal single quote inside a single-quoted
+	// string (end quote, escaped literal quote, restart quote).
+	s = strings.ReplaceAll(s, `'`, `'\''`)
+	s = strings.ReplaceAll(s, `"`, `'`)
+	return s
+}
+
 // DetectShells returns the list of shells available on the current OS.
 func DetectShells() []ShellInfo {
 	if runtime.GOOS == "windows" {
@@ -538,7 +566,11 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 			case strings.Contains(strings.ToLower(shell.Path), "cmd"):
 				args = append(args, shell.Path, "/k", cmdEscape(resumeCmd))
 			default:
-				args = append(args, shell.Path, "-c", resumeCmd)
+				bashCmd := resumeCmd
+				if isGitBash(shell) {
+					bashCmd = bashifyCmd(resumeCmd)
+				}
+				args = append(args, shell.Path, "-c", bashCmd)
 			}
 			cmd := exec.Command(p, args...)
 			return startAndWaitBriefly(cmd)
@@ -591,8 +623,12 @@ func buildStartCmdLine(shell ShellInfo, resumeCmd string) string {
 		// a single argument to the shell's -c flag. Without quoting,
 		// cmd.exe would interpret metacharacters (&, |, >) in the
 		// resume command before the shell receives them.
+		bashCmd := resumeCmd
+		if isGitBash(shell) {
+			bashCmd = bashifyCmd(resumeCmd)
+		}
 		cmdLine.WriteString(` -c `)
-		cmdLine.WriteString(cmdQuote(resumeCmd))
+		cmdLine.WriteString(cmdQuote(bashCmd))
 	}
 
 	return cmdLine.String()

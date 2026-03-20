@@ -62,7 +62,7 @@ func TestBuildStartCmdLine_Cmd(t *testing.T) {
 
 func TestBuildStartCmdLine_Bash(t *testing.T) {
 	shell := ShellInfo{Name: "Git Bash", Path: `C:\Program Files\Git\bin\bash.exe`, Args: []string{"--login", "-i"}}
-	resumeCmd := `ghcs --resume sess-123`
+	resumeCmd := `"C:\Users\u\ghcs.cmd" "--resume" "sess-123"`
 
 	got := buildStartCmdLine(shell, resumeCmd)
 
@@ -71,6 +71,20 @@ func TestBuildStartCmdLine_Bash(t *testing.T) {
 	}
 	if !containsStr(got, "--login") {
 		t.Error("cmd line should include --login from shell.Args")
+	}
+	// Backslashes should be converted to forward slashes for Git Bash,
+	// and double quotes should become single quotes for bash literal quoting.
+	if containsStr(got, `C:\Users`) {
+		t.Error("cmd line should convert backslashes to forward slashes for Git Bash")
+	}
+	if !containsStr(got, `C:/Users`) {
+		t.Error("cmd line should contain forward-slash paths for Git Bash")
+	}
+	if containsStr(got, `"C:/Users`) {
+		t.Error("cmd line should use single quotes (not double) for bash path quoting")
+	}
+	if !containsStr(got, `'C:/Users`) {
+		t.Error("cmd line should contain single-quoted paths for Git Bash")
 	}
 }
 
