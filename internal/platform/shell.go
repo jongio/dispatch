@@ -537,6 +537,22 @@ func defaultWindowsShell() ShellInfo {
 	return ShellInfo{Name: "Command Prompt", Path: p}
 }
 
+// appendWTPaneDirFlags translates a dispatch pane direction into the correct
+// wt.exe split-pane flags (-H for horizontal/down, -V for vertical/right).
+// Windows Terminal does not support "up" or "left" natively, so those fall
+// back to -H and -V respectively (the closest available direction).
+func appendWTPaneDirFlags(args []string, dir string) []string {
+	switch dir {
+	case "down", "up":
+		return append(args, "-H")
+	case "right", "left":
+		return append(args, "-V")
+	default:
+		// "auto" or empty — let Windows Terminal choose.
+		return args
+	}
+}
+
 func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {
 	// Use Windows Terminal when configured (or defaulted by LaunchSession).
 	if terminal == termWindowsTerminal {
@@ -549,9 +565,7 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 			case LaunchStylePane:
 				// Open a split pane in the current tab.
 				args = append(args, "-w", "0", "split-pane")
-				if paneDirection != "" && paneDirection != "auto" {
-					args = append(args, "--direction", paneDirection)
-				}
+				args = appendWTPaneDirFlags(args, paneDirection)
 			default:
 				// Open a new tab in the most recently used window.
 				// Without -w 0, wt.exe opens a new window by default.
@@ -879,9 +893,7 @@ func buildWSLWTArgs(shell ShellInfo, resumeCmd, winCwd, distro, launchStyle, pan
 		args = append(args, "-w", "new", "new-tab")
 	case LaunchStylePane:
 		args = append(args, "-w", "0", "split-pane")
-		if paneDirection != "" && paneDirection != "auto" {
-			args = append(args, "--direction", paneDirection)
-		}
+		args = appendWTPaneDirFlags(args, paneDirection)
 	default:
 		args = append(args, "-w", "0", "new-tab")
 	}
