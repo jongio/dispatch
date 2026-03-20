@@ -156,6 +156,57 @@ func TestLaunchStyleConstants(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// appendWTPaneDirFlags
+// ---------------------------------------------------------------------------
+
+func TestAppendWTPaneDirFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		dir  string
+		want []string
+	}{
+		{"down", "down", []string{"-H"}},
+		{"up", "up", []string{"-H"}},
+		{"right", "right", []string{"-V"}},
+		{"left", "left", []string{"-V"}},
+		{"auto", "auto", nil},
+		{"empty", "", nil},
+		{"unknown", "diagonal", nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			base := []string{"-w", "0", "split-pane"}
+			got := appendWTPaneDirFlags(base, tc.dir)
+
+			// base should never be modified in place.
+			extra := got[len(base):]
+			if tc.want == nil {
+				if len(extra) != 0 {
+					t.Errorf("dir=%q: got extra args %v, want none", tc.dir, extra)
+				}
+				return
+			}
+			if len(extra) != len(tc.want) {
+				t.Fatalf("dir=%q: got %v extra args, want %v", tc.dir, extra, tc.want)
+			}
+			for i, w := range tc.want {
+				if extra[i] != w {
+					t.Errorf("dir=%q: extra[%d]=%q, want %q", tc.dir, i, extra[i], w)
+				}
+			}
+		})
+	}
+}
+
+func TestAppendWTPaneDirFlags_PreservesExistingArgs(t *testing.T) {
+	base := []string{"existing", "args"}
+	got := appendWTPaneDirFlags(base, "down")
+	if len(got) != 3 || got[0] != "existing" || got[1] != "args" || got[2] != "-H" {
+		t.Errorf("got %v, want [existing args -H]", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // TerminalInfo and ShellInfo
 // ---------------------------------------------------------------------------
 
