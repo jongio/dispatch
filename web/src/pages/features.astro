@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Screenshot from '../components/Screenshot.astro';
+import Carousel from '../components/Carousel.astro';
 ---
 
 <Base title="Features — Dispatch">
@@ -178,10 +179,12 @@ import Screenshot from '../components/Screenshot.astro';
           </ul>
         </div>
         <div class="feature-screenshots">
-          <Screenshot src="one-half-light/preview-right.png" alt="Preview pane positioned to the right of the session list" caption="Preview on the right (default)" />
-          <Screenshot src="one-half-light/preview-bottom.png" alt="Preview pane positioned below the session list" caption="Preview on the bottom" />
-          <Screenshot src="one-half-light/preview-left.png" alt="Preview pane positioned to the left of the session list" caption="Preview on the left" />
-          <Screenshot src="one-half-light/preview-top.png" alt="Preview pane positioned above the session list" caption="Preview on the top" />
+          <Carousel>
+            <Screenshot src="one-half-light/preview-right.png" alt="Preview pane positioned to the right of the session list" caption="Preview on the right (default)" />
+            <Screenshot src="one-half-light/preview-bottom.png" alt="Preview pane positioned below the session list" caption="Preview on the bottom" />
+            <Screenshot src="one-half-light/preview-left.png" alt="Preview pane positioned to the left of the session list" caption="Preview on the left" />
+            <Screenshot src="one-half-light/preview-top.png" alt="Preview pane positioned above the session list" caption="Preview on the top" />
+          </Carousel>
         </div>
       </div>
     </section>
