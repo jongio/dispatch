@@ -195,7 +195,8 @@ type Model struct {
 	attentionFilter map[data.AttentionStatus]struct{} // when non-empty, only show sessions with matching status
 
 	// Plan status tracking — scanned from session-state directories.
-	planMap map[string]bool
+	planMap     map[string]bool
+	filterPlans bool // when true, only show sessions with a plan.md file
 }
 
 // NewModel creates the root Model with default configuration.
@@ -425,6 +426,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = m.filterHiddenSessions(msg.sessions)
 		m.sessions = m.filterFavoritedSessions(m.sessions)
 		m.sessions = m.filterAttentionSessions(m.sessions)
+		m.sessions = m.filterPlanSessions(m.sessions)
 		m.sortByAttention(m.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
@@ -445,6 +447,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.groups = m.filterHiddenGroups(msg.groups)
 		m.groups = m.filterFavoritedGroups(m.groups)
 		m.groups = m.filterAttentionGroups(m.groups)
+		m.groups = m.filterPlanGroups(m.groups)
 		for i := range m.groups {
 			m.sortByAttention(m.groups[i].Sessions)
 		}
@@ -515,11 +518,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case plansScannedMsg:
 		m.planMap = msg.plans
 		m.sessionList.SetPlanStatuses(m.planMap)
+		// When the plan filter is active, reload sessions so the list
+		// reflects any newly discovered (or removed) plan.md files.
+		var cmds []tea.Cmd
+		if m.filterPlans {
+			cmds = append(cmds, m.loadSessionsCmd())
+		}
 		// Update preview plan content if a session is selected.
 		if m.detail != nil && m.planMap[m.detail.Session.ID] {
-			return m, m.loadPlanContentCmd(m.detail.Session.ID)
+			cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
 		}
-		return m, nil
+		return m, tea.Batch(cmds...)
 
 	case planContentMsg:
 		if msg.err != nil || msg.content == "" {
@@ -1156,6 +1165,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FilterFavorites):
 		m.showFavorited = !m.showFavorited
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		cmd := m.loadSessionsCmd()
+		return m, cmd
+
+	case key.Matches(msg, keys.FilterPlans):
+		m.filterPlans = !m.filterPlans
 		cmd := m.loadSessionsCmd()
 		return m, cmd
 
@@ -1874,6 +1888,9 @@ func (m Model) renderFooter() string {
 		}
 		left += "  " + styles.ActiveBadgeStyle.Render("! "+strings.Join(names, ", "))
 	}
+	if m.filterPlans {
+		left += "  " + styles.ActiveBadgeStyle.Render("M plans")
+	}
 	if m.statusErr != "" {
 		left += "  " + styles.ErrorStyle.Render(m.statusErr)
 	} else if m.statusInfo != "" {
@@ -2131,6 +2148,48 @@ func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.Session
 		for _, s := range g.Sessions {
 			status := m.attentionMap[s.ID]
 			if _, ok := m.attentionFilter[status]; ok {
+				sessions = append(sessions, s)
+			}
+		}
+		if len(sessions) > 0 {
+			g.Sessions = sessions
+			g.Count = len(sessions)
+			filtered = append(filtered, g)
+		}
+	}
+	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Plan session filtering
+// ---------------------------------------------------------------------------
+
+// filterPlanSessions removes sessions that don't have a plan.md file when
+// filterPlans is active. When filterPlans is false, all sessions pass through.
+func (m *Model) filterPlanSessions(sessions []data.Session) []data.Session {
+	if !m.filterPlans || len(m.planMap) == 0 {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if m.planMap[s.ID] {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// filterPlanGroups removes sessions without a plan.md file from grouped
+// results when filterPlans is active. Empty groups are dropped.
+func (m *Model) filterPlanGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.filterPlans || len(m.planMap) == 0 {
+		return groups
+	}
+	filtered := make([]data.SessionGroup, 0, len(groups))
+	for _, g := range groups {
+		var sessions []data.Session
+		for _, s := range g.Sessions {
+			if m.planMap[s.ID] {
 				sessions = append(sessions, s)
 			}
 		}
