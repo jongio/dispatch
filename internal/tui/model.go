@@ -108,23 +108,6 @@ const (
 )
 
 // ---------------------------------------------------------------------------
-// Layout — computed once per resize, consumed by all rendering functions.
-// ---------------------------------------------------------------------------
-
-type layout struct {
-	totalWidth      int
-	totalHeight     int
-	headerHeight    int
-	footerHeight    int
-	contentHeight   int
-	listWidth       int
-	previewWidth    int
-	listHeight      int // for vertical splits: height allocated to the session list
-	previewHeight   int // for vertical splits: height allocated to the preview panel
-	previewPosition string
-}
-
-// ---------------------------------------------------------------------------
 // Root model
 // ---------------------------------------------------------------------------
 
@@ -1664,47 +1647,16 @@ func (m Model) renderMainView() string {
 	sep := m.renderSeparator()
 	footer := m.renderFooter()
 
-	// Recompute content height based on actual rendered heights.
-	headerH := lipgloss.Height(header) + lipgloss.Height(badges) + lipgloss.Height(sep)
-	footerH := lipgloss.Height(footer)
-	contentH := m.height - headerH - footerH
-	if contentH < 1 {
-		contentH = 1
-	}
-
-	pos := m.previewPosition
-	isHorizontal := pos == config.PreviewPositionRight || pos == config.PreviewPositionLeft
-	isVertical := pos == config.PreviewPositionTop || pos == config.PreviewPositionBottom
-
-	// Compute preview dimensions based on position.
-	previewW := 0
-	previewH := 0
-	listW := m.width
-	listH := contentH
-
-	if m.showPreview {
-		if isHorizontal && m.width >= styles.PreviewMinWidth {
-			previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-			previewH = contentH
-			listW = m.width - previewW - gapWidth
-			listH = contentH
-		} else if isVertical && m.height >= styles.PreviewMinHeight {
-			previewH = int(float64(contentH) * styles.PreviewHeightRatio)
-			previewW = m.width
-			listW = m.width
-			listH = contentH - previewH - 1 // 1-line gap
-		}
-	}
-
-	m.sessionList.SetSize(listW, listH)
-	m.preview.SetSize(previewW, previewH)
+	// Use pre-computed layout dimensions from recalcLayout() so that
+	// rendering and hit-testing always agree on panel positions/sizes.
+	l := m.layout
 
 	var content string
-	hasPreview := previewW > 0 && previewH > 0
+	hasPreview := l.previewWidth > 0 && l.previewHeight > 0
 
 	if hasPreview {
 		gap := strings.Repeat(" ", gapWidth)
-		switch pos {
+		switch l.previewPosition {
 		case config.PreviewPositionLeft:
 			content = lipgloss.JoinHorizontal(lipgloss.Top,
 				m.preview.View(),
@@ -2517,99 +2469,6 @@ func (m Model) selectedSessionCwd() string {
 		return sess.Cwd
 	}
 	return ""
-}
-
-// ---------------------------------------------------------------------------
-// Layout
-// ---------------------------------------------------------------------------
-
-func (m *Model) recalcLayout() {
-	contentH := m.height - styles.HeaderLines - styles.FooterLines
-	if contentH < 1 {
-		contentH = 1
-	}
-
-	pos := m.previewPosition
-	previewW := 0
-	previewH := 0
-	listW := m.width
-	listH := contentH
-
-	isHorizontal := pos == config.PreviewPositionRight || pos == config.PreviewPositionLeft
-	isVertical := pos == config.PreviewPositionTop || pos == config.PreviewPositionBottom
-
-	if m.showPreview {
-		if isHorizontal && m.width >= styles.PreviewMinWidth {
-			previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-			previewH = contentH
-			listW = m.width - previewW - gapWidth
-			listH = contentH
-		} else if isVertical && m.height >= styles.PreviewMinHeight {
-			previewH = int(float64(contentH) * styles.PreviewHeightRatio)
-			previewW = m.width
-			listW = m.width
-			listH = contentH - previewH - 1 // 1-line gap
-		}
-	}
-
-	m.layout = layout{
-		totalWidth:      m.width,
-		totalHeight:     m.height,
-		headerHeight:    styles.HeaderLines,
-		footerHeight:    styles.FooterLines,
-		contentHeight:   contentH,
-		listWidth:       listW,
-		previewWidth:    previewW,
-		listHeight:      listH,
-		previewHeight:   previewH,
-		previewPosition: pos,
-	}
-
-	m.sessionList.SetSize(listW, listH)
-	m.preview.SetSize(previewW, previewH)
-	m.help.SetSize(m.width, m.height)
-	m.shellPicker.SetSize(m.width, m.height)
-	m.filterPanel.SetSize(m.width, m.height)
-	m.configPanel.SetSize(m.width, m.height)
-	m.attentionPicker.SetSize(m.width, m.height)
-}
-
-// isOverPreview returns true when the mouse coordinates fall within the
-// preview panel area, accounting for the current preview position.
-func (m *Model) isOverPreview(x, y int) bool {
-	if m.layout.previewWidth == 0 || m.layout.previewHeight == 0 {
-		return false
-	}
-	contentY := y - styles.HeaderLines
-	if contentY < 0 {
-		return false
-	}
-	switch m.layout.previewPosition {
-	case config.PreviewPositionLeft:
-		return x < m.layout.previewWidth
-	case config.PreviewPositionTop:
-		return contentY < m.layout.previewHeight
-	case config.PreviewPositionBottom:
-		return contentY >= m.layout.listHeight+1 // +1 for gap line
-	default: // right
-		return x >= m.layout.listWidth+gapWidth
-	}
-}
-
-// cyclePreviewPosition advances the preview position: right → bottom → left → top → right.
-func (m *Model) cyclePreviewPosition() {
-	switch m.previewPosition {
-	case config.PreviewPositionRight:
-		m.previewPosition = config.PreviewPositionBottom
-	case config.PreviewPositionBottom:
-		m.previewPosition = config.PreviewPositionLeft
-	case config.PreviewPositionLeft:
-		m.previewPosition = config.PreviewPositionTop
-	case config.PreviewPositionTop:
-		m.previewPosition = config.PreviewPositionRight
-	default:
-		m.previewPosition = config.PreviewPositionBottom
-	}
 }
 
 // ---------------------------------------------------------------------------
