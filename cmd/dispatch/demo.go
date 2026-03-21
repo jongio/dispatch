@@ -79,6 +79,12 @@ func setupDemo() (cleanup func(), err error) {
 		return nil, err
 	}
 
+	// Write plan.md files for a few sessions so the plan indicator dot
+	// is visible in demo mode and screenshots.
+	if err := createDemoPlanFiles(stateDir); err != nil {
+		return nil, err
+	}
+
 	_ = os.Setenv("DISPATCH_DB", tmpDB)
 	_ = os.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
@@ -217,5 +223,38 @@ func createDemoSessionState(stateDir string) error {
 		}
 	}
 
+	return nil
+}
+
+// demoPlanSessions lists session IDs that get a plan.md file in demo mode.
+// Chosen to overlap with interesting attention states (one waiting, one active,
+// one stale) so the dot indicator is clearly visible.
+var demoPlanSessions = []string{
+	"fa800b7b-3a24-4e3b-9f2d-a414198b27ab", // Waiting (purple)
+	"ses-026",                              // Active (green)
+	"ses-003",                              // Stale (yellow)
+}
+
+// createDemoPlanFiles writes minimal plan.md files into session-state
+// directories so the plan indicator dot appears in demo mode.
+func createDemoPlanFiles(stateDir string) error {
+	planContent := `# Implementation Plan
+
+## Tasks
+- [ ] Design API endpoints
+- [ ] Implement database schema
+- [x] Set up project structure
+`
+
+	for _, id := range demoPlanSessions {
+		sessDir := filepath.Join(stateDir, id)
+		if err := os.MkdirAll(sessDir, 0o700); err != nil {
+			return err
+		}
+		planPath := filepath.Join(sessDir, "plan.md")
+		if err := os.WriteFile(planPath, []byte(planContent), 0o600); err != nil {
+			return err
+		}
+	}
 	return nil
 }

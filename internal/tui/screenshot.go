@@ -53,6 +53,7 @@ type captureCtx struct {
 	configVals    components.ConfigValues
 	themeNames    []string
 	attentionMap  map[string]data.AttentionStatus
+	planMap       map[string]bool
 }
 
 // captureFeatures captures the full set of feature screenshots using the
@@ -83,9 +84,11 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.store = c.store
 		m.pivot = pivotFolder
 		m.groups = c.folderGroups
+		m.planMap = c.planMap
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.sessionList.SetAttentionStatuses(c.attentionMap)
+		m.sessionList.SetPlanStatuses(c.planMap)
 		m.timeRange = "7d"
 		m.recalcLayout()
 		return m
@@ -348,6 +351,52 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		add("attention-filtered-interrupted", m)
 	}
 
+	// ── Plan indicator ───────────────────────────────────────────────
+	{
+		m := newBase()
+		m.showPreview = false
+		m.recalcLayout()
+		add("plan-indicator", m)
+	}
+
+	// ── Plan preview ─────────────────────────────────────────────────
+	{
+		m := newBase()
+		m.showPreview = true
+		m.detail = c.detail
+		m.preview.SetDetail(c.detail)
+		m.preview.SetPlanContent("# Implementation Plan\n\n## Tasks\n- [ ] Design API endpoints\n- [ ] Implement database schema\n- [x] Set up project structure\n")
+		m.preview.TogglePlanView()
+		m.recalcLayout()
+		add("plan-preview", m)
+	}
+
+	// ── Plan filter ──────────────────────────────────────────────────
+	{
+		m := newBase()
+		m.filterPlans = true
+		m.showPreview = false
+		// Rebuild the session list with the plan filter applied.
+		var filtered []data.SessionGroup
+		for _, g := range c.folderGroups {
+			var sessions []data.Session
+			for _, s := range g.Sessions {
+				if c.planMap[s.ID] {
+					sessions = append(sessions, s)
+				}
+			}
+			if len(sessions) > 0 {
+				g.Sessions = sessions
+				g.Count = len(sessions)
+				filtered = append(filtered, g)
+			}
+		}
+		m.groups = filtered
+		m.sessionList.SetGroups(filtered)
+		m.recalcLayout()
+		add("plan-filter", m)
+	}
+
 	// ── Tree collapsed / expanded ─────────────────────────────────────
 	{
 		m := newBase()
@@ -517,6 +566,14 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		"ses-027":                              data.AttentionIdle,        // Auth middleware (250 min ago)
 	}
 
+	// Build a fake plan map so screenshots show plan indicator dots on a
+	// few sessions (matching the demo plan sessions).
+	planMap := map[string]bool{
+		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": true, // Waiting — plan dot visible
+		"ses-026": true,                              // Active — plan dot visible
+		"ses-003": true,                              // Stale — plan dot visible
+	}
+
 	ctx := &captureCtx{
 		width: width, height: height,
 		store:        store,
@@ -530,6 +587,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		flatFilter:   flatFilter,
 		flatSort:     flatSort,
 		attentionMap: attentionMap,
+		planMap:      planMap,
 		configVals: components.ConfigValues{
 			YoloMode:          false,
 			Agent:             "copilot",
