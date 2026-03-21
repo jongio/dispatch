@@ -154,13 +154,13 @@ type Model struct {
 	showPreview     bool
 	previewPosition string // "right", "bottom", "left", "top"
 	showHidden      bool
-	hiddenSet     map[string]struct{} // session ID → struct{} for fast hidden-session lookup
-	favoritedSet  map[string]struct{} // session ID → struct{} for fast favorited-session lookup
-	showFavorited bool
-	reindexing    bool
-	reindexLog    []string                  // log lines streamed from chronicle reindex
-	reindexVP     viewport.Model            // scrollable viewport for reindex overlay
-	reindexCancel *components.ReindexHandle // cancel handle for running reindex
+	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
+	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	showFavorited   bool
+	reindexing      bool
+	reindexLog      []string                  // log lines streamed from chronicle reindex
+	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
+	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
 
 	// Click debounce: delays single-click action so double-click can be
 	// detected without the first click firing prematurely.
@@ -250,12 +250,12 @@ func NewModel() Model {
 			Field: sortFieldFromConfig(cfg.DefaultSort),
 			Order: data.Descending,
 		},
-		timeRange:    cfg.DefaultTimeRange,
-		pivot:        cfg.DefaultPivot,
+		timeRange:       cfg.DefaultTimeRange,
+		pivot:           cfg.DefaultPivot,
 		showPreview:     cfg.ShowPreview,
 		previewPosition: cfg.EffectivePreviewPosition(),
 		hiddenSet:       hiddenSet,
-		favoritedSet: favoritedSet,
+		favoritedSet:    favoritedSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
@@ -1356,11 +1356,14 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		// Preview pane click — check conversation sort toggle.
 		if m.isOverPreview(msg.X, msg.Y) {
-			previewRow := msg.Y - styles.HeaderLines - 1 // -1 for top border
-			if m.layout.previewPosition == config.PreviewPositionTop {
-				previewRow = msg.Y - styles.HeaderLines - 1
-			} else if m.layout.previewPosition == config.PreviewPositionBottom {
+			var previewRow int
+			switch m.layout.previewPosition {
+			case config.PreviewPositionTop:
+				previewRow = msg.Y - styles.HeaderLines - 1 // -1 for top border
+			case config.PreviewPositionBottom:
 				previewRow = msg.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+			default:
+				previewRow = msg.Y - styles.HeaderLines - 1
 			}
 			contentRow := previewRow + m.preview.ScrollOffset()
 			if m.preview.HitConversationSort(contentRow) {
