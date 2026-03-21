@@ -454,8 +454,11 @@ func TestBuildWSLWTArgs_LaunchStyles(t *testing.T) {
 		{"explicit_tab", LaunchStyleTab, "", []string{"-w", "0", "new-tab"}},
 		{"window", LaunchStyleWindow, "", []string{"-w", "new", "new-tab"}},
 		{"pane_auto", LaunchStylePane, "auto", []string{"-w", "0", "split-pane"}},
-		{"pane_right", LaunchStylePane, "right", []string{"-w", "0", "split-pane", "--direction", "right"}},
-		{"pane_down", LaunchStylePane, "down", []string{"-w", "0", "split-pane", "--direction", "down"}},
+		{"pane_right", LaunchStylePane, "right", []string{"-w", "0", "split-pane", "-V"}},
+		{"pane_down", LaunchStylePane, "down", []string{"-w", "0", "split-pane", "-H"}},
+		{"pane_left", LaunchStylePane, "left", []string{"-w", "0", "split-pane", "-V"}},
+		{"pane_up", LaunchStylePane, "up", []string{"-w", "0", "split-pane", "-H"}},
+		{"pane_empty_dir", LaunchStylePane, "", []string{"-w", "0", "split-pane"}},
 	}
 
 	for _, tc := range tests {

@@ -37,7 +37,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'agent', type: 'string', default: '""', description: 'Pass --agent <name> to Copilot CLI.' },
         { key: 'model', type: 'string', default: '""', description: 'Pass --model <name> to Copilot CLI.' },
         { key: 'launch_mode', type: 'string', default: '"tab"', description: 'How to open sessions: in-place, tab, window, pane.' },
-        { key: 'pane_direction', type: 'string', default: '"auto"', description: 'Split direction for pane mode: auto, right, down, left, up.' },
+        { key: 'pane_direction', type: 'string', default: '"auto"', description: 'Split direction for pane mode: auto, right, down, left, up (see Pane Direction Semantics below).' },
         { key: 'custom_command', type: 'string', default: '""', description: 'Custom launch command. {sessionId} is replaced with the session ID.' },
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
         { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
@@ -111,6 +111,29 @@ import ConfigTable from '../components/ConfigTable.astro';
       <p>Set <code>custom_command</code> to replace the default Copilot CLI launch command entirely. Use <code>{'{sessionId}'}</code> as a placeholder for the session ID.</p>
       <p>When a custom command is set, the Agent, Model, and Yolo Mode fields are ignored (dimmed in the settings panel).</p>
       <pre><code>"custom_command": "my-tool resume {'{sessionId}'}"</code></pre>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Pane Direction Semantics</h2>
+      <p>
+        When <code>launch_mode</code> is <code>"pane"</code>, the
+        <code>pane_direction</code> value maps to Windows Terminal's
+        <code>-H</code> / <code>-V</code> split-pane flags:
+      </p>
+      <ul>
+        <li><code>down</code> → <code>-H</code> — horizontal split (divider runs horizontally, new pane below)</li>
+        <li><code>up</code> → <code>-H</code> — horizontal split (WT controls actual placement; closest available)</li>
+        <li><code>right</code> → <code>-V</code> — vertical split (divider runs vertically, new pane to the right)</li>
+        <li><code>left</code> → <code>-V</code> — vertical split (WT controls actual placement; closest available)</li>
+        <li><code>auto</code> / empty — no flag; Windows Terminal decides automatically</li>
+      </ul>
+      <p>
+        <strong>Note:</strong> <code>-H</code> and <code>-V</code> control
+        split <em>orientation</em> only (the direction the divider runs).
+        Windows Terminal decides actual pane placement based on available space.
+      </p>
     </div>
   </section>
 </Base>

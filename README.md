@@ -253,7 +253,7 @@ Configuration is stored in the platform-specific config directory:
 | `agent` | string | `""` | Pass `--agent <name>` to Copilot CLI |
 | `model` | string | `""` | Pass `--model <name>` to Copilot CLI |
 | `launch_mode` | string | `"tab"` | How to open sessions: `in-place`, `tab`, `window`, `pane` |
-| `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` |
+| `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` (see note below) |
 | `custom_command` | string | `""` | Custom launch command (`{sessionId}` is replaced) |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
@@ -261,6 +261,20 @@ Configuration is stored in the platform-specific config directory:
 | `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
 | `hiddenSessions` | array | `[]` | Session IDs hidden from the main list |
 | `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
+
+#### Pane Direction Semantics
+
+When `launch_mode` is `"pane"`, the `pane_direction` value maps to Windows Terminal's `-H` / `-V` split-pane flags:
+
+| Direction | WT Flag | Meaning |
+|-----------|---------|---------|
+| `down` | `-H` | Horizontal split — divider runs horizontally, new pane below |
+| `up` | `-H` | Horizontal split — WT controls actual placement (closest available) |
+| `right` | `-V` | Vertical split — divider runs vertically, new pane to the right |
+| `left` | `-V` | Vertical split — WT controls actual placement (closest available) |
+| `auto` | *(none)* | Windows Terminal decides automatically |
+
+> **Note:** `-H` and `-V` control split *orientation* only (the direction the divider runs). Windows Terminal decides actual pane placement based on available space.
 
 ### Example config.json
 
