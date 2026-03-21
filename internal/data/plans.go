@@ -6,19 +6,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/jongio/dispatch/internal/validate"
 )
 
 // maxPlanFileSize caps the number of bytes read from a plan.md file to
 // prevent memory exhaustion from adversarially large files.
 const maxPlanFileSize = 64 * 1024 // 64 KB
-
-// sessionIDPattern matches safe session ID values (UUIDs, hex strings, and
-// similar tokens). Replicates the pattern from platform/shell.go to avoid
-// an import cycle.
-var sessionIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
 // ScanPlans checks which of the given session IDs have a plan.md file in
 // their session-state directory. Returns a map of session ID → true for
@@ -32,7 +28,7 @@ func ScanPlans(sessionIDs []string) map[string]bool {
 
 	result := make(map[string]bool, len(sessionIDs)/4) // expect ~25% to have plans
 	for _, id := range sessionIDs {
-		if !sessionIDPattern.MatchString(id) {
+		if !validate.SessionID(id) {
 			continue
 		}
 		planPath := filepath.Join(stateDir, id, "plan.md")
@@ -70,7 +66,7 @@ func ScanAllPlans() map[string]bool {
 			continue
 		}
 		id := e.Name()
-		if !sessionIDPattern.MatchString(id) {
+		if !validate.SessionID(id) {
 			continue
 		}
 		planPath := filepath.Join(stateDir, id, "plan.md")
@@ -123,7 +119,7 @@ func ReadPlanContent(sessionID string) (string, error) {
 // given session ID. Returns an error if the session ID is invalid or
 // the session-state directory cannot be resolved.
 func PlanFilePath(sessionID string) (string, error) {
-	if !sessionIDPattern.MatchString(sessionID) {
+	if !validate.SessionID(sessionID) {
 		return "", &os.PathError{Op: "open", Path: sessionID, Err: os.ErrInvalid}
 	}
 

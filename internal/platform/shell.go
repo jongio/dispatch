@@ -9,10 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/jongio/dispatch/internal/validate"
 )
 
 // ShellInfo describes a shell that can be used to launch Copilot CLI sessions.
@@ -67,11 +68,6 @@ func FindCLIBinary() string {
 	return ""
 }
 
-// sessionIDPattern matches safe session ID values (UUIDs, hex strings, and
-// short alphanum identifiers used by Copilot CLI). Anything outside this
-// pattern is rejected before it reaches os/exec.
-var sessionIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
-
 // resolvedCwd returns dir if it exists as a directory on disk, otherwise "".
 // This ensures we never try to launch into a stale or invalid path.
 func resolvedCwd(dir string) string {
@@ -87,7 +83,7 @@ func resolvedCwd(dir string) string {
 // validateSessionID returns an error if the session ID contains characters
 // that could be interpreted as shell metacharacters or path components.
 func validateSessionID(id string) error {
-	if !sessionIDPattern.MatchString(id) {
+	if !validate.SessionID(id) {
 		return errors.New("invalid session ID: contains disallowed characters")
 	}
 	return nil
