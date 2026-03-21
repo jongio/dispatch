@@ -27,6 +27,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
 - **Multi-session open** (`Space` / `O` / `a` / `d`) — select multiple sessions with Space, open all at once with O, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
+- **Plan indicator** (`v` / `M`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane, `M` to filter and show only sessions with plans
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*` / `F`) — star sessions as favorites, filter to show only favorites, persistent state
 - **Settings panel** (`,`) — 10 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery
@@ -163,6 +164,7 @@ dispatch
 | `H` | Toggle visibility of hidden sessions |
 | `*` | Toggle favorite on current session |
 | `F` | Filter to show only favorites |
+| `M` | Filter to show only sessions with plans |
 
 #### Search & Filter
 
@@ -181,6 +183,7 @@ dispatch
 | `Tab` | Cycle grouping mode |
 | `p` | Toggle preview panel |
 | `P` | Cycle preview position (right → bottom → left → top) |
+| `v` | View plan in preview pane |
 | `PgUp` / `PgDn` | Scroll preview |
 | `r` | Refresh session store |
 | `,` | Open settings panel |

@@ -289,6 +289,32 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- Plan Indicator -->
+    <section class="section" id="plan-indicator">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Plan Indicator</h2>
+          <p>
+            Sessions that contain a <code>plan.md</code> file display a small dot
+            indicator in the session list. The plan file lives at
+            <code>~/.copilot/session-state/{'{'}session-id{'}'}/plan.md</code> and is
+            scanned automatically when sessions load.
+          </p>
+          <ul>
+            <li>Dot indicator on sessions with a plan file</li>
+            <li><kbd>v</kbd> to view the rendered plan in the preview pane</li>
+            <li><kbd>M</kbd> to filter and show only sessions that have plans</li>
+            <li>Footer badge shows <strong>M plans</strong> when the filter is active</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/plan-indicator.png" alt="Session list showing plan indicator dots on sessions with plan.md files" caption="Plan indicator dots in session list" />
+          <Screenshot src="one-half-light/plan-preview.png" alt="Preview pane showing rendered plan.md content" caption="Plan preview pane" />
+          <Screenshot src="one-half-light/plan-filter.png" alt="Session list filtered to show only sessions with plans" caption="Plan filter active — only sessions with plans shown" />
+        </div>
+      </div>
+    </section>
+
     <!-- Session Hiding -->
     <section class="section" id="hiding">
       <div class="feature-section reverse">

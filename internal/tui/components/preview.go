@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/tui/markdown"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
@@ -16,9 +17,11 @@ type PreviewPanel struct {
 	width           int
 	height          int
 	scroll          int
-	totalLines      int  // cached line count for scroll clamping
-	newestFirst     bool // conversation turn display order
-	convHeaderLine  int  // content line where "Conversation" label is rendered (-1 = none)
+	totalLines      int    // cached line count for scroll clamping
+	newestFirst     bool   // conversation turn display order
+	convHeaderLine  int    // content line where "Conversation" label is rendered (-1 = none)
+	planContent     string // plan.md content (empty when no plan)
+	planViewMode    bool   // when true, render plan instead of session detail
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -53,6 +56,44 @@ func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 func (p *PreviewPanel) SetAttentionStatus(status data.AttentionStatus) {
 	p.attentionStatus = status
 	p.updateTotalLines()
+}
+
+// SetPlanContent stores the plan.md content for the current session.
+// Pass an empty string to clear the plan content.
+func (p *PreviewPanel) SetPlanContent(content string) {
+	p.planContent = content
+	p.updateTotalLines()
+}
+
+// TogglePlanView switches between plan view and normal session detail view.
+// Returns the new plan view mode state. Does nothing if no plan content is set.
+func (p *PreviewPanel) TogglePlanView() bool {
+	if p.planContent == "" {
+		return false
+	}
+	p.planViewMode = !p.planViewMode
+	p.scroll = 0
+	p.updateTotalLines()
+	return p.planViewMode
+}
+
+// PlanViewMode returns true when the preview is showing plan content.
+func (p *PreviewPanel) PlanViewMode() bool {
+	return p.planViewMode
+}
+
+// HasPlanContent returns true when plan.md content is available.
+func (p *PreviewPanel) HasPlanContent() bool {
+	return p.planContent != ""
+}
+
+// ExitPlanView switches back to normal session detail view.
+func (p *PreviewPanel) ExitPlanView() {
+	if p.planViewMode {
+		p.planViewMode = false
+		p.scroll = 0
+		p.updateTotalLines()
+	}
 }
 
 // SetSize updates the panel dimensions.
@@ -104,7 +145,18 @@ func (p *PreviewPanel) HitConversationSort(contentRow int) bool {
 
 // updateTotalLines recomputes the cached total line count for scroll clamping.
 func (p *PreviewPanel) updateTotalLines() {
-	if p.width <= 0 || p.height <= 0 || p.detail == nil {
+	if p.width <= 0 || p.height <= 0 {
+		p.totalLines = 0
+		p.convHeaderLine = -1
+		return
+	}
+	if p.planViewMode && p.planContent != "" {
+		content := p.renderPlanContent()
+		p.totalLines = strings.Count(content, "\n") + 1
+		p.convHeaderLine = -1
+		return
+	}
+	if p.detail == nil {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		return
@@ -120,7 +172,12 @@ func (p PreviewPanel) View() string {
 		return ""
 	}
 
-	content, _ := p.renderContent()
+	var content string
+	if p.planViewMode && p.planContent != "" {
+		content = p.renderPlanContent()
+	} else {
+		content, _ = p.renderContent()
+	}
 
 	// innerW = content+padding width passed to lipgloss Width() (excludes border).
 	// lipgloss Width() includes padding; text wraps at innerW - hPadding(2) = p.width-4.
@@ -324,6 +381,24 @@ func (p PreviewPanel) renderContent() (string, int) {
 	}
 
 	return b.String(), convLine
+}
+
+// renderPlanContent renders the plan.md content as styled markdown using
+// Glamour, with a cyan "Plan" header and a hint to return.
+func (p PreviewPanel) renderPlanContent() string {
+	contentW := max(1, p.width-4) // text area = total - border(2) - padding(2)
+
+	var b strings.Builder
+
+	// ── Title ──
+	b.WriteString(styles.PlanIndicatorStyle.Render(styles.IconPlan()+" Plan") + "\n")
+	b.WriteString(styles.DimmedStyle.Render("Press v or Esc to return") + "\n\n")
+
+	// ── Plan body — rendered as markdown ──
+	lines := markdown.RenderStatic(p.planContent, contentW)
+	b.WriteString(strings.Join(lines, "\n"))
+
+	return b.String()
 }
 
 // uniqueFilePaths returns deduplicated file paths preserving order.

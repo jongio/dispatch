@@ -65,6 +65,7 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'Tab', action: 'Cycle grouping mode' },
               { keys: 'p', action: 'Toggle preview panel' },
               { keys: 'P', action: 'Cycle preview position (right → bottom → left → top)' },
+              { keys: 'v', action: 'View plan in preview pane' },
               { keys: 'PgUp', action: 'Scroll preview up' },
               { keys: 'PgDn', action: 'Scroll preview down' },
               { keys: 'r', action: 'Reindex sessions' },
@@ -93,8 +94,9 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'H', action: 'Toggle visibility of hidden sessions' },
               { keys: '*', action: 'Toggle favorite on current session' },
               { keys: 'F', action: 'Filter to show only favorites' },
+              { keys: 'M', action: 'Filter to show only sessions with plans' },
             ]} />
-            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses. Press <kbd>R</kbd> to batch-resume all interrupted sessions.</p>
+            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses. Press <kbd>R</kbd> to batch-resume all interrupted sessions. Press <kbd>M</kbd> to toggle the plan filter, showing only sessions with a <code>plan.md</code> file.</p>
           </div>
 
           <div id="general-keys" class="shortcut-group">

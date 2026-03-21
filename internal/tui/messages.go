@@ -111,3 +111,19 @@ type attentionScannedMsg struct {
 
 // attentionTickMsg fires periodically to trigger the next attention scan.
 type attentionTickMsg struct{}
+
+// ---------------------------------------------------------------------------
+// Plan scan messages
+// ---------------------------------------------------------------------------
+
+// plansScannedMsg delivers plan.md existence data from the data layer.
+type plansScannedMsg struct {
+	plans map[string]bool
+}
+
+// planContentMsg delivers the contents of a plan.md file for preview.
+type planContentMsg struct {
+	sessionID string
+	content   string
+	err       error
+}

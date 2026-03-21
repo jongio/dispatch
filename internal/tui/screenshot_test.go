@@ -208,6 +208,9 @@ func TestCaptureScreenshots_WithData(t *testing.T) {
 		"favorites",
 		"loading-state",
 		"empty-state",
+		"plan-indicator",
+		"plan-preview",
+		"plan-filter",
 	}
 	for _, name := range expected {
 		if !seen[name] {

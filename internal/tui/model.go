@@ -193,6 +193,10 @@ type Model struct {
 	// Attention status tracking — scanned from session-state directories.
 	attentionMap    map[string]data.AttentionStatus
 	attentionFilter map[data.AttentionStatus]struct{} // when non-empty, only show sessions with matching status
+
+	// Plan status tracking — scanned from session-state directories.
+	planMap     map[string]bool
+	filterPlans bool // when true, only show sessions with a plan.md file
 }
 
 // NewModel creates the root Model with default configuration.
@@ -422,11 +426,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = m.filterHiddenSessions(msg.sessions)
 		m.sessions = m.filterFavoritedSessions(m.sessions)
 		m.sessions = m.filterAttentionSessions(m.sessions)
+		m.sessions = m.filterPlanSessions(m.sessions)
 		m.sortByAttention(m.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		m.sessionList.SetPlanStatuses(m.planMap)
 		m.sessionList.SetSessions(m.sessions)
 		// Only transition from loading to session-list; never clobber an
 		// active modal/overlay state with an async data load.
@@ -435,12 +441,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
 
 	case groupsLoadedMsg:
 		m.groups = m.filterHiddenGroups(msg.groups)
 		m.groups = m.filterFavoritedGroups(m.groups)
 		m.groups = m.filterAttentionGroups(m.groups)
+		m.groups = m.filterPlanGroups(m.groups)
 		for i := range m.groups {
 			m.sortByAttention(m.groups[i].Sessions)
 		}
@@ -448,6 +455,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetAttentionStatuses(m.attentionMap)
+		m.sessionList.SetPlanStatuses(m.planMap)
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
 		if m.state == stateLoading {
@@ -455,7 +463,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
 
 	case sessionDetailMsg:
 		if msg.version != m.detailVersion {
@@ -464,6 +472,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail = msg.detail
 		m.preview.SetDetail(m.detail)
 		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
+		// Exit plan view and load plan content for the newly selected session.
+		m.preview.ExitPlanView()
+		if m.planMap[m.detail.Session.ID] {
+			return m, m.loadPlanContentCmd(m.detail.Session.ID)
+		}
+		m.preview.SetPlanContent("")
 		return m, nil
 
 	case dataErrorMsg:
@@ -491,7 +505,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// is active, also reload sessions so the list reflects updated
 		// statuses. The reload no longer fires another scan (that was an
 		// infinite loop), so the tick is the sole driver of periodic scans.
-		cmds := []tea.Cmd{m.scheduleAttentionTick()}
+		cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd()}
 		if len(m.attentionFilter) > 0 {
 			cmds = append(cmds, m.loadSessionsCmd())
 		}
@@ -499,6 +513,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case attentionTickMsg:
 		return m, m.scanAttentionCmd()
+
+	// ----- Plan scanning --------------------------------------------------
+	case plansScannedMsg:
+		m.planMap = msg.plans
+		m.sessionList.SetPlanStatuses(m.planMap)
+		// When the plan filter is active, reload sessions so the list
+		// reflects any newly discovered (or removed) plan.md files.
+		var cmds []tea.Cmd
+		if m.filterPlans {
+			cmds = append(cmds, m.loadSessionsCmd())
+		}
+		// Update preview plan content if a session is selected.
+		if m.detail != nil && m.planMap[m.detail.Session.ID] {
+			cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
+		}
+		return m, tea.Batch(cmds...)
+
+	case planContentMsg:
+		if msg.err != nil || msg.content == "" {
+			m.preview.SetPlanContent("")
+			return m, nil
+		}
+		// Only apply if the content matches the currently selected session.
+		if m.detail != nil && m.detail.Session.ID == msg.sessionID {
+			m.preview.SetPlanContent(msg.content)
+		}
+		return m, nil
 
 	// ----- Deep search debounce -------------------------------------------
 	case deepSearchTickMsg:
@@ -899,6 +940,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case key.Matches(msg, keys.Escape):
+		// Exit plan view mode first, if active.
+		if m.preview.PlanViewMode() {
+			m.preview.ExitPlanView()
+			return m, nil
+		}
 		// Clear active search query when Escape is pressed in the session list.
 		if m.filter.Query != "" {
 			m.filter.Query = ""
@@ -1068,6 +1114,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.ViewPlan):
+		if m.showPreview && m.detail != nil {
+			if m.preview.HasPlanContent() {
+				m.preview.TogglePlanView()
+			} else {
+				m.statusInfo = "No plan for this session"
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Reindex):
 		if !m.reindexing {
 			m.reindexing = true
@@ -1109,6 +1165,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FilterFavorites):
 		m.showFavorited = !m.showFavorited
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		cmd := m.loadSessionsCmd()
+		return m, cmd
+
+	case key.Matches(msg, keys.FilterPlans):
+		m.filterPlans = !m.filterPlans
 		cmd := m.loadSessionsCmd()
 		return m, cmd
 
@@ -1827,6 +1888,9 @@ func (m Model) renderFooter() string {
 		}
 		left += "  " + styles.ActiveBadgeStyle.Render("! "+strings.Join(names, ", "))
 	}
+	if m.filterPlans {
+		left += "  " + styles.ActiveBadgeStyle.Render("M plans")
+	}
 	if m.statusErr != "" {
 		left += "  " + styles.ErrorStyle.Render(m.statusErr)
 	} else if m.statusInfo != "" {
@@ -2084,6 +2148,48 @@ func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.Session
 		for _, s := range g.Sessions {
 			status := m.attentionMap[s.ID]
 			if _, ok := m.attentionFilter[status]; ok {
+				sessions = append(sessions, s)
+			}
+		}
+		if len(sessions) > 0 {
+			g.Sessions = sessions
+			g.Count = len(sessions)
+			filtered = append(filtered, g)
+		}
+	}
+	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Plan session filtering
+// ---------------------------------------------------------------------------
+
+// filterPlanSessions removes sessions that don't have a plan.md file when
+// filterPlans is active. When filterPlans is false, all sessions pass through.
+func (m *Model) filterPlanSessions(sessions []data.Session) []data.Session {
+	if !m.filterPlans || len(m.planMap) == 0 {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if m.planMap[s.ID] {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// filterPlanGroups removes sessions without a plan.md file from grouped
+// results when filterPlans is active. Empty groups are dropped.
+func (m *Model) filterPlanGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.filterPlans || len(m.planMap) == 0 {
+		return groups
+	}
+	filtered := make([]data.SessionGroup, 0, len(groups))
+	for _, g := range groups {
+		var sessions []data.Session
+		for _, s := range g.Sessions {
+			if m.planMap[s.ID] {
 				sessions = append(sessions, s)
 			}
 		}
@@ -2599,6 +2705,22 @@ func (m Model) scheduleAttentionTick() tea.Cmd {
 	return tea.Tick(attentionRefreshInterval, func(time.Time) tea.Msg {
 		return attentionTickMsg{}
 	})
+}
+
+// scanPlansCmd checks for plan.md files across all session-state directories.
+func (m Model) scanPlansCmd() tea.Cmd {
+	return func() tea.Msg {
+		plans := data.ScanAllPlans()
+		return plansScannedMsg{plans: plans}
+	}
+}
+
+// loadPlanContentCmd reads the plan.md content for a specific session.
+func (m Model) loadPlanContentCmd(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		content, err := data.ReadPlanContent(sessionID)
+		return planContentMsg{sessionID: sessionID, content: content, err: err}
+	}
 }
 
 // handleJumpNextAttention moves the cursor to the next session with

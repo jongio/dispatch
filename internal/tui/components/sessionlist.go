@@ -33,6 +33,7 @@ type SessionList struct {
 	favoritedSet map[string]struct{}             // session ID → favorited sessions
 	aiSet        map[string]struct{}             // session ID → AI-found sessions
 	attentionMap map[string]data.AttentionStatus // session ID → attention status
+	planMap      map[string]bool                 // session ID → has plan.md
 	selected     map[string]struct{}             // session ID → selected for multi-open
 	treeMode     bool                            // true when showing grouped/tree view
 	pivotField   string                          // current pivot mode (e.g. "folder", "repo")
@@ -116,6 +117,12 @@ func (s *SessionList) SetAISessions(set map[string]struct{}) {
 // colored dots next to each session.
 func (s *SessionList) SetAttentionStatuses(m map[string]data.AttentionStatus) {
 	s.attentionMap = m
+}
+
+// SetPlanStatuses updates the plan status map used to render cyan plan
+// indicator dots next to sessions that have a plan.md file.
+func (s *SessionList) SetPlanStatuses(m map[string]bool) {
+	s.planMap = m
 }
 
 // SetSize updates the available rendering dimensions.
@@ -583,6 +590,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	// Attention dot — 2 chars (dot + space).
 	attDot := s.attentionDot(sess.ID, selected)
 
+	// Plan dot — 2 chars (dot + space) if plan exists, else 2 spaces.
+	plnDot := s.planDot(sess.ID, selected)
+
 	// In tree mode, indent sessions under their folder.
 	indent := ""
 	if s.treeMode {
@@ -600,15 +610,16 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		checkMark = styles.IconCheck() + " "
 	}
 
-	const dotW = 2 // dot + space
+	const dotW = 2     // attention dot + space
+	const planDotW = 2 // plan dot + space
 	const timeW = 9
 	const turnsW = 5
 	const spacing = 2
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-2-timeW-spacing) // dotW for attention, -2 for checkmark+space
-		line := indent + checkMark + indicator + attDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-2-dotW-planDotW-2-timeW-spacing)
+		line := indent + checkMark + indicator + attDot + plnDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
 			return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 		}
@@ -630,7 +641,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - 2 - dotW - 2 - timeW - turnsW - 2*spacing // dotW for attention, -2 for checkmark+space
+	summaryW := w - 2 - dotW - planDotW - 2 - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -646,6 +657,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(checkMark)
 	b.WriteString(indicator)
 	b.WriteString(attDot)
+	b.WriteString(plnDot)
 	b.WriteString(PadRight(summary, summaryW))
 	if folderW > 0 {
 		b.WriteString("  ")
@@ -722,4 +734,20 @@ func (s SessionList) attentionDot(sessionID string, selected bool) string {
 	}
 
 	return dotStyle.Render(icon + " ")
+}
+
+// planDot returns a styled 2-character string (dot + space) for sessions
+// that have a plan.md file, or two spaces if no plan exists. Follows the
+// same selected-row pattern as attentionDot.
+func (s SessionList) planDot(sessionID string, selected bool) string {
+	if s.planMap == nil || !s.planMap[sessionID] {
+		return "  "
+	}
+
+	icon := styles.IconPlan()
+
+	if selected {
+		return icon + " "
+	}
+	return styles.PlanIndicatorStyle.Render(icon + " ")
 }
