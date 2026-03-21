@@ -610,7 +610,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		checkMark = styles.IconCheck() + " "
 	}
 
-	const dotW = 2 // attention dot + space
+	const dotW = 2     // attention dot + space
 	const planDotW = 2 // plan dot + space
 	const timeW = 9
 	const turnsW = 5

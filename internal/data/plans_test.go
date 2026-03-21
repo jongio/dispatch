@@ -7,63 +7,6 @@ import (
 	"testing"
 )
 
-func TestScanPlans(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("DISPATCH_SESSION_STATE", dir)
-
-	// Create session directories — some with plans, some without.
-	withPlan := "session-with-plan"
-	withoutPlan := "session-without-plan"
-	emptyPlan := "session-empty-plan"
-
-	os.MkdirAll(filepath.Join(dir, withPlan), 0o755)
-	os.MkdirAll(filepath.Join(dir, withoutPlan), 0o755)
-	os.MkdirAll(filepath.Join(dir, emptyPlan), 0o755)
-
-	os.WriteFile(filepath.Join(dir, withPlan, "plan.md"), []byte("# My Plan"), 0o644)
-	os.WriteFile(filepath.Join(dir, emptyPlan, "plan.md"), []byte(""), 0o644)
-
-	plans := ScanPlans([]string{withPlan, withoutPlan, emptyPlan, "nonexistent"})
-
-	if !plans[withPlan] {
-		t.Error("expected session-with-plan to have plan")
-	}
-	if plans[withoutPlan] {
-		t.Error("expected session-without-plan to not have plan")
-	}
-	if plans[emptyPlan] {
-		t.Error("expected session-empty-plan (0 bytes) to not have plan")
-	}
-	if plans["nonexistent"] {
-		t.Error("expected nonexistent session to not have plan")
-	}
-}
-
-func TestScanPlans_InvalidSessionID(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("DISPATCH_SESSION_STATE", dir)
-
-	// Path traversal attempts should be rejected.
-	plans := ScanPlans([]string{"../../../etc/passwd", "", "valid-id"})
-	if plans["../../../etc/passwd"] {
-		t.Error("path traversal session ID should be rejected")
-	}
-}
-
-func TestScanPlans_NilStateDir(t *testing.T) {
-	// Ensure no crash when state dir cannot be resolved.
-	t.Setenv("DISPATCH_SESSION_STATE", "")
-	t.Setenv("HOME", "/nonexistent/path/that/does/not/exist")
-	if os.Getenv("USERPROFILE") != "" {
-		t.Setenv("USERPROFILE", "/nonexistent/path/that/does/not/exist")
-	}
-
-	plans := ScanPlans([]string{"some-session"})
-	if plans != nil && plans["some-session"] {
-		t.Error("expected nil or empty plans when state dir is unresolvable")
-	}
-}
-
 func TestScanAllPlans(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DISPATCH_SESSION_STATE", dir)

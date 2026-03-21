@@ -570,8 +570,8 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	// few sessions (matching the demo plan sessions).
 	planMap := map[string]bool{
 		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": true, // Waiting — plan dot visible
-		"ses-026": true,                              // Active — plan dot visible
-		"ses-003": true,                              // Stale — plan dot visible
+		"ses-026":                              true, // Active — plan dot visible
+		"ses-003":                              true, // Stale — plan dot visible
 	}
 
 	ctx := &captureCtx{

@@ -17,9 +17,9 @@ type PreviewPanel struct {
 	width           int
 	height          int
 	scroll          int
-	totalLines      int  // cached line count for scroll clamping
-	newestFirst     bool // conversation turn display order
-	convHeaderLine  int  // content line where "Conversation" label is rendered (-1 = none)
+	totalLines      int    // cached line count for scroll clamping
+	newestFirst     bool   // conversation turn display order
+	convHeaderLine  int    // content line where "Conversation" label is rendered (-1 = none)
 	planContent     string // plan.md content (empty when no plan)
 	planViewMode    bool   // when true, render plan instead of session detail
 }

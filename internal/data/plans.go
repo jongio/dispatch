@@ -16,38 +16,9 @@ import (
 // prevent memory exhaustion from adversarially large files.
 const maxPlanFileSize = 64 * 1024 // 64 KB
 
-// ScanPlans checks which of the given session IDs have a plan.md file in
-// their session-state directory. Returns a map of session ID → true for
-// sessions that have a plan. Sessions without a plan are omitted from the
-// map (not set to false) for efficiency.
-func ScanPlans(sessionIDs []string) map[string]bool {
-	stateDir := sessionStatePath()
-	if stateDir == "" {
-		return nil
-	}
-
-	result := make(map[string]bool, len(sessionIDs)/4) // expect ~25% to have plans
-	for _, id := range sessionIDs {
-		if !validate.SessionID(id) {
-			continue
-		}
-		planPath := filepath.Join(stateDir, id, "plan.md")
-		info, err := os.Lstat(planPath)
-		if err != nil {
-			continue
-		}
-		// Only accept regular files (no symlinks, devices, etc.).
-		if info.Mode().IsRegular() && info.Size() > 0 {
-			result[id] = true
-		}
-	}
-	return result
-}
-
 // ScanAllPlans reads the session-state directory and returns a map of
 // session ID → true for every session that has a non-empty plan.md file.
-// Unlike ScanPlans, this does not require a pre-filtered list of IDs —
-// it discovers sessions from the filesystem directly, matching the
+// It discovers sessions from the filesystem directly, matching the
 // pattern used by ScanAttention.
 func ScanAllPlans() map[string]bool {
 	stateDir := sessionStatePath()
