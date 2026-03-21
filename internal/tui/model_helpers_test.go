@@ -855,6 +855,231 @@ func TestRecalcLayout_NoPreviewNarrowWindow(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// recalcLayout — preview position variants
+// ---------------------------------------------------------------------------
+
+func TestRecalcLayout_PositionRight(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 40
+	m.showPreview = true
+	m.previewPosition = "right"
+	m.recalcLayout()
+
+	if m.layout.previewWidth == 0 {
+		t.Error("right position: previewWidth should be > 0")
+	}
+	if m.layout.previewHeight != m.layout.contentHeight {
+		t.Error("right position: previewHeight should equal contentHeight")
+	}
+	if m.layout.listWidth+gapWidth+m.layout.previewWidth != m.width {
+		t.Errorf("right position: listWidth(%d) + gap(%d) + previewWidth(%d) != width(%d)",
+			m.layout.listWidth, gapWidth, m.layout.previewWidth, m.width)
+	}
+	if m.layout.previewPosition != "right" {
+		t.Errorf("layout.previewPosition = %q, want %q", m.layout.previewPosition, "right")
+	}
+}
+
+func TestRecalcLayout_PositionLeft(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 40
+	m.showPreview = true
+	m.previewPosition = "left"
+	m.recalcLayout()
+
+	if m.layout.previewWidth == 0 {
+		t.Error("left position: previewWidth should be > 0")
+	}
+	if m.layout.listWidth+gapWidth+m.layout.previewWidth != m.width {
+		t.Errorf("left position: listWidth(%d) + gap(%d) + previewWidth(%d) != width(%d)",
+			m.layout.listWidth, gapWidth, m.layout.previewWidth, m.width)
+	}
+}
+
+func TestRecalcLayout_PositionBottom(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 40
+	m.showPreview = true
+	m.previewPosition = "bottom"
+	m.recalcLayout()
+
+	if m.layout.previewHeight == 0 {
+		t.Error("bottom position: previewHeight should be > 0")
+	}
+	if m.layout.previewWidth != m.width {
+		t.Errorf("bottom position: previewWidth = %d, want %d (full width)", m.layout.previewWidth, m.width)
+	}
+	if m.layout.listWidth != m.width {
+		t.Errorf("bottom position: listWidth = %d, want %d (full width)", m.layout.listWidth, m.width)
+	}
+	if m.layout.listHeight+1+m.layout.previewHeight != m.layout.contentHeight {
+		t.Errorf("bottom position: listHeight(%d) + gap(1) + previewHeight(%d) != contentHeight(%d)",
+			m.layout.listHeight, m.layout.previewHeight, m.layout.contentHeight)
+	}
+}
+
+func TestRecalcLayout_PositionTop(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 40
+	m.showPreview = true
+	m.previewPosition = "top"
+	m.recalcLayout()
+
+	if m.layout.previewHeight == 0 {
+		t.Error("top position: previewHeight should be > 0")
+	}
+	if m.layout.previewWidth != m.width {
+		t.Errorf("top position: previewWidth = %d, want %d (full width)", m.layout.previewWidth, m.width)
+	}
+	if m.layout.listHeight+1+m.layout.previewHeight != m.layout.contentHeight {
+		t.Errorf("top position: listHeight(%d) + gap(1) + previewHeight(%d) != contentHeight(%d)",
+			m.layout.listHeight, m.layout.previewHeight, m.layout.contentHeight)
+	}
+}
+
+func TestRecalcLayout_VerticalShortTerminal(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 10 // below PreviewMinHeight
+	m.showPreview = true
+	m.previewPosition = "bottom"
+	m.recalcLayout()
+
+	if m.layout.previewHeight != 0 {
+		t.Errorf("short terminal: previewHeight should be 0, got %d", m.layout.previewHeight)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// isOverPreview — mouse hit detection for all positions
+// ---------------------------------------------------------------------------
+
+func TestIsOverPreview_Right(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = true
+	m.previewPosition = "right"
+	m.recalcLayout()
+
+	// Click in list area (left portion) — should not be over preview.
+	if m.isOverPreview(0, styles.HeaderLines+1) {
+		t.Error("x=0 should not be over preview (right position)")
+	}
+
+	// Click in preview area (right portion past list+gap).
+	previewX := m.layout.listWidth + gapWidth + 1
+	if !m.isOverPreview(previewX, styles.HeaderLines+1) {
+		t.Errorf("x=%d should be over preview (right position)", previewX)
+	}
+}
+
+func TestIsOverPreview_Left(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = true
+	m.previewPosition = "left"
+	m.recalcLayout()
+
+	// Click in preview area (left portion).
+	if !m.isOverPreview(1, styles.HeaderLines+1) {
+		t.Error("x=1 should be over preview (left position)")
+	}
+
+	// Click past preview width — should not be over preview.
+	if m.isOverPreview(m.layout.previewWidth+5, styles.HeaderLines+1) {
+		t.Error("x past previewWidth should not be over preview (left position)")
+	}
+}
+
+func TestIsOverPreview_Bottom(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = true
+	m.previewPosition = "bottom"
+	m.recalcLayout()
+
+	// Click in list area (top portion) — should not be over preview.
+	if m.isOverPreview(10, styles.HeaderLines+1) {
+		t.Error("y in list area should not be over preview (bottom position)")
+	}
+
+	// Click in preview area (bottom portion past list+gap).
+	previewY := styles.HeaderLines + m.layout.listHeight + 1 + 1
+	if !m.isOverPreview(10, previewY) {
+		t.Errorf("y=%d should be over preview (bottom position)", previewY)
+	}
+}
+
+func TestIsOverPreview_Top(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = true
+	m.previewPosition = "top"
+	m.recalcLayout()
+
+	// Click in preview area (top portion).
+	if !m.isOverPreview(10, styles.HeaderLines+1) {
+		t.Error("y=HeaderLines+1 should be over preview (top position)")
+	}
+
+	// Click in list area (below preview).
+	listY := styles.HeaderLines + m.layout.previewHeight + 2
+	if m.isOverPreview(10, listY) {
+		t.Errorf("y=%d should not be over preview (top position)", listY)
+	}
+}
+
+func TestIsOverPreview_NoPreview(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = false
+	m.recalcLayout()
+
+	if m.isOverPreview(60, styles.HeaderLines+5) {
+		t.Error("should never be over preview when preview is disabled")
+	}
+}
+
+func TestIsOverPreview_AboveHeader(t *testing.T) {
+	m := testModelWithLayout()
+	m.width = 120
+	m.height = 30
+	m.showPreview = true
+	m.previewPosition = "right"
+	m.recalcLayout()
+
+	// Click in header area — should not be over preview.
+	if m.isOverPreview(100, 0) {
+		t.Error("y=0 (header) should not be over preview")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// cyclePreviewPosition on Model
+// ---------------------------------------------------------------------------
+
+func TestModelCyclePreviewPosition(t *testing.T) {
+	m := testModelWithLayout()
+
+	cycle := []string{"bottom", "left", "top", "right"}
+	for _, want := range cycle {
+		m.cyclePreviewPosition()
+		if m.previewPosition != want {
+			t.Errorf("cyclePreviewPosition: got %q, want %q", m.previewPosition, want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // doubleClickTimeout constant
 // ---------------------------------------------------------------------------
 

@@ -180,6 +180,7 @@ dispatch
 | `S` | Toggle sort direction |
 | `Tab` | Cycle grouping mode |
 | `p` | Toggle preview panel |
+| `P` | Cycle preview position (right → bottom → left → top) |
 | `PgUp` / `PgDn` | Scroll preview |
 | `r` | Refresh session store |
 | `,` | Open settings panel |
@@ -248,6 +249,7 @@ Configuration is stored in the platform-specific config directory:
 | `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
 | `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date` |
 | `show_preview` | bool | `true` | Show preview pane on startup |
+| `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |
 | `max_sessions` | int | `100` | Maximum sessions to load |
 | `yoloMode` | bool | `false` | Pass `--allow-all` to Copilot CLI (auto-confirm commands) |
 | `agent` | string | `""` | Pass `--agent <name>` to Copilot CLI |
@@ -286,6 +288,7 @@ When `launch_mode` is `"pane"`, the `pane_direction` value maps to Windows Termi
   "default_sort": "updated",
   "default_pivot": "folder",
   "show_preview": true,
+  "preview_position": "right",
   "max_sessions": 100,
   "yoloMode": false,
   "agent": "",

@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Screenshot from '../components/Screenshot.astro';
+import Carousel from '../components/Carousel.astro';
 ---
 
 <Base title="Features — Dispatch">
@@ -156,6 +157,34 @@ import Screenshot from '../components/Screenshot.astro';
         <div class="feature-screenshots">
           <Screenshot src="one-half-light/preview-panel.png" alt="Preview panel showing session conversation bubbles" caption="Preview with session conversation" />
           <Screenshot src="one-half-light/preview-scroll.png" alt="Preview panel scrolled to checkpoint details" caption="Scrolled preview showing checkpoint details" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Preview Position -->
+    <section class="section" id="preview-position">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Preview Position</h2>
+          <p>
+            Cycle the preview pane through four positions with the <kbd>P</kbd>
+            key: right (default), bottom, left, and top. The chosen position is
+            saved to configuration and restored on next launch.
+          </p>
+          <ul>
+            <li><strong>Right</strong> — preview beside the session list (default)</li>
+            <li><strong>Bottom</strong> — preview below the session list</li>
+            <li><strong>Left</strong> — preview to the left of the session list</li>
+            <li><strong>Top</strong> — preview above the session list</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Carousel>
+            <Screenshot src="one-half-light/preview-right.png" alt="Preview pane positioned to the right of the session list" caption="Preview on the right (default)" />
+            <Screenshot src="one-half-light/preview-bottom.png" alt="Preview pane positioned below the session list" caption="Preview on the bottom" />
+            <Screenshot src="one-half-light/preview-left.png" alt="Preview pane positioned to the left of the session list" caption="Preview on the left" />
+            <Screenshot src="one-half-light/preview-top.png" alt="Preview pane positioned above the session list" caption="Preview on the top" />
+          </Carousel>
         </div>
       </div>
     </section>

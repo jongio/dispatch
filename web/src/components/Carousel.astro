@@ -1,0 +1,232 @@
+---
+// Carousel.astro — displays one slotted child at a time with prev/next navigation.
+// Each direct <slot> child with class "screenshot" is treated as a slide.
+// Lightbox overlays (.lightbox) are relocated to <body> so the track's CSS
+// transform does not create a containing block that breaks position:fixed.
+---
+
+<div class="carousel" tabindex="0" aria-roledescription="carousel" aria-label="Screenshot carousel">
+  <div class="carousel-viewport">
+    <div class="carousel-track">
+      <slot />
+    </div>
+    <button class="carousel-btn carousel-prev" aria-label="Previous slide" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <button class="carousel-btn carousel-next" aria-label="Next slide" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  </div>
+  <div class="carousel-dots" role="tablist" aria-label="Slide indicators"></div>
+</div>
+
+<style>
+  .carousel {
+    position: relative;
+    width: 100%;
+  }
+
+  .carousel:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-lg);
+  }
+
+  .carousel-viewport {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-tertiary);
+  }
+
+  .carousel-track {
+    display: flex;
+    transition: transform 0.4s ease;
+  }
+
+  /* Each screenshot figure fills one full slide */
+  .carousel-track :global(.screenshot) {
+    flex: 0 0 100%;
+    min-width: 0;
+    border-radius: 0;
+    border: none;
+  }
+
+  /* --- Arrow buttons --- */
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    /* Semi-transparent bg-primary (#0d1117) */
+    background: rgba(13, 17, 23, 0.75);
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.15s, background 0.15s, border-color 0.15s;
+    z-index: 2;
+    padding: 0;
+  }
+
+  .carousel-viewport:hover .carousel-btn,
+  .carousel:focus-within .carousel-btn {
+    opacity: 1;
+  }
+
+  .carousel-btn:hover {
+    color: var(--text-primary);
+    /* Semi-transparent bg-tertiary (#21262d) */
+    background: rgba(33, 38, 45, 0.9);
+    border-color: var(--accent-muted);
+  }
+
+  .carousel-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    opacity: 1;
+  }
+
+  .carousel-prev {
+    left: var(--space-3);
+  }
+
+  .carousel-next {
+    right: var(--space-3);
+  }
+
+  /* --- Dot indicators --- */
+  .carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2);
+    padding-top: var(--space-3);
+  }
+
+  .carousel-dots :global(.carousel-dot) {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-tertiary);
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .carousel-dots :global(.carousel-dot:hover) {
+    border-color: var(--text-secondary);
+  }
+
+  .carousel-dots :global(.carousel-dot[aria-selected="true"]) {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .carousel-dots :global(.carousel-dot:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Always show arrows on touch devices */
+  @media (max-width: 768px) {
+    .carousel-btn {
+      opacity: 1;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.carousel').forEach(carousel => {
+    const track = carousel.querySelector('.carousel-track') as HTMLElement;
+    const prevBtn = carousel.querySelector('.carousel-prev') as HTMLButtonElement;
+    const nextBtn = carousel.querySelector('.carousel-next') as HTMLButtonElement;
+    const dotsContainer = carousel.querySelector('.carousel-dots') as HTMLElement;
+
+    if (!track || !prevBtn || !nextBtn || !dotsContainer) return;
+
+    // Relocate lightbox overlays to <body> so the track's CSS transform
+    // (which creates a containing block) doesn't break position:fixed.
+    track.querySelectorAll(':scope > .lightbox').forEach(lb => {
+      document.body.appendChild(lb);
+    });
+
+    const slides = Array.from(
+      track.querySelectorAll(':scope > .screenshot'),
+    ) as HTMLElement[];
+    const total = slides.length;
+
+    // Nothing to navigate with 0 or 1 slides
+    if (total <= 1) {
+      prevBtn.hidden = true;
+      nextBtn.hidden = true;
+      dotsContainer.hidden = true;
+      return;
+    }
+
+    let current = 0;
+
+    // Build dot buttons
+    slides.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = 'carousel-dot';
+      dot.type = 'button';
+      dot.setAttribute('role', 'tab');
+      dot.setAttribute('aria-label', `Slide ${i + 1} of ${total}`);
+      dot.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+      dot.setAttribute('tabindex', i === 0 ? '0' : '-1');
+      dot.addEventListener('click', () => goTo(i));
+      dotsContainer.appendChild(dot);
+    });
+
+    const dots = Array.from(
+      dotsContainer.querySelectorAll('.carousel-dot'),
+    ) as HTMLElement[];
+
+    function goTo(index: number) {
+      current = ((index % total) + total) % total;
+      track.style.transform = `translateX(-${current * 100}%)`;
+
+      dots.forEach((dot, i) => {
+        dot.setAttribute('aria-selected', i === current ? 'true' : 'false');
+        dot.setAttribute('tabindex', i === current ? '0' : '-1');
+      });
+
+      slides.forEach((slide, i) => {
+        if (i === current) {
+          slide.removeAttribute('aria-hidden');
+        } else {
+          slide.setAttribute('aria-hidden', 'true');
+        }
+      });
+    }
+
+    prevBtn.addEventListener('click', () => goTo(current - 1));
+    nextBtn.addEventListener('click', () => goTo(current + 1));
+
+    // Keyboard: left/right arrows when the carousel has focus
+    carousel.addEventListener('keydown', (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'ArrowLeft') {
+        ke.preventDefault();
+        goTo(current - 1);
+      } else if (ke.key === 'ArrowRight') {
+        ke.preventDefault();
+        goTo(current + 1);
+      }
+    });
+
+    // Set initial state
+    goTo(0);
+  });
+</script>

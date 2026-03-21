@@ -43,6 +43,7 @@ type keyMap struct {
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
 	ConversationSort  key.Binding
+	PreviewPosition   key.Binding
 	ResumeInterrupted key.Binding
 }
 
@@ -58,7 +59,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
-		{k.Preview, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.Reindex, k.Config},
+		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.Reindex, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
@@ -104,5 +105,6 @@ var keys = keyMap{
 	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 	ConversationSort:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order")),
+	PreviewPosition:   key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "cycle preview position")),
 	ResumeInterrupted: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resume interrupted")),
 }

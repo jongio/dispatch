@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
@@ -214,6 +215,25 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.preview.PageDown()
 		m.preview.PageDown()
 		add("preview-scroll", m)
+	}
+
+	// ── Preview positions ─────────────────────────────────────────────
+	for _, tc := range []struct {
+		name string
+		pos  string
+	}{
+		{"preview-right", config.PreviewPositionRight},
+		{"preview-bottom", config.PreviewPositionBottom},
+		{"preview-left", config.PreviewPositionLeft},
+		{"preview-top", config.PreviewPositionTop},
+	} {
+		m := newBase()
+		m.showPreview = true
+		m.detail = c.detail
+		m.preview.SetDetail(c.detail)
+		m.previewPosition = tc.pos
+		m.recalcLayout()
+		add(tc.name, m)
 	}
 
 	// ── Hidden sessions ───────────────────────────────────────────────

@@ -30,6 +30,7 @@ const (
 	cfgCustomCommand
 	cfgTheme
 	cfgWorkspaceRecovery
+	cfgPreviewPosition
 	cfgFieldCount
 )
 
@@ -50,6 +51,7 @@ type ConfigPanel struct {
 	customCommand     string
 	theme             string // active color scheme name ("auto" or a scheme name)
 	workspaceRecovery bool
+	previewPosition   string // "right", "bottom", "left", "top"
 
 	// Available options for cycling.
 	terminals  []string
@@ -89,6 +91,7 @@ type ConfigValues struct {
 	CustomCommand     string
 	Theme             string
 	WorkspaceRecovery bool
+	PreviewPosition   string
 }
 
 // SetValues loads the config panel state from external values.
@@ -103,6 +106,7 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.customCommand = v.CustomCommand
 	c.theme = v.Theme
 	c.workspaceRecovery = v.WorkspaceRecovery
+	c.previewPosition = v.PreviewPosition
 }
 
 // Values returns the current state of all editable fields.
@@ -118,6 +122,7 @@ func (c *ConfigPanel) Values() ConfigValues {
 		CustomCommand:     c.customCommand,
 		Theme:             c.theme,
 		WorkspaceRecovery: c.workspaceRecovery,
+		PreviewPosition:   c.previewPosition,
 	}
 }
 
@@ -206,6 +211,8 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.theme = c.cycleTheme(c.theme)
 	case cfgWorkspaceRecovery:
 		c.workspaceRecovery = !c.workspaceRecovery
+	case cfgPreviewPosition:
+		c.previewPosition = cyclePreviewPosition(c.previewPosition)
 	default:
 		// cfgFieldCount is a sentinel; no action needed.
 	}
@@ -277,6 +284,7 @@ func (c ConfigPanel) View() string {
 		{"Custom Command", stringDisplay(c.customCommand), false},
 		{"Theme", themeDisplay(c.theme), false},
 		{"Crash Recovery", boolDisplay(c.workspaceRecovery), false},
+		{"Preview Position", previewPositionDisplay(c.previewPosition), false},
 	}
 
 	var body strings.Builder
@@ -458,4 +466,34 @@ func (c *ConfigPanel) cycleTheme(current string) string {
 		}
 	}
 	return c.themeNames[0]
+}
+
+// cyclePreviewPosition cycles through the four preview positions.
+func cyclePreviewPosition(current string) string {
+	switch current {
+	case config.PreviewPositionRight:
+		return config.PreviewPositionBottom
+	case config.PreviewPositionBottom:
+		return config.PreviewPositionLeft
+	case config.PreviewPositionLeft:
+		return config.PreviewPositionTop
+	case config.PreviewPositionTop:
+		return config.PreviewPositionRight
+	default:
+		return config.PreviewPositionBottom
+	}
+}
+
+// previewPositionDisplay renders the preview position as a user-friendly label.
+func previewPositionDisplay(pos string) string {
+	switch pos {
+	case config.PreviewPositionBottom:
+		return styles.ConfigValueStyle.Render("Bottom")
+	case config.PreviewPositionLeft:
+		return styles.ConfigValueStyle.Render("Left")
+	case config.PreviewPositionTop:
+		return styles.ConfigValueStyle.Render("Top")
+	default:
+		return styles.ConfigValueStyle.Render("Right")
+	}
 }

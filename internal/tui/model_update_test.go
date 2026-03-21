@@ -1863,6 +1863,40 @@ func TestHandleKey_PreviewOff(t *testing.T) {
 	}
 }
 
+func TestHandleKey_PreviewPosition(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = true
+
+	// Cycle: right → bottom → left → top → right
+	positions := []string{"bottom", "left", "top", "right"}
+	for _, want := range positions {
+		result, _ := m.Update(runeKeyMsg('P'))
+		m = result.(Model)
+		if m.previewPosition != want {
+			t.Errorf("previewPosition = %q, want %q", m.previewPosition, want)
+		}
+		if m.cfg.PreviewPosition != want {
+			t.Errorf("cfg.PreviewPosition = %q, want %q (should be persisted)", m.cfg.PreviewPosition, want)
+		}
+	}
+}
+
+func TestHandleKey_PreviewPosition_PreviewOff(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = false
+
+	// Position should still cycle even when preview is hidden.
+	result, cmd := m.Update(runeKeyMsg('P'))
+	rm := result.(Model)
+	if rm.previewPosition != "bottom" {
+		t.Errorf("previewPosition = %q, want %q", rm.previewPosition, "bottom")
+	}
+	// When preview is off, no detail load cmd should be returned.
+	if cmd != nil {
+		t.Error("cycling position with preview off should return nil cmd")
+	}
+}
+
 func TestHandleKey_Reindex(t *testing.T) {
 	m := newTestModel()
 	m.reindexing = false

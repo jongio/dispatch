@@ -108,20 +108,6 @@ const (
 )
 
 // ---------------------------------------------------------------------------
-// Layout — computed once per resize, consumed by all rendering functions.
-// ---------------------------------------------------------------------------
-
-type layout struct {
-	totalWidth    int
-	totalHeight   int
-	headerHeight  int
-	footerHeight  int
-	contentHeight int
-	listWidth     int
-	previewWidth  int
-}
-
-// ---------------------------------------------------------------------------
 // Root model
 // ---------------------------------------------------------------------------
 
@@ -165,15 +151,16 @@ type Model struct {
 	spinner         spinner.Model
 
 	// UI toggles.
-	showPreview   bool
-	showHidden    bool
-	hiddenSet     map[string]struct{} // session ID → struct{} for fast hidden-session lookup
-	favoritedSet  map[string]struct{} // session ID → struct{} for fast favorited-session lookup
-	showFavorited bool
-	reindexing    bool
-	reindexLog    []string                  // log lines streamed from chronicle reindex
-	reindexVP     viewport.Model            // scrollable viewport for reindex overlay
-	reindexCancel *components.ReindexHandle // cancel handle for running reindex
+	showPreview     bool
+	previewPosition string // "right", "bottom", "left", "top"
+	showHidden      bool
+	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
+	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	showFavorited   bool
+	reindexing      bool
+	reindexLog      []string                  // log lines streamed from chronicle reindex
+	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
+	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
 
 	// Click debounce: delays single-click action so double-click can be
 	// detected without the first click firing prematurely.
@@ -233,6 +220,7 @@ func NewModel() Model {
 		CustomCommand:     cfg.CustomCommand,
 		Theme:             cfg.Theme,
 		WorkspaceRecovery: cfg.WorkspaceRecovery,
+		PreviewPosition:   cfg.EffectivePreviewPosition(),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -262,11 +250,12 @@ func NewModel() Model {
 			Field: sortFieldFromConfig(cfg.DefaultSort),
 			Order: data.Descending,
 		},
-		timeRange:    cfg.DefaultTimeRange,
-		pivot:        cfg.DefaultPivot,
-		showPreview:  cfg.ShowPreview,
-		hiddenSet:    hiddenSet,
-		favoritedSet: favoritedSet,
+		timeRange:       cfg.DefaultTimeRange,
+		pivot:           cfg.DefaultPivot,
+		showPreview:     cfg.ShowPreview,
+		previewPosition: cfg.EffectivePreviewPosition(),
+		hiddenSet:       hiddenSet,
+		favoritedSet:    favoritedSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
@@ -1044,6 +1033,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.PreviewPosition):
+		m.cyclePreviewPosition()
+		m.recalcLayout()
+		m.cfg.PreviewPosition = m.previewPosition
+		if err := config.Save(m.cfg); err != nil {
+			m.statusErr = "config save: " + err.Error()
+		}
+		if m.showPreview {
+			m.detailVersion++
+			return m, m.loadSelectedDetailCmd()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.PreviewScrollUp):
 		if m.showPreview {
 			m.preview.PageUp()
@@ -1277,6 +1279,9 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.CustomCommand = v.CustomCommand
 	m.cfg.Theme = v.Theme
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
+	m.cfg.PreviewPosition = v.PreviewPosition
+	m.previewPosition = v.PreviewPosition
+	m.recalcLayout()
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
@@ -1310,7 +1315,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Determine which pane the mouse is over.
-	overPreview := m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth
+	overPreview := m.isOverPreview(msg.X, msg.Y)
 
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
@@ -1350,8 +1355,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return m.handleFooterClick(msg.X)
 		}
 		// Preview pane click — check conversation sort toggle.
-		if m.layout.previewWidth > 0 && msg.X >= m.layout.listWidth {
-			previewRow := msg.Y - styles.HeaderLines - 1 // -1 for top border
+		if m.isOverPreview(msg.X, msg.Y) {
+			var previewRow int
+			switch m.layout.previewPosition {
+			case config.PreviewPositionTop:
+				previewRow = msg.Y - styles.HeaderLines - 1 // -1 for top border
+			case config.PreviewPositionBottom:
+				previewRow = msg.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+			default:
+				previewRow = msg.Y - styles.HeaderLines - 1
+			}
 			contentRow := previewRow + m.preview.ScrollOffset()
 			if m.preview.HitConversationSort(contentRow) {
 				newVal := m.preview.ToggleConversationSort()
@@ -1637,35 +1650,41 @@ func (m Model) renderMainView() string {
 	sep := m.renderSeparator()
 	footer := m.renderFooter()
 
-	// Recompute content height based on actual rendered heights.
-	headerH := lipgloss.Height(header) + lipgloss.Height(badges) + lipgloss.Height(sep)
-	footerH := lipgloss.Height(footer)
-	contentH := m.height - headerH - footerH
-	if contentH < 1 {
-		contentH = 1
-	}
-
-	// Compute preview width.
-	previewW := 0
-	if m.showPreview && m.width >= styles.PreviewMinWidth {
-		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-	}
-	listW := m.width - previewW
-	if previewW > 0 {
-		listW -= gapWidth
-	}
-
-	m.sessionList.SetSize(listW, contentH)
-	m.preview.SetSize(previewW, contentH)
+	// Use pre-computed layout dimensions from recalcLayout() so that
+	// rendering and hit-testing always agree on panel positions/sizes.
+	l := m.layout
 
 	var content string
-	if previewW > 0 {
+	hasPreview := l.previewWidth > 0 && l.previewHeight > 0
+
+	if hasPreview {
 		gap := strings.Repeat(" ", gapWidth)
-		content = lipgloss.JoinHorizontal(lipgloss.Top,
-			m.sessionList.View(),
-			gap,
-			m.preview.View(),
-		)
+		switch l.previewPosition {
+		case config.PreviewPositionLeft:
+			content = lipgloss.JoinHorizontal(lipgloss.Top,
+				m.preview.View(),
+				gap,
+				m.sessionList.View(),
+			)
+		case config.PreviewPositionTop:
+			content = lipgloss.JoinVertical(lipgloss.Left,
+				m.preview.View(),
+				"",
+				m.sessionList.View(),
+			)
+		case config.PreviewPositionBottom:
+			content = lipgloss.JoinVertical(lipgloss.Left,
+				m.sessionList.View(),
+				"",
+				m.preview.View(),
+			)
+		default: // right
+			content = lipgloss.JoinHorizontal(lipgloss.Top,
+				m.sessionList.View(),
+				gap,
+				m.preview.View(),
+			)
+		}
 	} else {
 		content = m.sessionList.View()
 	}
@@ -2453,43 +2472,6 @@ func (m Model) selectedSessionCwd() string {
 		return sess.Cwd
 	}
 	return ""
-}
-
-// ---------------------------------------------------------------------------
-// Layout
-// ---------------------------------------------------------------------------
-
-func (m *Model) recalcLayout() {
-	contentH := m.height - styles.HeaderLines - styles.FooterLines
-	if contentH < 1 {
-		contentH = 1
-	}
-	previewW := 0
-	if m.showPreview && m.width >= styles.PreviewMinWidth {
-		previewW = int(float64(m.width) * styles.PreviewWidthRatio)
-	}
-	listW := m.width - previewW
-	if previewW > 0 {
-		listW -= gapWidth
-	}
-
-	m.layout = layout{
-		totalWidth:    m.width,
-		totalHeight:   m.height,
-		headerHeight:  styles.HeaderLines,
-		footerHeight:  styles.FooterLines,
-		contentHeight: contentH,
-		listWidth:     listW,
-		previewWidth:  previewW,
-	}
-
-	m.sessionList.SetSize(listW, contentH)
-	m.preview.SetSize(previewW, contentH)
-	m.help.SetSize(m.width, m.height)
-	m.shellPicker.SetSize(m.width, m.height)
-	m.filterPanel.SetSize(m.width, m.height)
-	m.configPanel.SetSize(m.width, m.height)
-	m.attentionPicker.SetSize(m.width, m.height)
 }
 
 // ---------------------------------------------------------------------------

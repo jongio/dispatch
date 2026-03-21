@@ -9,7 +9,7 @@ import (
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
-// PreviewPanel renders a right-side detail panel for the selected session.
+// PreviewPanel renders a detail panel for the selected session.
 type PreviewPanel struct {
 	detail          *data.SessionDetail
 	attentionStatus data.AttentionStatus

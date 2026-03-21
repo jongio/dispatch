@@ -60,6 +60,9 @@ func TestDefaultValues(t *testing.T) {
 	if !cfg.WorkspaceRecovery {
 		t.Error("WorkspaceRecovery should default to true")
 	}
+	if cfg.PreviewPosition != "" {
+		t.Errorf("PreviewPosition = %q, want empty", cfg.PreviewPosition)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +85,7 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		ExcludedDirs:     []string{"/tmp", "/var"},
 		CustomCommand:    "ghcs --resume {sessionId} --custom",
 		HiddenSessions:   []string{"sess-1", "sess-2"},
+		PreviewPosition:  "bottom",
 	}
 
 	data, err := json.Marshal(original)
@@ -145,6 +149,9 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		if restored.HiddenSessions[i] != original.HiddenSessions[i] {
 			t.Errorf("HiddenSessions[%d] = %q, want %q", i, restored.HiddenSessions[i], original.HiddenSessions[i])
 		}
+	}
+	if restored.PreviewPosition != original.PreviewPosition {
+		t.Errorf("PreviewPosition = %q, want %q", restored.PreviewPosition, original.PreviewPosition)
 	}
 }
 
@@ -1033,5 +1040,74 @@ func TestLoad_SanitizesUnsafeShellOnDisk(t *testing.T) {
 	}
 	if cfg.DefaultTerminal != "" {
 		t.Errorf("DefaultTerminal = %q, want empty after sanitize", cfg.DefaultTerminal)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EffectivePreviewPosition tests
+// ---------------------------------------------------------------------------
+
+func TestEffectivePreviewPosition_Default(t *testing.T) {
+	cfg := Default()
+	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
+		t.Errorf("default config: got %q, want %q", got, PreviewPositionRight)
+	}
+}
+
+func TestEffectivePreviewPosition_EmptyDefaultsToRight(t *testing.T) {
+	cfg := &Config{}
+	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
+		t.Errorf("empty PreviewPosition: got %q, want %q", got, PreviewPositionRight)
+	}
+}
+
+func TestEffectivePreviewPosition_InvalidDefaultsToRight(t *testing.T) {
+	cfg := &Config{PreviewPosition: "invalid"}
+	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
+		t.Errorf("invalid PreviewPosition: got %q, want %q", got, PreviewPositionRight)
+	}
+}
+
+func TestEffectivePreviewPosition_ExplicitValues(t *testing.T) {
+	tests := []struct {
+		pos  string
+		want string
+	}{
+		{PreviewPositionRight, PreviewPositionRight},
+		{PreviewPositionBottom, PreviewPositionBottom},
+		{PreviewPositionLeft, PreviewPositionLeft},
+		{PreviewPositionTop, PreviewPositionTop},
+	}
+	for _, tt := range tests {
+		cfg := &Config{PreviewPosition: tt.pos}
+		if got := cfg.EffectivePreviewPosition(); got != tt.want {
+			t.Errorf("PreviewPosition=%q: got %q, want %q", tt.pos, got, tt.want)
+		}
+	}
+}
+
+func TestEffectivePreviewPosition_JSONRoundTrip(t *testing.T) {
+	jsonStr := `{"preview_position": "bottom"}`
+	cfg := Default()
+	if err := json.Unmarshal([]byte(jsonStr), cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionBottom {
+		t.Errorf("JSON preview_position: got %q, want %q", got, PreviewPositionBottom)
+	}
+}
+
+func TestPreviewPositionConstants(t *testing.T) {
+	if PreviewPositionRight != "right" {
+		t.Errorf("PreviewPositionRight = %q, want 'right'", PreviewPositionRight)
+	}
+	if PreviewPositionBottom != "bottom" {
+		t.Errorf("PreviewPositionBottom = %q, want 'bottom'", PreviewPositionBottom)
+	}
+	if PreviewPositionLeft != "left" {
+		t.Errorf("PreviewPositionLeft = %q, want 'left'", PreviewPositionLeft)
+	}
+	if PreviewPositionTop != "top" {
+		t.Errorf("PreviewPositionTop = %q, want 'top'", PreviewPositionTop)
 	}
 }
