@@ -537,10 +537,22 @@ func defaultWindowsShell() ShellInfo {
 	return ShellInfo{Name: "Command Prompt", Path: p}
 }
 
-// appendWTPaneDirFlags translates a dispatch pane direction into the correct
-// wt.exe split-pane flags (-H for horizontal/down, -V for vertical/right).
-// Windows Terminal does not support "up" or "left" natively, so those fall
-// back to -H and -V respectively (the closest available direction).
+// appendWTPaneDirFlags translates a dispatch pane direction string into
+// the correct wt.exe split-pane flags.
+//
+// Windows Terminal's -H and -V flags control the split *orientation* (the
+// direction the divider runs), not which side the new pane appears on.
+// WT itself decides actual pane placement based on available space.
+//
+// Mapping:
+//
+//	"down"  → -H  horizontal split — divider runs horizontally, new pane below
+//	"up"    → -H  horizontal split — WT picks closest available placement
+//	"right" → -V  vertical split   — divider runs vertically, new pane to the right
+//	"left"  → -V  vertical split   — WT picks closest available placement
+//	"auto"  → (no flag) WT default behavior
+//	""      → (no flag) WT default behavior
+//	unknown → (no flag) WT default behavior
 func appendWTPaneDirFlags(args []string, dir string) []string {
 	switch dir {
 	case "down", "up":

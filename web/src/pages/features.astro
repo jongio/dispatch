@@ -173,11 +173,28 @@ import Screenshot from '../components/Screenshot.astro';
           <ul>
             <li><kbd>Ctrl</kbd>+double-click forces a new window</li>
             <li><kbd>Shift</kbd>+double-click forces a new tab</li>
-            <li>Pane mode supports directional splits: auto, right, down, left, up</li>
+            <li>Pane mode supports directional splits: auto, right, down, left, up (see pane direction semantics below)</li>
             <li>Windows: uses <code>wt</code> commands for Windows Terminal</li>
             <li>macOS: supports Terminal.app and iTerm2</li>
             <li>Linux: detects and delegates to the active terminal emulator</li>
           </ul>
+          <h3>Pane Direction Semantics</h3>
+          <p>
+            The <code>pane_direction</code> config value maps to Windows Terminal's
+            <code>-H</code> / <code>-V</code> split-pane flags:
+          </p>
+          <ul>
+            <li><code>down</code> → <code>-H</code> — horizontal split (divider runs horizontally, new pane below)</li>
+            <li><code>up</code> → <code>-H</code> — horizontal split (WT controls actual placement)</li>
+            <li><code>right</code> → <code>-V</code> — vertical split (divider runs vertically, new pane right)</li>
+            <li><code>left</code> → <code>-V</code> — vertical split (WT controls actual placement)</li>
+            <li><code>auto</code> / empty — no flag; Windows Terminal decides automatically</li>
+          </ul>
+          <p>
+            <strong>Note:</strong> <code>-H</code> / <code>-V</code> control split
+            <em>orientation</em> only. Windows Terminal decides actual pane placement
+            based on available space.
+          </p>
         </div>
         <div class="feature-text">
           <p class="text-only-note">
