@@ -1370,6 +1370,13 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
 	m.previewPosition = v.PreviewPosition
+	resolveTheme(m.cfg)
+	// If the user switched back to "auto", re-apply with the detected
+	// terminal brightness so colours adapt immediately.
+	themeName := m.cfg.Theme
+	if themeName == "" || themeName == themeAuto {
+		styles.ApplyAutoTheme(m.hasDarkBackground)
+	}
 	m.recalcLayout()
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()

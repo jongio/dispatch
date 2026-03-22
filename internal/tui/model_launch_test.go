@@ -321,7 +321,7 @@ func TestHandleReindexClick_NilCancel(t *testing.T) {
 	btnLabel := "[ Cancel (esc) ]"
 	btnX := startX + (overlayW-len(btnLabel))/2
 
-	msg := tea.MouseReleaseMsg{X: btnX + 1, Y: btnY}
+	msg := tea.MouseReleaseMsg{X: btnX + 1, Y: btnY, Button: tea.MouseLeft}
 	// Should not panic with nil cancel handle
 	m.handleReindexClick(msg)
 }
