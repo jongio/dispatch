@@ -1,12 +1,6 @@
 name: Deploy website to GitHub Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'web/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
   workflow_dispatch:
   workflow_call:
 
