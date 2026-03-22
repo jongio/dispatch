@@ -31,6 +31,8 @@ const (
 	LaunchStyleWindow = "window"
 	// LaunchStylePane opens a split pane in the current tab (Windows Terminal only).
 	LaunchStylePane = "pane"
+	// LaunchStyleTSCode sends the session to tscode center via IPC.
+	LaunchStyleTSCode = "tscode"
 
 	// termWindowsTerminal is the human-readable name for Windows Terminal.
 	termWindowsTerminal = "Windows Terminal"
@@ -46,8 +48,12 @@ type ResumeConfig struct {
 	Terminal      string // preferred terminal emulator name (empty = auto-detect)
 	CustomCommand string // when set, replaces the entire copilot CLI command
 	Cwd           string // working directory to launch the session in
-	LaunchStyle   string // "", "window", or "pane" — controls tab vs window vs split pane
+	LaunchStyle   string // "", "window", "pane", or "tscode" — controls tab vs window vs split pane vs tscode
 	PaneDirection string // "auto", "right", "down", "left", "up" — split direction for pane mode
+
+	// TSCode-specific fields (only used when LaunchStyle is "tscode").
+	TSCodeTab      int    // 0 = new tab, >0 = add to existing tab
+	TSCodeSplitDir string // "v" or "h" for split direction when adding to tab
 }
 
 // TerminalInfo describes a terminal emulator available on the system.
@@ -470,6 +476,11 @@ func LaunchSession(shell ShellInfo, sessionID string, cfg ResumeConfig) error {
 
 	cwd := resolvedCwd(cfg.Cwd)
 
+	// TSCode mode: send to tscode center via IPC, bypassing OS terminal launch.
+	if cfg.LaunchStyle == LaunchStyleTSCode {
+		return launchTSCodeSession(sessionID, cwd, resumeCmd, cfg.TSCodeTab, cfg.TSCodeSplitDir)
+	}
+
 	switch runtime.GOOS {
 	case "windows":
 		return launchWindowsSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
@@ -478,6 +489,16 @@ func LaunchSession(shell ShellInfo, sessionID string, cfg ResumeConfig) error {
 	default:
 		return launchLinuxSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
 	}
+}
+
+// launchTSCodeSession sends an open_session request to the running tscode
+// center process via named pipe / Unix socket IPC.
+func launchTSCodeSession(sessionID, cwd, resumeCmd string, addToTab int, splitDir string) error {
+	_, err := TSCodeOpenSession(sessionID, cwd, resumeCmd, addToTab, splitDir)
+	if err != nil {
+		return fmt.Errorf("failed to open in tscode: %w", err)
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

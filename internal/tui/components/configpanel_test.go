@@ -445,6 +445,8 @@ func TestLaunchModeDisplay(t *testing.T) {
 		{"in-place", "In-Place"},
 		{"window", "Window"},
 		{"tab", "Tab"},
+		{"pane", "Pane"},
+		{"tscode", "TSCode"},
 		{"", "Tab"},
 	}
 	for _, tt := range tests {

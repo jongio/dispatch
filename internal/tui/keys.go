@@ -40,6 +40,7 @@ type keyMap struct {
 	JumpNextAttention key.Binding
 	FilterAttention   key.Binding
 	LaunchAll         key.Binding
+	LaunchTSCode      key.Binding
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
 	ConversationSort  key.Binding
@@ -51,13 +52,13 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.FilterPlans, k.Hide, k.Star, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchTSCode, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.FilterPlans, k.Hide, k.Star, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
+		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchTSCode},
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
@@ -99,6 +100,7 @@ var keys = keyMap{
 	LaunchWindow:      key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "open in window")),
 	LaunchTab:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "open in tab")),
 	LaunchPane:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open in pane")),
+	LaunchTSCode:      key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "open in tscode")),
 	PreviewScrollUp:   key.NewBinding(key.WithKeys("pgup"), key.WithHelp("PgUp", "preview ↑")),
 	PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
 	JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),

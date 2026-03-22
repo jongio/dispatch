@@ -74,6 +74,7 @@ type Config struct {
 	//   "tab"      — open in a new tab of the current terminal
 	//   "window"   — open in a new terminal window
 	//   "pane"     — open in a split pane (Windows Terminal only)
+	//   "tscode"   — open in a tscode center pane via IPC
 	// Default is "tab" when unset.
 	LaunchMode string `json:"launch_mode,omitempty"`
 
@@ -160,6 +161,8 @@ const (
 	LaunchModeWindow LaunchMode = "window"
 	// LaunchModePane opens sessions in a split pane (Windows Terminal only).
 	LaunchModePane LaunchMode = "pane"
+	// LaunchModeTSCode opens sessions in a tscode center pane via IPC.
+	LaunchModeTSCode LaunchMode = "tscode"
 )
 
 // PaneDirection constants control the split direction for pane mode.

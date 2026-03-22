@@ -742,7 +742,7 @@ func TestFormatIntConsistencyWithStrconv(t *testing.T) {
 
 func TestCycleLaunchMode(t *testing.T) {
 	t.Parallel()
-	// in-place → tab → window → pane → in-place
+	// in-place → tab → window → pane → tscode → in-place
 	if got := cycleLaunchMode("in-place"); got != "tab" {
 		t.Errorf("cycleLaunchMode(in-place) = %q, want tab", got)
 	}
@@ -752,8 +752,11 @@ func TestCycleLaunchMode(t *testing.T) {
 	if got := cycleLaunchMode("window"); got != "pane" {
 		t.Errorf("cycleLaunchMode(window) = %q, want pane", got)
 	}
-	if got := cycleLaunchMode("pane"); got != "in-place" {
-		t.Errorf("cycleLaunchMode(pane) = %q, want in-place", got)
+	if got := cycleLaunchMode("pane"); got != "tscode" {
+		t.Errorf("cycleLaunchMode(pane) = %q, want tscode", got)
+	}
+	if got := cycleLaunchMode("tscode"); got != "in-place" {
+		t.Errorf("cycleLaunchMode(tscode) = %q, want in-place", got)
 	}
 	// Unknown defaults to in-place.
 	if got := cycleLaunchMode(""); got != "in-place" {

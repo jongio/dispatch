@@ -44,7 +44,7 @@ type ConfigPanel struct {
 	yoloMode          bool
 	agent             string
 	model             string
-	launchMode        string // "in-place", "tab", "window", or "pane"
+	launchMode        string // "in-place", "tab", "window", "pane", or "tscode"
 	paneDirection     string // "auto", "right", "down", "left", "up"
 	terminal          string
 	shell             string
@@ -386,7 +386,7 @@ func stringDisplay(v string) string {
 	return styles.ConfigValueStyle.Render(v)
 }
 
-// cycleLaunchMode cycles through the four launch modes.
+// cycleLaunchMode cycles through the five launch modes.
 func cycleLaunchMode(current string) string {
 	switch current {
 	case config.LaunchModeInPlace:
@@ -395,6 +395,10 @@ func cycleLaunchMode(current string) string {
 		return config.LaunchModeWindow
 	case config.LaunchModeWindow:
 		return config.LaunchModePane
+	case config.LaunchModePane:
+		return config.LaunchModeTSCode
+	case config.LaunchModeTSCode:
+		return config.LaunchModeInPlace
 	default:
 		return config.LaunchModeInPlace
 	}
@@ -409,6 +413,8 @@ func launchModeDisplay(mode string) string {
 		return styles.ConfigValueStyle.Render("Window")
 	case config.LaunchModePane:
 		return styles.ConfigValueStyle.Render("Pane")
+	case config.LaunchModeTSCode:
+		return styles.ConfigValueStyle.Render("TSCode")
 	default:
 		return styles.ConfigValueStyle.Render("Tab")
 	}

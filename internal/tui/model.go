@@ -103,6 +103,7 @@ const (
 	stateShellPicker              // shell selection overlay
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
+	stateTSCodePicker             // tscode tab selection overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -159,6 +160,7 @@ type Model struct {
 	shellPicker     components.ShellPicker
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
+	tscodePicker    components.TSCodePicker
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -281,6 +283,7 @@ func NewModel() Model {
 		configPanel:     cp,
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
+		tscodePicker:    components.NewTSCodePicker(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 	}
 
@@ -769,6 +772,9 @@ func (m Model) View() tea.View {
 		case stateAttentionPicker:
 			content = m.attentionPicker.View()
 
+		case stateTSCodePicker:
+			content = m.tscodePicker.View()
+
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
 				content = m.renderReindexOverlay()
@@ -874,6 +880,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.attentionFilter = m.attentionPicker.Selected()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateTSCodePicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.tscodePicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.tscodePicker.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			choice := m.tscodePicker.Selected()
+			m.state = stateSessionList
+			cmd := m.launchViaTSCode(m.selectedSessionID(), m.selectedSessionCwd(), choice)
+			return m, cmd
 		}
 		return m, nil
 
@@ -1068,6 +1090,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		cmd := m.launchWithMode(config.LaunchModePane)
+		return m, cmd
+
+	case key.Matches(msg, keys.LaunchTSCode):
+		if m.sessionList.IsFolderSelected() {
+			cmd := m.launchNewInFolder(config.LaunchModeTSCode)
+			return m, cmd
+		}
+		if m.sessionList.SelectionCount() > 0 {
+			cmd := m.launchMultipleWithMode(config.LaunchModeTSCode)
+			return m, cmd
+		}
+		cmd := m.launchWithMode(config.LaunchModeTSCode)
 		return m, cmd
 
 	case key.Matches(msg, keys.Left):
@@ -2462,6 +2496,9 @@ func (m *Model) launchNewSession(cwd, mode string) tea.Cmd {
 	if mode == config.LaunchModeInPlace {
 		return m.launchInPlace("", cwd)
 	}
+	if mode == config.LaunchModeTSCode {
+		return m.launchTSCode("", cwd)
+	}
 	return m.resolveShellAndLaunch("", cwd, mode)
 }
 
@@ -2474,6 +2511,9 @@ func (m *Model) launchWithMode(mode string) tea.Cmd {
 	if mode == config.LaunchModeInPlace {
 		return m.launchInPlace(sess.ID, sess.Cwd)
 	}
+	if mode == config.LaunchModeTSCode {
+		return m.launchTSCode(sess.ID, sess.Cwd)
+	}
 	return m.resolveShellAndLaunch(sess.ID, sess.Cwd, mode)
 }
 
@@ -2484,7 +2524,69 @@ func (m *Model) launchNewInFolder(mode string) tea.Cmd {
 	if cwd == "" {
 		return nil
 	}
+	if mode == config.LaunchModeTSCode {
+		return m.launchTSCode("", cwd)
+	}
 	return m.resolveShellAndLaunch("", cwd, mode)
+}
+
+// launchTSCode checks whether tscode center is running and either opens the
+// session directly (no existing tabs) or shows the tab picker overlay.
+func (m *Model) launchTSCode(sessionID, cwd string) tea.Cmd {
+	tabs, err := platform.TSCodeListTabs()
+	if err != nil {
+		// tscode not running or not reachable.
+		m.statusErr = "tscode center is not running. Start it with 'tscode launch'"
+		return nil
+	}
+
+	if len(tabs) == 0 {
+		// No tabs — open directly in a new tab.
+		choice := components.TSCodePickerChoice{NewTab: true}
+		return m.launchViaTSCode(sessionID, cwd, choice)
+	}
+
+	// Show the tab picker so the user can choose new tab or existing tab.
+	m.tscodePicker.SetTabs(tabs)
+	m.tscodePicker.SetSize(m.width, m.height)
+	m.state = stateTSCodePicker
+	return nil
+}
+
+// launchViaTSCode sends the session to tscode center via IPC using the given
+// picker choice. It builds the resume command, then calls LaunchSession with
+// the tscode launch style.
+func (m *Model) launchViaTSCode(sessionID, cwd string, choice components.TSCodePickerChoice) tea.Cmd {
+	addToTab := 0
+	splitDir := ""
+	if !choice.NewTab {
+		addToTab = choice.TabID
+		splitDir = choice.SplitDir
+	}
+
+	sh := platform.DefaultShell()
+	if m.cfg.DefaultShell != "" {
+		sh = m.findShellByName(m.cfg.DefaultShell)
+	}
+
+	cfg := platform.ResumeConfig{
+		YoloMode:       m.cfg.YoloMode,
+		Agent:          m.cfg.Agent,
+		Model:          m.cfg.Model,
+		Terminal:       m.cfg.DefaultTerminal,
+		CustomCommand:  m.cfg.CustomCommand,
+		Cwd:            cwd,
+		LaunchStyle:    platform.LaunchStyleTSCode,
+		TSCodeTab:      addToTab,
+		TSCodeSplitDir: splitDir,
+	}
+	return func() tea.Msg {
+		if err := platform.LaunchSession(sh, sessionID, cfg); err != nil {
+			detail := fmt.Sprintf("tscode launch failed: %v", err)
+			return dataErrorMsg{err: errors.New(detail)}
+		}
+		return nil
+	}
 }
 
 // resolveShellAndLaunch picks the right shell (configured, single, or picker)
@@ -2534,6 +2636,12 @@ func (m *Model) findShellByName(name string) platform.ShellInfo {
 // shell, or the platform default. Used for multi-session batch launches where
 // showing an interactive picker per-session is impractical.
 func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd {
+	// TSCode batch: open each session directly in a new tab (no picker).
+	if mode == config.LaunchModeTSCode {
+		choice := components.TSCodePickerChoice{NewTab: true}
+		return m.launchViaTSCode(sessionID, cwd, choice)
+	}
+
 	launchStyle := launchStyleForMode(mode)
 
 	var sh platform.ShellInfo
@@ -2581,6 +2689,8 @@ func launchStyleForMode(mode string) string {
 		return platform.LaunchStyleWindow
 	case config.LaunchModePane:
 		return platform.LaunchStylePane
+	case config.LaunchModeTSCode:
+		return platform.LaunchStyleTSCode
 	default:
 		return platform.LaunchStyleTab
 	}
