@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"runtime"
 	"time"
 )
 
-// Pipe/socket paths for tscode center IPC.
+// Pipe/socket paths for tscode center IPC (legacy, single-instance fallback).
 const (
 	tscodePipeWindows = `\\.\pipe\terminal-studio-code`
 	tscodePipeUnix    = "/tmp/tscode.sock"
@@ -16,6 +18,20 @@ const (
 
 // tscodeTimeout is the maximum time to wait for a tscode IPC response.
 const tscodeTimeout = 5 * time.Second
+
+// tscodePipePath returns the IPC pipe/socket path for the tscode center
+// instance. It reads the TSCODE_PIPE environment variable (set by the
+// tscode launcher for instance-specific IPC) and falls back to the
+// legacy well-known path for backwards compatibility.
+func tscodePipePath() string {
+	if p := os.Getenv("TSCODE_PIPE"); p != "" {
+		return p
+	}
+	if runtime.GOOS == "windows" {
+		return tscodePipeWindows
+	}
+	return tscodePipeUnix
+}
 
 // ---------------------------------------------------------------------------
 // Wire types — match the tscode center JSON protocol.

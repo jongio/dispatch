@@ -12,5 +12,5 @@ import (
 // regular files, yielding a bidirectional stream suitable for JSON
 // line-protocol communication.
 func dialTSCode() (io.ReadWriteCloser, error) {
-	return os.OpenFile(tscodePipeWindows, os.O_RDWR, 0)
+	return os.OpenFile(tscodePipePath(), os.O_RDWR, 0)
 }
