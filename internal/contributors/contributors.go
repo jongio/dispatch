@@ -2,6 +2,7 @@
 package contributors
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -124,7 +125,7 @@ func FormatContributorsFile(contributors []Contributor) string {
 		if c.Count == 1 {
 			b.WriteString(" -- 1 contribution\n")
 		} else {
-			b.WriteString(fmt.Sprintf(" -- %d contributions\n", c.Count))
+			fmt.Fprintf(&b, " -- %d contributions\n", c.Count)
 		}
 	}
 
@@ -162,7 +163,7 @@ func extract(repoDir, revRange string) ([]Contributor, error) {
 }
 
 func gitOutput(repoDir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(context.Background(), "git", args...)
 	cmd.Dir = repoDir
 	out, err := cmd.Output()
 	if err != nil {
