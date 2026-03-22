@@ -39,6 +39,9 @@ var Version = "dev"
 // same Y position for them to be treated as a double-click.
 const doubleClickTimeout = 300 * time.Millisecond
 
+// themeAuto is the reserved theme name for terminal-adaptive colours.
+const themeAuto = "auto"
+
 const (
 	// copilotSearchTimeout limits a single Copilot AI search request.
 	// Must be generous: Init ~1s + Search ~10s + retries (3 × [0.5s + 1s + 10s]) ≈ 45s.
@@ -122,6 +125,10 @@ type Model struct {
 	width  int
 	height int
 	layout layout
+
+	// hasDarkBackground is set by tea.BackgroundColorMsg on startup.
+	// Used to select the correct light/dark color variant for the "auto" theme.
+	hasDarkBackground bool
 
 	// Data layer.
 	store *data.Store
@@ -233,7 +240,7 @@ func NewModel() Model {
 
 	// Build the list of available theme names for the config panel.
 	themeNames := make([]string, 0, 1+len(styles.BuiltinSchemeNames())+len(cfg.Schemes))
-	themeNames = append(themeNames, "auto")
+	themeNames = append(themeNames, themeAuto)
 	themeNames = append(themeNames, styles.BuiltinSchemeNames()...)
 	for _, cs := range cfg.Schemes {
 		themeNames = append(themeNames, cs.Name)
@@ -286,16 +293,15 @@ func NewModel() Model {
 // resolveTheme applies a user-chosen color scheme.
 //
 // When the config field is empty or "auto" we keep the legacy
-// adaptive-color defaults set by styles.init().  Those use
-// lipgloss.AdaptiveColor which adapts to the terminal's own
-// light/dark mode, so the UI looks correct on every terminal
-// without any detection logic.
+// defaults from styles.init().  The correct light/dark variant
+// is applied later when tea.BackgroundColorMsg is received
+// (see the Update handler).
 //
 // Only when the user explicitly names a scheme (built-in or
 // user-defined) do we derive a fixed-hex theme and apply it.
 func resolveTheme(cfg *config.Config) {
 	themeName := cfg.Theme
-	if themeName == "" || themeName == "auto" {
+	if themeName == "" || themeName == themeAuto {
 		// Keep the legacy adaptive-color defaults from
 		// styles.init() — no override needed.
 		return
@@ -330,11 +336,22 @@ func (m Model) Init() tea.Cmd {
 		detectTerminalsCmd(),
 		checkNerdFontCmd(),
 		m.spinner.Tick,
+		tea.RequestBackgroundColor,
 	)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	// ----- Background color detection --------------------------------------
+	case tea.BackgroundColorMsg:
+		m.hasDarkBackground = msg.IsDark()
+		// Re-apply the auto theme with the correct light/dark variant.
+		themeName := m.cfg.Theme
+		if themeName == "" || themeName == themeAuto {
+			styles.ApplyAutoTheme(msg.IsDark())
+		}
+		return m, nil
 
 	// ----- Window resize ---------------------------------------------------
 	case tea.WindowSizeMsg:
