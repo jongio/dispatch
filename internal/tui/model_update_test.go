@@ -1997,7 +1997,7 @@ func TestHandleKey_Hide(t *testing.T) {
 func TestHandleKey_CopyID_NoSession(t *testing.T) {
 	m := newTestModel()
 	// No sessions loaded — Selected() returns false.
-	result, cmd := m.Update(runeKeyMsg('y'))
+	result, cmd := m.Update(runeKeyMsg('c'))
 	rm := result.(Model)
 	if rm.statusInfo != "" {
 		t.Errorf("statusInfo = %q, want empty when no session selected", rm.statusInfo)
@@ -2018,7 +2018,7 @@ func TestHandleKey_CopyID_Success(t *testing.T) {
 
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
-	result, cmd := m.Update(runeKeyMsg('y'))
+	result, cmd := m.Update(runeKeyMsg('c'))
 	rm := result.(Model)
 	if copied != "abc-123" {
 		t.Errorf("clipboard text = %q, want %q", copied, "abc-123")
@@ -2043,7 +2043,7 @@ func TestHandleKey_CopyID_Error(t *testing.T) {
 
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
-	result, cmd := m.Update(runeKeyMsg('y'))
+	result, cmd := m.Update(runeKeyMsg('c'))
 	rm := result.(Model)
 	if rm.statusErr == "" {
 		t.Error("statusErr should be set on clipboard error")

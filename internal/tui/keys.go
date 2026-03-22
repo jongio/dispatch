@@ -112,5 +112,5 @@ var keys = keyMap{
 	ResumeInterrupted: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resume interrupted")),
 	ViewPlan:          key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view plan")),
 	FilterPlans:       key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "filter plans")),
-	CopyID:            key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank session ID")),
+	CopyID:            key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID")),
 }
