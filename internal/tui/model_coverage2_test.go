@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -391,7 +391,7 @@ func TestHandleKey_QuestionMark(t *testing.T) {
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}}
+	msg := tea.KeyPressMsg{Code: '?', Text: "?"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	_ = rm // verify no panic; ? may open help or attention picker
@@ -402,7 +402,7 @@ func TestHandleKey_Slash_Search(t *testing.T) {
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}}
+	msg := tea.KeyPressMsg{Code: '/', Text: "/"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	_ = rm // search should be activated
@@ -414,7 +414,7 @@ func TestHandleKey_S_Sort(t *testing.T) {
 	m.sessionList.SetSessions(m.sessions)
 	origSort := m.sort.Field
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}
+	msg := tea.KeyPressMsg{Code: 's', Text: "s"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.sort.Field == origSort {
@@ -429,7 +429,7 @@ func TestHandleKey_O_ToggleOrder(t *testing.T) {
 	origOrder := m.sort.Order
 
 	// 'S' (uppercase) toggles sort order
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}}
+	msg := tea.KeyPressMsg{Code: 'S', Text: "S"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.sort.Order == origOrder {
@@ -443,7 +443,7 @@ func TestHandleKey_Tab_CyclePivot(t *testing.T) {
 	m.sessionList.SetSessions(m.sessions)
 	origPivot := m.pivot
 
-	msg := tea.KeyMsg{Type: tea.KeyTab}
+	msg := tea.KeyPressMsg{Code: tea.KeyTab}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.pivot == origPivot {
@@ -457,7 +457,7 @@ func TestHandleKey_H_ToggleHidden(t *testing.T) {
 	m.sessionList.SetSessions(m.sessions)
 
 	// 'H' (uppercase) toggles showHidden
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'H'}}
+	msg := tea.KeyPressMsg{Code: 'H', Text: "H"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.showHidden == m.showHidden {
@@ -472,7 +472,7 @@ func TestHandleKey_F_ToggleFavorites(t *testing.T) {
 	origFav := m.showFavorited
 
 	// 'F' (uppercase) toggles favorites filter
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}}
+	msg := tea.KeyPressMsg{Code: 'F', Text: "F"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.showFavorited == origFav {
@@ -486,7 +486,7 @@ func TestHandleKey_M_TogglePlans(t *testing.T) {
 	m.sessionList.SetSessions(m.sessions)
 
 	// 'M' (uppercase) toggles plans filter
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}}
+	msg := tea.KeyPressMsg{Code: 'M', Text: "M"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
 	if rm.filterPlans == m.filterPlans {

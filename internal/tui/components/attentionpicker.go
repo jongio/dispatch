@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )

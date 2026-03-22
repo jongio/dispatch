@@ -433,6 +433,194 @@ func TestSetupDemo_NoDBFound(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// setupDemo — happy path from repo root
+// ---------------------------------------------------------------------------
+
+func TestSetupDemo_HappyPath(t *testing.T) {
+	// Preserve environment vars that setupDemo modifies.
+	t.Setenv("DISPATCH_DB", os.Getenv("DISPATCH_DB"))
+	t.Setenv("DISPATCH_SESSION_STATE", os.Getenv("DISPATCH_SESSION_STATE"))
+
+	// Find the module root.
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Skip("could not find module root")
+		}
+		dir = parent
+	}
+	t.Chdir(dir)
+
+	cleanup, err := setupDemo()
+	if err != nil {
+		t.Fatalf("setupDemo: %v", err)
+	}
+	if cleanup == nil {
+		t.Fatal("cleanup should be non-nil")
+	}
+	defer cleanup()
+
+	// Verify env vars were set.
+	if db := os.Getenv("DISPATCH_DB"); db == "" {
+		t.Error("DISPATCH_DB should be set after setupDemo")
+	}
+	if state := os.Getenv("DISPATCH_SESSION_STATE"); state == "" {
+		t.Error("DISPATCH_SESSION_STATE should be set after setupDemo")
+	}
+
+	// Verify the demo DB exists and was copied.
+	dbPath := os.Getenv("DISPATCH_DB")
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Errorf("demo DB should exist at %s: %v", dbPath, err)
+	}
+
+	// Verify session state dir was created with expected sessions.
+	stateDir := os.Getenv("DISPATCH_SESSION_STATE")
+	if _, err := os.Stat(stateDir); err != nil {
+		t.Errorf("session state dir should exist at %s: %v", stateDir, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// shiftDemoTimestamps — error paths
+// ---------------------------------------------------------------------------
+
+func TestShiftDemoTimestamps_BadDBPath(t *testing.T) {
+	t.Parallel()
+	err := shiftDemoTimestamps(filepath.Join(t.TempDir(), "nonexistent", "bad.db"))
+	if err == nil {
+		t.Error("expected error for nonexistent DB path")
+	}
+}
+
+func TestShiftDemoTimestamps_EmptyDB(t *testing.T) {
+	t.Parallel()
+	dbPath := filepath.Join(t.TempDir(), "empty.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = db.Exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at TEXT, updated_at TEXT)`)
+	_, _ = db.Exec(`CREATE TABLE turns (id INTEGER PRIMARY KEY, session_id TEXT, timestamp TEXT)`)
+	_, _ = db.Exec(`CREATE TABLE checkpoints (id INTEGER PRIMARY KEY, session_id TEXT, created_at TEXT)`)
+	_, _ = db.Exec(`CREATE TABLE session_files (id INTEGER PRIMARY KEY, session_id TEXT, first_seen_at TEXT)`)
+	_, _ = db.Exec(`CREATE TABLE session_refs (id INTEGER PRIMARY KEY, session_id TEXT, created_at TEXT)`)
+	db.Close()
+
+	// Empty DB → MAX(updated_at) is NULL → should produce an error.
+	err = shiftDemoTimestamps(dbPath)
+	if err == nil {
+		t.Log("no error for empty DB (NULL max) — function handled it gracefully")
+	}
+}
+
+func TestShiftDemoTimestamps_InvalidTimestamp(t *testing.T) {
+	t.Parallel()
+	dbPath := filepath.Join(t.TempDir(), "bad_ts.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at TEXT, updated_at TEXT)`,
+		`CREATE TABLE turns (id INTEGER PRIMARY KEY, session_id TEXT, timestamp TEXT)`,
+		`CREATE TABLE checkpoints (id INTEGER PRIMARY KEY, session_id TEXT, created_at TEXT)`,
+		`CREATE TABLE session_files (id INTEGER PRIMARY KEY, session_id TEXT, first_seen_at TEXT)`,
+		`CREATE TABLE session_refs (id INTEGER PRIMARY KEY, session_id TEXT, created_at TEXT)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Insert a row with an invalid timestamp.
+	_, _ = db.Exec(`INSERT INTO sessions (id, created_at, updated_at) VALUES ('s1', 'not-a-date', 'not-a-date')`)
+	db.Close()
+
+	err = shiftDemoTimestamps(dbPath)
+	if err == nil {
+		t.Error("expected error for invalid timestamp format")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// createDemoPlanFiles — error path
+// ---------------------------------------------------------------------------
+
+func TestCreateDemoPlanFiles_MkdirAllError(t *testing.T) {
+	t.Parallel()
+	// Create a file where a directory is expected to force MkdirAll failure.
+	blockingFile := filepath.Join(t.TempDir(), "blocking-file")
+	if err := os.WriteFile(blockingFile, []byte("not a dir"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := createDemoPlanFiles(filepath.Join(blockingFile, "subdir"))
+	if err == nil {
+		t.Error("expected error when state dir path is blocked by a file")
+	}
+}
+
+func TestCreateDemoPlanFiles_WriteFileError(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	// Pre-create a directory at the plan.md path to block file creation.
+	sessDir := filepath.Join(stateDir, demoPlanSessions[0])
+	if err := os.MkdirAll(sessDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	planDir := filepath.Join(sessDir, "plan.md")
+	if err := os.MkdirAll(planDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	err := createDemoPlanFiles(stateDir)
+	if err == nil {
+		t.Error("expected error when plan.md path is a directory")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// createDemoSessionState — error path
+// ---------------------------------------------------------------------------
+
+func TestCreateDemoSessionState_MkdirAllError(t *testing.T) {
+	t.Parallel()
+	blockingFile := filepath.Join(t.TempDir(), "blocking-file")
+	if err := os.WriteFile(blockingFile, []byte("not a dir"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := createDemoSessionState(filepath.Join(blockingFile, "subdir"))
+	if err == nil {
+		t.Error("expected error when state dir path is blocked by a file")
+	}
+}
+
+func TestCreateDemoSessionState_SessionDirError(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	// Block session directory creation by placing a file where a dir is expected.
+	blockPath := filepath.Join(stateDir, demoAttentionSessions[0].sessionID)
+	if err := os.WriteFile(blockPath, []byte("not a dir"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := createDemoSessionState(stateDir)
+	if err == nil {
+		t.Error("expected error when session dir path is blocked by a file")
+	}
+}
+
 // Suppress unused import warnings by referencing packages used in tests.
 var (
 	_ = fmt.Sprintf

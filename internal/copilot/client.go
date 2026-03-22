@@ -191,25 +191,25 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	// don't miss any streaming deltas.
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
 		switch event.Type {
-		case sdk.AssistantMessageDelta:
+		case sdk.SessionEventTypeAssistantMessageDelta:
 			if event.Data.DeltaContent != nil {
 				trySend(StreamEvent{Type: EventTextDelta, Content: *event.Data.DeltaContent})
 			}
-		case sdk.ToolExecutionStart:
+		case sdk.SessionEventTypeToolExecutionStart:
 			name := ""
 			if event.Data.ToolName != nil {
 				name = *event.Data.ToolName
 			}
 			trySend(StreamEvent{Type: EventToolStart, Content: name})
-		case sdk.ToolExecutionComplete:
+		case sdk.SessionEventTypeToolExecutionComplete:
 			name := ""
 			if event.Data.ToolName != nil {
 				name = *event.Data.ToolName
 			}
 			trySend(StreamEvent{Type: EventToolDone, Content: name})
-		case sdk.SessionIdle:
+		case sdk.SessionEventTypeSessionIdle:
 			trySend(StreamEvent{Type: EventDone})
-		case sdk.SessionError:
+		case sdk.SessionEventTypeSessionError:
 			msg := "unknown error"
 			if event.Data.Content != nil {
 				msg = *event.Data.Content

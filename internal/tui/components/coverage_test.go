@@ -3,7 +3,7 @@ package components
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -567,7 +567,7 @@ func TestCountUniqueRefs_Empty(t *testing.T) {
 func TestConfigPanel_Update_NotEditing(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()
-	msg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	msg := tea.KeyPressMsg{Code: 'a', Text: "a"}
 	cp2, cmd := cp.Update(msg)
 	if cmd != nil {
 		t.Error("Update when not editing should return nil cmd")
@@ -587,7 +587,7 @@ func TestConfigPanel_Update_Editing(t *testing.T) {
 		t.Fatal("should be in editing mode after HandleEnter on Agent")
 	}
 
-	msg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	msg := tea.KeyPressMsg{Code: 'x', Text: "x"}
 	cp2, _ := cp.Update(msg)
 	// Should still be editing after typing.
 	if !cp2.IsEditing() {
@@ -603,7 +603,7 @@ func TestSearchBar_Update(t *testing.T) {
 	t.Parallel()
 	sb := NewSearchBar()
 	sb.Focus()
-	msg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	msg := tea.KeyPressMsg{Code: 'h', Text: "h"}
 	sb2, _ := sb.Update(msg)
 	// Value may or may not contain 'h' depending on textinput state,
 	// but should not panic.

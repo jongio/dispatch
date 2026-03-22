@@ -3,13 +3,17 @@
 //
 // The package exposes the same set of style variables as before, but they
 // are now backed by a Theme instance.  Call SetTheme() to swap the active
-// palette; all exported style variables are updated atomically.
+// palette; all exported style variables are updated sequentially in one shot.
 //
 // When no explicit SetTheme() call is made the package initialises with
 // the legacy adaptive-color palette so existing code keeps working.
 package styles
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 // currentTheme holds the active theme.  Access via CurrentTheme().
 var currentTheme *Theme
@@ -17,7 +21,7 @@ var currentTheme *Theme
 func init() {
 	// Build the legacy default theme so every exported variable is
 	// populated before any consumer reads them.
-	applyLegacyDefaults()
+	applyLegacyDefaults(true) // default to dark; updated by BackgroundColorMsg
 }
 
 // SetTheme swaps the active theme and updates every exported style
@@ -94,15 +98,15 @@ func CurrentTheme() *Theme {
 var (
 	// ColorPrimary is the accent color used for highlights, links, and
 	// interactive elements. Updated by SetTheme.
-	ColorPrimary lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#7C6FF4"}
+	ColorPrimary color.Color = lipgloss.Color("#7C6FF4")
 
 	// ColorText is the primary foreground color for body text.
 	// Updated by SetTheme.
-	ColorText lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#1A1A2E", Dark: "#E4E4E7"}
+	ColorText color.Color = lipgloss.Color("#E4E4E7")
 
 	// ColorDimmed is a muted foreground color for secondary or
 	// de-emphasised text. Updated by SetTheme.
-	ColorDimmed lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#71717A", Dark: "#71717A"}
+	ColorDimmed color.Color = lipgloss.Color("#71717A")
 )
 
 // ---------------------------------------------------------------------------
@@ -225,62 +229,73 @@ var (
 	PlanIndicatorStyle lipgloss.Style
 )
 
-// applyLegacyDefaults initialises the exported variables with the same
-// adaptive-color defaults that existed before theming was introduced.
-// This ensures backward compatibility when SetTheme() is never called.
-func applyLegacyDefaults() {
-	lp := lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#7C6FF4"}
-	lt := lipgloss.AdaptiveColor{Light: "#1A1A2E", Dark: "#E4E4E7"}
-	ld := lipgloss.AdaptiveColor{Light: "#71717A", Dark: "#71717A"}
-	lb := lipgloss.AdaptiveColor{Light: "#D4D4D8", Dark: "#3F3F46"}
-	ls := lipgloss.AdaptiveColor{Light: "#EEE8FF", Dark: "#2D2250"}
-	le := lipgloss.AdaptiveColor{Light: "#DC2626", Dark: "#F87171"}
-	lk := lipgloss.AdaptiveColor{Light: "#16A34A", Dark: "#4ADE80"}
-	lbdg := lipgloss.AdaptiveColor{Light: "#6D28D9", Dark: "#A78BFA"}
-	lbbg := lipgloss.AdaptiveColor{Light: "#F5F3FF", Dark: "#1E1538"}
+// applyLegacyDefaults initialises the exported variables with the original
+// light/dark adaptive-color pairs from v1.  isDark selects the dark variant.
+// Called at init with isDark=true (safe default); later re-called by
+// ApplyAutoTheme when the terminal background colour is detected.
+// ApplyAutoTheme re-applies the legacy adaptive-color defaults using the
+// given background brightness.  Call this when the terminal background
+// colour is detected (via tea.BackgroundColorMsg) and the user has not
+// selected an explicit theme.
+func ApplyAutoTheme(isDark bool) {
+	applyLegacyDefaults(isDark)
+}
+
+func applyLegacyDefaults(isDark bool) {
+	lightDark := lipgloss.LightDark(isDark)
+	c := lipgloss.Color
+	lp := lightDark(c("#5A56E0"), c("#7C6FF4"))
+	lt := lightDark(c("#1A1A2E"), c("#E4E4E7"))
+	dimmed := lightDark(c("#71717A"), c("#71717A"))
+	lb := lightDark(c("#D4D4D8"), c("#3F3F46"))
+	ls := lightDark(c("#EEE8FF"), c("#2D2250"))
+	le := lightDark(c("#DC2626"), c("#F87171"))
+	lk := lightDark(c("#16A34A"), c("#4ADE80"))
+	lbdg := lightDark(c("#6D28D9"), c("#A78BFA"))
+	lbbg := lightDark(c("#F5F3FF"), c("#1E1538"))
 
 	ColorPrimary = lp
 	ColorText = lt
-	ColorDimmed = ld
+	ColorDimmed = dimmed
 
 	TitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
-	SubtitleStyle = lipgloss.NewStyle().Foreground(ld)
+	SubtitleStyle = lipgloss.NewStyle().Foreground(dimmed)
 	HeaderStyle = lipgloss.NewStyle().Foreground(lt)
 
 	SelectedStyle = lipgloss.NewStyle().Bold(true).Background(ls).Foreground(lt)
 	NormalStyle = lipgloss.NewStyle().Foreground(lt)
-	DimmedStyle = lipgloss.NewStyle().Foreground(ld)
-	HiddenStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
+	DimmedStyle = lipgloss.NewStyle().Foreground(dimmed)
+	HiddenStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	FavoritedStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
 
 	BadgeStyle = lipgloss.NewStyle().Foreground(lbdg).Background(lbbg).Padding(0, 1)
 	ActiveBadgeStyle = lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Foreground(lipgloss.Color("#FFFFFF")).
 		Background(lp).Padding(0, 1)
 
 	PreviewBorderStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lb).Padding(0, 1)
 	PreviewTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lp).Padding(0, 0, 1, 0)
 	PreviewLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lt)
-	PreviewValueStyle = lipgloss.NewStyle().Foreground(ld)
+	PreviewValueStyle = lipgloss.NewStyle().Foreground(dimmed)
 
 	OverlayStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lp).
 		Foreground(lt).Padding(1, 2)
 	OverlayTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lp).Padding(0, 0, 1, 0)
 
-	StatusBarStyle = lipgloss.NewStyle().Foreground(ld)
+	StatusBarStyle = lipgloss.NewStyle().Foreground(dimmed)
 	SearchPromptStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	ErrorStyle = lipgloss.NewStyle().Foreground(le)
 	SuccessStyle = lipgloss.NewStyle().Foreground(lk)
-	DimStyle = lipgloss.NewStyle().Foreground(ld)
+	DimStyle = lipgloss.NewStyle().Foreground(dimmed)
 	KeyStyle = lipgloss.NewStyle().Foreground(lp)
 	SpinnerStyle = lipgloss.NewStyle().Foreground(lp)
 	SeparatorStyle = lipgloss.NewStyle().Foreground(lb)
 	ConfigLabelStyle = lipgloss.NewStyle().Foreground(lt).Width(20)
 	ConfigValueStyle = lipgloss.NewStyle().Foreground(lp)
-	ConfigDimmedValue = lipgloss.NewStyle().Foreground(ld)
+	ConfigDimmedValue = lipgloss.NewStyle().Foreground(dimmed)
 
 	// Chat bubble styles — thick side-bar borders only.
 	ChatUserBubbleStyle = lipgloss.NewStyle().
@@ -296,21 +311,27 @@ func applyLegacyDefaults() {
 		Foreground(lt).
 		PaddingLeft(1).PaddingRight(1)
 	ChatUserLabelStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
-	ChatAssistantLabelStyle = lipgloss.NewStyle().Foreground(ld).Bold(true)
+	ChatAssistantLabelStyle = lipgloss.NewStyle().Foreground(dimmed).Bold(true)
 
 	// Attention dot styles — legacy adaptive defaults.
 	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
-	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C19C00", Dark: "#C19C00"})
-	AttentionIdleStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
-	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#EA580C", Dark: "#F97316"}).Bold(true)
-	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0891B2", Dark: "#22D3EE"}).Bold(true)
+	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00")))
+	AttentionIdleStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
+	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lightDark(c("#EA580C"), c("#F97316"))).Bold(true)
+	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE"))).Bold(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
+	primary := "#7C6FF4"
+	text := "#E4E4E7"
+	if !isDark {
+		primary = "#5A56E0"
+		text = "#1A1A2E"
+	}
 	currentTheme = &Theme{
 		SchemeName: "Default",
-		Primary:    "#7C6FF4",
-		Text:       "#E4E4E7",
+		Primary:    primary,
+		Text:       text,
 		Dimmed:     "#71717A",
 		Border:     "#3F3F46",
 		Selected:   "#2D2250",
@@ -320,7 +341,7 @@ func applyLegacyDefaults() {
 		BadgeBg:    "#1E1538",
 		StatusBg:   "#18181B",
 		HeaderBg:   "#111111",
-		IsDark:     true,
+		IsDark:     isDark,
 	}
 }
 

@@ -4,9 +4,9 @@ package components
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/styles"
@@ -70,7 +70,10 @@ func NewConfigPanel() ConfigPanel {
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.CharLimit = 256
-	ti.PromptStyle = styles.SearchPromptStyle
+	tiStyles := ti.Styles()
+	tiStyles.Focused.Prompt = styles.SearchPromptStyle
+	tiStyles.Blurred.Prompt = styles.SearchPromptStyle
+	ti.SetStyles(tiStyles)
 	ti.Prompt = "> "
 
 	return ConfigPanel{

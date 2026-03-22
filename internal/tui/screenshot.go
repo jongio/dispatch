@@ -7,11 +7,6 @@
 package tui
 
 import (
-	"os"
-
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
-
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
@@ -65,7 +60,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		t := styles.CurrentTheme()
 		shots = append(shots, Screenshot{
 			Name: name, SubDir: subDir,
-			ANSI: m.View(), FG: t.Text, BG: t.Background,
+			ANSI: m.View().Content, FG: t.Text, BG: t.Background,
 			Palette:    t.ANSIPalette,
 			Highlights: highlights,
 		})
@@ -74,7 +69,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		t := styles.CurrentTheme()
 		shots = append(shots, Screenshot{
 			Name: name, SubDir: subDir,
-			ANSI: m.View(), FG: t.Text, BG: t.Background,
+			ANSI: m.View().Content, FG: t.Text, BG: t.Background,
 			Palette: t.ANSIPalette,
 		})
 	}
@@ -502,11 +497,6 @@ var allThemes = []themeEntry{
 // CaptureScreenshots drives the TUI model through every visual state
 // used on the website and returns the rendered ANSI output for each.
 func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) {
-	// Force TrueColor rendering even when stdout is not a terminal.
-	lipgloss.SetDefaultRenderer(
-		lipgloss.NewRenderer(os.Stdout, termenv.WithProfile(termenv.TrueColor)),
-	)
-
 	// Enable NerdFont icons so the title bar shows the terminal glyph
 	// instead of the ⚡ fallback.
 	styles.SetNerdFontEnabled(true)

@@ -2,18 +2,13 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jongio/dispatch/internal/config"
-	"github.com/jongio/dispatch/internal/data"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jongio/dispatch/internal/tui"
 	"github.com/jongio/dispatch/internal/update"
 )
@@ -36,70 +31,15 @@ func main() {
 		defer origStderr.Close() //nolint:errcheck // best-effort cleanup
 	}
 
-	for _, arg := range os.Args[1:] {
-		switch arg {
-		case "--help", "-h", "help":
-			printUsage()
-			showUpdateNotification(origStderr, updateCh)
-			return
-
-		case "--version", "-v", "version":
-			fmt.Println(tui.Version)
-			showUpdateNotification(origStderr, updateCh)
-			return
-
-		case "update":
-			if err := update.RunUpdate(tui.Version); err != nil {
-				fmt.Fprintf(os.Stderr, "update: %v\n", err)
-				os.Exit(1)
-			}
-			return
-
-		case "--demo":
-			demoCleanup, demoErr := setupDemo()
-			if demoErr != nil {
-				fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
-				os.Exit(1)
-			}
-			defer demoCleanup()
-
-		case "--clear-cache":
-			if err := config.Reset(); err != nil {
-				fmt.Fprintf(os.Stderr, "clear-cache: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Println("Config reset to defaults.")
-			return
-
-		case "--reindex":
-			fmt.Println("Reindexing session store via Copilot CLI…")
-			err := data.ChronicleReindex(context.Background(), func(line string) {
-				fmt.Println(line)
-			})
-			if err != nil {
-				if errors.Is(err, data.ErrCopilotNotFound) {
-					fmt.Println("Copilot CLI not found, running index maintenance…")
-					if mErr := data.Maintain(); mErr != nil {
-						fmt.Fprintf(os.Stderr, "reindex: %v\n", mErr)
-						os.Exit(1)
-					}
-				} else {
-					fmt.Fprintf(os.Stderr, "reindex: %v\n", err)
-					os.Exit(1)
-				}
-			}
-			// Post-reindex maintenance (WAL checkpoint + FTS5 optimize).
-			if mErr := data.Maintain(); mErr != nil {
-				fmt.Fprintf(os.Stderr, "warning: post-reindex maintenance: %v\n", mErr)
-			}
-			fmt.Println("Done.")
-			return
-
-		default:
-			fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
-			printUsage()
-			os.Exit(1)
-		}
+	done, demoCleanup, err := handleArgs(os.Args[1:], origStderr, updateCh)
+	if demoCleanup != nil {
+		defer demoCleanup()
+	}
+	if err != nil {
+		os.Exit(1)
+	}
+	if done {
+		return
 	}
 
 	// Redirect stderr BEFORE starting Bubble Tea.  The Copilot SDK
@@ -107,28 +47,8 @@ func main() {
 	// "file already closed" to it.  That raw output leaks into Bubble
 	// Tea's alt-screen buffer.  By redirecting fd 2 here we ensure the
 	// subprocess's stderr goes to the log file (if set) or /dev/null.
-	var logFile *os.File
-	logWriter := io.Discard
-	if logPath := os.Getenv("DISPATCH_LOG"); logPath != "" {
-		// Validate log path: must be absolute and local (reject UNC paths
-		// on Windows that could trigger outbound SMB authentication).
-		cleaned := filepath.Clean(logPath)
-		if filepath.IsAbs(cleaned) && !strings.HasPrefix(cleaned, `\\`) {
-			if f, err := os.OpenFile(cleaned, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
-				logFile = f
-				logWriter = f
-			}
-		}
-	}
-	if logFile != nil {
-		redirectStderr(logFile)
-		defer logFile.Close() //nolint:errcheck // best-effort cleanup
-	} else {
-		if devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0); err == nil {
-			redirectStderr(devNull)
-			defer devNull.Close() //nolint:errcheck // best-effort cleanup
-		}
-	}
+	logWriter, logCleanup := setupLogRedirect()
+	defer logCleanup()
 
 	// Silence slog during TUI mode — direct structured logs to the same
 	// destination as stderr (log file or discard).
@@ -146,8 +66,6 @@ func main() {
 
 	p := tea.NewProgram(
 		tui.NewModel(),
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
 	)
 
 	if _, err := p.Run(); err != nil {

@@ -1,9 +1,9 @@
 package components
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
@@ -26,8 +26,12 @@ func NewSearchBar() SearchBar {
 	ti.Placeholder = "Search sessions…"
 	ti.Prompt = styles.IconSearch() + " "
 	ti.CharLimit = 0 // unlimited
-	ti.PlaceholderStyle = styles.DimmedStyle
-	ti.PromptStyle = styles.SearchPromptStyle
+	tiStyles := ti.Styles()
+	tiStyles.Focused.Placeholder = styles.DimmedStyle
+	tiStyles.Blurred.Placeholder = styles.DimmedStyle
+	tiStyles.Focused.Prompt = styles.SearchPromptStyle
+	tiStyles.Blurred.Prompt = styles.SearchPromptStyle
+	ti.SetStyles(tiStyles)
 	return SearchBar{input: ti}
 }
 
@@ -92,7 +96,7 @@ func (s *SearchBar) SetAIResults(n int) {
 // SetWidth sets the available width for the search bar.
 func (s *SearchBar) SetWidth(w int) {
 	s.width = w
-	s.input.Width = max(10, w-6) // account for prompt + padding
+	s.input.SetWidth(max(10, w-6)) // account for prompt + padding
 }
 
 // Update delegates a tea.Msg to the underlying textinput.
@@ -141,7 +145,7 @@ func (s SearchBar) View() string {
 		suffixW := lipgloss.Width(suffix)
 		// 4 = prompt icon + space + small padding
 		inputW := max(10, s.width-suffixW-4)
-		s.input.Width = inputW
+		s.input.SetWidth(inputW)
 	}
 
 	v := s.input.View() + suffix

@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/copilot"
@@ -39,6 +39,9 @@ var Version = "dev"
 // same Y position for them to be treated as a double-click.
 const doubleClickTimeout = 300 * time.Millisecond
 
+// themeAuto is the reserved theme name for terminal-adaptive colours.
+const themeAuto = "auto"
+
 const (
 	// copilotSearchTimeout limits a single Copilot AI search request.
 	// Must be generous: Init ~1s + Search ~10s + retries (3 × [0.5s + 1s + 10s]) ≈ 45s.
@@ -51,6 +54,10 @@ const (
 	// statusReindexCancelled is the status message shown when the user
 	// cancels an in-flight reindex operation.
 	statusReindexCancelled = "Reindex cancelled"
+
+	// cancelBtnLabel is the button label shown in overlays that can be
+	// dismissed with Escape (reindex, etc.).
+	cancelBtnLabel = "[ Cancel (esc) ]"
 
 	// headerRightReserve is the default column reserve on the right side
 	// of the header row (accounts for a potential trailing space or cursor).
@@ -118,6 +125,10 @@ type Model struct {
 	width  int
 	height int
 	layout layout
+
+	// hasDarkBackground is set by tea.BackgroundColorMsg on startup.
+	// Used to select the correct light/dark color variant for the "auto" theme.
+	hasDarkBackground bool
 
 	// Data layer.
 	store *data.Store
@@ -229,7 +240,7 @@ func NewModel() Model {
 
 	// Build the list of available theme names for the config panel.
 	themeNames := make([]string, 0, 1+len(styles.BuiltinSchemeNames())+len(cfg.Schemes))
-	themeNames = append(themeNames, "auto")
+	themeNames = append(themeNames, themeAuto)
 	themeNames = append(themeNames, styles.BuiltinSchemeNames()...)
 	for _, cs := range cfg.Schemes {
 		themeNames = append(themeNames, cs.Name)
@@ -282,16 +293,15 @@ func NewModel() Model {
 // resolveTheme applies a user-chosen color scheme.
 //
 // When the config field is empty or "auto" we keep the legacy
-// adaptive-color defaults set by styles.init().  Those use
-// lipgloss.AdaptiveColor which adapts to the terminal's own
-// light/dark mode, so the UI looks correct on every terminal
-// without any detection logic.
+// defaults from styles.init().  The correct light/dark variant
+// is applied later when tea.BackgroundColorMsg is received
+// (see the Update handler).
 //
 // Only when the user explicitly names a scheme (built-in or
 // user-defined) do we derive a fixed-hex theme and apply it.
 func resolveTheme(cfg *config.Config) {
 	themeName := cfg.Theme
-	if themeName == "" || themeName == "auto" {
+	if themeName == "" || themeName == themeAuto {
 		// Keep the legacy adaptive-color defaults from
 		// styles.init() — no override needed.
 		return
@@ -326,11 +336,22 @@ func (m Model) Init() tea.Cmd {
 		detectTerminalsCmd(),
 		checkNerdFontCmd(),
 		m.spinner.Tick,
+		tea.RequestBackgroundColor,
 	)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	// ----- Background color detection --------------------------------------
+	case tea.BackgroundColorMsg:
+		m.hasDarkBackground = msg.IsDark()
+		// Re-apply the auto theme with the correct light/dark variant.
+		themeName := m.cfg.Theme
+		if themeName == "" || themeName == themeAuto {
+			styles.ApplyAutoTheme(msg.IsDark())
+		}
+		return m, nil
 
 	// ----- Window resize ---------------------------------------------------
 	case tea.WindowSizeMsg:
@@ -713,7 +734,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	// ----- Keyboard --------------------------------------------------------
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
 	// ----- Mouse -----------------------------------------------------------
@@ -724,43 +745,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	if m.width == 0 || m.height == 0 {
-		return ""
-	}
+		content = ""
+	} else {
+		switch m.state {
+		case stateLoading:
+			content = m.renderLoadingView()
 
-	switch m.state {
-	case stateLoading:
-		return m.renderLoadingView()
+		case stateHelpOverlay:
+			content = m.help.View()
 
-	case stateHelpOverlay:
-		return m.help.View()
+		case stateShellPicker:
+			content = m.shellPicker.View()
 
-	case stateShellPicker:
-		return m.shellPicker.View()
+		case stateFilterPanel:
+			content = m.filterPanel.View()
 
-	case stateFilterPanel:
-		return m.filterPanel.View()
+		case stateConfigPanel:
+			content = m.configPanel.View()
 
-	case stateConfigPanel:
-		return m.configPanel.View()
+		case stateAttentionPicker:
+			content = m.attentionPicker.View()
 
-	case stateAttentionPicker:
-		return m.attentionPicker.View()
-
-	default: // stateSessionList
-		if m.reindexing && len(m.reindexLog) > 0 {
-			return m.renderReindexOverlay()
+		default: // stateSessionList
+			if m.reindexing && len(m.reindexLog) > 0 {
+				content = m.renderReindexOverlay()
+			} else {
+				content = m.renderMainView()
+			}
 		}
-		return m.renderMainView()
 	}
+
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 // ---------------------------------------------------------------------------
 // Key handling
 // ---------------------------------------------------------------------------
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Force-quit always works.
 	if key.Matches(msg, keys.ForceQuit) {
 		m.closeStore()
@@ -891,12 +919,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
-		case msg.Type == tea.KeyUp:
+		case key.Matches(msg, keys.Up):
 			m.searchBar.Blur()
 			m.sessionList.MoveUp()
 			m.detailVersion++
 			return m, m.loadSelectedDetailCmd()
-		case msg.Type == tea.KeyDown:
+		case key.Matches(msg, keys.Down):
 			m.searchBar.Blur()
 			m.sessionList.MoveDown()
 			m.detailVersion++
@@ -1128,8 +1156,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.reindexing {
 			m.reindexing = true
 			m.reindexLog = []string{"Starting reindex…"}
-			m.reindexVP = viewport.New(0, reindexOverlayHeight)
-			m.reindexVP.MouseWheelEnabled = true
+			m.reindexVP = viewport.New(viewport.WithHeight(reindexOverlayHeight))
+			// MouseWheelEnabled is default in v2
 			m.updateReindexViewport()
 			handle, cmds := components.StartChronicleReindex()
 			m.reindexCancel = &handle
@@ -1289,7 +1317,7 @@ func (m *Model) visibleHiddenSet() map[string]struct{} {
 }
 
 // handleConfigKey processes keys while the config panel is open.
-func (m Model) handleConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.configPanel.IsEditing() {
 		switch {
 		case key.Matches(msg, keys.Escape):
@@ -1342,6 +1370,13 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
 	m.previewPosition = v.PreviewPosition
+	resolveTheme(m.cfg)
+	// If the user switched back to "auto", re-apply with the detected
+	// terminal brightness so colours adapt immediately.
+	themeName := m.cfg.Theme
+	if themeName == "" || themeName == themeAuto {
+		styles.ApplyAutoTheme(m.hasDarkBackground)
+	}
 	m.recalcLayout()
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
@@ -1356,14 +1391,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// When reindex overlay is active, handle scroll within overlay viewport
 	// and block all other mouse events from reaching the background.
 	if m.reindexing && len(m.reindexLog) > 0 {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			m.reindexVP.ScrollUp(3)
-		case tea.MouseButtonWheelDown:
-			m.reindexVP.ScrollDown(3)
-		case tea.MouseButtonLeft:
-			if msg.Action == tea.MouseActionRelease {
-				// Check if click is on the cancel button area.
+		switch msg := msg.(type) {
+		case tea.MouseWheelMsg:
+			switch msg.Button {
+			case tea.MouseWheelUp:
+				m.reindexVP.ScrollUp(3)
+			case tea.MouseWheelDown:
+				m.reindexVP.ScrollDown(3)
+			}
+		case tea.MouseReleaseMsg:
+			if msg.Button == tea.MouseLeft {
 				m.handleReindexClick(msg)
 			}
 		}
@@ -1376,55 +1413,59 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Determine which pane the mouse is over.
-	overPreview := m.isOverPreview(msg.X, msg.Y)
+	mouse := msg.Mouse()
+	overPreview := m.isOverPreview(mouse.X, mouse.Y)
 
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
-		if overPreview {
-			m.preview.ScrollUp(3)
-		} else {
-			m.sessionList.ScrollBy(-3)
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			if overPreview {
+				m.preview.ScrollUp(3)
+			} else {
+				m.sessionList.ScrollBy(-3)
+				m.detailVersion++
+				return m, m.loadSelectedDetailCmd()
+			}
+		case tea.MouseWheelDown:
+			if overPreview {
+				m.preview.ScrollDown(3)
+			} else {
+				m.sessionList.ScrollBy(3)
+				m.detailVersion++
+				return m, m.loadSelectedDetailCmd()
+			}
 		}
 		return m, nil
 
-	case tea.MouseButtonWheelDown:
-		if overPreview {
-			m.preview.ScrollDown(3)
-		} else {
-			m.sessionList.ScrollBy(3)
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
-		}
-		return m, nil
-
-	case tea.MouseButtonLeft:
-		if msg.Action != tea.MouseActionRelease {
+	case tea.MouseReleaseMsg:
+		// Only handle left-button releases — right/middle clicks must not
+		// trigger selection, double-click detection, or session launch.
+		if msg.Button != tea.MouseLeft {
 			return m, nil
 		}
 
 		// --- Clickable header area (Y < HeaderLines) ---
-		if msg.Y < styles.HeaderLines {
-			return m.handleHeaderClick(msg.X, msg.Y)
+		if mouse.Y < styles.HeaderLines {
+			return m.handleHeaderClick(mouse.X, mouse.Y)
 		}
 
 		// Map Y coordinate to a list item.
-		listRow := msg.Y - styles.HeaderLines
+		listRow := mouse.Y - styles.HeaderLines
 		if listRow >= m.layout.contentHeight {
 			// Footer click — check for waiting badge.
-			return m.handleFooterClick(msg.X)
+			return m.handleFooterClick(mouse.X)
 		}
 		// Preview pane click — check conversation sort toggle.
-		if m.isOverPreview(msg.X, msg.Y) {
+		if m.isOverPreview(mouse.X, mouse.Y) {
 			var previewRow int
 			switch m.layout.previewPosition {
 			case config.PreviewPositionTop:
-				previewRow = msg.Y - styles.HeaderLines - 1 // -1 for top border
+				previewRow = mouse.Y - styles.HeaderLines - 1 // -1 for top border
 			case config.PreviewPositionBottom:
-				previewRow = msg.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+				previewRow = mouse.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
 			default:
-				previewRow = msg.Y - styles.HeaderLines - 1
+				previewRow = mouse.Y - styles.HeaderLines - 1
 			}
 			contentRow := previewRow + m.preview.ScrollOffset()
 			if m.preview.HitConversationSort(contentRow) {
@@ -1441,7 +1482,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Detect double-click: second click on the same row while a
 		// pending single-click timer is still running.
 		isDoubleClick := m.pendingClickVersion > 0 &&
-			msg.Y == m.pendingClickY
+			mouse.Y == m.pendingClickY
 
 		if isDoubleClick {
 			// Invalidate the pending single-click so it won't fire.
@@ -1458,9 +1499,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 			if m.sessionList.IsFolderSelected() {
 				mode := m.cfg.EffectiveLaunchMode()
-				if msg.Ctrl {
+				if msg.Mod.Contains(tea.ModCtrl) {
 					mode = config.LaunchModeWindow
-				} else if msg.Shift {
+				} else if msg.Mod.Contains(tea.ModShift) {
 					mode = config.LaunchModeTab
 				}
 				cmd := m.launchNewInFolder(mode)
@@ -1472,11 +1513,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				cmd := m.launchMultiple()
 				return m, cmd
 			}
-			if msg.Ctrl {
+			if msg.Mod.Contains(tea.ModCtrl) {
 				cmd := m.launchWithMode(config.LaunchModeWindow)
 				return m, cmd
 			}
-			if msg.Shift {
+			if msg.Mod.Contains(tea.ModShift) {
 				cmd := m.launchWithMode(config.LaunchModeTab)
 				return m, cmd
 			}
@@ -1487,7 +1528,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Ctrl+click: toggle multi-select immediately (no deferred action).
 		// If nothing is selected yet, auto-select the previously focused
 		// item first so it stays in the set (Windows Explorer behavior).
-		if msg.Ctrl {
+		if msg.Mod.Contains(tea.ModCtrl) {
 			if m.sessionList.SelectionCount() == 0 {
 				m.sessionList.ToggleSelected() // select current cursor item
 			}
@@ -1500,7 +1541,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Shift+click: range select from anchor to clicked item.
-		if msg.Shift {
+		if msg.Mod.Contains(tea.ModShift) {
 			m.sessionList.MoveTo(itemIdx)
 			m.sessionList.SelectRange(m.sessionList.Anchor(), itemIdx)
 			m.updateSelectionStatus()
@@ -1511,7 +1552,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// First click — defer the single-click action behind a timer so
 		// a potential second click (double-click) can cancel it.
 		m.pendingClickVersion++
-		m.pendingClickY = msg.Y
+		m.pendingClickY = mouse.Y
 		m.pendingClickItemIdx = itemIdx
 
 		// Immediately move selection so the highlight follows the cursor,
@@ -1949,7 +1990,7 @@ func (m Model) cancelReindex() (tea.Model, tea.Cmd) {
 
 // handleReindexClick checks whether a mouse click hit the cancel button
 // in the reindex overlay and cancels if so.
-func (m *Model) handleReindexClick(msg tea.MouseMsg) {
+func (m *Model) handleReindexClick(msg tea.MouseReleaseMsg) {
 	innerW := m.reindexInnerWidth()
 	overlayW := innerW + overlayBorderPadding
 	// title (with bottom padding 1) + viewport + cancel row + padding top/bottom from border
@@ -1960,11 +2001,12 @@ func (m *Model) handleReindexClick(msg tea.MouseMsg) {
 
 	// The cancel button is on the last content row before bottom border/padding.
 	btnY := startY + overlayH - 3 // 1 border + 1 padding from bottom
-	btnLabel := "[ Cancel (esc) ]"
+	btnLabel := cancelBtnLabel
 	btnW := lipgloss.Width(btnLabel)
 	btnX := startX + (overlayW-btnW)/2
 
-	if msg.Y == btnY && msg.X >= btnX && msg.X < btnX+btnW {
+	mouse := msg.Mouse()
+	if mouse.Y == btnY && mouse.X >= btnX && mouse.X < btnX+btnW {
 		if m.reindexCancel != nil {
 			m.reindexCancel.Cancel()
 		}
@@ -2001,8 +2043,8 @@ func (m *Model) updateReindexViewport() {
 		sb.WriteString(lineStyle.Render(l))
 	}
 
-	m.reindexVP.Width = innerW
-	m.reindexVP.Height = reindexOverlayHeight
+	m.reindexVP.SetWidth(innerW)
+	m.reindexVP.SetHeight(reindexOverlayHeight)
 
 	// Only auto-scroll if already at or past the bottom.
 	wasAtBottom := m.reindexVP.AtBottom()
@@ -2024,7 +2066,7 @@ func (m Model) renderReindexOverlay() string {
 
 	cancelBtn := lipgloss.NewStyle().
 		Foreground(styles.ColorPrimary).
-		Render("[ Cancel (esc) ]")
+		Render(cancelBtnLabel)
 
 	body := title + m.reindexVP.View() + "\n" +
 		lipgloss.PlaceHorizontal(maxW, lipgloss.Center, cancelBtn)
@@ -3021,7 +3063,7 @@ func sortFieldFromConfig(s string) data.SortField {
 		return data.SortByTurns
 	case "name", "summary":
 		return data.SortByName
-	case "folder", "cwd":
+	case pivotFolder, "cwd":
 		return data.SortByFolder
 	default:
 		return data.SortByUpdated

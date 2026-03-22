@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // keyMap holds all key bindings used by the root model.
 // It implements help.KeyMap for automatic help text generation.
@@ -74,7 +74,7 @@ var keys = keyMap{
 	Left:              key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "collapse")),
 	Right:             key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "expand")),
 	Enter:             key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "launch/toggle")),
-	Space:             key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle select")),
+	Space:             key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle select")),
 	Quit:              key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 	ForceQuit:         key.NewBinding(key.WithKeys("ctrl+c")),
 	Search:            key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),

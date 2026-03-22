@@ -1296,9 +1296,15 @@ func TestCoverage_Search_createSessionFails(t *testing.T) {
 		// If CreateSession somehow succeeds, that's fine — just verify we got a result.
 		t.Logf("Search succeeded unexpectedly: %v", ids)
 	} else {
-		if !strings.Contains(err.Error(), "search session") &&
-			!strings.Contains(err.Error(), "session") {
-			t.Errorf("expected session-related error, got: %v", err)
+		// SDK v0.2.0 wraps startup failures in a retry loop:
+		// "search unavailable after N retries: reinit attempt N: starting Copilot SDK: ..."
+		// SDK v0.1.x returned a direct session-related error message.
+		// Accept either form — any error indicating search/session/SDK failure is correct.
+		e := err.Error()
+		if !strings.Contains(e, "session") &&
+			!strings.Contains(e, "unavailable") &&
+			!strings.Contains(e, "search") {
+			t.Errorf("expected search/session/unavailable error, got: %v", err)
 		}
 	}
 
