@@ -76,7 +76,7 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 	t.Parallel()
 	p := NewAttentionPicker()
 
-	// Start at 0, move down through all entries.
+	// Start at 0, move down through all entries (5 attention + 1 plan = 6).
 	p.MoveDown()
 	if p.cursor != 1 {
 		t.Errorf("after MoveDown cursor = %d, want 1", p.cursor)
@@ -93,6 +93,10 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 	if p.cursor != 4 {
 		t.Errorf("after 4th MoveDown cursor = %d, want 4", p.cursor)
 	}
+	p.MoveDown()
+	if p.cursor != 5 {
+		t.Errorf("after 5th MoveDown cursor = %d, want 5 (plan row)", p.cursor)
+	}
 
 	// Wrap to top.
 	p.MoveDown()
@@ -102,13 +106,13 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 
 	// Wrap to bottom.
 	p.MoveUp()
-	if p.cursor != 4 {
-		t.Errorf("MoveUp should wrap: cursor = %d, want 4", p.cursor)
+	if p.cursor != 5 {
+		t.Errorf("MoveUp should wrap: cursor = %d, want 5", p.cursor)
 	}
 
 	p.MoveUp()
-	if p.cursor != 3 {
-		t.Errorf("after MoveUp cursor = %d, want 3", p.cursor)
+	if p.cursor != 4 {
+		t.Errorf("after MoveUp cursor = %d, want 4", p.cursor)
 	}
 }
 
@@ -261,4 +265,140 @@ func TestAttentionPicker_View_DoesNotPanic(t *testing.T) {
 	_ = p.View() // zero size
 	p.SetSize(80, 40)
 	_ = p.View() // with size
+}
+
+// ---------------------------------------------------------------------------
+// Plan filter (Has plan row)
+// ---------------------------------------------------------------------------
+
+func TestAttentionPicker_FilterPlans_DefaultFalse(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.FilterPlans() {
+		t.Error("new picker should have FilterPlans = false")
+	}
+}
+
+func TestAttentionPicker_SetFilterPlans(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetFilterPlans(true)
+	if !p.FilterPlans() {
+		t.Error("FilterPlans should be true after SetFilterPlans(true)")
+	}
+	p.SetFilterPlans(false)
+	if p.FilterPlans() {
+		t.Error("FilterPlans should be false after SetFilterPlans(false)")
+	}
+}
+
+func TestAttentionPicker_TogglePlanRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Move cursor to the plan row (index 5, after 5 attention entries).
+	for i := 0; i < planRowIndex; i++ {
+		p.MoveDown()
+	}
+	if p.cursor != planRowIndex {
+		t.Fatalf("cursor = %d, want %d (plan row)", p.cursor, planRowIndex)
+	}
+
+	// Toggle on.
+	p.Toggle()
+	if !p.FilterPlans() {
+		t.Error("FilterPlans should be true after toggling plan row")
+	}
+
+	// Toggle off.
+	p.Toggle()
+	if p.FilterPlans() {
+		t.Error("FilterPlans should be false after toggling plan row again")
+	}
+}
+
+func TestAttentionPicker_HasSelection_IncludesPlan(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.HasSelection() {
+		t.Error("empty picker should have no selection")
+	}
+	p.SetFilterPlans(true)
+	if !p.HasSelection() {
+		t.Error("HasSelection should be true when filterPlans is set")
+	}
+}
+
+func TestAttentionPicker_SetPlanCount(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetPlanCount(7)
+	if p.planCount != 7 {
+		t.Errorf("planCount = %d, want 7", p.planCount)
+	}
+}
+
+func TestAttentionPicker_View_ContainsPlanRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	p.SetPlanCount(3)
+	view := p.View()
+	if !strings.Contains(view, "Has plan") {
+		t.Error("View should contain 'Has plan' label")
+	}
+	if !strings.Contains(view, "(3)") {
+		t.Error("View should contain plan count (3)")
+	}
+}
+
+func TestAttentionPicker_View_PlanCheckmark(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	p.SetFilterPlans(true)
+	view := p.View()
+	// Should have at least 2 checkmarks when plan is checked (unchecked attention entries also present).
+	if !strings.Contains(view, "[✓]") {
+		t.Error("View should show checked checkbox for plan row")
+	}
+}
+
+func TestAttentionPicker_TogglePlanDoesNotAffectAttention(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Select first attention entry.
+	p.Toggle() // cursor at 0 = AttentionWaiting
+	sel := p.Selected()
+	if _, ok := sel[data.AttentionWaiting]; !ok {
+		t.Fatal("expected AttentionWaiting to be selected")
+	}
+
+	// Move to plan row and toggle.
+	for i := 0; i < planRowIndex; i++ {
+		p.MoveDown()
+	}
+	p.Toggle()
+
+	// Attention selection should be unaffected.
+	sel2 := p.Selected()
+	if _, ok := sel2[data.AttentionWaiting]; !ok {
+		t.Error("toggling plan row should not affect attention selection")
+	}
+	if !p.FilterPlans() {
+		t.Error("FilterPlans should be true")
+	}
+}
+
+func TestAttentionPicker_View_ContainsAllLabelsIncludingPlan(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	view := p.View()
+	for _, label := range []string{"Needs input", "AI working", "Running, quiet", "Interrupted", "Not running", "Has plan"} {
+		if !strings.Contains(view, label) {
+			t.Errorf("View should contain label %q", label)
+		}
+	}
 }
