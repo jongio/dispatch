@@ -1439,6 +1439,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseReleaseMsg:
+		// Only handle left-button releases — right/middle clicks must not
+		// trigger selection, double-click detection, or session launch.
+		if msg.Button != tea.MouseLeft {
+			return m, nil
+		}
 
 		// --- Clickable header area (Y < HeaderLines) ---
 		if mouse.Y < styles.HeaderLines {

@@ -7,8 +7,6 @@
 package tui
 
 import (
-	"charm.land/lipgloss/v2"
-
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
@@ -62,7 +60,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		t := styles.CurrentTheme()
 		shots = append(shots, Screenshot{
 			Name: name, SubDir: subDir,
-			ANSI: m.View(), FG: t.Text, BG: t.Background,
+			ANSI: m.View().Content, FG: t.Text, BG: t.Background,
 			Palette:    t.ANSIPalette,
 			Highlights: highlights,
 		})
@@ -71,7 +69,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		t := styles.CurrentTheme()
 		shots = append(shots, Screenshot{
 			Name: name, SubDir: subDir,
-			ANSI: m.View(), FG: t.Text, BG: t.Background,
+			ANSI: m.View().Content, FG: t.Text, BG: t.Background,
 			Palette: t.ANSIPalette,
 		})
 	}
