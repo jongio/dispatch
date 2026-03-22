@@ -3,7 +3,19 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'web/**'
+      - 'LICENSE'
+      - '.github/CODEOWNERS'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'web/**'
+      - 'LICENSE'
+      - '.github/CODEOWNERS'
   workflow_call:
 
 # Cancel in-progress runs for the same branch/PR to avoid wasted resources.
