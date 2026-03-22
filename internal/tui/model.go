@@ -52,6 +52,10 @@ const (
 	// cancels an in-flight reindex operation.
 	statusReindexCancelled = "Reindex cancelled"
 
+	// cancelBtnLabel is the button label shown in overlays that can be
+	// dismissed with Escape (reindex, etc.).
+	cancelBtnLabel = "[ Cancel (esc) ]"
+
 	// headerRightReserve is the default column reserve on the right side
 	// of the header row (accounts for a potential trailing space or cursor).
 	headerRightReserve = 4
@@ -1968,7 +1972,7 @@ func (m *Model) handleReindexClick(msg tea.MouseReleaseMsg) {
 
 	// The cancel button is on the last content row before bottom border/padding.
 	btnY := startY + overlayH - 3 // 1 border + 1 padding from bottom
-	btnLabel := "[ Cancel (esc) ]"
+	btnLabel := cancelBtnLabel
 	btnW := lipgloss.Width(btnLabel)
 	btnX := startX + (overlayW-btnW)/2
 
@@ -2032,7 +2036,7 @@ func (m Model) renderReindexOverlay() string {
 
 	cancelBtn := lipgloss.NewStyle().
 		Foreground(styles.ColorPrimary).
-		Render("[ Cancel (esc) ]")
+		Render(cancelBtnLabel)
 
 	body := title + m.reindexVP.View() + "\n" +
 		lipgloss.PlaceHorizontal(maxW, lipgloss.Center, cancelBtn)
@@ -3029,7 +3033,7 @@ func sortFieldFromConfig(s string) data.SortField {
 		return data.SortByTurns
 	case "name", "summary":
 		return data.SortByName
-	case "folder", "cwd":
+	case pivotFolder, "cwd":
 		return data.SortByFolder
 	default:
 		return data.SortByUpdated

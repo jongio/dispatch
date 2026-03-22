@@ -7,7 +7,6 @@
 package tui
 
 import (
-
 	"charm.land/lipgloss/v2"
 
 	"github.com/jongio/dispatch/internal/config"
@@ -500,7 +499,6 @@ var allThemes = []themeEntry{
 // CaptureScreenshots drives the TUI model through every visual state
 // used on the website and returns the rendered ANSI output for each.
 func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) {
-
 	// Enable NerdFont icons so the title bar shows the terminal glyph
 	// instead of the ⚡ fallback.
 	styles.SetNerdFontEnabled(true)
