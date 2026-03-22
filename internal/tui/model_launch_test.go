@@ -266,9 +266,8 @@ func TestHandleReindexClick_CancelButtonHit(t *testing.T) {
 	btnLabel := "[ Cancel (esc) ]"
 	btnX := startX + (overlayW-len(btnLabel))/2
 
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      btnX + 1, // click inside button
 		Y:      btnY,
 	}
@@ -295,9 +294,8 @@ func TestHandleReindexClick_MissButton(t *testing.T) {
 	m.reindexLog = []string{"log line"}
 
 	// Click at (0,0) — completely outside the overlay
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      0,
 		Y:      0,
 	}
@@ -323,7 +321,7 @@ func TestHandleReindexClick_NilCancel(t *testing.T) {
 	btnLabel := "[ Cancel (esc) ]"
 	btnX := startX + (overlayW-len(btnLabel))/2
 
-	msg := tea.MouseMsg{X: btnX + 1, Y: btnY}
+	msg := tea.MouseReleaseMsg{X: btnX + 1, Y: btnY}
 	// Should not panic with nil cancel handle
 	m.handleReindexClick(msg)
 }

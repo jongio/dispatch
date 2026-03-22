@@ -30,13 +30,13 @@ func newTestModelWithSize(w, h int) Model {
 }
 
 // tabKeyMsg creates a tea.KeyMsg for the Tab key.
-func tabKeyMsg() tea.KeyMsg {
-	return tea.KeyMsg(tea.Key{Type: tea.KeyTab})
+func tabKeyMsg() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: tea.KeyTab}
 }
 
 // ctrlCKeyMsg creates a tea.KeyMsg for ctrl+c.
-func ctrlCKeyMsg() tea.KeyMsg {
-	return tea.KeyMsg(tea.Key{Type: tea.KeyCtrlC})
+func ctrlCKeyMsg() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 }
 
 // ---------------------------------------------------------------------------
@@ -76,8 +76,8 @@ func TestView_ZeroDimensions(t *testing.T) {
 	m := newTestModel()
 	m.width = 0
 	m.height = 0
-	if got := m.View(); got != "" {
-		t.Errorf("View() with 0 dimensions should return empty, got %q", got)
+	if got := m.View(); got.Content != "" {
+		t.Errorf("View() with 0 dimensions should return empty, got %q", got.Content)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestView_WithDimensions_SessionList(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.state = stateSessionList
 	v := m.View()
-	if v == "" {
+	if v.Content == "" {
 		t.Error("View() with dimensions should return non-empty string")
 	}
 }
@@ -94,7 +94,7 @@ func TestView_Loading(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.state = stateLoading
 	v := m.View()
-	if v == "" {
+	if v.Content == "" {
 		t.Error("View() in stateLoading should return non-empty string")
 	}
 }
@@ -1663,11 +1663,11 @@ func TestHandleConfigKey_UpDown(t *testing.T) {
 	m.configPanel.SetValues(components.ConfigValues{})
 
 	// Down
-	result, _ := m.handleConfigKey(tea.KeyMsg(tea.Key{Type: tea.KeyDown}))
+	result, _ := m.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	_ = result.(Model)
 
 	// Up
-	result, _ = m.handleConfigKey(tea.KeyMsg(tea.Key{Type: tea.KeyUp}))
+	result, _ = m.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyUp})
 	_ = result.(Model)
 }
 
@@ -2035,7 +2035,7 @@ func TestHandleKey_TimeRange4(t *testing.T) {
 func TestHandleKey_Up(t *testing.T) {
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyUp}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	_ = result.(Model)
 	// Just verify no panic.
 }
@@ -2043,16 +2043,16 @@ func TestHandleKey_Up(t *testing.T) {
 func TestHandleKey_Down(t *testing.T) {
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyDown}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	_ = result.(Model)
 }
 
 func TestHandleKey_LeftRight_Folder(t *testing.T) {
 	m := newTestModel()
 	// Left/right on non-folder item should be noop.
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyLeft}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	_ = result.(Model)
-	result, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRight}))
+	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	_ = result.(Model)
 }
 
@@ -2087,7 +2087,7 @@ func TestHandleKey_LaunchTab_NoSelection(t *testing.T) {
 func TestHandleKey_PreviewScrollUp(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
-	result, cmd := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyPgUp}))
+	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("PgUp should return nil cmd")
@@ -2097,7 +2097,7 @@ func TestHandleKey_PreviewScrollUp(t *testing.T) {
 func TestHandleKey_PreviewScrollDown(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
-	result, cmd := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyPgDown}))
+	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("PgDn should return nil cmd")
@@ -2107,7 +2107,7 @@ func TestHandleKey_PreviewScrollDown(t *testing.T) {
 func TestHandleKey_PreviewScrollUp_NoPreview(t *testing.T) {
 	m := newTestModel()
 	m.showPreview = false
-	result, cmd := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyPgUp}))
+	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("PgUp without preview should return nil cmd")
@@ -2137,10 +2137,10 @@ func TestHandleKey_ShellPicker_UpDown(t *testing.T) {
 		{Name: "zsh", Path: "/bin/zsh"},
 	}, "")
 
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyDown}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	_ = result.(Model)
 
-	result, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyUp}))
+	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	_ = result.(Model)
 }
 
@@ -2161,25 +2161,25 @@ func TestHandleKey_FilterPanel_Escape(t *testing.T) {
 func TestHandleKey_FilterPanel_UpDown(t *testing.T) {
 	m := newTestModel()
 	m.state = stateFilterPanel
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyDown}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	_ = result.(Model)
-	result, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyUp}))
+	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	_ = result.(Model)
 }
 
 func TestHandleKey_FilterPanel_LeftRight(t *testing.T) {
 	m := newTestModel()
 	m.state = stateFilterPanel
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyLeft}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	_ = result.(Model)
-	result, _ = m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRight}))
+	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	_ = result.(Model)
 }
 
 func TestHandleKey_FilterPanel_Space(t *testing.T) {
 	m := newTestModel()
 	m.state = stateFilterPanel
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeySpace, Runes: []rune{' '}}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
 	_ = result.(Model)
 }
 
@@ -2206,7 +2206,7 @@ func TestHandleKey_SearchFocused_UpDown(t *testing.T) {
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 
 	// Up should blur search and move selection.
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyUp}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	rm := result.(Model)
 	if rm.searchBar.Focused() {
 		t.Error("search bar should be blurred after Up")
@@ -2218,7 +2218,7 @@ func TestHandleKey_SearchFocused_Down(t *testing.T) {
 	m.searchBar.Focus()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyDown}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	rm := result.(Model)
 	if rm.searchBar.Focused() {
 		t.Error("search bar should be blurred after Down")
@@ -2232,7 +2232,7 @@ func TestHandleKey_SearchFocused_Down(t *testing.T) {
 func TestHandleMouse_WheelUp(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 5, Y: 10}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 5, Y: 10}
 	result, _ := m.Update(msg)
 	_ = result.(Model)
 }
@@ -2240,7 +2240,7 @@ func TestHandleMouse_WheelUp(t *testing.T) {
 func TestHandleMouse_WheelDown(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 5, Y: 10}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 5, Y: 10}
 	result, _ := m.Update(msg)
 	_ = result.(Model)
 }
@@ -2249,7 +2249,7 @@ func TestHandleMouse_WheelUp_OverPreview(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: m.layout.listWidth + 5, Y: 10}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: m.layout.listWidth + 5, Y: 10}
 	result, _ := m.Update(msg)
 	_ = result.(Model)
 }
@@ -2258,7 +2258,7 @@ func TestHandleMouse_WheelDown_OverPreview(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: m.layout.listWidth + 5, Y: 10}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: m.layout.listWidth + 5, Y: 10}
 	result, _ := m.Update(msg)
 	_ = result.(Model)
 }
@@ -2266,7 +2266,7 @@ func TestHandleMouse_WheelDown_OverPreview(t *testing.T) {
 func TestHandleMouse_NotSessionList(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.state = stateHelpOverlay
-	msg := tea.MouseMsg{Button: tea.MouseButtonLeft, X: 5, Y: 10}
+	msg := tea.MouseClickMsg{Button: tea.MouseLeft, X: 5, Y: 10}
 	result, cmd := m.Update(msg)
 	_ = result.(Model)
 	if cmd != nil {
@@ -2276,9 +2276,8 @@ func TestHandleMouse_NotSessionList(t *testing.T) {
 
 func TestHandleMouse_LeftClick_HeaderArea(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      5,
 		Y:      0,
 	}
@@ -2288,9 +2287,8 @@ func TestHandleMouse_LeftClick_HeaderArea(t *testing.T) {
 
 func TestHandleMouse_LeftClick_BelowContent(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      5,
 		Y:      m.height + 10, // way below content
 	}
@@ -2303,9 +2301,8 @@ func TestHandleMouse_LeftClick_BelowContent(t *testing.T) {
 
 func TestHandleMouse_LeftClick_NotRelease(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	msg := tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      5,
 		Y:      5,
 	}
@@ -2494,9 +2491,8 @@ func TestHandleMouse_LeftClick_ContentArea(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
 	// Single click in content area (below header, above footer)
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      styles.HeaderLines + 1, // within content area
 	}
@@ -2516,9 +2512,8 @@ func TestHandleMouse_DoubleClick_ContentArea(t *testing.T) {
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
 	clickY := styles.HeaderLines + 1
 	// First click
-	msg1 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg1 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}
@@ -2526,9 +2521,8 @@ func TestHandleMouse_DoubleClick_ContentArea(t *testing.T) {
 	rm1 := result1.(Model)
 
 	// Second click at same Y (double-click)
-	msg2 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg2 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}
@@ -2545,9 +2539,8 @@ func TestHandleMouse_DoubleClick_WithCtrl(t *testing.T) {
 	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/tmp"}, {ID: "s2"}})
 	clickY := styles.HeaderLines + 0
 	// First click
-	msg1 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg1 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}
@@ -2555,12 +2548,11 @@ func TestHandleMouse_DoubleClick_WithCtrl(t *testing.T) {
 	rm1 := result1.(Model)
 
 	// Second click with Ctrl
-	msg2 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg2 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
-		Ctrl:   true,
+		Mod:    tea.ModCtrl,
 	}
 	result2, _ := rm1.Update(msg2)
 	_ = result2.(Model)
@@ -2571,9 +2563,8 @@ func TestHandleMouse_DoubleClick_WithShift(t *testing.T) {
 	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/tmp"}, {ID: "s2"}})
 	clickY := styles.HeaderLines + 0
 	// First click
-	msg1 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg1 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}
@@ -2581,12 +2572,11 @@ func TestHandleMouse_DoubleClick_WithShift(t *testing.T) {
 	rm1 := result1.(Model)
 
 	// Second click with Shift
-	msg2 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg2 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
-		Shift:  true,
+		Mod:    tea.ModShift,
 	}
 	result2, _ := rm1.Update(msg2)
 	_ = result2.(Model)
@@ -2598,9 +2588,8 @@ func TestHandleMouse_LeftClick_InPreviewPane(t *testing.T) {
 	m.recalcLayout()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 	// Click in the preview pane area
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      m.layout.listWidth + 5, // past list, in preview
 		Y:      styles.HeaderLines + 1,
 	}
@@ -2644,9 +2633,8 @@ func TestHandleMouse_LeftClick_PreviewConversationSort(t *testing.T) {
 	clickY := hitRow + styles.HeaderLines + 1
 
 	origSort := m.cfg.ConversationNewestFirst
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      m.layout.listWidth + 5,
 		Y:      clickY,
 	}
@@ -2681,9 +2669,8 @@ func TestHandleMouse_LeftClick_PreviewNonConversationLine(t *testing.T) {
 	origSort := m.cfg.ConversationNewestFirst
 
 	// Click on the very first content line (title area, not conversation).
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      m.layout.listWidth + 5,
 		Y:      styles.HeaderLines + 1, // first line of preview content
 	}
@@ -2697,9 +2684,8 @@ func TestHandleMouse_LeftClick_PreviewNonConversationLine(t *testing.T) {
 func TestHandleMouse_LeftClick_NotRelease_ContentArea(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress, // not release
+	msg := tea.MouseClickMsg{
+		Button: tea.MouseLeft, // not release
 		X:      10,
 		Y:      styles.HeaderLines + 1,
 	}
@@ -2712,7 +2698,7 @@ func TestHandleMouse_LeftClick_NotRelease_ContentArea(t *testing.T) {
 
 func TestHandleMouse_RightClick(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	msg := tea.MouseMsg{Button: tea.MouseButtonRight, X: 10, Y: 10}
+	msg := tea.MouseClickMsg{Button: tea.MouseRight, X: 10, Y: 10}
 	result, cmd := m.Update(msg)
 	_ = result.(Model)
 	if cmd != nil {
@@ -3154,7 +3140,7 @@ func TestHandleKey_PreviewScrollDown_Active(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
-	result, cmd := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRight, Alt: true}))
+	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt})
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("preview scroll should return nil cmd")
@@ -3171,9 +3157,8 @@ func TestHandleMouse_DoubleClick_EmptyList_NoPanic(t *testing.T) {
 	clickY := styles.HeaderLines + 1
 
 	// First click
-	msg1 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg1 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}
@@ -3181,9 +3166,8 @@ func TestHandleMouse_DoubleClick_EmptyList_NoPanic(t *testing.T) {
 	rm1 := result1.(Model)
 
 	// Second click at same Y (double-click) — must not panic.
-	msg2 := tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	msg2 := tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      10,
 		Y:      clickY,
 	}

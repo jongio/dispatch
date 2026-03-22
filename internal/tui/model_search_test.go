@@ -29,18 +29,18 @@ func newTestModel() Model {
 }
 
 // escKeyMsg creates a tea.KeyMsg for the Escape key.
-func escKeyMsg() tea.KeyMsg {
-	return tea.KeyMsg(tea.Key{Type: tea.KeyEscape})
+func escKeyMsg() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: tea.KeyEscape}
 }
 
 // runeKeyMsg creates a tea.KeyMsg for a printable rune (e.g., '/', '2').
-func runeKeyMsg(r rune) tea.KeyMsg {
-	return tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{r}})
+func runeKeyMsg(r rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: r, Text: string(r)}
 }
 
 // enterKeyMsg creates a tea.KeyMsg for the Enter key.
-func enterKeyMsg() tea.KeyMsg {
-	return tea.KeyMsg(tea.Key{Type: tea.KeyEnter})
+func enterKeyMsg() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: tea.KeyEnter}
 }
 
 // --- Tests -------------------------------------------------------------------

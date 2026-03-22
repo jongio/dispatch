@@ -305,7 +305,7 @@ func TestCovPivotCycleKey(t *testing.T) {
 	m.state = stateSessionList
 	m.pivot = pivotNone
 
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyTab}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm := result.(Model)
 
 	if rm.pivot != pivotFolder {
@@ -649,7 +649,7 @@ func TestCovSearchPreservedAcrossPivotCycle(t *testing.T) {
 	m.filter.DeepSearch = true
 	m.pivot = pivotNone
 
-	result, _ := m.Update(tea.KeyMsg(tea.Key{Type: tea.KeyTab}))
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm := result.(Model)
 
 	if rm.filter.Query != "my-query" {
