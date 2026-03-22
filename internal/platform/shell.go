@@ -267,13 +267,15 @@ func psQuote(resumeCmd string) string {
 
 // cmdQuote wraps s in double quotes for cmd.exe. Interior double quotes
 // are escaped with a backslash, which is how Windows CreateProcess and
-// cmd.exe interpret them. Unlike shellQuote (POSIX single quotes), this
-// produces quoting that cmd.exe actually understands.
+// cmd.exe interpret them. Percent signs are doubled to prevent cmd.exe
+// environment-variable expansion (CWE-78). Unlike shellQuote (POSIX
+// single quotes), this produces quoting that cmd.exe actually understands.
 func cmdQuote(s string) string {
 	s = strings.ReplaceAll(s, "\x00", "")
 	if s == "" {
 		return `""`
 	}
+	s = strings.ReplaceAll(s, "%", "%%")
 	return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
 }
 

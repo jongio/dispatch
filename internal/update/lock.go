@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/jongio/dispatch/internal/platform"
 )
 
 const (
@@ -83,7 +85,16 @@ func isStaleLock(path string) (bool, error) {
 
 	var metadata lockMetadata
 	if err := json.Unmarshal(raw, &metadata); err == nil && !metadata.CreatedAt.IsZero() {
-		return time.Since(metadata.CreatedAt) > lockStaleDuration, nil
+		if time.Since(metadata.CreatedAt) > lockStaleDuration {
+			return true, nil
+		}
+		// The lock hasn't exceeded the stale timeout yet, but the
+		// owning process may have crashed.  Check PID liveness so a
+		// dead updater doesn't block future updates (CWE-367).
+		if metadata.PID > 0 && !platform.IsProcessAlive(metadata.PID) {
+			return true, nil
+		}
+		return false, nil
 	}
 
 	info, err := os.Stat(path)

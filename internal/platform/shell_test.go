@@ -176,6 +176,9 @@ func TestCmdQuote(t *testing.T) {
 		{`C:\Program Files\PowerShell\7\pwsh.exe`, `"C:\Program Files\PowerShell\7\pwsh.exe"`},
 		{`path with "quotes"`, `"path with \"quotes\""`},
 		{"no-special", `"no-special"`},
+		{`%PATH%`, `"%%PATH%%"`},
+		{`%USERPROFILE%\bin`, `"%%USERPROFILE%%\bin"`},
+		{`100%`, `"100%%"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

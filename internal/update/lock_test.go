@@ -8,6 +8,98 @@ import (
 	"time"
 )
 
+// deadPID returns a PID that is almost certainly not alive.  We pick a very
+// high value that no real OS process will occupy.
+func deadPID() int { return 4_000_000 }
+
+func TestAcquireUpdateLockReplacesDeadPIDLock(t *testing.T) {
+	t.Parallel()
+	lockPath := filepath.Join(t.TempDir(), lockFileName)
+
+	// Write a lock with a recent timestamp (NOT stale by time) but a dead PID.
+	meta := lockMetadata{
+		PID:       deadPID(),
+		CreatedAt: time.Now().UTC(), // just created — not stale by duration
+	}
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal lock metadata: %v", err)
+	}
+	if err := os.WriteFile(lockPath, raw, cacheFilePerm); err != nil {
+		t.Fatalf("write lock file: %v", err)
+	}
+
+	// The lock PID is dead, so acquiring should succeed despite the
+	// recent timestamp.
+	lock, err := acquireUpdateLock(lockPath)
+	if err != nil {
+		t.Fatalf("acquireUpdateLock() should treat dead-PID lock as stale: %v", err)
+	}
+	defer releaseUpdateLock(lock)
+
+	// Verify the new lock was written with *our* PID.
+	raw, err = os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read refreshed lock: %v", err)
+	}
+	var refreshed lockMetadata
+	if err := json.Unmarshal(raw, &refreshed); err != nil {
+		t.Fatalf("unmarshal refreshed lock: %v", err)
+	}
+	if refreshed.PID != os.Getpid() {
+		t.Errorf("refreshed PID = %d, want %d", refreshed.PID, os.Getpid())
+	}
+}
+
+func TestIsStaleLockDeadPID(t *testing.T) {
+	t.Parallel()
+	lockPath := filepath.Join(t.TempDir(), lockFileName)
+	meta := lockMetadata{
+		PID:       deadPID(),
+		CreatedAt: time.Now().UTC(),
+	}
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(lockPath, raw, cacheFilePerm); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	stale, err := isStaleLock(lockPath)
+	if err != nil {
+		t.Fatalf("isStaleLock() error = %v", err)
+	}
+	if !stale {
+		t.Fatal("expected lock with dead PID to be stale")
+	}
+}
+
+func TestIsStaleLockAlivePID(t *testing.T) {
+	t.Parallel()
+	lockPath := filepath.Join(t.TempDir(), lockFileName)
+	// Use our own PID — guaranteed alive.
+	meta := lockMetadata{
+		PID:       os.Getpid(),
+		CreatedAt: time.Now().UTC(),
+	}
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(lockPath, raw, cacheFilePerm); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	stale, err := isStaleLock(lockPath)
+	if err != nil {
+		t.Fatalf("isStaleLock() error = %v", err)
+	}
+	if stale {
+		t.Fatal("expected lock with alive PID to NOT be stale")
+	}
+}
+
 func TestAcquireUpdateLockReleaseAndReacquire(t *testing.T) {
 	t.Parallel()
 	lockPath := filepath.Join(t.TempDir(), lockFileName)
