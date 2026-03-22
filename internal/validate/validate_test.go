@@ -3,6 +3,7 @@ package validate
 import "testing"
 
 func TestSessionID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		id   string
 		want bool

@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestNewSearchBar_Defaults(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	if sb.Focused() {
 		t.Error("new SearchBar should not be focused")
@@ -26,6 +27,7 @@ func TestNewSearchBar_Defaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_FocusBlur(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 
 	_ = sb.Focus()
@@ -44,6 +46,7 @@ func TestSearchBar_FocusBlur(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_ValueRoundTrip(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetValue("test query")
 	if sb.Value() != "test query" {
@@ -52,6 +55,7 @@ func TestSearchBar_ValueRoundTrip(t *testing.T) {
 }
 
 func TestSearchBar_SetValue_Empty(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetValue("something")
 	sb.SetValue("")
@@ -65,6 +69,7 @@ func TestSearchBar_SetValue_Empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_SetResultCount(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetResultCount(42)
 	if sb.resultCount != 42 {
@@ -77,6 +82,7 @@ func TestSearchBar_SetResultCount(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_SetSearching(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetSearching(true)
 	if !sb.searching {
@@ -93,6 +99,7 @@ func TestSearchBar_SetSearching(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_SetWidth(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetWidth(80)
 	if sb.width != 80 {
@@ -105,11 +112,13 @@ func TestSearchBar_SetWidth(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.View()
 }
 
 func TestSearchBar_View_ShowsResultCount(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetValue("test")
@@ -121,6 +130,7 @@ func TestSearchBar_View_ShowsResultCount(t *testing.T) {
 }
 
 func TestSearchBar_View_ShowsSearchingIndicator(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetValue("query")
@@ -133,6 +143,7 @@ func TestSearchBar_View_ShowsSearchingIndicator(t *testing.T) {
 }
 
 func TestSearchBar_View_NoCountWhenInactive(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.SetValue("test")
 	sb.SetResultCount(10)
@@ -144,6 +155,7 @@ func TestSearchBar_View_NoCountWhenInactive(t *testing.T) {
 }
 
 func TestSearchBar_View_NoCountWhenEmpty(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetResultCount(10)
@@ -163,6 +175,7 @@ func TestSearchBar_View_NoCountWhenEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_View_AIIndicatorVisible(t *testing.T) {
+	t.Parallel()
 	widths := []int{60, 80, 100, 120}
 	for _, w := range widths {
 		sb := NewSearchBar()
@@ -188,6 +201,7 @@ func TestSearchBar_View_AIIndicatorVisible(t *testing.T) {
 }
 
 func TestSearchBar_View_AISearchingVisible(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetValue("test")
@@ -205,6 +219,7 @@ func TestSearchBar_View_AISearchingVisible(t *testing.T) {
 }
 
 func TestSearchBar_View_AIConnectingVisible(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetValue("test")
@@ -219,6 +234,7 @@ func TestSearchBar_View_AIConnectingVisible(t *testing.T) {
 }
 
 func TestSearchBar_View_AIUnavailableVisible(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	_ = sb.Focus()
 	sb.SetValue("test")
@@ -233,6 +249,7 @@ func TestSearchBar_View_AIUnavailableVisible(t *testing.T) {
 }
 
 func TestSearchBar_View_FitsWithinWidth(t *testing.T) {
+	t.Parallel()
 	// Even at narrow widths the rendered output must not exceed allocation.
 	sb := NewSearchBar()
 	_ = sb.Focus()

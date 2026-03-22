@@ -16,6 +16,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFormatInt(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		v    int
@@ -37,6 +38,7 @@ func TestFormatInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := FormatInt(tt.v)
 			if got != tt.want {
 				t.Errorf("FormatInt(%d) = %q, want %q", tt.v, got, tt.want)
@@ -46,6 +48,7 @@ func TestFormatInt(t *testing.T) {
 }
 
 func TestFormatIntMaxInt(t *testing.T) {
+	t.Parallel()
 	// Verify math.MaxInt produces a valid positive numeric string.
 	got := FormatInt(math.MaxInt)
 	want := strconv.Itoa(math.MaxInt)
@@ -55,6 +58,7 @@ func TestFormatIntMaxInt(t *testing.T) {
 }
 
 func TestFormatIntMinInt(t *testing.T) {
+	t.Parallel()
 	// Previously caused infinite recursion with the hand-rolled implementation.
 	// Now delegates to strconv.Itoa which handles two's complement correctly.
 	got := FormatInt(math.MinInt)
@@ -69,6 +73,7 @@ func TestFormatIntMinInt(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTruncate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		s     string
@@ -93,6 +98,7 @@ func TestTruncate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := Truncate(tt.s, tt.width)
 			if got != tt.want {
 				t.Errorf("Truncate(%q, %d) = %q, want %q", tt.s, tt.width, got, tt.want)
@@ -106,6 +112,7 @@ func TestTruncate(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPadRight(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		s     string
@@ -125,6 +132,7 @@ func TestPadRight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := PadRight(tt.s, tt.width)
 			if got != tt.want {
 				t.Errorf("PadRight(%q, %d) = %q, want %q", tt.s, tt.width, got, tt.want)
@@ -138,6 +146,7 @@ func TestPadRight(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPadLeft(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		s     string
@@ -157,6 +166,7 @@ func TestPadLeft(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := PadLeft(tt.s, tt.width)
 			if got != tt.want {
 				t.Errorf("PadLeft(%q, %d) = %q, want %q", tt.s, tt.width, got, tt.want)
@@ -167,6 +177,7 @@ func TestPadLeft(t *testing.T) {
 
 // PadLeft does not truncate (unlike PadRight). Verify explicitly.
 func TestPadLeftDoesNotTruncate(t *testing.T) {
+	t.Parallel()
 	got := PadLeft("toolong", 3)
 	if got != "toolong" {
 		t.Errorf("PadLeft(%q, 3) = %q, want original string unchanged", "toolong", got)
@@ -178,6 +189,7 @@ func TestPadLeftDoesNotTruncate(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAbbrevPath(t *testing.T) {
+	t.Parallel()
 	sep := string(filepath.Separator)
 
 	tests := []struct {
@@ -196,6 +208,7 @@ func TestAbbrevPath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := AbbrevPath(tt.path)
 			if got != tt.want {
 				t.Errorf("AbbrevPath(%q) = %q, want %q", tt.path, got, tt.want)
@@ -205,6 +218,7 @@ func TestAbbrevPath(t *testing.T) {
 }
 
 func TestAbbrevPathPlatformSpecific(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		// On Windows, forward slashes are converted to backslashes.
 		// Path not under home dir should be shown in full.
@@ -228,6 +242,7 @@ func TestAbbrevPathPlatformSpecific(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAbbrevHomeEmpty(t *testing.T) {
+	t.Parallel()
 	got := AbbrevHome("")
 	if got != "–" {
 		t.Errorf("AbbrevHome(%q) = %q, want %q", "", got, "–")
@@ -235,6 +250,7 @@ func TestAbbrevHomeEmpty(t *testing.T) {
 }
 
 func TestAbbrevHomeWithHomePrefix(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skipf("cannot determine home dir: %v", err)
@@ -253,6 +269,7 @@ func TestAbbrevHomeWithHomePrefix(t *testing.T) {
 }
 
 func TestAbbrevHomeWithoutHomePrefix(t *testing.T) {
+	t.Parallel()
 	// Path not under home should be returned as-is (OS-normalised).
 	var input string
 	if runtime.GOOS == "windows" {
@@ -267,6 +284,7 @@ func TestAbbrevHomeWithoutHomePrefix(t *testing.T) {
 }
 
 func TestAbbrevHomeExactHomeDir(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skipf("cannot determine home dir: %v", err)
@@ -283,6 +301,7 @@ func TestAbbrevHomeExactHomeDir(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSplitDirLeaf(t *testing.T) {
+	t.Parallel()
 	sep := string(filepath.Separator)
 
 	tests := []struct {
@@ -300,6 +319,7 @@ func TestSplitDirLeaf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			gotDir, gotLeaf := SplitDirLeaf(tt.path)
 			if gotDir != tt.wantDir || gotLeaf != tt.wantLeaf {
 				t.Errorf("SplitDirLeaf(%q) = (%q, %q), want (%q, %q)",
@@ -310,6 +330,7 @@ func TestSplitDirLeaf(t *testing.T) {
 }
 
 func TestSplitDirLeafPlatform(t *testing.T) {
+	t.Parallel()
 	sep := string(filepath.Separator)
 
 	if runtime.GOOS == "windows" {
@@ -334,6 +355,7 @@ func TestSplitDirLeafPlatform(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFormatTimestampEmpty(t *testing.T) {
+	t.Parallel()
 	got := FormatTimestamp("")
 	if got != "–" {
 		t.Errorf("FormatTimestamp(%q) = %q, want %q", "", got, "–")
@@ -341,6 +363,7 @@ func TestFormatTimestampEmpty(t *testing.T) {
 }
 
 func TestFormatTimestampInvalidReturnRaw(t *testing.T) {
+	t.Parallel()
 	raw := "not-a-timestamp"
 	got := FormatTimestamp(raw)
 	if got != raw {
@@ -349,6 +372,7 @@ func TestFormatTimestampInvalidReturnRaw(t *testing.T) {
 }
 
 func TestFormatTimestampRFC3339(t *testing.T) {
+	t.Parallel()
 	// Use a fixed UTC time so we can predict the local rendering.
 	utc := time.Date(2026, time.March, 15, 22, 23, 0, 0, time.UTC)
 	input := utc.Format(time.RFC3339)
@@ -362,6 +386,7 @@ func TestFormatTimestampRFC3339(t *testing.T) {
 }
 
 func TestFormatTimestampAlternateFormats(t *testing.T) {
+	t.Parallel()
 	ts := time.Date(2025, time.June, 1, 14, 30, 0, 0, time.UTC)
 	tests := []struct {
 		name   string
@@ -373,6 +398,7 @@ func TestFormatTimestampAlternateFormats(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			input := ts.Format(tt.format)
 			got := FormatTimestamp(input)
 			if got == "–" || got == input {
@@ -389,6 +415,7 @@ func TestFormatTimestampAlternateFormats(t *testing.T) {
 }
 
 func TestFormatTimestampContainsTimezone(t *testing.T) {
+	t.Parallel()
 	input := "2026-01-15T10:00:00Z"
 	got := FormatTimestamp(input)
 	// The output must end with a timezone abbreviation.
@@ -411,6 +438,7 @@ func TestFormatTimestampContainsTimezone(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestParseTimestampValid(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -422,6 +450,7 @@ func TestParseTimestampValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := parseTimestamp(tt.input)
 			if err != nil {
 				t.Errorf("parseTimestamp(%q) returned error: %v", tt.input, err)
@@ -431,6 +460,7 @@ func TestParseTimestampValid(t *testing.T) {
 }
 
 func TestParseTimestampInvalid(t *testing.T) {
+	t.Parallel()
 	for _, input := range []string{"", "garbage", "2026/03/15", "March 15 2026"} {
 		_, err := parseTimestamp(input)
 		if err == nil {
@@ -444,6 +474,7 @@ func TestParseTimestampInvalid(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRelativeTimeEmpty(t *testing.T) {
+	t.Parallel()
 	got := RelativeTime("")
 	if got != "–" {
 		t.Errorf("RelativeTime(%q) = %q, want %q", "", got, "–")
@@ -451,6 +482,7 @@ func TestRelativeTimeEmpty(t *testing.T) {
 }
 
 func TestRelativeTimeInvalidFormat(t *testing.T) {
+	t.Parallel()
 	got := RelativeTime("not-a-timestamp")
 	if got != "–" {
 		t.Errorf("RelativeTime(%q) = %q, want %q", "not-a-timestamp", got, "–")
@@ -458,6 +490,7 @@ func TestRelativeTimeInvalidFormat(t *testing.T) {
 }
 
 func TestRelativeTimeNow(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if got != "now" {
@@ -466,6 +499,7 @@ func TestRelativeTimeNow(t *testing.T) {
 }
 
 func TestRelativeTimeMinutesAgo(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if !strings.HasSuffix(got, " ago") || !strings.Contains(got, "m") {
@@ -474,6 +508,7 @@ func TestRelativeTimeMinutesAgo(t *testing.T) {
 }
 
 func TestRelativeTimeHoursAgo(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Add(-3 * time.Hour).Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if !strings.HasSuffix(got, " ago") || !strings.Contains(got, "h") {
@@ -482,6 +517,7 @@ func TestRelativeTimeHoursAgo(t *testing.T) {
 }
 
 func TestRelativeTimeDaysAgo(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Add(-48 * time.Hour).Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if !strings.HasSuffix(got, "d ago") {
@@ -490,6 +526,7 @@ func TestRelativeTimeDaysAgo(t *testing.T) {
 }
 
 func TestRelativeTimeOneDayAgo(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Add(-25 * time.Hour).Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if got != "1d ago" {
@@ -498,6 +535,7 @@ func TestRelativeTimeOneDayAgo(t *testing.T) {
 }
 
 func TestRelativeTimeLargeValue(t *testing.T) {
+	t.Parallel()
 	ts := time.Now().Add(-365 * 24 * time.Hour).Format(time.RFC3339)
 	got := RelativeTime(ts)
 	if !strings.HasSuffix(got, "d ago") {
@@ -506,6 +544,7 @@ func TestRelativeTimeLargeValue(t *testing.T) {
 }
 
 func TestRelativeTimeAlternateFormats(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		format string
@@ -517,6 +556,7 @@ func TestRelativeTimeAlternateFormats(t *testing.T) {
 	ts := time.Now().Add(-2 * time.Hour)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			input := ts.Format(tt.format)
 			got := RelativeTime(input)
 			if got == "–" {
@@ -532,6 +572,7 @@ func TestRelativeTimeAlternateFormats(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFormatDuration(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		value float64
@@ -547,6 +588,7 @@ func TestFormatDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := formatDuration(tt.value, tt.unit)
 			if got != tt.want {
 				t.Errorf("formatDuration(%v, %q) = %q, want %q",
@@ -561,6 +603,7 @@ func TestFormatDuration(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestWordWrap(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		text  string
@@ -648,6 +691,7 @@ func TestWordWrap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := wordWrap(tt.text, tt.width)
 			if got != tt.want {
 				t.Errorf("wordWrap(%q, %d) =\n  got:  %q\n  want: %q",
@@ -663,6 +707,7 @@ func TestWordWrap(t *testing.T) {
 
 // PadRight(Truncate(s, n), n) should always yield exactly n runes.
 func TestPadRightTruncateConsistency(t *testing.T) {
+	t.Parallel()
 	inputs := []string{"", "a", "hello", "hello world", "日本語テスト"}
 	widths := []int{1, 3, 5, 10}
 
@@ -680,6 +725,7 @@ func TestPadRightTruncateConsistency(t *testing.T) {
 
 // FormatInt should be consistent with strconv.Itoa for common values.
 func TestFormatIntConsistencyWithStrconv(t *testing.T) {
+	t.Parallel()
 	values := []int{0, 1, -1, 42, -42, 1000, -1000, 999999, -999999}
 	for _, v := range values {
 		got := FormatInt(v)
@@ -695,6 +741,7 @@ func TestFormatIntConsistencyWithStrconv(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCycleLaunchMode(t *testing.T) {
+	t.Parallel()
 	// in-place → tab → window → pane → in-place
 	if got := cycleLaunchMode("in-place"); got != "tab" {
 		t.Errorf("cycleLaunchMode(in-place) = %q, want tab", got)
@@ -715,6 +762,7 @@ func TestCycleLaunchMode(t *testing.T) {
 }
 
 func TestConfigPanelLaunchModeSetGet(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{LaunchMode: "window"})
 	if mode := cp.Values().LaunchMode; mode != "window" {
@@ -723,6 +771,7 @@ func TestConfigPanelLaunchModeSetGet(t *testing.T) {
 }
 
 func TestConfigPanelLaunchModeHandleEnter(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{LaunchMode: "tab"})
 	cp.cursor = cfgLaunchMode
@@ -733,6 +782,7 @@ func TestConfigPanelLaunchModeHandleEnter(t *testing.T) {
 }
 
 func TestCyclePaneDirection(t *testing.T) {
+	t.Parallel()
 	// auto → right → down → left → up → auto
 	if got := cyclePaneDirection("auto"); got != "right" {
 		t.Errorf("cyclePaneDirection(auto) = %q, want right", got)
@@ -759,6 +809,7 @@ func TestCyclePaneDirection(t *testing.T) {
 }
 
 func TestPaneDirectionDisplay(t *testing.T) {
+	t.Parallel()
 	// Verify each direction returns a non-empty rendered string.
 	for _, dir := range []string{"auto", "", "right", "down", "left", "up"} {
 		got := paneDirectionDisplay(dir)
@@ -769,6 +820,7 @@ func TestPaneDirectionDisplay(t *testing.T) {
 }
 
 func TestConfigPanelPaneDirectionSetGet(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{PaneDirection: "left"})
 	if dir := cp.Values().PaneDirection; dir != "left" {
@@ -777,6 +829,7 @@ func TestConfigPanelPaneDirectionSetGet(t *testing.T) {
 }
 
 func TestConfigPanelPaneDirectionHandleEnter(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{PaneDirection: "auto"})
 	cp.cursor = cfgPaneDirection
@@ -787,6 +840,7 @@ func TestConfigPanelPaneDirectionHandleEnter(t *testing.T) {
 }
 
 func TestConfigPanel_PaneDirection_DimmedWhenNotPaneMode(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{LaunchMode: "tab", PaneDirection: "right"})
 	cp.SetSize(80, 24)
@@ -802,6 +856,7 @@ func TestConfigPanel_PaneDirection_DimmedWhenNotPaneMode(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCleanSummary(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   string
@@ -820,6 +875,7 @@ func TestCleanSummary(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := CleanSummary(tt.in)
 			if got != tt.want {
 				t.Errorf("CleanSummary(%q) = %q, want %q", tt.in, got, tt.want)

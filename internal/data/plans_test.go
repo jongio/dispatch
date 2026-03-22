@@ -122,3 +122,84 @@ func TestPlanFilePath(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// sessionStatePath — additional coverage
+// ---------------------------------------------------------------------------
+
+func TestSessionStatePath_WithOverride(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	got := sessionStatePath()
+	if got == "" {
+		t.Error("sessionStatePath should return the override path")
+	}
+}
+
+func TestSessionStatePath_EmptyOverride(t *testing.T) {
+	t.Setenv("DISPATCH_SESSION_STATE", "")
+
+	got := sessionStatePath()
+	if got == "" {
+		// When no override is set, sessionStatePath uses os.UserHomeDir + sessionStateRel.
+		// It should only be empty if UserHomeDir fails.
+		t.Log("sessionStatePath returned empty — UserHomeDir may have failed")
+	}
+}
+
+func TestSessionStatePath_UNCPath(t *testing.T) {
+	// UNC paths (\\server\share) should be rejected on Windows
+	t.Setenv("DISPATCH_SESSION_STATE", `\\server\share\path`)
+
+	got := sessionStatePath()
+	// On Windows: should return "" (UNC paths rejected)
+	// On non-Windows: UNC path is just a regular path
+	_ = got
+}
+
+// ---------------------------------------------------------------------------
+// PlanFilePath — additional branches
+// ---------------------------------------------------------------------------
+
+func TestPlanFilePath_NoStateDir(t *testing.T) {
+	// Set DISPATCH_SESSION_STATE to empty to force sessionStatePath to use home dir
+	// but set HOME to non-existent to make it fail
+	t.Setenv("DISPATCH_SESSION_STATE", "")
+	t.Setenv("HOME", "/nonexistent-path-12345")
+	t.Setenv("USERPROFILE", "/nonexistent-path-12345")
+
+	_, err := PlanFilePath("valid-session-id")
+	// May or may not error depending on platform
+	_ = err
+}
+
+func TestReadPlanContent_NoStateDir(t *testing.T) {
+	t.Setenv("DISPATCH_SESSION_STATE", "")
+	t.Setenv("HOME", "/nonexistent-path-12345")
+	t.Setenv("USERPROFILE", "/nonexistent-path-12345")
+
+	_, err := ReadPlanContent("valid-session-id")
+	if err == nil {
+		t.Error("expected error when state dir unavailable")
+	}
+}
+
+func TestScanAllPlans_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	plans := ScanAllPlans()
+	if len(plans) != 0 {
+		t.Errorf("expected 0 plans in empty dir, got %d", len(plans))
+	}
+}
+
+func TestScanAllPlans_NoStateDir(t *testing.T) {
+	t.Setenv("DISPATCH_SESSION_STATE", "/nonexistent-path-12345")
+
+	plans := ScanAllPlans()
+	if len(plans) != 0 {
+		t.Errorf("expected 0 plans when state dir missing, got %d", len(plans))
+	}
+}

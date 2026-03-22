@@ -10,6 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestNewHelpOverlay_Defaults(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	if h.width != 0 || h.height != 0 {
 		t.Error("new HelpOverlay should have zero dimensions")
@@ -21,6 +22,7 @@ func TestNewHelpOverlay_Defaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHelpOverlay_SetSize(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	h.SetSize(100, 50)
 	if h.width != 100 || h.height != 50 {
@@ -33,6 +35,7 @@ func TestHelpOverlay_SetSize(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHelpOverlay_View_ContainsKeyboardShortcuts(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	h.SetSize(80, 40)
 	view := h.View()
@@ -42,6 +45,7 @@ func TestHelpOverlay_View_ContainsKeyboardShortcuts(t *testing.T) {
 }
 
 func TestHelpOverlay_View_ContainsCategories(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	h.SetSize(80, 40)
 	view := h.View()
@@ -54,6 +58,7 @@ func TestHelpOverlay_View_ContainsCategories(t *testing.T) {
 }
 
 func TestHelpOverlay_View_ContainsBindings(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	h.SetSize(80, 40)
 	view := h.View()
@@ -66,6 +71,7 @@ func TestHelpOverlay_View_ContainsBindings(t *testing.T) {
 }
 
 func TestHelpOverlay_View_ContainsCloseHint(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	h.SetSize(80, 40)
 	view := h.View()
@@ -75,6 +81,7 @@ func TestHelpOverlay_View_ContainsCloseHint(t *testing.T) {
 }
 
 func TestHelpOverlay_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	_ = h.View() // zero size
 	h.SetSize(80, 40)
@@ -86,6 +93,7 @@ func TestHelpOverlay_View_DoesNotPanic(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHelpOverlay_ShortView_ContainsKeyHints(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	view := h.ShortView()
 	hints := []string{"launch", "search", "filter", "sort", "preview", "settings", "help", "quit"}
@@ -97,6 +105,7 @@ func TestHelpOverlay_ShortView_ContainsKeyHints(t *testing.T) {
 }
 
 func TestHelpOverlay_ShortView_SingleLine(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	view := h.ShortView()
 	if strings.Contains(view, "\n") {
@@ -105,6 +114,7 @@ func TestHelpOverlay_ShortView_SingleLine(t *testing.T) {
 }
 
 func TestHelpOverlay_ShortView_NonEmpty(t *testing.T) {
+	t.Parallel()
 	h := NewHelpOverlay()
 	view := h.ShortView()
 	if view == "" {

@@ -9,6 +9,7 @@ import (
 )
 
 func TestAcquireUpdateLockReleaseAndReacquire(t *testing.T) {
+	t.Parallel()
 	lockPath := filepath.Join(t.TempDir(), lockFileName)
 
 	lock, err := acquireUpdateLock(lockPath)
@@ -36,6 +37,7 @@ func TestAcquireUpdateLockReleaseAndReacquire(t *testing.T) {
 }
 
 func TestAcquireUpdateLockReplacesStaleLock(t *testing.T) {
+	t.Parallel()
 	lockPath := filepath.Join(t.TempDir(), lockFileName)
 	stale := lockMetadata{
 		PID:       4242,
@@ -73,6 +75,7 @@ func TestAcquireUpdateLockReplacesStaleLock(t *testing.T) {
 }
 
 func TestIsStaleLockFallsBackToModTimeForInvalidMetadata(t *testing.T) {
+	t.Parallel()
 	lockPath := filepath.Join(t.TempDir(), lockFileName)
 	if err := os.WriteFile(lockPath, []byte("not-json"), cacheFilePerm); err != nil {
 		t.Fatalf("write invalid lock: %v", err)

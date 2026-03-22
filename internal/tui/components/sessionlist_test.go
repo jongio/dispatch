@@ -63,6 +63,7 @@ func makeGroups(folders int, sessionsPerFolder int) []data.SessionGroup {
 // TestSessionListViewConsistency verifies that every View() output during
 // scrolling has exactly height lines, each of exactly width columns.
 func TestSessionListViewConsistency(t *testing.T) {
+	t.Parallel()
 	const width = 120
 	const height = 25
 
@@ -82,6 +83,7 @@ func TestSessionListViewConsistency(t *testing.T) {
 
 // TestSessionListTreeViewConsistency does the same for tree mode (groups).
 func TestSessionListTreeViewConsistency(t *testing.T) {
+	t.Parallel()
 	const width = 120
 	const height = 25
 
@@ -104,6 +106,7 @@ func TestSessionListTreeViewConsistency(t *testing.T) {
 // TestSessionListViewLineWidths checks that every line in View() has the
 // expected terminal column width (using len([]rune) as a proxy for ASCII data).
 func TestSessionListViewLineWidths(t *testing.T) {
+	t.Parallel()
 	const width = 100
 	const height = 20
 
@@ -152,6 +155,7 @@ func stripAnsi(s string) string {
 // ---------------------------------------------------------------------------
 
 func TestToggleSelected(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(5))
 
@@ -180,6 +184,7 @@ func TestToggleSelected(t *testing.T) {
 }
 
 func TestToggleSelectedOnFolder(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(2, 3))
 	// Cursor starts at 0 which is a folder row.
@@ -192,6 +197,7 @@ func TestToggleSelectedOnFolder(t *testing.T) {
 }
 
 func TestSelectAll(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(2, 3))
 
@@ -211,6 +217,7 @@ func TestSelectAll(t *testing.T) {
 }
 
 func TestDeselectAll(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(5))
 
@@ -226,6 +233,7 @@ func TestDeselectAll(t *testing.T) {
 }
 
 func TestSelectedSessions(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(5)
 	sl.SetSessions(sessions)
@@ -255,6 +263,7 @@ func TestSelectedSessions(t *testing.T) {
 }
 
 func TestSelectionCount(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(10))
 
@@ -275,6 +284,7 @@ func TestSelectionCount(t *testing.T) {
 }
 
 func TestFolderSessions(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(3, 4))
 
@@ -293,6 +303,7 @@ func TestFolderSessions(t *testing.T) {
 }
 
 func TestFolderSessionsEmpty(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	// Empty list → should not panic, return nil.
 	if sl.FolderSessions() != nil {
@@ -301,6 +312,7 @@ func TestFolderSessionsEmpty(t *testing.T) {
 }
 
 func TestSelectionClearedOnSetSessions(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(5))
 	sl.SelectAll()
@@ -316,6 +328,7 @@ func TestSelectionClearedOnSetSessions(t *testing.T) {
 }
 
 func TestSelectionClearedOnSetGroups(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(2, 3))
 	sl.SelectAll()
@@ -335,6 +348,7 @@ func TestSelectionClearedOnSetGroups(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFindNextWaiting_NoItems(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	attMap := map[string]data.AttentionStatus{}
 	if got := sl.FindNextWaiting(attMap); got != -1 {
@@ -343,6 +357,7 @@ func TestFindNextWaiting_NoItems(t *testing.T) {
 }
 
 func TestFindNextWaiting_NoneWaiting(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(5)
 	sl.SetSessions(sessions)
@@ -358,6 +373,7 @@ func TestFindNextWaiting_NoneWaiting(t *testing.T) {
 }
 
 func TestFindNextWaiting_ForwardWrap(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(5)
 	sl.SetSessions(sessions)
@@ -381,6 +397,7 @@ func TestFindNextWaiting_ForwardWrap(t *testing.T) {
 }
 
 func TestFindNextWaiting_SkipsFolders(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	groups := makeGroups(2, 3) // 2 folders × 3 sessions = 8 visible items
 	sl.SetSessions(nil)        // ensure clean state
@@ -409,6 +426,7 @@ func TestFindNextWaiting_SkipsFolders(t *testing.T) {
 }
 
 func TestFindNextWaiting_MultipleWaiting(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(5)
 	sl.SetSessions(sessions)
@@ -443,6 +461,7 @@ func TestFindNextWaiting_MultipleWaiting(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionDotRendering(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(3)
 	sl.SetSessions(sessions)
@@ -469,6 +488,7 @@ func TestAttentionDotRendering(t *testing.T) {
 }
 
 func TestAttentionDotNilMap(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sessions := makeSessions(3)
 	sl.SetSessions(sessions)

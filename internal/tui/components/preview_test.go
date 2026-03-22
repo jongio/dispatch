@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestRenderChatBubbleEmptyMessage(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("", "You", 60, true)
 	if got != "" {
 		t.Errorf("RenderChatBubble with empty msg should return empty, got %q", got)
@@ -19,6 +20,7 @@ func TestRenderChatBubbleEmptyMessage(t *testing.T) {
 }
 
 func TestRenderChatBubbleUserContainsLabel(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("hello", "You", 60, true)
 	if !strings.Contains(got, "You") {
 		t.Errorf("User bubble should contain label 'You', got:\n%s", got)
@@ -26,6 +28,7 @@ func TestRenderChatBubbleUserContainsLabel(t *testing.T) {
 }
 
 func TestRenderChatBubbleUserContainsMessage(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("hello world", "You", 60, true)
 	if !strings.Contains(got, "hello world") {
 		t.Errorf("User bubble should contain message text, got:\n%s", got)
@@ -33,6 +36,7 @@ func TestRenderChatBubbleUserContainsMessage(t *testing.T) {
 }
 
 func TestRenderChatBubbleAssistantContainsLabel(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("hi there", "Copilot", 60, false)
 	if !strings.Contains(got, "Copilot") {
 		t.Errorf("Assistant bubble should contain label 'Copilot', got:\n%s", got)
@@ -40,6 +44,7 @@ func TestRenderChatBubbleAssistantContainsLabel(t *testing.T) {
 }
 
 func TestRenderChatBubbleAssistantContainsMessage(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("hi there", "Copilot", 60, false)
 	if !strings.Contains(got, "hi there") {
 		t.Errorf("Assistant bubble should contain message text, got:\n%s", got)
@@ -47,6 +52,7 @@ func TestRenderChatBubbleAssistantContainsMessage(t *testing.T) {
 }
 
 func TestRenderChatBubbleUserRightAligned(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("short", "You", 60, true)
 	lines := strings.Split(got, "\n")
 
@@ -69,6 +75,7 @@ func TestRenderChatBubbleUserRightAligned(t *testing.T) {
 }
 
 func TestRenderChatBubbleAssistantLeftAligned(t *testing.T) {
+	t.Parallel()
 	got := RenderChatBubble("hello", "Copilot", 60, false)
 	lines := strings.Split(got, "\n")
 
@@ -89,6 +96,7 @@ func TestRenderChatBubbleAssistantLeftAligned(t *testing.T) {
 }
 
 func TestRenderChatBubbleNarrowWidth(t *testing.T) {
+	t.Parallel()
 	// Should not panic with very narrow widths.
 	got := RenderChatBubble("hello world this is a test", "You", 15, true)
 	if got == "" {
@@ -100,6 +108,7 @@ func TestRenderChatBubbleNarrowWidth(t *testing.T) {
 }
 
 func TestRenderChatBubbleMinimumWidth(t *testing.T) {
+	t.Parallel()
 	// Should not panic with minimum width.
 	got := RenderChatBubble("x", "Copilot", 1, false)
 	if got == "" {
@@ -112,6 +121,7 @@ func TestRenderChatBubbleMinimumWidth(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRenderConversationEmpty(t *testing.T) {
+	t.Parallel()
 	got := RenderConversation(nil, 60)
 	if got != "" {
 		t.Errorf("RenderConversation with nil turns should return empty, got %q", got)
@@ -124,6 +134,7 @@ func TestRenderConversationEmpty(t *testing.T) {
 }
 
 func TestRenderConversationSingleTurn(t *testing.T) {
+	t.Parallel()
 	turns := []data.Turn{
 		{
 			UserMessage:       "What is Go?",
@@ -146,6 +157,7 @@ func TestRenderConversationSingleTurn(t *testing.T) {
 }
 
 func TestRenderConversationMultipleTurns(t *testing.T) {
+	t.Parallel()
 	turns := []data.Turn{
 		{UserMessage: "Hello", AssistantResponse: "Hi!"},
 		{UserMessage: "How are you?", AssistantResponse: "I'm good."},
@@ -176,6 +188,7 @@ func TestRenderConversationMultipleTurns(t *testing.T) {
 }
 
 func TestRenderConversationMissingUserMessage(t *testing.T) {
+	t.Parallel()
 	turns := []data.Turn{
 		{UserMessage: "", AssistantResponse: "Auto response"},
 	}
@@ -189,6 +202,7 @@ func TestRenderConversationMissingUserMessage(t *testing.T) {
 }
 
 func TestRenderConversationMissingAssistantResponse(t *testing.T) {
+	t.Parallel()
 	turns := []data.Turn{
 		{UserMessage: "Hello?", AssistantResponse: ""},
 	}
@@ -206,6 +220,7 @@ func TestRenderConversationMissingAssistantResponse(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPreviewPanelScrollUpClampsAtZero(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.ScrollUp(10)
 	if p.scroll != 0 {
@@ -214,6 +229,7 @@ func TestPreviewPanelScrollUpClampsAtZero(t *testing.T) {
 }
 
 func TestPreviewPanelScrollDown(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 
@@ -236,6 +252,7 @@ func TestPreviewPanelScrollDown(t *testing.T) {
 }
 
 func TestPreviewPanelScrollUpAfterDown(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 20) // Small viewport to ensure scrollable content.
 
@@ -264,6 +281,7 @@ func TestPreviewPanelScrollUpAfterDown(t *testing.T) {
 }
 
 func TestPreviewPanelPageUpPageDown(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 
@@ -292,6 +310,7 @@ func TestPreviewPanelPageUpPageDown(t *testing.T) {
 }
 
 func TestPreviewPanelSetDetailResetsScroll(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 
@@ -318,6 +337,7 @@ func TestPreviewPanelSetDetailResetsScroll(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPreviewPanelViewEmpty(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	got := p.View()
 	if got != "" {
@@ -326,6 +346,7 @@ func TestPreviewPanelViewEmpty(t *testing.T) {
 }
 
 func TestPreviewPanelViewNoDetail(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	got := p.View()
@@ -335,6 +356,7 @@ func TestPreviewPanelViewNoDetail(t *testing.T) {
 }
 
 func TestPreviewPanelViewWithDetail(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 
@@ -360,6 +382,7 @@ func TestPreviewPanelViewWithDetail(t *testing.T) {
 }
 
 func TestPreviewPanelViewShowsAllTurns(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(120, 100) // Large enough to show everything.
 
@@ -382,6 +405,7 @@ func TestPreviewPanelViewShowsAllTurns(t *testing.T) {
 }
 
 func TestPreviewPanelViewCheckpoints(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(120, 100)
 
@@ -408,6 +432,7 @@ func TestPreviewPanelViewCheckpoints(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPreviewPanelHitConversationSort_NoTurns(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	p.SetDetail(&data.SessionDetail{
@@ -422,6 +447,7 @@ func TestPreviewPanelHitConversationSort_NoTurns(t *testing.T) {
 }
 
 func TestPreviewPanelHitConversationSort_WithTurns(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	p.SetDetail(&data.SessionDetail{
@@ -448,6 +474,7 @@ func TestPreviewPanelHitConversationSort_WithTurns(t *testing.T) {
 }
 
 func TestPreviewPanelHitConversationSort_NoDetail(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	// No detail set → convHeaderLine stays -1.
@@ -457,6 +484,7 @@ func TestPreviewPanelHitConversationSort_NoDetail(t *testing.T) {
 }
 
 func TestPreviewPanelScrollOffset(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	if p.ScrollOffset() != 0 {
 		t.Errorf("initial ScrollOffset = %d, want 0", p.ScrollOffset())
@@ -480,6 +508,7 @@ func TestPreviewPanelScrollOffset(t *testing.T) {
 }
 
 func TestPreviewPanelConvHeaderLineUpdatesOnResize(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	p.SetDetail(&data.SessionDetail{
@@ -499,6 +528,7 @@ func TestPreviewPanelConvHeaderLineUpdatesOnResize(t *testing.T) {
 }
 
 func TestPreviewPanelConvHeaderLineResetOnNilDetail(t *testing.T) {
+	t.Parallel()
 	p := NewPreviewPanel()
 	p.SetSize(80, 40)
 	p.SetDetail(&data.SessionDetail{

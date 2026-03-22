@@ -15,6 +15,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestCompareVersions(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		a, b string
 		want int
@@ -38,6 +39,7 @@ func TestCompareVersions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.a+"_vs_"+tt.b, func(t *testing.T) {
+			t.Parallel()
 			got := CompareVersions(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
@@ -47,6 +49,7 @@ func TestCompareVersions(t *testing.T) {
 }
 
 func TestCompareVersions_Symmetry(t *testing.T) {
+	t.Parallel()
 	pairs := [][2]string{
 		{"1.0.0", "2.0.0"},
 		{"0.1.0", "0.2.0"},
@@ -60,6 +63,7 @@ func TestCompareVersions_Symmetry(t *testing.T) {
 }
 
 func TestCompareVersions_EmptyAndMalformed(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		a    string
@@ -75,6 +79,7 @@ func TestCompareVersions_EmptyAndMalformed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := CompareVersions(tt.a, tt.b); got != tt.want {
 				t.Fatalf("CompareVersions(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
 			}
@@ -87,6 +92,7 @@ func TestCompareVersions_EmptyAndMalformed(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestValidateVersion(t *testing.T) {
+	t.Parallel()
 	valid := []string{"1.0.0", "0.4.1", "10.20.30", "0.0.0"}
 	for _, v := range valid {
 		if err := validateVersion(v); err != nil {
@@ -120,6 +126,7 @@ func TestValidateVersion(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIsDevVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		v    string
 		want bool
@@ -139,6 +146,7 @@ func TestIsDevVersion(t *testing.T) {
 			name = "(empty)"
 		}
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			got := isDevVersion(tt.v)
 			if got != tt.want {
 				t.Errorf("isDevVersion(%q) = %v, want %v", tt.v, got, tt.want)
@@ -152,6 +160,7 @@ func TestIsDevVersion(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSplitVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		v    string
 		want []int
@@ -168,6 +177,7 @@ func TestSplitVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.v, func(t *testing.T) {
+			t.Parallel()
 			got := splitVersion(tt.v)
 			if len(got) != len(tt.want) {
 				t.Fatalf("splitVersion(%q) = %v (len %d), want %v (len %d)",
@@ -188,6 +198,7 @@ func TestSplitVersion(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCacheReadWriteRoundTrip(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "test-cache.json")
 
@@ -219,6 +230,7 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 }
 
 func TestCacheCreatesDirectory(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	nested := filepath.Join(tmpDir, "a", "b", "c")
 	path := filepath.Join(nested, "cache.json")
@@ -235,9 +247,7 @@ func TestCacheCreatesDirectory(t *testing.T) {
 }
 
 func TestCacheFilePermissions(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("file permission checks not applicable on Windows")
-	}
+	t.Parallel()
 
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "perm-cache.json")
@@ -252,9 +262,21 @@ func TestCacheFilePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat cache file: %v", err)
 	}
-	perm := info.Mode().Perm()
-	if perm != cacheFilePerm {
-		t.Errorf("cache file perm = %o, want %o", perm, cacheFilePerm)
+
+	if runtime.GOOS == "windows" {
+		// Windows doesn't enforce Unix permission bits. Verify the file
+		// is non-empty and writable (owner-access equivalent).
+		if info.Size() == 0 {
+			t.Error("cache file should be non-empty")
+		}
+		if info.Mode().Perm()&0o200 == 0 {
+			t.Error("cache file should be writable on Windows")
+		}
+	} else {
+		perm := info.Mode().Perm()
+		if perm != cacheFilePerm {
+			t.Errorf("cache file perm = %o, want %o", perm, cacheFilePerm)
+		}
 	}
 }
 
@@ -294,6 +316,7 @@ func TestReadCacheCorrupt(t *testing.T) {
 }
 
 func TestWriteCache_ConcurrentWritesRemainReadable(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "cache.json")
 	if err := os.WriteFile(path, []byte("previous-cache"), cacheFilePerm); err != nil {
 		t.Fatalf("seed cache file: %v", err)
@@ -338,6 +361,7 @@ func TestWriteCache_ConcurrentWritesRemainReadable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCheckForUpdate_DevVersion(t *testing.T) {
+	t.Parallel()
 	info := CheckForUpdate("dev")
 	if info != nil {
 		t.Error("CheckForUpdate(\"dev\") should return nil")

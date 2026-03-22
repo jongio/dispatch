@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestNewConfigPanel_Defaults(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	if cp.IsEditing() {
 		t.Error("new ConfigPanel should not be in editing mode")
@@ -30,6 +31,7 @@ func TestNewConfigPanel_Defaults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{
 		YoloMode: true, Agent: "myagent", Model: "gpt-4", LaunchMode: "tab",
@@ -75,6 +77,7 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_MoveUpDown(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	if cp.cursor != 0 {
 		t.Errorf("initial cursor = %d, want 0", cp.cursor)
@@ -106,6 +109,7 @@ func TestConfigPanel_MoveUpDown(t *testing.T) {
 }
 
 func TestConfigPanel_MoveBlockedWhileEditing(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.cursor = cfgAgent
 	_ = cp.HandleEnter() // starts editing
@@ -129,6 +133,7 @@ func TestConfigPanel_MoveBlockedWhileEditing(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_HandleEnter_YoloToggle(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.cursor = cfgYoloMode
 	cp.HandleEnter()
@@ -142,6 +147,7 @@ func TestConfigPanel_HandleEnter_YoloToggle(t *testing.T) {
 }
 
 func TestConfigPanel_HandleEnter_WorkspaceRecoveryToggle(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{WorkspaceRecovery: true})
 	cp.cursor = cfgWorkspaceRecovery
@@ -156,6 +162,7 @@ func TestConfigPanel_HandleEnter_WorkspaceRecoveryToggle(t *testing.T) {
 }
 
 func TestConfigPanel_HandleEnter_PreviewPositionCycle(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{PreviewPosition: "right"})
 	cp.cursor = cfgPreviewPosition
@@ -186,6 +193,7 @@ func TestConfigPanel_HandleEnter_PreviewPositionCycle(t *testing.T) {
 }
 
 func TestConfigPanel_HandleEnter_LaunchModeCycle(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{LaunchMode: "window"})
 	cp.cursor = cfgLaunchMode
@@ -196,6 +204,7 @@ func TestConfigPanel_HandleEnter_LaunchModeCycle(t *testing.T) {
 }
 
 func TestConfigPanel_HandleEnter_AgentEditing(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.cursor = cfgAgent
 	_ = cp.HandleEnter()
@@ -206,6 +215,7 @@ func TestConfigPanel_HandleEnter_AgentEditing(t *testing.T) {
 }
 
 func TestConfigPanel_HandleEnter_CustomCommandOverrides(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{CustomCommand: "my-cmd"})
 
@@ -222,6 +232,7 @@ func TestConfigPanel_HandleEnter_CustomCommandOverrides(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_ConfirmEdit(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.cursor = cfgAgent
 	_ = cp.HandleEnter() // start editing
@@ -237,6 +248,7 @@ func TestConfigPanel_ConfirmEdit(t *testing.T) {
 }
 
 func TestConfigPanel_CancelEdit(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{Agent: "original"})
 	cp.cursor = cfgAgent
@@ -254,6 +266,7 @@ func TestConfigPanel_CancelEdit(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_SetTerminals(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetTerminals([]string{"Windows Terminal", "conhost"})
 	if len(cp.terminals) != 2 {
@@ -262,6 +275,7 @@ func TestConfigPanel_SetTerminals(t *testing.T) {
 }
 
 func TestConfigPanel_SetShellOptions(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	shells := []platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -274,6 +288,7 @@ func TestConfigPanel_SetShellOptions(t *testing.T) {
 }
 
 func TestConfigPanel_SetThemeOptions(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetThemeOptions([]string{"auto", "Dispatch Dark", "Campbell"})
 	if len(cp.themeNames) != 3 {
@@ -286,6 +301,7 @@ func TestConfigPanel_SetThemeOptions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_CycleTerminal(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetTerminals([]string{"Windows Terminal", "conhost"})
 	cp.SetValues(ConfigValues{})
@@ -297,6 +313,7 @@ func TestConfigPanel_CycleTerminal(t *testing.T) {
 }
 
 func TestConfigPanel_CycleShell(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetShellOptions([]platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -311,6 +328,7 @@ func TestConfigPanel_CycleShell(t *testing.T) {
 }
 
 func TestConfigPanel_CycleTheme(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetThemeOptions([]string{"auto", "Dispatch Dark", "Campbell"})
 	cp.SetValues(ConfigValues{Theme: "auto"})
@@ -326,6 +344,7 @@ func TestConfigPanel_CycleTheme(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_View_ContainsSettings(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	view := cp.View()
@@ -335,6 +354,7 @@ func TestConfigPanel_View_ContainsSettings(t *testing.T) {
 }
 
 func TestConfigPanel_View_ContainsFields(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	view := cp.View()
@@ -346,6 +366,7 @@ func TestConfigPanel_View_ContainsFields(t *testing.T) {
 }
 
 func TestConfigPanel_View_ShowsOverriddenWhenCustomCommand(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{CustomCommand: "my-cmd"})
 	cp.SetSize(80, 40)
@@ -356,6 +377,7 @@ func TestConfigPanel_View_ShowsOverriddenWhenCustomCommand(t *testing.T) {
 }
 
 func TestConfigPanel_View_ShowsEditFooter(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	cp.cursor = cfgAgent
@@ -368,6 +390,7 @@ func TestConfigPanel_View_ShowsEditFooter(t *testing.T) {
 }
 
 func TestConfigPanel_View_CustomCommandHelp(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	cp.cursor = cfgCustomCommand
@@ -378,6 +401,7 @@ func TestConfigPanel_View_CustomCommandHelp(t *testing.T) {
 }
 
 func TestConfigPanel_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	_ = cp.View() // zero size
 	cp.SetSize(80, 40)
@@ -389,6 +413,7 @@ func TestConfigPanel_View_DoesNotPanic(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBoolDisplay(t *testing.T) {
+	t.Parallel()
 	on := boolDisplay(true)
 	off := boolDisplay(false)
 	if !strings.Contains(on, "ON") {
@@ -400,6 +425,7 @@ func TestBoolDisplay(t *testing.T) {
 }
 
 func TestStringDisplay(t *testing.T) {
+	t.Parallel()
 	empty := stringDisplay("")
 	if !strings.Contains(empty, "(none)") {
 		t.Errorf("stringDisplay(\"\") = %q, want to contain '(none)'", empty)
@@ -411,6 +437,7 @@ func TestStringDisplay(t *testing.T) {
 }
 
 func TestLaunchModeDisplay(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		mode string
 		want string
@@ -429,6 +456,7 @@ func TestLaunchModeDisplay(t *testing.T) {
 }
 
 func TestThemeDisplay(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		theme string
 		want  string
@@ -450,6 +478,7 @@ func TestThemeDisplay(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCyclePreviewPosition(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		current string
 		want    string
@@ -470,6 +499,7 @@ func TestCyclePreviewPosition(t *testing.T) {
 }
 
 func TestPreviewPositionDisplay(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		pos  string
 		want string

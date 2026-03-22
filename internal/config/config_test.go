@@ -13,6 +13,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestDefaultValues(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 
 	if cfg.DefaultShell != "" {
@@ -70,6 +71,7 @@ func TestDefaultValues(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigJSONRoundTrip(t *testing.T) {
+	t.Parallel()
 	original := &Config{
 		DefaultShell:     "zsh",
 		DefaultTerminal:  "alacritty",
@@ -156,6 +158,7 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 }
 
 func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
+	t.Parallel()
 	jsonData := `{"workspace_recovery": false}`
 	cfg := Default()
 	if err := json.Unmarshal([]byte(jsonData), cfg); err != nil {
@@ -167,6 +170,7 @@ func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
 }
 
 func TestWorkspaceRecoveryJSONTrue(t *testing.T) {
+	t.Parallel()
 	jsonData := `{"workspace_recovery": true}`
 	cfg := Default()
 	if err := json.Unmarshal([]byte(jsonData), cfg); err != nil {
@@ -178,6 +182,7 @@ func TestWorkspaceRecoveryJSONTrue(t *testing.T) {
 }
 
 func TestDefaultValuesPreservedOnPartialJSON(t *testing.T) {
+	t.Parallel()
 	// When JSON has only some keys, defaults should fill the rest.
 	partialJSON := `{"default_shell": "fish", "yoloMode": true}`
 
@@ -205,6 +210,7 @@ func TestDefaultValuesPreservedOnPartialJSON(t *testing.T) {
 }
 
 func TestJSONFieldNames(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{
 		DefaultShell:   "zsh",
 		YoloMode:       true,
@@ -578,10 +584,6 @@ func TestSaveAndLoadPreservesAllFields(t *testing.T) {
 }
 
 func TestSaveFilePermissions(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("file permission checks not meaningful on Windows")
-	}
-
 	withTempConfigDir(t)
 
 	cfg := Default()
@@ -599,10 +601,23 @@ func TestSaveFilePermissions(t *testing.T) {
 		t.Fatalf("Stat: %v", err)
 	}
 
-	// Save uses 0o600, so only owner should have read/write.
-	perm := info.Mode().Perm()
-	if perm&0o077 != 0 {
-		t.Errorf("config file permissions = %o, want no group/other access (0600)", perm)
+	if runtime.GOOS == "windows" {
+		// On Windows, Unix permission bits (group/other) are not
+		// meaningful.  Verify the file was created non-empty and is
+		// writable by the current user (the write-permission bit is
+		// the only one Windows maps from os.FileMode).
+		if info.Size() == 0 {
+			t.Error("config file should not be empty after Save")
+		}
+		if info.Mode().Perm()&0o200 == 0 {
+			t.Error("config file should be writable on Windows")
+		}
+	} else {
+		// Save uses 0o600, so only owner should have read/write.
+		perm := info.Mode().Perm()
+		if perm&0o077 != 0 {
+			t.Errorf("config file permissions = %o, want no group/other access (0600)", perm)
+		}
 	}
 }
 
@@ -676,6 +691,7 @@ func TestConfigPathFormat(t *testing.T) {
 }
 
 func TestDefaultFieldTypes(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 
 	// Verify zero-value fields are indeed their zero values.
@@ -753,6 +769,7 @@ func TestSave_ErrorWhenConfigPathFails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestEffectiveLaunchMode_ExplicitMode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		mode string
 		want string
@@ -771,6 +788,7 @@ func TestEffectiveLaunchMode_ExplicitMode(t *testing.T) {
 }
 
 func TestEffectiveLaunchMode_BackwardCompat_InPlace(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{LaunchInPlace: true}
 	if got := cfg.EffectiveLaunchMode(); got != "in-place" {
 		t.Errorf("legacy LaunchInPlace=true: got %q, want 'in-place'", got)
@@ -778,6 +796,7 @@ func TestEffectiveLaunchMode_BackwardCompat_InPlace(t *testing.T) {
 }
 
 func TestEffectiveLaunchMode_Default(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if got := cfg.EffectiveLaunchMode(); got != "tab" {
 		t.Errorf("default config: got %q, want 'tab'", got)
@@ -785,6 +804,7 @@ func TestEffectiveLaunchMode_Default(t *testing.T) {
 }
 
 func TestEffectiveLaunchMode_JSONBackwardCompat(t *testing.T) {
+	t.Parallel()
 	// Simulate a config file from before LaunchMode existed.
 	legacyJSON := `{"launchInPlace": true}`
 	cfg := Default()
@@ -797,6 +817,7 @@ func TestEffectiveLaunchMode_JSONBackwardCompat(t *testing.T) {
 }
 
 func TestEffectiveLaunchMode_NewFieldOverridesLegacy(t *testing.T) {
+	t.Parallel()
 	// LaunchMode takes precedence over LaunchInPlace.
 	mixedJSON := `{"launchInPlace": true, "launch_mode": "window"}`
 	cfg := Default()
@@ -813,6 +834,7 @@ func TestEffectiveLaunchMode_NewFieldOverridesLegacy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestEffectivePaneDirection_ExplicitDirection(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		dir  string
 		want string
@@ -832,6 +854,7 @@ func TestEffectivePaneDirection_ExplicitDirection(t *testing.T) {
 }
 
 func TestEffectivePaneDirection_Default(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if got := cfg.EffectivePaneDirection(); got != "auto" {
 		t.Errorf("default config: got %q, want 'auto'", got)
@@ -839,6 +862,7 @@ func TestEffectivePaneDirection_Default(t *testing.T) {
 }
 
 func TestEffectivePaneDirection_EmptyDefaultsToAuto(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{}
 	if got := cfg.EffectivePaneDirection(); got != "auto" {
 		t.Errorf("empty PaneDirection: got %q, want 'auto'", got)
@@ -846,6 +870,7 @@ func TestEffectivePaneDirection_EmptyDefaultsToAuto(t *testing.T) {
 }
 
 func TestEffectivePaneDirection_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
 	jsonStr := `{"launch_mode": "pane", "pane_direction": "left"}`
 	cfg := Default()
 	if err := json.Unmarshal([]byte(jsonStr), cfg); err != nil {
@@ -857,6 +882,7 @@ func TestEffectivePaneDirection_JSONRoundTrip(t *testing.T) {
 }
 
 func TestPaneDirectionConstants(t *testing.T) {
+	t.Parallel()
 	// Verify constant values match expected strings.
 	if PaneDirectionAuto != "auto" {
 		t.Errorf("PaneDirectionAuto = %q, want 'auto'", PaneDirectionAuto)
@@ -933,6 +959,7 @@ func TestLoad_ClampsNegativeMaxSessions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSanitizeConfigValue_SafeValues(t *testing.T) {
+	t.Parallel()
 	safe := []string{
 		"",
 		"bash",
@@ -951,6 +978,7 @@ func TestSanitizeConfigValue_SafeValues(t *testing.T) {
 }
 
 func TestSanitizeConfigValue_UnsafeValues(t *testing.T) {
+	t.Parallel()
 	unsafe := []string{
 		"bash; rm -rf /",
 		"pwsh$(evil)",
@@ -972,6 +1000,7 @@ func TestSanitizeConfigValue_UnsafeValues(t *testing.T) {
 }
 
 func TestSanitize_ClearsUnsafeFields(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	cfg.DefaultShell = "bash; rm -rf /"
 	cfg.DefaultTerminal = "term$(evil)"
@@ -994,6 +1023,7 @@ func TestSanitize_ClearsUnsafeFields(t *testing.T) {
 }
 
 func TestSanitize_PreservesSafeFields(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	cfg.DefaultShell = "zsh"
 	cfg.DefaultTerminal = "Windows Terminal"
@@ -1048,6 +1078,7 @@ func TestLoad_SanitizesUnsafeShellOnDisk(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestEffectivePreviewPosition_Default(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
 		t.Errorf("default config: got %q, want %q", got, PreviewPositionRight)
@@ -1055,6 +1086,7 @@ func TestEffectivePreviewPosition_Default(t *testing.T) {
 }
 
 func TestEffectivePreviewPosition_EmptyDefaultsToRight(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{}
 	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
 		t.Errorf("empty PreviewPosition: got %q, want %q", got, PreviewPositionRight)
@@ -1062,6 +1094,7 @@ func TestEffectivePreviewPosition_EmptyDefaultsToRight(t *testing.T) {
 }
 
 func TestEffectivePreviewPosition_InvalidDefaultsToRight(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{PreviewPosition: "invalid"}
 	if got := cfg.EffectivePreviewPosition(); got != PreviewPositionRight {
 		t.Errorf("invalid PreviewPosition: got %q, want %q", got, PreviewPositionRight)
@@ -1069,6 +1102,7 @@ func TestEffectivePreviewPosition_InvalidDefaultsToRight(t *testing.T) {
 }
 
 func TestEffectivePreviewPosition_ExplicitValues(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		pos  string
 		want string
@@ -1087,6 +1121,7 @@ func TestEffectivePreviewPosition_ExplicitValues(t *testing.T) {
 }
 
 func TestEffectivePreviewPosition_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
 	jsonStr := `{"preview_position": "bottom"}`
 	cfg := Default()
 	if err := json.Unmarshal([]byte(jsonStr), cfg); err != nil {
@@ -1098,6 +1133,7 @@ func TestEffectivePreviewPosition_JSONRoundTrip(t *testing.T) {
 }
 
 func TestPreviewPositionConstants(t *testing.T) {
+	t.Parallel()
 	if PreviewPositionRight != "right" {
 		t.Errorf("PreviewPositionRight = %q, want 'right'", PreviewPositionRight)
 	}

@@ -13,6 +13,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestEffectiveLaunchMode_ExplicitModes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		launchMode    string
@@ -30,6 +31,7 @@ func TestEffectiveLaunchMode_ExplicitModes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cfg := &Config{
 				LaunchMode:    tt.launchMode,
 				LaunchInPlace: tt.launchInPlace,
@@ -47,6 +49,7 @@ func TestEffectiveLaunchMode_ExplicitModes(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLaunchModeConstants(t *testing.T) {
+	t.Parallel()
 	if LaunchModeInPlace != "in-place" {
 		t.Errorf("LaunchModeInPlace = %q", LaunchModeInPlace)
 	}
@@ -63,6 +66,7 @@ func TestLaunchModeConstants(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDefaultLaunchMode(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if cfg.LaunchMode != "" {
 		t.Errorf("LaunchMode should default to empty, got %q", cfg.LaunchMode)
@@ -73,6 +77,7 @@ func TestDefaultLaunchMode(t *testing.T) {
 }
 
 func TestDefaultTheme(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if cfg.Theme != "" {
 		t.Errorf("Theme should default to empty, got %q", cfg.Theme)
@@ -80,6 +85,7 @@ func TestDefaultTheme(t *testing.T) {
 }
 
 func TestDefaultSchemes(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
 	if cfg.Schemes != nil {
 		t.Errorf("Schemes should default to nil, got %v", cfg.Schemes)
@@ -91,6 +97,7 @@ func TestDefaultSchemes(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigJSONRoundTrip_AllFields(t *testing.T) {
+	t.Parallel()
 	// Verifies all fields survive JSON marshaling/unmarshaling
 	cfg := &Config{
 		DefaultShell:     "zsh",
@@ -122,6 +129,7 @@ func TestConfigJSONRoundTrip_AllFields(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestEffectiveLaunchMode_CustomStringFallsThrough(t *testing.T) {
+	t.Parallel()
 	// Any non-empty LaunchMode is returned as-is
 	cfg := &Config{LaunchMode: "custom-mode"}
 	if cfg.EffectiveLaunchMode() != "custom-mode" {

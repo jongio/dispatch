@@ -22,6 +22,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestAssetNameForPlatform(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		version, goos, goarch string
 		want                  string
@@ -37,6 +38,7 @@ func TestAssetNameForPlatform(t *testing.T) {
 	for _, tt := range tests {
 		name := tt.goos + "_" + tt.goarch + "_v" + tt.version
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			got := assetNameForPlatform(tt.version, tt.goos, tt.goarch)
 			if got != tt.want {
 				t.Errorf("assetNameForPlatform(%q, %q, %q) = %q, want %q",
@@ -47,6 +49,7 @@ func TestAssetNameForPlatform(t *testing.T) {
 }
 
 func TestAssetName_CurrentPlatform(t *testing.T) {
+	t.Parallel()
 	name := AssetName("1.2.3")
 	if name == "" {
 		t.Fatal("AssetName returned empty string")
@@ -62,6 +65,7 @@ func TestAssetName_CurrentPlatform(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestParseChecksum(t *testing.T) {
+	t.Parallel()
 	content := `aabbccdd1122334455667788aabbccdd1122334455667788aabbccdd11223344  dispatch_0.4.1_linux_amd64.tar.gz
 11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff  dispatch_0.4.1_windows_amd64.zip
 ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100  dispatch_0.4.1_darwin_arm64.tar.gz
@@ -92,6 +96,7 @@ ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100  dispatch_0.4.1
 
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
 			got, err := ParseChecksum(content, tt.filename)
 			if tt.wantErr {
 				if err == nil {
@@ -110,6 +115,7 @@ ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100  dispatch_0.4.1
 }
 
 func TestParseChecksum_EmptyContent(t *testing.T) {
+	t.Parallel()
 	_, err := ParseChecksum("", "dispatch_0.4.1_linux_amd64.tar.gz")
 	if err == nil {
 		t.Error("expected error for empty content")
@@ -117,6 +123,7 @@ func TestParseChecksum_EmptyContent(t *testing.T) {
 }
 
 func TestParseChecksum_MixedCase(t *testing.T) {
+	t.Parallel()
 	content := `AABBCCDD1122334455667788AABBCCDD1122334455667788AABBCCDD11223344  dispatch_0.4.1_linux_amd64.tar.gz`
 
 	got, err := ParseChecksum(content, "dispatch_0.4.1_linux_amd64.tar.gz")
@@ -135,6 +142,7 @@ func TestParseChecksum_MixedCase(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSHA256File(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "test.bin")
 	data := []byte("hello dispatch update test")
@@ -158,6 +166,7 @@ func TestSHA256File(t *testing.T) {
 }
 
 func TestSHA256File_Missing(t *testing.T) {
+	t.Parallel()
 	_, err := SHA256File(filepath.Join(t.TempDir(), "nonexistent"))
 	if err == nil {
 		t.Error("expected error for missing file")
@@ -169,6 +178,7 @@ func TestSHA256File_Missing(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExtractFromTarGz(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
 	binaryContent := []byte("#!/bin/sh\necho hello")
@@ -202,6 +212,7 @@ func TestExtractFromTarGz(t *testing.T) {
 }
 
 func TestExtractFromTarGz_NoBinary(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
 
@@ -226,6 +237,7 @@ func TestExtractFromTarGz_NoBinary(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExtractFromZip(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.zip")
 	binaryContent := []byte("MZ fake exe content")
@@ -259,6 +271,7 @@ func TestExtractFromZip(t *testing.T) {
 }
 
 func TestExtractFromZip_NoBinary(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.zip")
 
@@ -282,6 +295,7 @@ func TestExtractFromZip_NoBinary(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExtractBinary_RoutesToZip(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.zip")
 	if err := createTestZip(archivePath, "dispatch.exe", []byte("exe")); err != nil {
@@ -300,6 +314,7 @@ func TestExtractBinary_RoutesToZip(t *testing.T) {
 }
 
 func TestExtractBinary_RoutesToTarGz(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
 	if err := createTestTarGz(archivePath, "dispatch", []byte("bin")); err != nil {
@@ -322,6 +337,7 @@ func TestExtractBinary_RoutesToTarGz(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCopyFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	src := filepath.Join(tmpDir, "src.bin")
 	dst := filepath.Join(tmpDir, "dst.bin")
@@ -345,6 +361,7 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestCopyFile_MissingSrc(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	err := copyFile(filepath.Join(tmpDir, "nope"), filepath.Join(tmpDir, "dst"))
 	if err == nil {
@@ -357,6 +374,7 @@ func TestCopyFile_MissingSrc(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExtractFromTarGz_PathTraversalRejected(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "path-traversal.tar.gz")
 	if err := createTestTarGz(archivePath, "../../dispatch", []byte("evil")); err != nil {
@@ -378,6 +396,7 @@ func TestExtractFromTarGz_PathTraversalRejected(t *testing.T) {
 }
 
 func TestExtractFromZip_PathTraversalRejected(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "path-traversal.zip")
 	if err := createTestZip(archivePath, "../../dispatch.exe", []byte("evil")); err != nil {
@@ -399,6 +418,7 @@ func TestExtractFromZip_PathTraversalRejected(t *testing.T) {
 }
 
 func TestExtractFromTarGz_SymlinkRejected(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "symlink.tar.gz")
 	if err := createTestTarGzWithHeader(archivePath, &tar.Header{
@@ -441,6 +461,7 @@ func TestDownloadAsset_RejectsNonHTTPSRedirect(t *testing.T) {
 }
 
 func TestDownloadAsset_EnforcesMaxSize(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.FormatInt(maxDownloadSize+1, 10))
 		w.WriteHeader(http.StatusOK)
@@ -454,6 +475,7 @@ func TestDownloadAsset_EnforcesMaxSize(t *testing.T) {
 }
 
 func TestVerifyChecksum_Mismatch(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "dispatch.tar.gz")
 	if err := os.WriteFile(archivePath, []byte("actual archive data"), 0o600); err != nil {
@@ -472,6 +494,7 @@ func TestVerifyChecksum_Mismatch(t *testing.T) {
 }
 
 func TestReplaceWindows_RollbackOnFailure(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	exeDir := filepath.Join(tmpDir, "bin")
 	if err := os.MkdirAll(exeDir, 0o755); err != nil {
@@ -506,6 +529,7 @@ func TestReplaceWindows_RollbackOnFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRunUpdate_DevVersion(t *testing.T) {
+	t.Parallel()
 	err := RunUpdate("dev")
 	if err == nil {
 		t.Fatal("expected error for dev version")

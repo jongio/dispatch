@@ -10,6 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestNewFilterPanel_EmptyState(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	if fp.HasActive() {
 		t.Error("new FilterPanel should have no active exclusions")
@@ -25,6 +26,7 @@ func TestNewFilterPanel_EmptyState(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_SetFolders_BuildsGroups(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	folders := []string{
 		"/home/user/projects/alpha",
@@ -40,6 +42,7 @@ func TestFilterPanel_SetFolders_BuildsGroups(t *testing.T) {
 }
 
 func TestFilterPanel_SetFolders_WithExclusions(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	folders := []string{
 		"/home/user/projects/alpha",
@@ -62,6 +65,7 @@ func TestFilterPanel_SetFolders_WithExclusions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_MoveUpDown(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{
 		"/home/a/x", "/home/a/y", "/home/b/z",
@@ -99,6 +103,7 @@ func TestFilterPanel_MoveUpDown(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_ToggleExclusion_Child(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/home/a/x", "/home/a/y"}, nil)
 
@@ -113,6 +118,7 @@ func TestFilterPanel_ToggleExclusion_Child(t *testing.T) {
 }
 
 func TestFilterPanel_ToggleExclusion_Parent(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/home/a/x", "/home/a/y"}, nil)
 
@@ -136,6 +142,7 @@ func TestFilterPanel_ToggleExclusion_Parent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_Apply_ReturnsSorted(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/z/b", "/z/a", "/z/c"}, nil)
 
@@ -151,6 +158,7 @@ func TestFilterPanel_Apply_ReturnsSorted(t *testing.T) {
 }
 
 func TestFilterPanel_Cancel_RevertsToPending(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/x", "/a/y"}, []string{"/a/x"})
 
@@ -168,6 +176,7 @@ func TestFilterPanel_Cancel_RevertsToPending(t *testing.T) {
 }
 
 func TestFilterPanel_ClearAll(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/x"}, []string{"/a/x"})
 
@@ -182,6 +191,7 @@ func TestFilterPanel_ClearAll(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_ExpandCollapseGroup(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/x", "/a/y"}, nil)
 	fp.SetSize(80, 40)
@@ -206,6 +216,7 @@ func TestFilterPanel_ExpandCollapseGroup(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_View_ContainsTitle(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetSize(80, 40)
 	view := fp.View()
@@ -215,6 +226,7 @@ func TestFilterPanel_View_ContainsTitle(t *testing.T) {
 }
 
 func TestFilterPanel_View_ContainsFooter(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetSize(80, 40)
 	view := fp.View()
@@ -224,6 +236,7 @@ func TestFilterPanel_View_ContainsFooter(t *testing.T) {
 }
 
 func TestFilterPanel_View_EmptyState(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetSize(80, 40)
 	view := fp.View()
@@ -233,6 +246,7 @@ func TestFilterPanel_View_EmptyState(t *testing.T) {
 }
 
 func TestFilterPanel_View_WithFolders(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/home/user/projects/alpha"}, nil)
 	fp.SetSize(80, 40)
@@ -243,6 +257,7 @@ func TestFilterPanel_View_WithFolders(t *testing.T) {
 }
 
 func TestFilterPanel_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	// Zero size.
 	_ = fp.View()
@@ -259,6 +274,7 @@ func TestFilterPanel_View_DoesNotPanic(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_ActiveBadges_WithExclusions(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/x", "/a/y"}, []string{"/a/x", "/a/y"})
 
@@ -273,12 +289,14 @@ func TestFilterPanel_ActiveBadges_WithExclusions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_SetActive_NoOp(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	// Should not panic.
 	fp.SetActive(FilterFolder, "test")
 }
 
 func TestFilterPanel_Toggle_BackwardCompat(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/x"}, nil)
 	cat, _, _ := fp.Toggle()

@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestSessionList_MoveUp(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(5))
 	sl.SetSize(80, 5)
@@ -37,6 +38,7 @@ func TestSessionList_MoveUp(t *testing.T) {
 }
 
 func TestSessionList_MoveUp_ScrollsViewport(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(20))
 	sl.SetSize(80, 5) // only 5 visible
@@ -59,6 +61,7 @@ func TestSessionList_MoveUp_ScrollsViewport(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_MoveTo(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(10))
 	sl.SetSize(80, 5)
@@ -90,6 +93,7 @@ func TestSessionList_MoveTo(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_ScrollBy(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(20))
 	sl.SetSize(80, 5)
@@ -120,6 +124,7 @@ func TestSessionList_ScrollBy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_Accessors(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(10))
 	sl.SetSize(80, 5)
@@ -140,6 +145,7 @@ func TestSessionList_Accessors(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_FolderOperations(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(2, 3))
 	sl.SetSize(80, 20)
@@ -188,6 +194,7 @@ func TestSessionList_FolderOperations(t *testing.T) {
 }
 
 func TestSessionList_FolderOperations_OnSession(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(1, 3))
 	sl.SetSize(80, 20)
@@ -205,6 +212,7 @@ func TestSessionList_FolderOperations_OnSession(t *testing.T) {
 }
 
 func TestSessionList_FolderOperations_OutOfBounds(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	// No items.
 	sl.ToggleFolder()   // should not panic
@@ -220,6 +228,7 @@ func TestSessionList_FolderOperations_OutOfBounds(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_Selected(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(3))
 	sl.SetSize(80, 10)
@@ -234,6 +243,7 @@ func TestSessionList_Selected(t *testing.T) {
 }
 
 func TestSessionList_Selected_OnFolder(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(1, 2))
 	sl.SetSize(80, 10)
@@ -246,6 +256,7 @@ func TestSessionList_Selected_OnFolder(t *testing.T) {
 }
 
 func TestSessionList_Selected_Empty(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	_, ok := sl.Selected()
 	if ok {
@@ -254,6 +265,7 @@ func TestSessionList_Selected_Empty(t *testing.T) {
 }
 
 func TestSessionList_SelectedFolderPath(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(1, 2))
 	sl.SetSize(80, 10)
@@ -265,6 +277,7 @@ func TestSessionList_SelectedFolderPath(t *testing.T) {
 }
 
 func TestSessionList_SelectedFolderPath_OnSession(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(3))
 	sl.SetSize(80, 10)
@@ -276,6 +289,7 @@ func TestSessionList_SelectedFolderPath_OnSession(t *testing.T) {
 }
 
 func TestSessionList_SessionCount(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetSessions(makeSessions(7))
 	sl.SetSize(80, 10)
@@ -286,6 +300,7 @@ func TestSessionList_SessionCount(t *testing.T) {
 }
 
 func TestSessionList_SessionCount_WithGroups(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	sl.SetGroups(makeGroups(2, 3))
 	sl.SetSize(80, 10)
@@ -300,6 +315,7 @@ func TestSessionList_SessionCount_WithGroups(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSessionList_SetHiddenSessions(t *testing.T) {
+	t.Parallel()
 	sl := NewSessionList()
 	hidden := map[string]struct{}{"sess-1": {}}
 	sl.SetHiddenSessions(hidden)
@@ -314,6 +330,7 @@ func TestSessionList_SetHiddenSessions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_SetOptions(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	folders := []string{"/a/b", "/a/c"}
 	fp.SetOptions(folders, nil, nil)
@@ -321,6 +338,7 @@ func TestFilterPanel_SetOptions(t *testing.T) {
 }
 
 func TestFilterPanel_SetActive(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetActive(FilterFolder, "test") // no-op, should not panic
 }
@@ -330,6 +348,7 @@ func TestFilterPanel_SetActive(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterPanel_MoveUp_AtTop(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	fp.SetFolders([]string{"/a/b", "/a/c"}, nil)
 	fp.SetSize(80, 20)
@@ -342,6 +361,7 @@ func TestFilterPanel_MoveUp_AtTop(t *testing.T) {
 }
 
 func TestFilterPanel_MoveUp_ScrollsOffset(t *testing.T) {
+	t.Parallel()
 	fp := NewFilterPanel()
 	folders := make([]string, 30)
 	for i := range folders {
@@ -371,6 +391,7 @@ func TestFilterPanel_MoveUp_ScrollsOffset(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPreview_ViewWithDetail(t *testing.T) {
+	t.Parallel()
 	pp := NewPreviewPanel()
 	pp.SetSize(60, 30)
 	pp.SetDetail(&data.SessionDetail{
@@ -411,6 +432,7 @@ func TestPreview_ViewWithDetail(t *testing.T) {
 }
 
 func TestPreview_ViewWithManyRefs(t *testing.T) {
+	t.Parallel()
 	pp := NewPreviewPanel()
 	pp.SetSize(60, 50)
 	refs := make([]data.SessionRef, 10)
@@ -431,6 +453,7 @@ func TestPreview_ViewWithManyRefs(t *testing.T) {
 }
 
 func TestPreview_ViewWithManyFiles(t *testing.T) {
+	t.Parallel()
 	pp := NewPreviewPanel()
 	pp.SetSize(60, 50)
 	files := make([]data.SessionFile, 10)
@@ -448,6 +471,7 @@ func TestPreview_ViewWithManyFiles(t *testing.T) {
 }
 
 func TestPreview_ViewWithManyCheckpoints(t *testing.T) {
+	t.Parallel()
 	pp := NewPreviewPanel()
 	pp.SetSize(60, 50)
 	cps := make([]data.Checkpoint, 10)
@@ -465,6 +489,7 @@ func TestPreview_ViewWithManyCheckpoints(t *testing.T) {
 }
 
 func TestPreview_ViewWithScroll(t *testing.T) {
+	t.Parallel()
 	pp := NewPreviewPanel()
 	pp.SetSize(60, 10)
 	// Set a long detail to enable scrolling.
@@ -487,6 +512,7 @@ func TestPreview_ViewWithScroll(t *testing.T) {
 }
 
 func TestUniqueFilePaths(t *testing.T) {
+	t.Parallel()
 	files := []data.SessionFile{
 		{FilePath: "a.go"},
 		{FilePath: "b.go"},
@@ -505,6 +531,7 @@ func TestUniqueFilePaths(t *testing.T) {
 }
 
 func TestUniqueFilePaths_Empty(t *testing.T) {
+	t.Parallel()
 	got := uniqueFilePaths(nil)
 	if len(got) != 0 {
 		t.Errorf("uniqueFilePaths(nil) = %v, want empty", got)
@@ -512,6 +539,7 @@ func TestUniqueFilePaths_Empty(t *testing.T) {
 }
 
 func TestCountUniqueRefs(t *testing.T) {
+	t.Parallel()
 	refs := []data.SessionRef{
 		{RefType: "commit", RefValue: "abc"},
 		{RefType: "pr", RefValue: "42"},
@@ -525,6 +553,7 @@ func TestCountUniqueRefs(t *testing.T) {
 }
 
 func TestCountUniqueRefs_Empty(t *testing.T) {
+	t.Parallel()
 	got := countUniqueRefs(nil)
 	if got != 0 {
 		t.Errorf("countUniqueRefs(nil) = %d, want 0", got)
@@ -536,6 +565,7 @@ func TestCountUniqueRefs_Empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigPanel_Update_NotEditing(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	msg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	cp2, cmd := cp.Update(msg)
@@ -548,6 +578,7 @@ func TestConfigPanel_Update_NotEditing(t *testing.T) {
 }
 
 func TestConfigPanel_Update_Editing(t *testing.T) {
+	t.Parallel()
 	cp := NewConfigPanel()
 	// Move to Agent field (index 1) and enter edit mode.
 	cp.MoveDown() // cursor = 1 (Agent)
@@ -569,6 +600,7 @@ func TestConfigPanel_Update_Editing(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSearchBar_Update(t *testing.T) {
+	t.Parallel()
 	sb := NewSearchBar()
 	sb.Focus()
 	msg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'h'}})

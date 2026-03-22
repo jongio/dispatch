@@ -165,6 +165,7 @@ func invokeTool(t *testing.T, tool sdk.Tool, args map[string]any) (sdk.ToolResul
 // ---------------------------------------------------------------------------
 
 func TestCoverage_marshalJSON(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   any
@@ -225,6 +226,7 @@ func TestCoverage_marshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := marshalJSON(tt.input)
 			if tt.wantErr {
 				if err == nil {
@@ -243,6 +245,7 @@ func TestCoverage_marshalJSON(t *testing.T) {
 }
 
 func TestCoverage_marshalJSON_indented(t *testing.T) {
+	t.Parallel()
 	// Verify output is indented (multi-line).
 	input := map[string]string{"key": "value"}
 	result, err := marshalJSON(input)
@@ -259,6 +262,7 @@ func TestCoverage_marshalJSON_indented(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_defineTools_count(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tools := defineTools(store)
 	if len(tools) != 4 {
@@ -267,6 +271,7 @@ func TestCoverage_defineTools_count(t *testing.T) {
 }
 
 func TestCoverage_defineTools_names(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tools := defineTools(store)
 	expected := map[string]bool{
@@ -297,6 +302,7 @@ func TestCoverage_defineTools_names(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_searchSessionsTool_noFilter(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -315,6 +321,7 @@ func TestCoverage_searchSessionsTool_noFilter(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_byRepo(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -336,6 +343,7 @@ func TestCoverage_searchSessionsTool_byRepo(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_byBranch(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -354,6 +362,7 @@ func TestCoverage_searchSessionsTool_byBranch(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_byQuery(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -369,6 +378,7 @@ func TestCoverage_searchSessionsTool_byQuery(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_sinceRFC3339(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -388,6 +398,7 @@ func TestCoverage_searchSessionsTool_sinceRFC3339(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_sinceDateOnly(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -403,6 +414,7 @@ func TestCoverage_searchSessionsTool_sinceDateOnly(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_sinceInvalid(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -418,6 +430,7 @@ func TestCoverage_searchSessionsTool_sinceInvalid(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_untilRFC3339(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -436,6 +449,7 @@ func TestCoverage_searchSessionsTool_untilRFC3339(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_untilDateOnly(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -452,6 +466,7 @@ func TestCoverage_searchSessionsTool_untilDateOnly(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_untilInvalid(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -467,6 +482,7 @@ func TestCoverage_searchSessionsTool_untilInvalid(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_noResults(t *testing.T) {
+	t.Parallel()
 	store := newEmptyTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -480,6 +496,7 @@ func TestCoverage_searchSessionsTool_noResults(t *testing.T) {
 }
 
 func TestCoverage_searchSessionsTool_combinedFilters(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -504,6 +521,7 @@ func TestCoverage_searchSessionsTool_combinedFilters(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_getSessionDetailTool_valid(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -521,6 +539,7 @@ func TestCoverage_getSessionDetailTool_valid(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_emptyID(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -534,6 +553,7 @@ func TestCoverage_getSessionDetailTool_emptyID(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_missingID(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -544,6 +564,7 @@ func TestCoverage_getSessionDetailTool_missingID(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_notFound(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -554,6 +575,7 @@ func TestCoverage_getSessionDetailTool_notFound(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_sessionWithoutExtras(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -572,6 +594,7 @@ func TestCoverage_getSessionDetailTool_sessionWithoutExtras(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_listRepositoriesTool_withData(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineListRepositoriesTool(store)
 
@@ -589,6 +612,7 @@ func TestCoverage_listRepositoriesTool_withData(t *testing.T) {
 }
 
 func TestCoverage_listRepositoriesTool_empty(t *testing.T) {
+	t.Parallel()
 	store := newEmptyTestStore(t)
 	tool := defineListRepositoriesTool(store)
 
@@ -606,6 +630,7 @@ func TestCoverage_listRepositoriesTool_empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_searchDeepTool_matchesTurns(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -619,6 +644,7 @@ func TestCoverage_searchDeepTool_matchesTurns(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_matchesSummary(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -632,6 +658,7 @@ func TestCoverage_searchDeepTool_matchesSummary(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_emptyQuery(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -645,6 +672,7 @@ func TestCoverage_searchDeepTool_emptyQuery(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_missingQuery(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -655,6 +683,7 @@ func TestCoverage_searchDeepTool_missingQuery(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_noResults(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -672,6 +701,7 @@ func TestCoverage_searchDeepTool_noResults(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_Close_uninitialised(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	// Close on uninitialised client should not panic.
 	c.Close()
@@ -681,6 +711,7 @@ func TestCoverage_Close_uninitialised(t *testing.T) {
 }
 
 func TestCoverage_Close_idempotent(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	c.Close()
 	c.Close()
@@ -691,6 +722,7 @@ func TestCoverage_Close_idempotent(t *testing.T) {
 }
 
 func TestCoverage_Close_setsFieldsToNil(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	c.Close()
 	c.mu.Lock()
@@ -704,6 +736,7 @@ func TestCoverage_Close_setsFieldsToNil(t *testing.T) {
 }
 
 func TestCoverage_SendMessage_unavailable(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	ch, err := c.SendMessage(context.Background(), "hello")
 	if err == nil {
@@ -718,6 +751,7 @@ func TestCoverage_SendMessage_unavailable(t *testing.T) {
 }
 
 func TestCoverage_Search_unavailableReturnsNilNil(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	// Inject a hook that returns a non-transport init error so Search
 	// gracefully returns nil, nil without hitting real SDK.
@@ -736,6 +770,7 @@ func TestCoverage_Search_unavailableReturnsNilNil(t *testing.T) {
 }
 
 func TestCoverage_Available_beforeInit(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	if c.Available() {
 		t.Error("should not be available before Init")
@@ -743,6 +778,7 @@ func TestCoverage_Available_beforeInit(t *testing.T) {
 }
 
 func TestCoverage_InitError_beforeInit(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	if c.InitError() != nil {
 		t.Error("InitError should be nil before Init")
@@ -750,6 +786,7 @@ func TestCoverage_InitError_beforeInit(t *testing.T) {
 }
 
 func TestCoverage_New_withStore(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	c := New(store)
 	if c == nil {
@@ -766,6 +803,7 @@ func TestCoverage_New_withStore(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_parseSessionIDs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -830,6 +868,7 @@ func TestCoverage_parseSessionIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := parseSessionIDs(tt.input)
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d IDs, got %d: %v", len(tt.expected), len(result), result)
@@ -844,6 +883,7 @@ func TestCoverage_parseSessionIDs(t *testing.T) {
 }
 
 func TestParseSessionIDs_capAtMax(t *testing.T) {
+	t.Parallel()
 	// Build an array with more IDs than maxParsedSessionIDs.
 	n := maxParsedSessionIDs + 50
 	ids := make([]string, n)
@@ -865,17 +905,21 @@ func TestParseSessionIDs_capAtMax(t *testing.T) {
 }
 
 func TestCoverage_Init_failsWithoutSDK(t *testing.T) {
-	// Init requires the Copilot CLI binary which isn't available in tests,
-	// or will fail at session creation due to missing permission handler.
-	// Either way, Init should fail and cache the error.
+	t.Parallel()
+	// Use test hooks to deterministically simulate SDK failure,
+	// so this test always exercises the error path regardless of
+	// whether the real Copilot binary is available.
 	c := New(nil)
+	c.hooks = &testHooks{
+		doInit: func(_ context.Context) error {
+			return fmt.Errorf("Copilot binary not found")
+		},
+	}
 	err := c.Init(context.Background())
 	if err == nil {
-		// If the SDK is actually available and Init succeeds, skip.
-		c.Close()
-		t.Skip("Copilot SDK Init succeeded; skipping failure test")
+		t.Fatal("Init should fail with injected hook error")
 	}
-	// Error may be "starting Copilot SDK" or "creating Copilot session"
+	// The hook error is wrapped: "starting Copilot SDK: Copilot binary not found"
 	if !strings.Contains(err.Error(), "Copilot") {
 		t.Errorf("expected error about Copilot, got: %v", err)
 	}
@@ -888,12 +932,18 @@ func TestCoverage_Init_failsWithoutSDK(t *testing.T) {
 }
 
 func TestCoverage_Init_cachedError(t *testing.T) {
-	// Second Init call should return the same cached error.
+	t.Parallel()
+	// Use test hooks to force failure, then verify the error is cached
+	// on subsequent Init calls.
 	c := New(nil)
+	c.hooks = &testHooks{
+		doInit: func(_ context.Context) error {
+			return fmt.Errorf("Copilot SDK unavailable")
+		},
+	}
 	err1 := c.Init(context.Background())
 	if err1 == nil {
-		c.Close()
-		t.Skip("Copilot SDK is available")
+		t.Fatal("first Init should fail with injected hook error")
 	}
 	err2 := c.Init(context.Background())
 	if err2 == nil {
@@ -905,6 +955,7 @@ func TestCoverage_Init_cachedError(t *testing.T) {
 }
 
 func TestCoverage_Init_idempotentAfterSuccess(t *testing.T) {
+	t.Parallel()
 	// Simulate already-initialised state by setting available=true directly.
 	c := New(nil)
 	c.mu.Lock()
@@ -922,6 +973,7 @@ func TestCoverage_Init_idempotentAfterSuccess(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_SendMessage_availableButNilSDK(t *testing.T) {
+	t.Parallel()
 	// available=true but sdk=nil triggers the same error path.
 	c := New(nil)
 	c.mu.Lock()
@@ -947,6 +999,7 @@ func TestCoverage_SendMessage_availableButNilSDK(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_Search_availableButNilSDK(t *testing.T) {
+	t.Parallel()
 	// available=true but sdk=nil → graceful no-op.
 	c := New(nil)
 	c.mu.Lock()
@@ -968,6 +1021,7 @@ func TestCoverage_Search_availableButNilSDK(t *testing.T) {
 }
 
 func TestCoverage_Search_nilContext(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	// Inject a hook that returns a non-transport init error so Search
 	// gracefully returns nil, nil without hitting real SDK (which panics on nil ctx).
@@ -990,6 +1044,7 @@ func TestCoverage_Search_nilContext(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_Close_withSDKClient(t *testing.T) {
+	t.Parallel()
 	// Create an SDK client without starting it, then Close.
 	// This exercises the c.sdk != nil branch in Close.
 	c := New(nil)
@@ -1023,6 +1078,7 @@ func newClosedTestStore(t *testing.T) *data.Store {
 }
 
 func TestCoverage_searchSessionsTool_storeError(t *testing.T) {
+	t.Parallel()
 	store := newClosedTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -1036,6 +1092,7 @@ func TestCoverage_searchSessionsTool_storeError(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_storeError(t *testing.T) {
+	t.Parallel()
 	store := newClosedTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -1049,6 +1106,7 @@ func TestCoverage_getSessionDetailTool_storeError(t *testing.T) {
 }
 
 func TestCoverage_listRepositoriesTool_storeError(t *testing.T) {
+	t.Parallel()
 	store := newClosedTestStore(t)
 	tool := defineListRepositoriesTool(store)
 
@@ -1062,6 +1120,7 @@ func TestCoverage_listRepositoriesTool_storeError(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_storeError(t *testing.T) {
+	t.Parallel()
 	store := newClosedTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -1079,6 +1138,7 @@ func TestCoverage_searchDeepTool_storeError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_searchSessionsTool_validJSON(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -1090,6 +1150,7 @@ func TestCoverage_searchSessionsTool_validJSON(t *testing.T) {
 }
 
 func TestCoverage_getSessionDetailTool_validJSON(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineGetSessionDetailTool(store)
 
@@ -1101,6 +1162,7 @@ func TestCoverage_getSessionDetailTool_validJSON(t *testing.T) {
 }
 
 func TestCoverage_searchDeepTool_validJSON(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchDeepTool(store)
 
@@ -1139,8 +1201,10 @@ func assertSanitizedJSON(t *testing.T, result string) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_paramTypes(t *testing.T) {
+	t.Parallel()
 	// Ensure param structs can round-trip through JSON (used by SDK handler).
 	t.Run("SearchSessionsParams", func(t *testing.T) {
+		t.Parallel()
 		p := SearchSessionsParams{
 			Query:  "test",
 			Repo:   "owner/repo",
@@ -1162,6 +1226,7 @@ func TestCoverage_paramTypes(t *testing.T) {
 	})
 
 	t.Run("GetSessionDetailParams", func(t *testing.T) {
+		t.Parallel()
 		p := GetSessionDetailParams{ID: "sess-1"}
 		b, err := json.Marshal(p)
 		if err != nil {
@@ -1177,6 +1242,7 @@ func TestCoverage_paramTypes(t *testing.T) {
 	})
 
 	t.Run("SearchDeepParams", func(t *testing.T) {
+		t.Parallel()
 		p := SearchDeepParams{Query: "test"}
 		b, err := json.Marshal(p)
 		if err != nil {
@@ -1192,6 +1258,7 @@ func TestCoverage_paramTypes(t *testing.T) {
 	})
 
 	t.Run("ListReposParams", func(t *testing.T) {
+		t.Parallel()
 		p := ListReposParams{Filter: "test"}
 		b, err := json.Marshal(p)
 		if err != nil {
@@ -1212,26 +1279,21 @@ func TestCoverage_paramTypes(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_Search_createSessionFails(t *testing.T) {
-	// Start a real SDK client, wire it into our Client, and call Search.
-	// CreateSession will fail (no OnPermissionRequest) but this exercises
-	// the code path past the availability check.
+	t.Parallel()
+	// Exercise the code path where Search reaches the SDK but CreateSession
+	// fails.  We use an unstarted SDK client (no real binary needed) so
+	// CreateSession returns an error deterministically.
 	store := newCopilotTestStore(t)
-
-	sdkClient := sdk.NewClient(nil)
-	if err := sdkClient.Start(context.Background()); err != nil {
-		t.Skipf("Copilot SDK not available: %v", err)
-	}
-	defer func() { _ = sdkClient.Stop() }()
 
 	c := New(store)
 	c.mu.Lock()
-	c.sdk = sdkClient
+	c.sdk = sdk.NewClient(nil) // not started → CreateSession will fail
 	c.available = true
 	c.mu.Unlock()
 
 	ids, err := c.Search(context.Background(), "auth")
 	if err == nil {
-		// If CreateSession succeeds, that's fine — just verify we got a result.
+		// If CreateSession somehow succeeds, that's fine — just verify we got a result.
 		t.Logf("Search succeeded unexpectedly: %v", ids)
 	} else {
 		if !strings.Contains(err.Error(), "search session") &&
@@ -1252,14 +1314,13 @@ func TestCoverage_Search_createSessionFails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_Close_withStartedSDKClient(t *testing.T) {
-	sdkClient := sdk.NewClient(nil)
-	if err := sdkClient.Start(context.Background()); err != nil {
-		t.Skipf("Copilot SDK not available: %v", err)
-	}
-
+	t.Parallel()
+	// Exercise Close on a client whose SDK field is non-nil.
+	// We use an unstarted SDK client (no real binary needed);
+	// Stop() is safe to call on an unstarted client.
 	c := New(nil)
 	c.mu.Lock()
-	c.sdk = sdkClient
+	c.sdk = sdk.NewClient(nil)
 	c.available = true
 	c.mu.Unlock()
 
@@ -1268,95 +1329,6 @@ func TestCoverage_Close_withStartedSDKClient(t *testing.T) {
 	if c.Available() {
 		t.Error("should not be available after Close")
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests with a real SDK session (if the Copilot CLI is available and authenticated)
-// ---------------------------------------------------------------------------
-
-func createRealSession(t *testing.T) (*sdk.Client, *sdk.Session) {
-	t.Helper()
-	sdkClient := sdk.NewClient(nil)
-	if err := sdkClient.Start(context.Background()); err != nil {
-		t.Skipf("Copilot SDK not available: %v", err)
-	}
-	session, err := sdkClient.CreateSession(context.Background(), &sdk.SessionConfig{
-		Model:               "gpt-4.1",
-		Streaming:           true,
-		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
-		SystemMessage: &sdk.SystemMessageConfig{
-			Content: "You are a test assistant. Respond briefly.",
-		},
-	})
-	if err != nil {
-		_ = sdkClient.Stop()
-		t.Skipf("Cannot create session (auth may not be configured): %v", err)
-	}
-	return sdkClient, session
-}
-
-func TestCoverage_SendMessage_withRealSession(t *testing.T) {
-	sdkClient, session := createRealSession(t)
-
-	store := newCopilotTestStore(t)
-	c := New(store)
-	c.mu.Lock()
-	c.sdk = sdkClient
-	c.available = true
-	c.mu.Unlock()
-
-	// Destroy the pre-created session; SendMessage creates its own now.
-	_ = session.Disconnect()
-
-	ch, err := c.SendMessage(context.Background(), "Say hello in one word.")
-	if err != nil {
-		c.Close()
-		t.Fatalf("SendMessage failed: %v", err)
-	}
-
-	// Drain the channel to exercise all event types.
-	var gotDone, gotDelta bool
-	for ev := range ch {
-		switch ev.Type {
-		case EventTextDelta:
-			gotDelta = true
-		case EventDone:
-			gotDone = true
-		case EventError:
-			t.Logf("stream error: %s", ev.Content)
-		}
-	}
-	if !gotDelta {
-		t.Log("no text delta received (may be expected for some models)")
-	}
-	if !gotDone {
-		t.Log("no done event received")
-	}
-
-	c.Close()
-}
-
-func TestCoverage_Close_withRealSession(t *testing.T) {
-	sdkClient, session := createRealSession(t)
-	// Destroy the session immediately — Close only stops the SDK client now.
-	_ = session.Disconnect()
-
-	c := New(nil)
-	c.mu.Lock()
-	c.sdk = sdkClient
-	c.available = true
-	c.mu.Unlock()
-
-	// Close should call sdk.Stop() without panic.
-	c.Close()
-	if c.Available() {
-		t.Error("should not be available after Close")
-	}
-	c.mu.Lock()
-	if c.sdk != nil {
-		t.Error("sdk should be nil after Close")
-	}
-	c.mu.Unlock()
 }
 
 // ---------------------------------------------------------------------------
@@ -1364,6 +1336,7 @@ func TestCoverage_Close_withRealSession(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_searchSessionsTool_sinceAndUntil(t *testing.T) {
+	t.Parallel()
 	store := newCopilotTestStore(t)
 	tool := defineSearchSessionsTool(store)
 
@@ -1390,6 +1363,7 @@ func TestCoverage_searchSessionsTool_sinceAndUntil(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCoverage_StreamEventTypes_values(t *testing.T) {
+	t.Parallel()
 	// Verify the iota-assigned values.
 	if EventTextDelta != 0 {
 		t.Errorf("EventTextDelta should be 0, got %d", EventTextDelta)
@@ -1409,6 +1383,7 @@ func TestCoverage_StreamEventTypes_values(t *testing.T) {
 }
 
 func TestCoverage_StreamEvent_construction(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		typ     StreamEventType
 		content string
@@ -1452,6 +1427,7 @@ func newHookedClient(t *testing.T, initFn func(ctx context.Context) error, searc
 // ---------------------------------------------------------------------------
 
 func TestIsTransportError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		msg  string
 		want bool
@@ -1584,6 +1560,7 @@ func TestSearch_clearsStateAfterExhaustedRetries(t *testing.T) {
 }
 
 func TestSearch_cachedInitErrorNotPermanent(t *testing.T) {
+	t.Parallel()
 	// Simulates: Init fails (sets initErr), then on next search
 	// the cached init error is a transport error — Search should
 	// clear it and retry init successfully.
@@ -1625,6 +1602,7 @@ func TestSearch_cachedInitErrorNotPermanent(t *testing.T) {
 }
 
 func TestSearch_selfContainedInit(t *testing.T) {
+	t.Parallel()
 	// Search should call Init() internally — caller should NOT need to
 	// call Init() separately before Search().
 	c := newHookedClient(t,
@@ -1648,6 +1626,7 @@ func TestSearch_selfContainedInit(t *testing.T) {
 }
 
 func TestSearch_nonTransportInitError_gracefulNoOp(t *testing.T) {
+	t.Parallel()
 	// If Init fails with a non-transport error, Search returns nil, nil
 	// (graceful no-op) rather than crashing or returning an error.
 	c := newHookedClient(t,
@@ -1670,6 +1649,7 @@ func TestSearch_nonTransportInitError_gracefulNoOp(t *testing.T) {
 }
 
 func TestSearch_emptyQuery_stillSearches(t *testing.T) {
+	t.Parallel()
 	called := false
 	c := newHookedClient(t,
 		func(ctx context.Context) error { return nil },
@@ -1711,6 +1691,7 @@ func TestSearch_initRecoversFromTransportError(t *testing.T) {
 }
 
 func TestResetSDK_clearsAllState(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	c.mu.Lock()
 	c.available = true
@@ -1932,4 +1913,251 @@ func TestSearch_transportErrorAfterCancel_noErrorLeaked(t *testing.T) {
 	// get nil, nil (exhausted retries).  The key check: no panic, no hang.
 	_ = ids2
 	_ = err2
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: SendMessage CreateSession failure path
+// ---------------------------------------------------------------------------
+
+func TestCoverage_SendMessage_createSessionFails(t *testing.T) {
+	t.Parallel()
+	// Exercise SendMessage with an unstarted SDK client.
+	// CreateSession will fail, covering the error return at line 168-169.
+	store := newCopilotTestStore(t)
+
+	c := New(store)
+	c.mu.Lock()
+	c.sdk = sdk.NewClient(nil) // not started → CreateSession will fail
+	c.available = true
+	c.mu.Unlock()
+
+	ch, err := c.SendMessage(context.Background(), "hello")
+	if err == nil {
+		// Unexpected success — drain channel to avoid goroutine leak.
+		if ch != nil {
+			for range ch {
+			}
+		}
+		t.Log("SendMessage succeeded unexpectedly with unstarted SDK")
+	} else {
+		if !strings.Contains(err.Error(), "session") {
+			t.Errorf("expected session-related error, got: %v", err)
+		}
+		if ch != nil {
+			t.Error("channel should be nil on error")
+		}
+	}
+
+	c.mu.Lock()
+	c.sdk = nil
+	c.available = false
+	c.mu.Unlock()
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: SendMessage context cancellation
+// ---------------------------------------------------------------------------
+
+func TestCoverage_SendMessage_cancelledContext(t *testing.T) {
+	t.Parallel()
+	// SendMessage with a cancelled context — exercises early exit paths.
+	c := New(nil)
+	c.mu.Lock()
+	c.sdk = sdk.NewClient(nil)
+	c.available = true
+	c.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	ch, err := c.SendMessage(ctx, "hello")
+	if err == nil && ch != nil {
+		for range ch {
+		}
+	}
+	// Either an error or a channel that gets closed quickly is acceptable.
+	// The key assertion: no panic, no hang.
+
+	c.mu.Lock()
+	c.sdk = nil
+	c.available = false
+	c.mu.Unlock()
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: resetSDK with non-nil SDK
+// ---------------------------------------------------------------------------
+
+func TestCoverage_resetSDK_withSDKClient(t *testing.T) {
+	t.Parallel()
+	// Exercise resetSDK when c.sdk is non-nil (exercises Stop + cleanup).
+	c := New(nil)
+	c.mu.Lock()
+	c.sdk = sdk.NewClient(nil) // unstarted — Stop is safe
+	c.available = true
+	c.initErr = fmt.Errorf("stale error")
+	c.mu.Unlock()
+
+	c.resetSDK()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sdk != nil {
+		t.Error("sdk should be nil after resetSDK")
+	}
+	if c.available {
+		t.Error("should not be available after resetSDK")
+	}
+	if c.initErr != nil {
+		t.Error("initErr should be cleared after resetSDK")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: Init with real SDK path (exercises lines 100+)
+// ---------------------------------------------------------------------------
+
+func TestCoverage_Init_realSDKPath(t *testing.T) {
+	t.Parallel()
+	// Try to init with the real SDK. Whether it succeeds or fails
+	// depends on the environment, but either way it exercises the
+	// production code path (not the hook path).
+	c := New(nil)
+	err := c.Init(context.Background())
+	if err != nil {
+		// SDK not available — that's fine, we've exercised the error path.
+		if !strings.Contains(err.Error(), "Copilot") {
+			t.Errorf("expected Copilot-related error, got: %v", err)
+		}
+		if c.Available() {
+			t.Error("should not be available after failed Init")
+		}
+	} else {
+		// SDK available — verify init succeeded.
+		if !c.Available() {
+			t.Error("should be available after successful Init")
+		}
+		c.Close()
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: Init context cancellation (non-cached)
+// ---------------------------------------------------------------------------
+
+func TestCoverage_Init_contextCancellation(t *testing.T) {
+	t.Parallel()
+	// Use hooks to simulate context cancellation during init.
+	// Context cancellation errors should NOT be cached.
+	c := New(nil)
+	c.hooks = &testHooks{
+		doInit: func(ctx context.Context) error {
+			return context.Canceled
+		},
+	}
+
+	err := c.Init(context.Background())
+	if err == nil {
+		t.Fatal("Init should fail with cancelled context")
+	}
+	// Context cancellation should NOT be cached.
+	if c.InitError() != nil {
+		t.Error("context cancellation should not be cached in initErr")
+	}
+
+	// Second init should retry (not return cached error).
+	c.hooks.doInit = func(_ context.Context) error {
+		return nil // succeed this time
+	}
+	err = c.Init(context.Background())
+	if err != nil {
+		t.Errorf("second Init should succeed, got: %v", err)
+	}
+	if !c.Available() {
+		t.Error("should be available after successful retry")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: Init with DeadlineExceeded (non-cached)
+// ---------------------------------------------------------------------------
+
+func TestCoverage_Init_deadlineExceeded(t *testing.T) {
+	t.Parallel()
+	c := New(nil)
+	c.hooks = &testHooks{
+		doInit: func(ctx context.Context) error {
+			return context.DeadlineExceeded
+		},
+	}
+
+	err := c.Init(context.Background())
+	if err == nil {
+		t.Fatal("Init should fail with deadline exceeded")
+	}
+	// Deadline errors should NOT be cached.
+	if c.InitError() != nil {
+		t.Error("deadline exceeded should not be cached in initErr")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: Search with pre-cancelled context
+// ---------------------------------------------------------------------------
+
+func TestCoverage_Search_preCancelledContext(t *testing.T) {
+	t.Parallel()
+	c := newHookedClient(t,
+		func(ctx context.Context) error { return nil },
+		func(ctx context.Context, query string) ([]string, error) {
+			return []string{"id1"}, nil
+		},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel before calling Search
+
+	ids, err := c.Search(ctx, "test")
+	if err != nil {
+		t.Errorf("pre-cancelled search should return nil,nil not error: %v", err)
+	}
+	if ids != nil {
+		t.Errorf("expected nil ids for cancelled context, got: %v", ids)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: doSearch with unavailable client (nil sdk)
+// ---------------------------------------------------------------------------
+
+func TestCoverage_doSearch_unavailableNilSDK(t *testing.T) {
+	t.Parallel()
+	c := New(nil)
+	// Client not available, sdk is nil — doSearch should return nil, nil.
+	ids, err := c.doSearch(context.Background(), "test")
+	if err != nil {
+		t.Errorf("expected nil error, got: %v", err)
+	}
+	if ids != nil {
+		t.Errorf("expected nil ids, got: %v", ids)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: listRepositoriesTool additional branch
+// ---------------------------------------------------------------------------
+
+func TestCoverage_listRepositoriesTool_filterParams(t *testing.T) {
+	t.Parallel()
+	store := newCopilotTestStore(t)
+	tool := defineListRepositoriesTool(store)
+
+	// Invoke with no params — exercises the happy path.
+	result, err := invokeTool(t, tool, map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.TextResultForLLM == "" {
+		t.Error("expected non-empty result from listRepositoriesTool")
+	}
 }

@@ -7,6 +7,7 @@ import (
 )
 
 func TestStreamEventTypes(t *testing.T) {
+	t.Parallel()
 	// Verify that all stream event types are distinct.
 	types := []StreamEventType{
 		EventTextDelta,
@@ -25,6 +26,7 @@ func TestStreamEventTypes(t *testing.T) {
 }
 
 func TestStreamEventContent(t *testing.T) {
+	t.Parallel()
 	ev := StreamEvent{Type: EventTextDelta, Content: "hello"}
 	if ev.Type != EventTextDelta {
 		t.Errorf("expected EventTextDelta, got %d", ev.Type)
@@ -35,6 +37,7 @@ func TestStreamEventContent(t *testing.T) {
 }
 
 func TestNewClient(t *testing.T) {
+	t.Parallel()
 	// New with nil store should not panic.
 	c := New(nil)
 	if c == nil {
@@ -46,6 +49,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClientInitWithoutStore(t *testing.T) {
+	t.Parallel()
 	c := New(nil)
 	// Available should be false before init.
 	if c.Available() {
@@ -58,6 +62,7 @@ func TestClientInitWithoutStore(t *testing.T) {
 }
 
 func TestClientCloseSafe(t *testing.T) {
+	t.Parallel()
 	// Close on uninitialised client should not panic.
 	c := New(nil)
 	c.Close() // should be a no-op
@@ -69,6 +74,7 @@ func TestClientCloseSafe(t *testing.T) {
 }
 
 func TestSearchUnavailableClient(t *testing.T) {
+	t.Parallel()
 	// Search on an uninitialised client should return nil, nil (graceful no-op)
 	// when init fails with a non-transport error.
 	c := New(nil)
@@ -87,6 +93,7 @@ func TestSearchUnavailableClient(t *testing.T) {
 }
 
 func TestParseSessionIDs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -136,6 +143,7 @@ func TestParseSessionIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := parseSessionIDs(tt.input)
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d IDs, got %d: %v", len(tt.expected), len(result), result)

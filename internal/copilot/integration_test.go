@@ -1,3 +1,5 @@
+//go:build integration
+
 package copilot
 
 import (
@@ -7,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/github/copilot-sdk/go"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -19,7 +22,7 @@ import (
 func TestIntegration_RealSearch(t *testing.T) {
 	// Skip if no copilot binary or auth is available.
 	if os.Getenv("DISPATCH_INTEGRATION") == "" {
-		t.Skip("set DISPATCH_INTEGRATION=1 to run real SDK tests")
+		t.Fatal("set DISPATCH_INTEGRATION=1 to run real SDK tests")
 	}
 
 	store, err := data.Open()
@@ -112,4 +115,106 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ---------------------------------------------------------------------------
+// Tests with a real SDK session (require Copilot CLI binary + auth)
+// ---------------------------------------------------------------------------
+
+func createRealSession(t *testing.T) (*sdk.Client, *sdk.Session) {
+	t.Helper()
+	sdkClient := sdk.NewClient(nil)
+	if err := sdkClient.Start(context.Background()); err != nil {
+		t.Fatalf("Copilot SDK not available: %v", err)
+	}
+	session, err := sdkClient.CreateSession(context.Background(), &sdk.SessionConfig{
+		Model:               "gpt-4.1",
+		Streaming:           true,
+		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
+		SystemMessage: &sdk.SystemMessageConfig{
+			Content: "You are a test assistant. Respond briefly.",
+		},
+	})
+	if err != nil {
+		_ = sdkClient.Stop()
+		t.Fatalf("Cannot create session (auth may not be configured): %v", err)
+	}
+	return sdkClient, session
+}
+
+func TestIntegration_SendMessage_withRealSession(t *testing.T) {
+	if os.Getenv("DISPATCH_INTEGRATION") == "" {
+		t.Fatal("set DISPATCH_INTEGRATION=1 to run real SDK tests")
+	}
+
+	sdkClient, session := createRealSession(t)
+
+	store, err := data.Open()
+	if err != nil {
+		t.Fatalf("opening session store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	c := New(store)
+	c.mu.Lock()
+	c.sdk = sdkClient
+	c.available = true
+	c.mu.Unlock()
+
+	// Destroy the pre-created session; SendMessage creates its own now.
+	_ = session.Disconnect()
+
+	ch, sendErr := c.SendMessage(context.Background(), "Say hello in one word.")
+	if sendErr != nil {
+		c.Close()
+		t.Fatalf("SendMessage failed: %v", sendErr)
+	}
+
+	// Drain the channel to exercise all event types.
+	var gotDone, gotDelta bool
+	for ev := range ch {
+		switch ev.Type {
+		case EventTextDelta:
+			gotDelta = true
+		case EventDone:
+			gotDone = true
+		case EventError:
+			t.Logf("stream error: %s", ev.Content)
+		}
+	}
+	if !gotDelta {
+		t.Log("no text delta received (may be expected for some models)")
+	}
+	if !gotDone {
+		t.Log("no done event received")
+	}
+
+	c.Close()
+}
+
+func TestIntegration_Close_withRealSession(t *testing.T) {
+	if os.Getenv("DISPATCH_INTEGRATION") == "" {
+		t.Fatal("set DISPATCH_INTEGRATION=1 to run real SDK tests")
+	}
+
+	sdkClient, session := createRealSession(t)
+	// Destroy the session immediately — Close only stops the SDK client now.
+	_ = session.Disconnect()
+
+	c := New(nil)
+	c.mu.Lock()
+	c.sdk = sdkClient
+	c.available = true
+	c.mu.Unlock()
+
+	// Close should call sdk.Stop() without panic.
+	c.Close()
+	if c.Available() {
+		t.Error("should not be available after Close")
+	}
+	c.mu.Lock()
+	if c.sdk != nil {
+		t.Error("sdk should be nil after Close")
+	}
+	c.mu.Unlock()
 }

@@ -251,6 +251,7 @@ func TestLoadMalformedJSON_HugeArray(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfig_CustomCommandWithShellMetachars(t *testing.T) {
+	t.Parallel()
 	// Verify that custom commands with shell metacharacters round-trip
 	// through JSON without corruption.
 	hostile := []string{
@@ -321,6 +322,7 @@ func TestLoadMalformedJSON_FavoriteSessionsNull(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfig_FavoriteSessionsHostileIDs(t *testing.T) {
+	t.Parallel()
 	hostile := []string{
 		"../../../etc/passwd",
 		"; rm -rf /",
@@ -392,6 +394,7 @@ func TestConfig_FavoriteSessionsRoundTrip(t *testing.T) {
 }
 
 func TestConfig_AgentModelWithSpecialChars(t *testing.T) {
+	t.Parallel()
 	// Agent and Model are passed as --agent/--model flags. Verify they
 	// round-trip cleanly even with hostile content.
 	values := []string{

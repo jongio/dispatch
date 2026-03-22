@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_NewHasNoSelection(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	if p.HasSelection() {
 		t.Error("new AttentionPicker should have no selection")
@@ -27,6 +28,7 @@ func TestAttentionPicker_NewHasNoSelection(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_Toggle(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 
 	// Cursor starts at 0 (AttentionWaiting).
@@ -47,6 +49,7 @@ func TestAttentionPicker_Toggle(t *testing.T) {
 }
 
 func TestAttentionPicker_ToggleMultiple(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 
 	p.Toggle() // select Waiting (index 0)
@@ -70,6 +73,7 @@ func TestAttentionPicker_ToggleMultiple(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_MoveUpDown(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 
 	// Start at 0, move down through all entries.
@@ -113,6 +117,7 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_SetSelected(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	initial := map[data.AttentionStatus]struct{}{
 		data.AttentionStale: {},
@@ -143,6 +148,7 @@ func TestAttentionPicker_SetSelected(t *testing.T) {
 }
 
 func TestAttentionPicker_SetSelectedResetsCursor(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.MoveDown()
 	p.MoveDown()
@@ -157,6 +163,7 @@ func TestAttentionPicker_SetSelectedResetsCursor(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_HasSelection(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	if p.HasSelection() {
 		t.Error("empty picker should not have selection")
@@ -176,6 +183,7 @@ func TestAttentionPicker_HasSelection(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAttentionPicker_View_NonEmpty(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
@@ -185,6 +193,7 @@ func TestAttentionPicker_View_NonEmpty(t *testing.T) {
 }
 
 func TestAttentionPicker_View_ContainsTitle(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
@@ -194,6 +203,7 @@ func TestAttentionPicker_View_ContainsTitle(t *testing.T) {
 }
 
 func TestAttentionPicker_View_ContainsLabels(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
@@ -205,6 +215,7 @@ func TestAttentionPicker_View_ContainsLabels(t *testing.T) {
 }
 
 func TestAttentionPicker_View_ContainsFooter(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
@@ -214,6 +225,7 @@ func TestAttentionPicker_View_ContainsFooter(t *testing.T) {
 }
 
 func TestAttentionPicker_View_ShowsCheckmarks(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	p.Toggle() // check first entry
@@ -227,6 +239,7 @@ func TestAttentionPicker_View_ShowsCheckmarks(t *testing.T) {
 }
 
 func TestAttentionPicker_View_ShowsCounts(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	p.SetCounts(map[data.AttentionStatus]int{
@@ -243,6 +256,7 @@ func TestAttentionPicker_View_ShowsCounts(t *testing.T) {
 }
 
 func TestAttentionPicker_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	p := NewAttentionPicker()
 	_ = p.View() // zero size
 	p.SetSize(80, 40)

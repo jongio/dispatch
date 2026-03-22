@@ -12,6 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestNewShellPicker_Empty(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	_, ok := sp.Selected()
 	if ok {
@@ -24,6 +25,7 @@ func TestNewShellPicker_Empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestShellPicker_SetShells_Basic(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -36,6 +38,7 @@ func TestShellPicker_SetShells_Basic(t *testing.T) {
 }
 
 func TestShellPicker_SetShells_DefaultFirst(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "cmd", Path: "cmd.exe"},
@@ -50,6 +53,7 @@ func TestShellPicker_SetShells_DefaultFirst(t *testing.T) {
 }
 
 func TestShellPicker_SetShells_ResetsCursor(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -69,6 +73,7 @@ func TestShellPicker_SetShells_ResetsCursor(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestShellPicker_MoveUpDown(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "a", Path: "a"},
@@ -111,6 +116,7 @@ func TestShellPicker_MoveUpDown(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestShellPicker_Selected(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -138,6 +144,7 @@ func TestShellPicker_Selected(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestShellPicker_View_ContainsTitle(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	sp.SetShells([]platform.ShellInfo{{Name: "pwsh", Path: "pwsh.exe"}}, "")
 	sp.SetSize(80, 40)
@@ -148,6 +155,7 @@ func TestShellPicker_View_ContainsTitle(t *testing.T) {
 }
 
 func TestShellPicker_View_ContainsShellNames(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "pwsh", Path: "pwsh.exe"},
@@ -165,6 +173,7 @@ func TestShellPicker_View_ContainsShellNames(t *testing.T) {
 }
 
 func TestShellPicker_View_ShowsDefault(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	shells := []platform.ShellInfo{
 		{Name: "cmd", Path: "cmd.exe"},
@@ -179,6 +188,7 @@ func TestShellPicker_View_ShowsDefault(t *testing.T) {
 }
 
 func TestShellPicker_View_ContainsFooter(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	sp.SetShells([]platform.ShellInfo{{Name: "pwsh", Path: "pwsh.exe"}}, "")
 	sp.SetSize(80, 40)
@@ -189,6 +199,7 @@ func TestShellPicker_View_ContainsFooter(t *testing.T) {
 }
 
 func TestShellPicker_View_UsesPathWhenNameEmpty(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	sp.SetShells([]platform.ShellInfo{{Name: "", Path: "/usr/bin/fish"}}, "")
 	sp.SetSize(80, 40)
@@ -199,6 +210,7 @@ func TestShellPicker_View_UsesPathWhenNameEmpty(t *testing.T) {
 }
 
 func TestShellPicker_View_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	sp := NewShellPicker()
 	_ = sp.View() // zero shells, zero size
 	sp.SetSize(80, 40)
