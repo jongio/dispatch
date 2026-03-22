@@ -3,7 +3,7 @@
 //
 // The package exposes the same set of style variables as before, but they
 // are now backed by a Theme instance.  Call SetTheme() to swap the active
-// palette; all exported style variables are updated atomically.
+// palette; all exported style variables are updated sequentially in one shot.
 //
 // When no explicit SetTheme() call is made the package initialises with
 // the legacy adaptive-color palette so existing code keeps working.

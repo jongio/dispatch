@@ -919,12 +919,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
-		case msg.Code == tea.KeyUp:
+		case key.Matches(msg, keys.Up):
 			m.searchBar.Blur()
 			m.sessionList.MoveUp()
 			m.detailVersion++
 			return m, m.loadSelectedDetailCmd()
-		case msg.Code == tea.KeyDown:
+		case key.Matches(msg, keys.Down):
 			m.searchBar.Blur()
 			m.sessionList.MoveDown()
 			m.detailVersion++
@@ -2000,7 +2000,8 @@ func (m *Model) handleReindexClick(msg tea.MouseReleaseMsg) {
 	btnW := lipgloss.Width(btnLabel)
 	btnX := startX + (overlayW-btnW)/2
 
-	if msg.Mouse().Y == btnY && msg.Mouse().X >= btnX && msg.Mouse().X < btnX+btnW {
+	mouse := msg.Mouse()
+	if mouse.Y == btnY && mouse.X >= btnX && mouse.X < btnX+btnW {
 		if m.reindexCancel != nil {
 			m.reindexCancel.Cancel()
 		}
