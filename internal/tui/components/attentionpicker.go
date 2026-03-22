@@ -9,6 +9,9 @@ import (
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
+// totalRows returns the number of rows in the picker (attention entries + plan row).
+func totalRows() int { return len(attentionEntries) + 1 }
+
 // attentionEntry defines one row in the attention status picker.
 type attentionEntry struct {
 	status data.AttentionStatus
@@ -43,14 +46,20 @@ func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
 	}
 }
 
+// planRowIndex is the fixed index of the "Has plan" row, placed after
+// all attention entries.
+var planRowIndex = len(attentionEntries)
+
 // AttentionPicker renders a compact overlay for selecting which attention
 // statuses to include when filtering the session list.
 type AttentionPicker struct {
-	cursor   int
-	selected map[data.AttentionStatus]struct{} // checked statuses
-	counts   map[data.AttentionStatus]int      // session counts per status
-	width    int
-	height   int
+	cursor      int
+	selected    map[data.AttentionStatus]struct{} // checked statuses
+	counts      map[data.AttentionStatus]int      // session counts per status
+	filterPlans bool                              // "Has plan" row checked
+	planCount   int                               // sessions with a plan doc
+	width       int
+	height      int
 }
 
 // NewAttentionPicker returns a picker with no statuses selected (show all).
@@ -71,18 +80,23 @@ func (p *AttentionPicker) SetSize(w, h int) {
 func (p *AttentionPicker) MoveUp() {
 	p.cursor--
 	if p.cursor < 0 {
-		p.cursor = len(attentionEntries) - 1
+		p.cursor = totalRows() - 1
 	}
 }
 
 // MoveDown moves the cursor down, wrapping to the top.
 func (p *AttentionPicker) MoveDown() {
-	p.cursor = (p.cursor + 1) % len(attentionEntries)
+	p.cursor = (p.cursor + 1) % totalRows()
 }
 
 // Toggle toggles the status at the current cursor position.
 func (p *AttentionPicker) Toggle() {
-	if p.cursor < 0 || p.cursor >= len(attentionEntries) {
+	if p.cursor < 0 || p.cursor >= totalRows() {
+		return
+	}
+	// Plan row is the last entry.
+	if p.cursor == planRowIndex {
+		p.filterPlans = !p.filterPlans
 		return
 	}
 	status := attentionEntries[p.cursor].status
@@ -116,9 +130,25 @@ func (p *AttentionPicker) SetCounts(counts map[data.AttentionStatus]int) {
 	p.counts = counts
 }
 
-// HasSelection returns true when at least one status is checked.
+// HasSelection returns true when at least one status is checked or
+// the plan filter is active.
 func (p *AttentionPicker) HasSelection() bool {
-	return len(p.selected) > 0
+	return len(p.selected) > 0 || p.filterPlans
+}
+
+// FilterPlans returns whether the "Has plan" row is checked.
+func (p *AttentionPicker) FilterPlans() bool {
+	return p.filterPlans
+}
+
+// SetFilterPlans sets the "Has plan" row state.
+func (p *AttentionPicker) SetFilterPlans(v bool) {
+	p.filterPlans = v
+}
+
+// SetPlanCount sets the session count shown beside the "Has plan" row.
+func (p *AttentionPicker) SetPlanCount(n int) {
+	p.planCount = n
 }
 
 // View renders the attention picker overlay.
@@ -144,6 +174,20 @@ func (p AttentionPicker) View() string {
 		// Row text.
 		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, entry.label, count)
 		if i == p.cursor {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// "Has plan" row.
+	{
+		check := "[ ]"
+		if p.filterPlans {
+			check = "[✓]"
+		}
+		dot := styles.PlanIndicatorStyle.Render(styles.IconPlan())
+		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Has plan", p.planCount)
+		if p.cursor == planRowIndex {
 			line = styles.SelectedStyle.Render(line)
 		}
 		body.WriteString(line + "\n")

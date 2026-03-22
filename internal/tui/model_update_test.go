@@ -1993,6 +1993,71 @@ func TestHandleKey_Hide(t *testing.T) {
 	}
 }
 
+func TestHandleKey_CopyID_NoSession(t *testing.T) {
+	m := newTestModel()
+	// No sessions loaded — Selected() returns false.
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if rm.statusInfo != "" {
+		t.Errorf("statusInfo = %q, want empty when no session selected", rm.statusInfo)
+	}
+	if cmd != nil {
+		t.Error("CopyID with no session should return nil cmd")
+	}
+}
+
+func TestHandleKey_CopyID_Success(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if copied != "abc-123" {
+		t.Errorf("clipboard text = %q, want %q", copied, "abc-123")
+	}
+	if rm.statusInfo != "Copied session ID ✓" {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, "Copied session ID ✓")
+	}
+	if rm.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty", rm.statusErr)
+	}
+	if cmd == nil {
+		t.Error("CopyID success should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyID_Error(t *testing.T) {
+	orig := clipboardWrite
+	clipboardWrite = func(string) error {
+		return errors.New("no display")
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if rm.statusErr == "" {
+		t.Error("statusErr should be set on clipboard error")
+	}
+	if !strings.Contains(rm.statusErr, "clipboard:") {
+		t.Errorf("statusErr = %q, want prefix 'clipboard:'", rm.statusErr)
+	}
+	if rm.statusInfo != "" {
+		t.Errorf("statusInfo = %q, want empty on error", rm.statusInfo)
+	}
+	if cmd == nil {
+		t.Error("CopyID error should return clearStatusAfter cmd")
+	}
+}
+
 func TestHandleKey_TimeRange1(t *testing.T) {
 	m := newTestModel()
 	result, cmd := m.Update(runeKeyMsg('1'))
