@@ -713,7 +713,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	// ----- Keyboard --------------------------------------------------------
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
 	// ----- Mouse -----------------------------------------------------------
@@ -724,43 +724,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var content string
 	if m.width == 0 || m.height == 0 {
-		return ""
-	}
+		content = ""
+	} else {
+		switch m.state {
+		case stateLoading:
+			content = m.renderLoadingView()
 
-	switch m.state {
-	case stateLoading:
-		return m.renderLoadingView()
+		case stateHelpOverlay:
+			content = m.help.View()
 
-	case stateHelpOverlay:
-		return m.help.View()
+		case stateShellPicker:
+			content = m.shellPicker.View()
 
-	case stateShellPicker:
-		return m.shellPicker.View()
+		case stateFilterPanel:
+			content = m.filterPanel.View()
 
-	case stateFilterPanel:
-		return m.filterPanel.View()
+		case stateConfigPanel:
+			content = m.configPanel.View()
 
-	case stateConfigPanel:
-		return m.configPanel.View()
+		case stateAttentionPicker:
+			content = m.attentionPicker.View()
 
-	case stateAttentionPicker:
-		return m.attentionPicker.View()
-
-	default: // stateSessionList
-		if m.reindexing && len(m.reindexLog) > 0 {
-			return m.renderReindexOverlay()
+		default: // stateSessionList
+			if m.reindexing && len(m.reindexLog) > 0 {
+				content = m.renderReindexOverlay()
+			} else {
+				content = m.renderMainView()
+			}
 		}
-		return m.renderMainView()
 	}
+
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 // ---------------------------------------------------------------------------
 // Key handling
 // ---------------------------------------------------------------------------
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Force-quit always works.
 	if key.Matches(msg, keys.ForceQuit) {
 		m.closeStore()
@@ -891,12 +898,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
-		case msg.Type == tea.KeyUp:
+		case msg.Code == tea.KeyUp:
 			m.searchBar.Blur()
 			m.sessionList.MoveUp()
 			m.detailVersion++
 			return m, m.loadSelectedDetailCmd()
-		case msg.Type == tea.KeyDown:
+		case msg.Code == tea.KeyDown:
 			m.searchBar.Blur()
 			m.sessionList.MoveDown()
 			m.detailVersion++
@@ -1128,8 +1135,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.reindexing {
 			m.reindexing = true
 			m.reindexLog = []string{"Starting reindex…"}
-			m.reindexVP = viewport.New(0, reindexOverlayHeight)
-			m.reindexVP.MouseWheelEnabled = true
+			m.reindexVP = viewport.New(viewport.WithHeight(reindexOverlayHeight))
+			// MouseWheelEnabled is default in v2
 			m.updateReindexViewport()
 			handle, cmds := components.StartChronicleReindex()
 			m.reindexCancel = &handle
@@ -1289,7 +1296,7 @@ func (m *Model) visibleHiddenSet() map[string]struct{} {
 }
 
 // handleConfigKey processes keys while the config panel is open.
-func (m Model) handleConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.configPanel.IsEditing() {
 		switch {
 		case key.Matches(msg, keys.Escape):
@@ -1356,14 +1363,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// When reindex overlay is active, handle scroll within overlay viewport
 	// and block all other mouse events from reaching the background.
 	if m.reindexing && len(m.reindexLog) > 0 {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			m.reindexVP.ScrollUp(3)
-		case tea.MouseButtonWheelDown:
-			m.reindexVP.ScrollDown(3)
-		case tea.MouseButtonLeft:
-			if msg.Action == tea.MouseActionRelease {
-				// Check if click is on the cancel button area.
+		switch msg := msg.(type) {
+		case tea.MouseWheelMsg:
+			switch msg.Button {
+			case tea.MouseWheelUp:
+				m.reindexVP.ScrollUp(3)
+			case tea.MouseWheelDown:
+				m.reindexVP.ScrollDown(3)
+			}
+		case tea.MouseReleaseMsg:
+			if msg.Button == tea.MouseLeft {
 				m.handleReindexClick(msg)
 			}
 		}
@@ -1376,55 +1385,54 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Determine which pane the mouse is over.
-	overPreview := m.isOverPreview(msg.X, msg.Y)
+	mouse := msg.Mouse()
+	overPreview := m.isOverPreview(mouse.X, mouse.Y)
 
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
-		if overPreview {
-			m.preview.ScrollUp(3)
-		} else {
-			m.sessionList.ScrollBy(-3)
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			if overPreview {
+				m.preview.ScrollUp(3)
+			} else {
+				m.sessionList.ScrollBy(-3)
+				m.detailVersion++
+				return m, m.loadSelectedDetailCmd()
+			}
+		case tea.MouseWheelDown:
+			if overPreview {
+				m.preview.ScrollDown(3)
+			} else {
+				m.sessionList.ScrollBy(3)
+				m.detailVersion++
+				return m, m.loadSelectedDetailCmd()
+			}
 		}
 		return m, nil
 
-	case tea.MouseButtonWheelDown:
-		if overPreview {
-			m.preview.ScrollDown(3)
-		} else {
-			m.sessionList.ScrollBy(3)
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
-		}
-		return m, nil
-
-	case tea.MouseButtonLeft:
-		if msg.Action != tea.MouseActionRelease {
-			return m, nil
-		}
+	case tea.MouseReleaseMsg:
 
 		// --- Clickable header area (Y < HeaderLines) ---
-		if msg.Y < styles.HeaderLines {
-			return m.handleHeaderClick(msg.X, msg.Y)
+		if mouse.Y < styles.HeaderLines {
+			return m.handleHeaderClick(mouse.X, mouse.Y)
 		}
 
 		// Map Y coordinate to a list item.
-		listRow := msg.Y - styles.HeaderLines
+		listRow := mouse.Y - styles.HeaderLines
 		if listRow >= m.layout.contentHeight {
 			// Footer click — check for waiting badge.
-			return m.handleFooterClick(msg.X)
+			return m.handleFooterClick(mouse.X)
 		}
 		// Preview pane click — check conversation sort toggle.
-		if m.isOverPreview(msg.X, msg.Y) {
+		if m.isOverPreview(mouse.X, mouse.Y) {
 			var previewRow int
 			switch m.layout.previewPosition {
 			case config.PreviewPositionTop:
-				previewRow = msg.Y - styles.HeaderLines - 1 // -1 for top border
+				previewRow = mouse.Y - styles.HeaderLines - 1 // -1 for top border
 			case config.PreviewPositionBottom:
-				previewRow = msg.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+				previewRow = mouse.Y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
 			default:
-				previewRow = msg.Y - styles.HeaderLines - 1
+				previewRow = mouse.Y - styles.HeaderLines - 1
 			}
 			contentRow := previewRow + m.preview.ScrollOffset()
 			if m.preview.HitConversationSort(contentRow) {
@@ -1441,7 +1449,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Detect double-click: second click on the same row while a
 		// pending single-click timer is still running.
 		isDoubleClick := m.pendingClickVersion > 0 &&
-			msg.Y == m.pendingClickY
+			mouse.Y == m.pendingClickY
 
 		if isDoubleClick {
 			// Invalidate the pending single-click so it won't fire.
@@ -1458,9 +1466,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 			if m.sessionList.IsFolderSelected() {
 				mode := m.cfg.EffectiveLaunchMode()
-				if msg.Ctrl {
+				if msg.Mod.Contains(tea.ModCtrl) {
 					mode = config.LaunchModeWindow
-				} else if msg.Shift {
+				} else if msg.Mod.Contains(tea.ModShift) {
 					mode = config.LaunchModeTab
 				}
 				cmd := m.launchNewInFolder(mode)
@@ -1472,11 +1480,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				cmd := m.launchMultiple()
 				return m, cmd
 			}
-			if msg.Ctrl {
+			if msg.Mod.Contains(tea.ModCtrl) {
 				cmd := m.launchWithMode(config.LaunchModeWindow)
 				return m, cmd
 			}
-			if msg.Shift {
+			if msg.Mod.Contains(tea.ModShift) {
 				cmd := m.launchWithMode(config.LaunchModeTab)
 				return m, cmd
 			}
@@ -1487,7 +1495,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Ctrl+click: toggle multi-select immediately (no deferred action).
 		// If nothing is selected yet, auto-select the previously focused
 		// item first so it stays in the set (Windows Explorer behavior).
-		if msg.Ctrl {
+		if msg.Mod.Contains(tea.ModCtrl) {
 			if m.sessionList.SelectionCount() == 0 {
 				m.sessionList.ToggleSelected() // select current cursor item
 			}
@@ -1500,7 +1508,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 		// Shift+click: range select from anchor to clicked item.
-		if msg.Shift {
+		if msg.Mod.Contains(tea.ModShift) {
 			m.sessionList.MoveTo(itemIdx)
 			m.sessionList.SelectRange(m.sessionList.Anchor(), itemIdx)
 			m.updateSelectionStatus()
@@ -1511,7 +1519,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// First click — defer the single-click action behind a timer so
 		// a potential second click (double-click) can cancel it.
 		m.pendingClickVersion++
-		m.pendingClickY = msg.Y
+		m.pendingClickY = mouse.Y
 		m.pendingClickItemIdx = itemIdx
 
 		// Immediately move selection so the highlight follows the cursor,
@@ -1949,7 +1957,7 @@ func (m Model) cancelReindex() (tea.Model, tea.Cmd) {
 
 // handleReindexClick checks whether a mouse click hit the cancel button
 // in the reindex overlay and cancels if so.
-func (m *Model) handleReindexClick(msg tea.MouseMsg) {
+func (m *Model) handleReindexClick(msg tea.MouseReleaseMsg) {
 	innerW := m.reindexInnerWidth()
 	overlayW := innerW + overlayBorderPadding
 	// title (with bottom padding 1) + viewport + cancel row + padding top/bottom from border
@@ -1964,7 +1972,7 @@ func (m *Model) handleReindexClick(msg tea.MouseMsg) {
 	btnW := lipgloss.Width(btnLabel)
 	btnX := startX + (overlayW-btnW)/2
 
-	if msg.Y == btnY && msg.X >= btnX && msg.X < btnX+btnW {
+	if msg.Mouse().Y == btnY && msg.Mouse().X >= btnX && msg.Mouse().X < btnX+btnW {
 		if m.reindexCancel != nil {
 			m.reindexCancel.Cancel()
 		}
@@ -2001,8 +2009,8 @@ func (m *Model) updateReindexViewport() {
 		sb.WriteString(lineStyle.Render(l))
 	}
 
-	m.reindexVP.Width = innerW
-	m.reindexVP.Height = reindexOverlayHeight
+	m.reindexVP.SetWidth(innerW)
+	m.reindexVP.SetHeight(reindexOverlayHeight)
 
 	// Only auto-scroll if already at or past the bottom.
 	wasAtBottom := m.reindexVP.AtBottom()

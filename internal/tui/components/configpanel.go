@@ -70,7 +70,10 @@ func NewConfigPanel() ConfigPanel {
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.CharLimit = 256
-	ti.PromptStyle = styles.SearchPromptStyle
+	tiStyles := ti.Styles()
+	tiStyles.Focused.Prompt = styles.SearchPromptStyle
+	tiStyles.Blurred.Prompt = styles.SearchPromptStyle
+	ti.SetStyles(tiStyles)
 	ti.Prompt = "> "
 
 	return ConfigPanel{
