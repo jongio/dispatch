@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // keyMap holds all key bindings used by the root model.
 // It implements help.KeyMap for automatic help text generation.

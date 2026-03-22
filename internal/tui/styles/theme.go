@@ -9,7 +9,7 @@
 // the legacy adaptive-color palette so existing code keeps working.
 package styles
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // currentTheme holds the active theme.  Access via CurrentTheme().
 var currentTheme *Theme
