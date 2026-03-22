@@ -2,12 +2,15 @@
 package contributors
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
+	"time"
 )
 
 // Contributor represents a person who contributed to the project.
@@ -21,6 +24,10 @@ type Contributor struct {
 // botSuffix identifies automated bot accounts in git history.
 const botSuffix = "[bot]"
 
+// gitTimeout is the maximum duration for any single git subprocess.
+// Prevents indefinite hangs from corrupted repos or network issues (CWE-400).
+const gitTimeout = 60 * time.Second
+
 // noreplyPattern matches GitHub noreply email addresses and captures the username.
 // Formats: "12345+username@users.noreply.github.com" or "username@users.noreply.github.com".
 var noreplyPattern = regexp.MustCompile(`^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$`)
@@ -33,7 +40,18 @@ var coAuthorPattern = regexp.MustCompile(`^(.+?)\s*<([^>]+)>$`)
 // ---------------------------------------------------------------------------
 
 // ExtractContributors returns all unique contributors between two git tags.
+// When fromTag is empty, returns all contributors reachable from toTag
+// (useful for the first release where no previous tag exists).
 func ExtractContributors(repoDir, fromTag, toTag string) ([]Contributor, error) {
+	if err := validateRef(fromTag); err != nil {
+		return nil, err
+	}
+	if err := validateRef(toTag); err != nil {
+		return nil, err
+	}
+	if fromTag == "" {
+		return extract(repoDir, toTag)
+	}
 	return extract(repoDir, fromTag+".."+toTag)
 }
 
@@ -47,6 +65,9 @@ func ExtractAllContributors(repoDir string) ([]Contributor, error) {
 // ref (all ancestors including the ref itself). This is useful for building
 // a historical baseline before a release tag.
 func ExtractContributorsUpTo(repoDir, ref string) ([]Contributor, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, err
+	}
 	return extract(repoDir, ref)
 }
 
@@ -110,13 +131,12 @@ func FormatContributorsFile(contributors []Contributor) string {
 	}
 
 	// Sort by contribution count (descending), then name (ascending).
-	sorted := make([]Contributor, len(contributors))
-	copy(sorted, contributors)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].Count != sorted[j].Count {
-			return sorted[i].Count > sorted[j].Count
+	sorted := slices.Clone(contributors)
+	slices.SortFunc(sorted, func(a, b Contributor) int {
+		if n := cmp.Compare(b.Count, a.Count); n != 0 {
+			return n
 		}
-		return strings.ToLower(sorted[i].Name) < strings.ToLower(sorted[j].Name)
+		return cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	for _, c := range sorted {
@@ -135,6 +155,15 @@ func FormatContributorsFile(contributors []Contributor) string {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+// validateRef rejects git refs starting with "-" to prevent argument injection
+// into git commands (CWE-88). Empty strings are allowed (used for "all history").
+func validateRef(ref string) error {
+	if strings.HasPrefix(ref, "-") {
+		return fmt.Errorf("invalid git ref %q: must not start with '-'", ref)
+	}
+	return nil
+}
 
 func extract(repoDir, revRange string) ([]Contributor, error) {
 	logArgs := []string{"log"}
@@ -163,10 +192,16 @@ func extract(repoDir, revRange string) ([]Contributor, error) {
 }
 
 func gitOutput(repoDir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(context.Background(), "git", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = repoDir
 	out, err := cmd.Output()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return "", err
 	}
 	return string(out), nil
@@ -298,19 +333,40 @@ func filterBots(contributors []Contributor) []Contributor {
 	return result
 }
 
+// sanitizeMD strips markdown-significant characters from user-controlled
+// strings to prevent document structure injection (CWE-79).
+//
+// Covered characters:
+//   - *       bold/italic
+//   - [ ]     links
+//   - ( )     link targets, image URLs
+//   - `       code spans
+//   - < >     HTML tags / autolinks
+//   - ~       strikethrough (GFM ~~text~~)
+//   - \       escape sequences that break formatting
+//   - |       table cell separators (GFM)
+//   - \n \r   line breaks that enable block-level injection (#, -, etc.)
+var mdReplacer = strings.NewReplacer(
+	"*", "", "[", "", "]", "", "(", "", ")", "",
+	"`", "", "<", "", ">", "", "~", "", "\\", "", "|", "",
+	"\n", " ", "\r", "",
+)
+
+func sanitizeMD(s string) string { return mdReplacer.Replace(s) }
+
 // formatEntry formats a contributor as "**Name** (@handle)" or "**Name**".
 func formatEntry(c Contributor) string {
+	name := sanitizeMD(c.Name)
 	if c.Handle != "" {
-		return "**" + c.Name + "** (@" + c.Handle + ")"
+		return "**" + name + "** (@" + sanitizeMD(c.Handle) + ")"
 	}
-	return "**" + c.Name + "**"
+	return "**" + name + "**"
 }
 
 func sortByName(contributors []Contributor) []Contributor {
-	sorted := make([]Contributor, len(contributors))
-	copy(sorted, contributors)
-	sort.Slice(sorted, func(i, j int) bool {
-		return strings.ToLower(sorted[i].Name) < strings.ToLower(sorted[j].Name)
+	sorted := slices.Clone(contributors)
+	slices.SortFunc(sorted, func(a, b Contributor) int {
+		return cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 	return sorted
 }

@@ -83,6 +83,7 @@ jobs:
 
       - name: Generate contributor notes
         run: |
+          set -euo pipefail
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           NEW_TAG="v${{ steps.version.outputs.version }}"
 
@@ -94,7 +95,7 @@ jobs:
           fi
 
           # Update CONTRIBUTORS.md with all-time contributors
-          go run ./cmd/contributors/ --all > CONTRIBUTORS.md
+          go run ./cmd/contributors/ --all
 
           # Commit updated CONTRIBUTORS.md if changed
           if ! git diff --quiet CONTRIBUTORS.md; then
@@ -115,16 +116,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           TAG="v${{ steps.version.outputs.version }}"
           if [ -f contrib-notes.md ] && [ -s contrib-notes.md ]; then
             # Get current release body
             CURRENT_BODY=$(gh release view "$TAG" --json body --jq '.body')
-            # Append contributor notes
-            CONTRIB=$(cat contrib-notes.md)
-            NEW_BODY="${CURRENT_BODY}
-
-          ${CONTRIB}"
-            gh release edit "$TAG" --notes "$NEW_BODY"
+            # Append contributor notes via stdin to avoid ARG_MAX limits (CWE-400)
+            {
+              printf '%s\n\n' "$CURRENT_BODY"
+              cat contrib-notes.md
+            } | gh release edit "$TAG" --notes-file -
           fi
 
   pages:

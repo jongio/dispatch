@@ -417,6 +417,7 @@ go build ./cmd/dispatch/
 | **Fmt** | `mage fmt` | Format all Go source files |
 | **Build** | `mage build` | Compile dev binary with version info |
 | **Clean** | `mage clean` | Remove `bin/` directory |
+| **Contributors** | `mage contributors` | Regenerate CONTRIBUTORS.md from git history |
 
 ### Quality Pipeline
 
