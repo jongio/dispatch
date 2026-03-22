@@ -543,3 +543,71 @@ func TestPreviewPanelConvHeaderLineResetOnNilDetail(t *testing.T) {
 		t.Errorf("convHeaderLine = %d after nil detail, want -1", p.convHeaderLine)
 	}
 }
+
+// HitSessionID / SessionID / idFieldLine
+// ---------------------------------------------------------------------------
+
+func TestPreviewPanelHitSessionID_WithDetail(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "abc-123", Cwd: "/tmp"},
+	})
+	// idFieldLine should be positive (after title line).
+	if p.idFieldLine < 0 {
+		t.Fatalf("idFieldLine = %d, want >= 0 when detail is set", p.idFieldLine)
+	}
+	// Exact line should hit.
+	if !p.HitSessionID(p.idFieldLine) {
+		t.Error("HitSessionID should return true on the ID field line")
+	}
+	// Adjacent lines should miss.
+	if p.HitSessionID(p.idFieldLine - 1) {
+		t.Error("HitSessionID should return false one line above")
+	}
+	if p.HitSessionID(p.idFieldLine + 1) {
+		t.Error("HitSessionID should return false one line below")
+	}
+}
+
+func TestPreviewPanelHitSessionID_NoDetail(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	// No detail set → idFieldLine stays -1.
+	if p.HitSessionID(0) {
+		t.Error("HitSessionID should return false when no detail is set")
+	}
+}
+
+func TestPreviewPanelSessionID(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	if p.SessionID() != "" {
+		t.Errorf("SessionID() = %q, want empty when no detail set", p.SessionID())
+	}
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "xyz-789", Cwd: "/home"},
+	})
+	if p.SessionID() != "xyz-789" {
+		t.Errorf("SessionID() = %q, want %q", p.SessionID(), "xyz-789")
+	}
+}
+
+func TestPreviewPanelIDFieldLineResetOnNilDetail(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", Cwd: "/a"},
+	})
+	if p.idFieldLine < 0 {
+		t.Fatal("idFieldLine should be >= 0 with detail")
+	}
+	p.SetDetail(nil)
+	if p.idFieldLine != -1 {
+		t.Errorf("idFieldLine = %d after nil detail, want -1", p.idFieldLine)
+	}
+}

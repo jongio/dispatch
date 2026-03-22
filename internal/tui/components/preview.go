@@ -20,6 +20,7 @@ type PreviewPanel struct {
 	totalLines      int    // cached line count for scroll clamping
 	newestFirst     bool   // conversation turn display order
 	convHeaderLine  int    // content line where "Conversation" label is rendered (-1 = none)
+	idFieldLine     int    // content line where "ID: ..." is rendered (-1 = none)
 	planContent     string // plan.md content (empty when no plan)
 	planViewMode    bool   // when true, render plan instead of session detail
 	hasPlan         bool   // whether the session has a plan.md file
@@ -27,7 +28,7 @@ type PreviewPanel struct {
 
 // NewPreviewPanel returns an empty PreviewPanel.
 func NewPreviewPanel() PreviewPanel {
-	return PreviewPanel{convHeaderLine: -1}
+	return PreviewPanel{convHeaderLine: -1, idFieldLine: -1}
 }
 
 // SetConversationSort sets the conversation turn display order.
@@ -151,27 +152,46 @@ func (p *PreviewPanel) HitConversationSort(contentRow int) bool {
 	return p.convHeaderLine >= 0 && contentRow == p.convHeaderLine
 }
 
+// HitSessionID reports whether contentRow (a 0-indexed line in the full
+// rendered content) falls on the "ID: ..." field line. This is used by
+// the mouse handler to detect clicks that should copy the session ID.
+func (p *PreviewPanel) HitSessionID(contentRow int) bool {
+	return p.idFieldLine >= 0 && contentRow == p.idFieldLine
+}
+
+// SessionID returns the current session ID, or empty string if no detail is set.
+func (p *PreviewPanel) SessionID() string {
+	if p.detail == nil {
+		return ""
+	}
+	return p.detail.Session.ID
+}
+
 // updateTotalLines recomputes the cached total line count for scroll clamping.
 func (p *PreviewPanel) updateTotalLines() {
 	if p.width <= 0 || p.height <= 0 {
 		p.totalLines = 0
 		p.convHeaderLine = -1
+		p.idFieldLine = -1
 		return
 	}
 	if p.planViewMode && p.planContent != "" {
 		content := p.renderPlanContent()
 		p.totalLines = strings.Count(content, "\n") + 1
 		p.convHeaderLine = -1
+		p.idFieldLine = -1
 		return
 	}
 	if p.detail == nil {
 		p.totalLines = 0
 		p.convHeaderLine = -1
+		p.idFieldLine = -1
 		return
 	}
-	content, convLine := p.renderContent()
+	content, convLine, idLine := p.renderContent()
 	p.totalLines = strings.Count(content, "\n") + 1
 	p.convHeaderLine = convLine
+	p.idFieldLine = idLine
 }
 
 // View renders the preview panel content.
@@ -184,7 +204,7 @@ func (p PreviewPanel) View() string {
 	if p.planViewMode && p.planContent != "" {
 		content = p.renderPlanContent()
 	} else {
-		content, _ = p.renderContent()
+		content, _, _ = p.renderContent()
 	}
 
 	// innerW = content+padding width passed to lipgloss Width() (excludes border).
@@ -243,14 +263,14 @@ func (p PreviewPanel) View() string {
 // shown before truncation with a "… N more" indicator.
 const maxPreviewItems = 5
 
-func (p PreviewPanel) renderContent() (string, int) {
+func (p PreviewPanel) renderContent() (string, int, int) {
 	if p.detail == nil {
 		// Use height-2 to account for the border added by View().
 		return lipgloss.Place(
 			max(1, p.width-4), max(1, p.height-2),
 			lipgloss.Center, lipgloss.Center,
 			styles.DimmedStyle.Render("Select a session"),
-		), -1
+		), -1, -1
 	}
 
 	s := p.detail.Session
@@ -258,6 +278,7 @@ func (p PreviewPanel) renderContent() (string, int) {
 
 	var b strings.Builder
 	convLine := -1
+	idLine := -1
 
 	// ── Title ──
 	b.WriteString(styles.PreviewTitleStyle.Render(styles.IconSession()+"Session Detail") + "\n")
@@ -276,6 +297,8 @@ func (p PreviewPanel) renderContent() (string, int) {
 		b.WriteString(l + v + "\n")
 	}
 
+	// Record the content line where "ID: ..." is rendered for click-to-copy.
+	idLine = strings.Count(b.String(), "\n")
 	field("ID", s.ID)
 	field("Folder", AbbrevPath(s.Cwd))
 
@@ -394,7 +417,7 @@ func (p PreviewPanel) renderContent() (string, int) {
 		}
 	}
 
-	return b.String(), convLine
+	return b.String(), convLine, idLine
 }
 
 // renderPlanContent renders the plan.md content as styled markdown using

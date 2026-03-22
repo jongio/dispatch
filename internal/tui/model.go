@@ -1492,7 +1492,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			// Footer click — check for waiting badge.
 			return m.handleFooterClick(mouse.X)
 		}
-		// Preview pane click — check conversation sort toggle.
+		// Preview pane click — check conversation sort toggle and session ID click-to-copy.
 		if m.isOverPreview(mouse.X, mouse.Y) {
 			var previewRow int
 			switch m.layout.previewPosition {
@@ -1509,6 +1509,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				m.cfg.ConversationNewestFirst = newVal
 				if err := config.Save(m.cfg); err != nil {
 					m.statusErr = "config save: " + err.Error()
+				}
+			}
+			if m.preview.HitSessionID(contentRow) {
+				if sid := m.preview.SessionID(); sid != "" {
+					if err := clipboardWrite(sid); err != nil {
+						m.statusErr = "clipboard: " + err.Error()
+						return m, clearStatusAfter(2 * time.Second)
+					}
+					m.statusInfo = "Copied session ID ✓"
+					return m, clearStatusAfter(2 * time.Second)
 				}
 			}
 			return m, nil
