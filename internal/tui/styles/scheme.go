@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"image/color"
+
 	"charm.land/lipgloss/v2"
 	"github.com/lucasb-eyer/go-colorful"
 )
@@ -237,7 +239,7 @@ func DeriveTheme(cs ColorScheme) *Theme {
 
 // buildStyles populates every lipgloss.Style field on t.
 func (t *Theme) buildStyles() {
-	c := func(hex string) lipgloss.Color {
+	c := func(hex string) color.Color {
 		return lipgloss.Color(hex)
 	}
 

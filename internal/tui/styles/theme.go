@@ -9,7 +9,11 @@
 // the legacy adaptive-color palette so existing code keeps working.
 package styles
 
-import "charm.land/lipgloss/v2"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 // currentTheme holds the active theme.  Access via CurrentTheme().
 var currentTheme *Theme
@@ -94,15 +98,15 @@ func CurrentTheme() *Theme {
 var (
 	// ColorPrimary is the accent color used for highlights, links, and
 	// interactive elements. Updated by SetTheme.
-	ColorPrimary lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#7C6FF4"}
+	ColorPrimary color.Color = lipgloss.Color("#7C6FF4")
 
 	// ColorText is the primary foreground color for body text.
 	// Updated by SetTheme.
-	ColorText lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#1A1A2E", Dark: "#E4E4E7"}
+	ColorText color.Color = lipgloss.Color("#E4E4E7")
 
 	// ColorDimmed is a muted foreground color for secondary or
 	// de-emphasised text. Updated by SetTheme.
-	ColorDimmed lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#71717A", Dark: "#71717A"}
+	ColorDimmed color.Color = lipgloss.Color("#71717A")
 )
 
 // ---------------------------------------------------------------------------
@@ -229,15 +233,15 @@ var (
 // adaptive-color defaults that existed before theming was introduced.
 // This ensures backward compatibility when SetTheme() is never called.
 func applyLegacyDefaults() {
-	lp := lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#7C6FF4"}
-	lt := lipgloss.AdaptiveColor{Light: "#1A1A2E", Dark: "#E4E4E7"}
-	ld := lipgloss.AdaptiveColor{Light: "#71717A", Dark: "#71717A"}
-	lb := lipgloss.AdaptiveColor{Light: "#D4D4D8", Dark: "#3F3F46"}
-	ls := lipgloss.AdaptiveColor{Light: "#EEE8FF", Dark: "#2D2250"}
-	le := lipgloss.AdaptiveColor{Light: "#DC2626", Dark: "#F87171"}
-	lk := lipgloss.AdaptiveColor{Light: "#16A34A", Dark: "#4ADE80"}
-	lbdg := lipgloss.AdaptiveColor{Light: "#6D28D9", Dark: "#A78BFA"}
-	lbbg := lipgloss.AdaptiveColor{Light: "#F5F3FF", Dark: "#1E1538"}
+	lp := lipgloss.Color("#7C6FF4")
+	lt := lipgloss.Color("#E4E4E7")
+	ld := lipgloss.Color("#71717A")
+	lb := lipgloss.Color("#3F3F46")
+	ls := lipgloss.Color("#2D2250")
+	le := lipgloss.Color("#F87171")
+	lk := lipgloss.Color("#4ADE80")
+	lbdg := lipgloss.Color("#A78BFA")
+	lbbg := lipgloss.Color("#1E1538")
 
 	ColorPrimary = lp
 	ColorText = lt
@@ -256,7 +260,7 @@ func applyLegacyDefaults() {
 
 	BadgeStyle = lipgloss.NewStyle().Foreground(lbdg).Background(lbbg).Padding(0, 1)
 	ActiveBadgeStyle = lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}).
+		Foreground(lipgloss.Color("#FFFFFF")).
 		Background(lp).Padding(0, 1)
 
 	PreviewBorderStyle = lipgloss.NewStyle().
@@ -301,10 +305,10 @@ func applyLegacyDefaults() {
 	// Attention dot styles — legacy adaptive defaults.
 	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
-	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C19C00", Dark: "#C19C00"})
+	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#C19C00"))
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(ld).Faint(true)
-	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#EA580C", Dark: "#F97316"}).Bold(true)
-	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#0891B2", Dark: "#22D3EE"}).Bold(true)
+	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")).Bold(true)
+	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#22D3EE")).Bold(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
 	currentTheme = &Theme{

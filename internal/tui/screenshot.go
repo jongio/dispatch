@@ -7,10 +7,8 @@
 package tui
 
 import (
-	"os"
 
 	"charm.land/lipgloss/v2"
-	"github.com/muesli/termenv"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
@@ -502,10 +500,6 @@ var allThemes = []themeEntry{
 // CaptureScreenshots drives the TUI model through every visual state
 // used on the website and returns the rendered ANSI output for each.
 func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) {
-	// Force TrueColor rendering even when stdout is not a terminal.
-	lipgloss.SetDefaultRenderer(
-		lipgloss.NewRenderer(os.Stdout, termenv.WithProfile(termenv.TrueColor)),
-	)
 
 	// Enable NerdFont icons so the title bar shows the terminal glyph
 	// instead of the ⚡ fallback.
