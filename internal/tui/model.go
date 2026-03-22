@@ -498,6 +498,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail = msg.detail
 		m.preview.SetDetail(m.detail)
 		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
+		m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 		// Exit plan view and load plan content for the newly selected session.
 		m.preview.ExitPlanView()
 		if m.planMap[m.detail.Session.ID] {
@@ -550,9 +551,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.filterPlans {
 			cmds = append(cmds, m.loadSessionsCmd())
 		}
-		// Update preview plan content if a session is selected.
-		if m.detail != nil && m.planMap[m.detail.Session.ID] {
-			cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
+		// Update preview plan indicator and content if a session is selected.
+		if m.detail != nil {
+			m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
+			if m.planMap[m.detail.Session.ID] {
+				cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
+			}
 		}
 		return m, tea.Batch(cmds...)
 
@@ -794,6 +798,8 @@ func (m Model) View() tea.View {
 // ---------------------------------------------------------------------------
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	slog.Debug("handleKey", "key", msg.String(), "state", m.state, "showPreview", m.showPreview, "searchFocused", m.searchBar.Focused())
+
 	// Force-quit always works.
 	if key.Matches(msg, keys.ForceQuit) {
 		m.closeStore()
@@ -1128,19 +1134,24 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.PreviewScrollUp):
 		if m.showPreview {
+			before := m.preview.ScrollOffset()
 			m.preview.PageUp()
+			slog.Debug("preview scroll up", "before", before, "after", m.preview.ScrollOffset())
 		}
 		return m, nil
 
 	case key.Matches(msg, keys.PreviewScrollDown):
 		if m.showPreview {
+			before := m.preview.ScrollOffset()
 			m.preview.PageDown()
+			slog.Debug("preview scroll down", "before", before, "after", m.preview.ScrollOffset())
 		}
 		return m, nil
 
 	case key.Matches(msg, keys.ConversationSort):
 		if m.showPreview && m.detail != nil {
 			newVal := m.preview.ToggleConversationSort()
+			slog.Debug("conversation sort toggled", "newestFirst", newVal)
 			m.cfg.ConversationNewestFirst = newVal
 			if err := config.Save(m.cfg); err != nil {
 				m.statusErr = "config save: " + err.Error()

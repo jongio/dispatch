@@ -22,6 +22,7 @@ type PreviewPanel struct {
 	convHeaderLine  int    // content line where "Conversation" label is rendered (-1 = none)
 	planContent     string // plan.md content (empty when no plan)
 	planViewMode    bool   // when true, render plan instead of session detail
+	hasPlan         bool   // whether the session has a plan.md file
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -85,6 +86,13 @@ func (p *PreviewPanel) PlanViewMode() bool {
 // HasPlanContent returns true when plan.md content is available.
 func (p *PreviewPanel) HasPlanContent() bool {
 	return p.planContent != ""
+}
+
+// SetHasPlan records whether the session has a plan.md file (for the
+// indicator shown in the detail view, independent of plan content loading).
+func (p *PreviewPanel) SetHasPlan(has bool) {
+	p.hasPlan = has
+	p.updateTotalLines()
 }
 
 // ExitPlanView switches back to normal session detail view.
@@ -287,6 +295,12 @@ func (p PreviewPanel) renderContent() (string, int) {
 	statusIcon, statusLabel, statusStyle := attentionStatusDisplay(p.attentionStatus)
 	l := styles.PreviewLabelStyle.Render("Status: ")
 	b.WriteString(l + statusStyle.Render(statusIcon+" "+statusLabel) + "\n")
+
+	// ── Plan indicator ──
+	if p.hasPlan {
+		planLabel := styles.PreviewLabelStyle.Render("Plan: ")
+		b.WriteString(planLabel + styles.PlanIndicatorStyle.Render(styles.IconPlan()+" Yes") + "\n")
+	}
 
 	field("Turns", FormatInt(s.TurnCount))
 	field("Files", FormatInt(s.FileCount))

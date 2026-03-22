@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -3205,10 +3206,274 @@ func TestHandleKey_PreviewScrollDown_Active(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
-	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt})
-	_ = result.(Model)
+
+	// Load a detail with enough turns to produce scrollable content.
+	turns := make([]data.Turn, 20)
+	for i := range turns {
+		turns[i] = data.Turn{
+			UserMessage:       "Question " + strconv.Itoa(i) + " with enough text to fill the line",
+			AssistantResponse: "Answer " + strconv.Itoa(i) + " with a detailed response",
+		}
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "scroll-test", TurnCount: 20},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+	m.recalcLayout()
+
+	// Verify content is taller than viewport (prerequisite for scrolling).
+	scrollBefore := m.preview.ScrollOffset()
+
+	result, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	rm := result.(Model)
 	if cmd != nil {
 		t.Error("preview scroll should return nil cmd")
+	}
+
+	scrollAfter := rm.preview.ScrollOffset()
+	if scrollAfter <= scrollBefore {
+		t.Errorf("PgDown should increase scroll offset: before=%d, after=%d",
+			scrollBefore, scrollAfter)
+	}
+}
+
+func TestHandleKey_PreviewScrollUp_Active(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = true
+	m.recalcLayout()
+
+	turns := make([]data.Turn, 20)
+	for i := range turns {
+		turns[i] = data.Turn{
+			UserMessage:       "Question " + strconv.Itoa(i) + " with enough text to fill the line",
+			AssistantResponse: "Answer " + strconv.Itoa(i) + " with a detailed response",
+		}
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "scroll-test", TurnCount: 20},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+	m.recalcLayout()
+
+	// First scroll down, then scroll up and verify it decreases.
+	result1, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	rm1 := result1.(Model)
+	scrollAfterDown := rm1.preview.ScrollOffset()
+	if scrollAfterDown == 0 {
+		t.Fatal("prerequisite: PgDown should have scrolled past 0")
+	}
+
+	result2, _ := rm1.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	rm2 := result2.(Model)
+	scrollAfterUp := rm2.preview.ScrollOffset()
+	if scrollAfterUp >= scrollAfterDown {
+		t.Errorf("PgUp should decrease scroll offset: after_down=%d, after_up=%d",
+			scrollAfterDown, scrollAfterUp)
+	}
+}
+
+func TestHandleKey_ConversationSort_Active(t *testing.T) {
+	m := newTestModelWithSize(120, 50)
+	m.showPreview = true
+	m.recalcLayout()
+
+	turns := []data.Turn{
+		{UserMessage: "FIRST_MSG", AssistantResponse: "first response"},
+		{UserMessage: "LAST_MSG", AssistantResponse: "last response"},
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "sort-test", TurnCount: 2},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetConversationSort(false) // oldest first
+
+	viewBefore := m.preview.View()
+
+	// Press 'o' to toggle conversation sort.
+	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	rm := result.(Model)
+
+	viewAfter := rm.preview.View()
+	if viewBefore == viewAfter {
+		t.Error("ConversationSort toggle should change the preview view")
+	}
+}
+
+// TestHandleKey_PreviewScrollDown_ViewChanges verifies that the full model
+// View output actually changes after PgDown — i.e., the scroll is visible.
+func TestHandleKey_PreviewScrollDown_ViewChanges(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = true
+	m.recalcLayout()
+
+	turns := make([]data.Turn, 20)
+	for i := range turns {
+		turns[i] = data.Turn{
+			UserMessage:       "Question " + strconv.Itoa(i) + " with enough text to fill the line",
+			AssistantResponse: "Answer " + strconv.Itoa(i) + " with a detailed response here",
+		}
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "view-test", TurnCount: 20},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+	m.recalcLayout()
+
+	viewBefore := m.View()
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	rm := result.(Model)
+
+	viewAfter := rm.View()
+	if viewBefore.Content == viewAfter.Content {
+		t.Error("Full model View content should change after PgDown scroll")
+	}
+}
+
+// TestHandleKey_ConversationSort_FullViewChanges verifies that the full model
+// View output changes after pressing 'o' to toggle sort.
+func TestHandleKey_ConversationSort_FullViewChanges(t *testing.T) {
+	m := newTestModelWithSize(120, 50)
+	m.showPreview = true
+	m.recalcLayout()
+
+	turns := []data.Turn{
+		{UserMessage: "FIRST_MSG", AssistantResponse: "first response"},
+		{UserMessage: "SECOND_MSG", AssistantResponse: "second response"},
+		{UserMessage: "THIRD_MSG", AssistantResponse: "third response"},
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "sort-test", TurnCount: 3},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetConversationSort(false) // oldest first
+	m.recalcLayout()
+
+	viewBefore := m.View()
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	rm := result.(Model)
+
+	viewAfter := rm.View()
+	if viewBefore.Content == viewAfter.Content {
+		t.Error("Full model View content should change after conversation sort toggle")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Scroll/sort are NO-OPS when preview is hidden or detail is nil
+// ---------------------------------------------------------------------------
+
+func TestHandleKey_PreviewScrollDown_NoOpWhenHidden(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = false // preview hidden
+	m.recalcLayout()
+
+	// Give the preview some content so scroll *would* work if it were visible.
+	turns := make([]data.Turn, 20)
+	for i := range turns {
+		turns[i] = data.Turn{UserMessage: "Q" + strconv.Itoa(i), AssistantResponse: "A" + strconv.Itoa(i)}
+	}
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "noop-scroll"},
+		Turns:   turns,
+	}
+	m.preview.SetDetail(m.detail)
+
+	scrollBefore := m.preview.ScrollOffset()
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+	rm := result.(Model)
+	scrollAfter := rm.preview.ScrollOffset()
+
+	if scrollAfter != scrollBefore {
+		t.Errorf("PgDown should be no-op when preview hidden: before=%d, after=%d",
+			scrollBefore, scrollAfter)
+	}
+}
+
+func TestHandleKey_PreviewScrollUp_NoOpWhenHidden(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = false
+	m.recalcLayout()
+
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "noop-scroll-up"},
+	}
+	m.preview.SetDetail(m.detail)
+
+	scrollBefore := m.preview.ScrollOffset()
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
+	rm := result.(Model)
+	scrollAfter := rm.preview.ScrollOffset()
+
+	if scrollAfter != scrollBefore {
+		t.Errorf("PgUp should be no-op when preview hidden: before=%d, after=%d",
+			scrollBefore, scrollAfter)
+	}
+}
+
+func TestHandleKey_ConversationSort_NoOpWhenHidden(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = false // hidden
+	m.recalcLayout()
+
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "noop-sort"},
+		Turns:   []data.Turn{{UserMessage: "hi"}},
+	}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetConversationSort(false) // oldest first
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	rm := result.(Model)
+
+	if rm.cfg.ConversationNewestFirst {
+		t.Error("'o' should be no-op when preview hidden — ConversationNewestFirst should stay false")
+	}
+}
+
+func TestHandleKey_ConversationSort_NoOpWhenDetailNil(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.showPreview = true
+	m.recalcLayout()
+	m.detail = nil // no detail loaded
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	rm := result.(Model)
+
+	if rm.cfg.ConversationNewestFirst {
+		t.Error("'o' should be no-op when detail is nil — ConversationNewestFirst should stay false")
+	}
+}
+
+// TestKeyMatchesPgUpPgDown verifies that the key bindings defined in keys.go
+// actually match the expected KeyPressMsg values for PgUp and PgDown.
+func TestKeyMatchesPgUpPgDown(t *testing.T) {
+	pgUp := tea.KeyPressMsg{Code: tea.KeyPgUp}
+	pgDown := tea.KeyPressMsg{Code: tea.KeyPgDown}
+
+	if pgUp.String() != "pgup" {
+		t.Errorf("PgUp.String() = %q, want %q", pgUp.String(), "pgup")
+	}
+	if pgDown.String() != "pgdown" {
+		t.Errorf("PgDown.String() = %q, want %q", pgDown.String(), "pgdown")
+	}
+
+	if !key.Matches(pgUp, keys.PreviewScrollUp) {
+		t.Error("PgUp KeyPressMsg should match PreviewScrollUp binding")
+	}
+	if !key.Matches(pgDown, keys.PreviewScrollDown) {
+		t.Error("PgDown KeyPressMsg should match PreviewScrollDown binding")
+	}
+
+	oKey := tea.KeyPressMsg{Code: 'o', Text: "o"}
+	if !key.Matches(oKey, keys.ConversationSort) {
+		t.Error("'o' KeyPressMsg should match ConversationSort binding")
 	}
 }
 

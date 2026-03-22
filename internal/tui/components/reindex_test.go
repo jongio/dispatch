@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -250,6 +251,38 @@ func TestPreviewPanel_PlanScrollResets(t *testing.T) {
 	p.TogglePlanView()
 	if p.ScrollOffset() != 0 {
 		t.Errorf("scroll should be 0 after toggling plan view, got %d", p.ScrollOffset())
+	}
+}
+
+func TestPreviewPanel_SetHasPlan(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 24)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "s1", Summary: "test"},
+	})
+
+	// hasPlan=false by default — "Plan" should not appear in the output.
+	view1 := p.View()
+	if strings.Contains(view1, "Plan:") {
+		t.Error("View should NOT contain 'Plan:' when hasPlan is false")
+	}
+
+	// Set hasPlan=true — "Plan" indicator should now appear.
+	p.SetHasPlan(true)
+	view2 := p.View()
+	if !strings.Contains(view2, "Plan:") {
+		t.Error("View should contain 'Plan:' when hasPlan is true")
+	}
+	if !strings.Contains(view2, "Yes") {
+		t.Error("View should contain 'Yes' when hasPlan is true")
+	}
+
+	// Reset hasPlan=false — indicator should disappear.
+	p.SetHasPlan(false)
+	view3 := p.View()
+	if strings.Contains(view3, "Plan:") {
+		t.Error("View should NOT contain 'Plan:' after SetHasPlan(false)")
 	}
 }
 
