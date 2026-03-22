@@ -81,12 +81,51 @@ jobs:
           git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
 
+      - name: Generate contributor notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          NEW_TAG="v${{ steps.version.outputs.version }}"
+
+          # Generate release contributor notes
+          if [ -n "$PREV_TAG" ]; then
+            go run ./cmd/contributors/ --release "$PREV_TAG" "$NEW_TAG" > contrib-notes.md
+          else
+            go run ./cmd/contributors/ --release "" "$NEW_TAG" > contrib-notes.md
+          fi
+
+          # Update CONTRIBUTORS.md with all-time contributors
+          go run ./cmd/contributors/ --all > CONTRIBUTORS.md
+
+          # Commit updated CONTRIBUTORS.md if changed
+          if ! git diff --quiet CONTRIBUTORS.md; then
+            git add CONTRIBUTORS.md
+            git commit -m "docs: update CONTRIBUTORS.md for $NEW_TAG"
+            git push origin HEAD:main
+          fi
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "v2.9.0"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add contributor notes to release
+        if: hashFiles('contrib-notes.md') != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if [ -f contrib-notes.md ] && [ -s contrib-notes.md ]; then
+            # Get current release body
+            CURRENT_BODY=$(gh release view "$TAG" --json body --jq '.body')
+            # Append contributor notes
+            CONTRIB=$(cat contrib-notes.md)
+            NEW_BODY="${CURRENT_BODY}
+
+          ${CONTRIB}"
+            gh release edit "$TAG" --notes "$NEW_BODY"
+          fi
 
   pages:
     needs: release

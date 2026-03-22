@@ -273,6 +273,12 @@ func Clean() error {
 	return os.RemoveAll(filepath.Join(projectDir(), "bin"))
 }
 
+// Contributors regenerates CONTRIBUTORS.md from the full git history.
+func Contributors() error {
+	fmt.Println("\n=== Generating CONTRIBUTORS.md ===")
+	return run("go", "run", "./cmd/contributors/", "--all")
+}
+
 // --- helpers ---
 
 func fmtSources() error {
