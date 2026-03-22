@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **Contributor recognition** — automated contributor attribution in releases
+  - `mage contributors` target regenerates CONTRIBUTORS.md from git history
+  - `go run ./cmd/contributors/` CLI tool for release-time contributor extraction
+  - Co-authored-by trailer parsing (recognizes AI pair programming)
+  - Bot filtering (excludes CI bots, keeps Copilot co-authorship)
+  - First-time contributor detection and highlighting
+  - Contributors section in changelog entries and GitHub Release notes
+
 ## [v0.3.0] - 2026-03-19
 
 ### Added

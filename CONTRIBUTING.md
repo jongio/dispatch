@@ -127,6 +127,15 @@ scripts/                Screenshot generation
 - Extract numeric literals (limits, timeouts, buffer sizes) into named constants.
 - Comment only when the code isn't self-explanatory.
 
+## Recognition
+
+All contributors are automatically recognized in:
+- The **CHANGELOG.md** entry for each release
+- **GitHub Release** notes
+- The **CONTRIBUTORS.md** hall of fame
+
+Your first contribution gets a special "New contributor" callout! Run `mage contributors` to see the current contributor list.
+
 ## Reporting Issues
 
 - Use GitHub Issues to report bugs or request features.
