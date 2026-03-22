@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard with the `c` key. Click the ID row in the preview pane for the same effect
+- **"Has plan" status filter** — the `!` attention status picker now includes a "Has plan" row to filter sessions with `plan.md` files
+- **Plan indicator in preview** — sessions with a `plan.md` file show "Plan: Yes" in the preview pane metadata
+- **Conversation sort toggle** (`o`) — toggle between oldest-first and newest-first conversation display in the preview pane; also clickable via the sort arrow in the conversation header
 - **Contributor recognition** — automated contributor attribution in releases
   - `mage contributors` target regenerates CONTRIBUTORS.md from git history
   - `go run ./cmd/contributors/` CLI tool for release-time contributor extraction
@@ -15,6 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Bot filtering (excludes CI bots, keeps Copilot co-authorship)
   - First-time contributor detection and highlighting
   - Contributors section in changelog entries and GitHub Release notes
+
+### Changed
+
+- Copy session ID keybinding changed from `y` (yank) to `c` (copy) for better discoverability
+
+### Fixed
+
+- TestLaunchSession test reliability — fixed flaky session launch test
 
 ## [v0.3.0] - 2026-03-19
 

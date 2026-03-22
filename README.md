@@ -23,7 +23,8 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, created, turns) with toggleable direction
 - **Grouping (pivot) modes** (`Tab`) — flat, folder, repo, branch, date — displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
-- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators
+- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Click the session ID row to copy it to clipboard
+- **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
 - **Multi-session open** (`Space` / `O` / `a` / `d`) — select multiple sessions with Space, open all at once with O, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
@@ -184,6 +185,8 @@ dispatch
 | `p` | Toggle preview panel |
 | `P` | Cycle preview position (right → bottom → left → top) |
 | `v` | View plan in preview pane |
+| `o` | Toggle conversation sort order (oldest/newest first) |
+| `c` | Copy session ID to clipboard |
 | `PgUp` / `PgDn` | Scroll preview |
 | `r` | Refresh session store |
 | `,` | Open settings panel |
@@ -233,6 +236,8 @@ Keys inside overlays (filter, settings, shell picker, help):
 | Scroll wheel (list) | Scroll session list |
 | Scroll wheel (preview) | Scroll preview pane |
 | Click header elements | Interact with search, time range, sort, pivot |
+| Click session ID in preview | Copy session ID to clipboard |
+| Click conversation sort arrow | Toggle conversation sort order |
 
 ## Configuration
 

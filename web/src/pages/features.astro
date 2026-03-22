@@ -145,13 +145,16 @@ import Carousel from '../components/Carousel.astro';
             Toggle with <kbd>p</kbd>. Shows session metadata (created, updated,
             turn count, working directory), conversation history rendered as
             chat-style bubbles, checkpoints (up to 5), referenced files
-            (up to 5), and external references (up to 5).
+            (up to 5), and external references (up to 5). Sessions with a
+            <code>plan.md</code> file show a "Plan: Yes" indicator.
           </p>
           <ul>
             <li><kbd>PgUp</kbd> / <kbd>PgDn</kbd> for keyboard scrolling</li>
             <li>Mouse wheel scrolling in 3-line increments</li>
             <li>Scroll indicators: ▲ lines above / ▼ lines below</li>
             <li>Responsive width: 30–40% of terminal</li>
+            <li><kbd>o</kbd> to toggle conversation sort order (oldest/newest first)</li>
+            <li><kbd>c</kbd> to copy session ID to clipboard (or click the ID row)</li>
           </ul>
         </div>
         <div class="feature-screenshots">
@@ -280,7 +283,7 @@ import Carousel from '../components/Carousel.astro';
             <li><strong>Idle</strong> (gray ○) — session not running</li>
             <li><kbd>n</kbd> to jump to next waiting session</li>
             <li><kbd>R</kbd> to resume all interrupted sessions</li>
-            <li><kbd>!</kbd> to open the attention status filter picker</li>
+            <li><kbd>!</kbd> to open the attention status filter picker (includes a "Has plan" row)</li>
           </ul>
         </div>
         <div class="feature-screenshots">

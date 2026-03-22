@@ -212,6 +212,13 @@
     - Behavior: Toggles filter to show only sessions starred as favorites
     - Condition: In session list view
 
+27b. **c** → Copy Session ID to Clipboard
+     - File: D:\code\dispatch\internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID"))
+     - Handler: D:\code\dispatch\internal\tui\model.go (handleCopyID)
+     - Behavior: Copies the selected session's ID to the system clipboard. Shows "Copied session ID ✓" status on success. Also triggered by clicking the ID row in the preview pane.
+     - Condition: Only when a session is selected (not a folder)
+
 ### Attention & Session Status
 28. **n** → Jump to Next Waiting Session
     - File: D:\code\dispatch\internal\tui\keys.go
@@ -231,7 +238,7 @@
     - File: D:\code\dispatch\internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("!"))
     - Handler: D:\code\dispatch\internal\tui\model.go
-    - Behavior: Opens the attention picker overlay to filter sessions by one or more attention states (waiting, active, stale, interrupted, idle)
+    - Behavior: Opens the attention picker overlay to filter sessions by one or more attention states (waiting, active, stale, interrupted, idle) and a "Has plan" row to filter sessions with plan.md files
     - Condition: In session list view
 
 **Attention Status Indicators:**
@@ -240,6 +247,7 @@
 - ● Stale (yellow) — running but quiet (live PID, no recent events)
 - ⚡ Interrupted (orange) — killed mid-work by crash/reboot (stale lock file + active event)
 - ○ Idle (gray) — not running
+- Has plan — sessions with a `plan.md` file
 
 ### Time Range Filter
 31. **1** → Set Time Range to 1 Hour
@@ -507,6 +515,13 @@ When help overlay is open (after pressing ?):
     - Condition: Click on Y=1, within pivot area
 
 ### Scroll Wheel (Mouse)
+
+### Preview Pane Clicks
+71b. **Click on Session ID Row** → Copy Session ID to Clipboard
+     - Handler: D:\code\dispatch\internal\tui\model.go (handleMouse → HitSessionID)
+     - Behavior: Copies the session ID to the system clipboard and shows "Copied session ID ✓" status
+     - Condition: Preview pane visible, click lands on the "ID: ..." row
+
 72. **Mouse Wheel Up (List Area)** → Scroll List Up
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 1076-1084)
     - Behavior: Scrolls session list up by 3 items

@@ -66,6 +66,8 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'p', action: 'Toggle preview panel' },
               { keys: 'P', action: 'Cycle preview position (right → bottom → left → top)' },
               { keys: 'v', action: 'View plan in preview pane' },
+              { keys: 'o', action: 'Toggle conversation sort order (oldest/newest first)' },
+              { keys: 'c', action: 'Copy session ID to clipboard' },
               { keys: 'PgUp', action: 'Scroll preview up' },
               { keys: 'PgDn', action: 'Scroll preview down' },
               { keys: 'r', action: 'Reindex sessions' },
@@ -96,7 +98,7 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'F', action: 'Filter to show only favorites' },
               { keys: 'M', action: 'Filter to show only sessions with plans' },
             ]} />
-            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses. Press <kbd>R</kbd> to batch-resume all interrupted sessions. Press <kbd>M</kbd> to toggle the plan filter, showing only sessions with a <code>plan.md</code> file.</p>
+            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses, including a "Has plan" row to filter sessions with a <code>plan.md</code> file. Press <kbd>R</kbd> to batch-resume all interrupted sessions. Press <kbd>M</kbd> to toggle the plan filter, showing only sessions with a <code>plan.md</code> file.</p>
           </div>
 
           <div id="general-keys" class="shortcut-group">
@@ -147,6 +149,8 @@ import KeyTable from '../components/KeyTable.astro';
                 <tr><td>Click time range badge</td><td>Select time range</td></tr>
                 <tr><td>Click sort indicator</td><td>Cycle sort field</td></tr>
                 <tr><td>Click pivot indicator</td><td>Cycle grouping mode</td></tr>
+                <tr><td>Click session ID in preview</td><td>Copy session ID to clipboard</td></tr>
+                <tr><td>Click conversation sort arrow</td><td>Toggle conversation sort order</td></tr>
               </tbody>
             </table>
           </div>
