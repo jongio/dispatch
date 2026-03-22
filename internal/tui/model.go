@@ -872,6 +872,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.attentionPicker.Toggle()
 		case key.Matches(msg, keys.Enter):
 			m.attentionFilter = m.attentionPicker.Selected()
+			m.filterPlans = m.attentionPicker.FilterPlans()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
 		}
@@ -1208,6 +1209,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		counts := m.attentionStatusCounts()
 		m.attentionPicker.SetCounts(counts)
 		m.attentionPicker.SetSelected(m.attentionFilter)
+		m.attentionPicker.SetFilterPlans(m.filterPlans)
+		m.attentionPicker.SetPlanCount(m.planSessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -1588,6 +1591,8 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 		counts := m.attentionStatusCounts()
 		m.attentionPicker.SetCounts(counts)
 		m.attentionPicker.SetSelected(m.attentionFilter)
+		m.attentionPicker.SetFilterPlans(m.filterPlans)
+		m.attentionPicker.SetPlanCount(m.planSessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -2853,6 +2858,17 @@ func (m Model) attentionStatusCounts() map[data.AttentionStatus]int {
 		counts[status]++
 	}
 	return counts
+}
+
+// planSessionCount returns the number of sessions that have a plan doc.
+func (m Model) planSessionCount() int {
+	n := 0
+	for _, has := range m.planMap {
+		if has {
+			n++
+		}
+	}
+	return n
 }
 
 const deepSearchDelay = 300 * time.Millisecond
