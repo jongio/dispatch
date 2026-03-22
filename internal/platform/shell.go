@@ -444,6 +444,23 @@ func startAndWaitBriefly(cmd *exec.Cmd) error {
 	}
 }
 
+// platformLaunchSessionFn dispatches to the OS-specific terminal launcher.
+// Tests can replace this variable to prevent real process spawning (see
+// chronicleReindexFn / maintainFn in cmd/dispatch/cli.go for the pattern).
+var platformLaunchSessionFn = platformLaunchSession
+
+// platformLaunchSession is the default implementation of platformLaunchSessionFn.
+func platformLaunchSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {
+	switch runtime.GOOS {
+	case "windows":
+		return launchWindowsSession(shell, resumeCmd, terminal, cwd, launchStyle, paneDirection)
+	case "darwin":
+		return launchDarwinSession(shell, resumeCmd, terminal, cwd, launchStyle == LaunchStyleWindow)
+	default:
+		return launchLinuxSession(shell, resumeCmd, terminal, cwd, launchStyle, paneDirection)
+	}
+}
+
 // LaunchSession opens a new terminal window running the Copilot CLI session
 // resume command for the given sessionID. The detected CLI binary ("ghcs" or
 // "copilot") is used with "session resume <sessionID>" plus any flags from cfg.
@@ -470,14 +487,7 @@ func LaunchSession(shell ShellInfo, sessionID string, cfg ResumeConfig) error {
 
 	cwd := resolvedCwd(cfg.Cwd)
 
-	switch runtime.GOOS {
-	case "windows":
-		return launchWindowsSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
-	case "darwin":
-		return launchDarwinSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle == LaunchStyleWindow)
-	default:
-		return launchLinuxSession(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
-	}
+	return platformLaunchSessionFn(shell, resumeCmd, cfg.Terminal, cwd, cfg.LaunchStyle, cfg.PaneDirection)
 }
 
 // ---------------------------------------------------------------------------

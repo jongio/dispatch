@@ -683,13 +683,40 @@ func TestPsQuoteEscapesMetachars(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLaunchSession_EmptyShellPath_AfterDefault(t *testing.T) {
-	// On any real OS, DefaultShell() returns a valid path, so LaunchSession
-	// with empty shell.Path won't hit the "no shell available" error.
-	// This test verifies the function does not panic regardless.
+	// Stub the platform launcher so no real terminal is spawned (issue #28).
+	old := platformLaunchSessionFn
+	defer func() { platformLaunchSessionFn = old }()
+
+	var gotShell ShellInfo
+	var gotResumeCmd string
+	platformLaunchSessionFn = func(shell ShellInfo, resumeCmd string, _ string, _ string, _ string, _ string) error {
+		gotShell = shell
+		gotResumeCmd = resumeCmd
+		return nil
+	}
+
 	err := LaunchSession(ShellInfo{}, "test-session-id", ResumeConfig{})
-	// err may or may not be nil depending on whether copilot CLI is present.
-	// The key assertion is: no panic.
-	_ = err
+	// On systems without ghcs/copilot CLI, buildResumeCommandString returns
+	// an error. That is fine — the important thing is no process was spawned.
+	if err != nil {
+		// If the error is about CLI not found, the test still proves no
+		// zombie was created (the stub was never reached).
+		if strings.Contains(err.Error(), "not found") {
+			return
+		}
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// When the CLI binary IS found, verify argument construction.
+	if gotShell.Path == "" {
+		t.Error("expected non-empty shell path after defaulting")
+	}
+	if gotResumeCmd == "" {
+		t.Error("expected non-empty resume command")
+	}
+	if !strings.Contains(gotResumeCmd, "test-session-id") {
+		t.Errorf("resume command %q does not contain session ID", gotResumeCmd)
+	}
 }
 
 func TestLaunchSession_DefaultShell_AlwaysHasPath(t *testing.T) {
