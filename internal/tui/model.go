@@ -19,6 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/atotto/clipboard"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
@@ -88,6 +89,10 @@ const (
 var timeRanges = []struct{ key, label string }{
 	{"1", "1h"}, {"2", "1d"}, {"3", "7d"}, {"4", "all"},
 }
+
+// clipboardWrite is the function used to write text to the system clipboard.
+// It is a package-level variable so tests can substitute a fake.
+var clipboardWrite = clipboard.WriteAll
 
 // ---------------------------------------------------------------------------
 // Application states
@@ -1202,6 +1207,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.loadSessionsCmd()
 		return m, cmd
 
+	case key.Matches(msg, keys.CopyID):
+		return m.handleCopyID()
+
 	case key.Matches(msg, keys.JumpNextAttention):
 		return m.handleJumpNextAttention()
 
@@ -1299,6 +1307,20 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 	m.sessionList.SetFavoritedSessions(m.favoritedSet)
 	cmd := m.loadSessionsCmd()
 	return m, cmd
+}
+
+// handleCopyID copies the selected session's ID to the system clipboard.
+func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	if err := clipboardWrite(sess.ID); err != nil {
+		m.statusErr = "clipboard: " + err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.statusInfo = "Copied session ID ✓"
+	return m, clearStatusAfter(2 * time.Second)
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic
