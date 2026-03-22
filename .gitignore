@@ -24,6 +24,7 @@ copilot_cov
 # ── OS generated ────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+CON
 
 # ── Editor / IDE ────────────────────────────────────────────
 .vscode/
