@@ -42,13 +42,13 @@ type keyMap struct {
 	LaunchAll         key.Binding
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
-	ConversationSort   key.Binding
-	PreviewPosition    key.Binding
-	ResumeInterrupted  key.Binding
-	ViewPlan           key.Binding
-	FilterPlans        key.Binding
-	CopyID             key.Binding
-	ExpandCollapseAll  key.Binding
+	ConversationSort  key.Binding
+	PreviewPosition   key.Binding
+	ResumeInterrupted key.Binding
+	ViewPlan          key.Binding
+	FilterPlans       key.Binding
+	CopyID            key.Binding
+	ExpandCollapseAll key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
