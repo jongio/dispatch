@@ -48,11 +48,12 @@ type keyMap struct {
 	ViewPlan          key.Binding
 	FilterPlans       key.Binding
 	CopyID            key.Binding
+	ExpandCollapseAll key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.FilterPlans, k.Hide, k.Star, k.CopyID, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.FilterPlans, k.Hide, k.Star, k.CopyID, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ExpandCollapseAll, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -61,7 +62,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
-		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder},
+		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
 		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.Reindex, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention, k.FilterPlans, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
@@ -113,4 +114,5 @@ var keys = keyMap{
 	ViewPlan:          key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view plan")),
 	FilterPlans:       key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "filter plans")),
 	CopyID:            key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID")),
+	ExpandCollapseAll: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "expand/collapse all")),
 }

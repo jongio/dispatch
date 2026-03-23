@@ -295,11 +295,12 @@ func fmtSources() error {
 			unformatted = append(unformatted, f)
 		}
 	}
-	fmt.Printf("   Formatting %d file(s):\n", len(unformatted))
+	fmt.Printf("   %d file(s) need formatting:\n", len(unformatted))
 	for _, f := range unformatted {
 		fmt.Printf("     %s\n", f)
 	}
-	return run("gofmt", "-w", ".")
+	fmt.Println("\n   Run 'gofmt -w .' to fix, then commit the changes.")
+	return fmt.Errorf("gofmt: %d file(s) not formatted", len(unformatted))
 }
 
 func binaryName() string {

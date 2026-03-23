@@ -467,6 +467,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Only transition from loading to session-list; never clobber an
 		// active modal/overlay state with an async data load.
 		if m.state == stateLoading {
+			if m.cfg.DefaultCollapsed {
+				m.sessionList.CollapseAll()
+			}
 			m.state = stateSessionList
 		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
@@ -489,6 +492,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
 		if m.state == stateLoading {
+			if m.cfg.DefaultCollapsed {
+				m.sessionList.CollapseAll()
+			}
 			m.state = stateSessionList
 		}
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
@@ -935,17 +941,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
-		case key.Matches(msg, keys.Up):
-			m.searchBar.Blur()
-			m.sessionList.MoveUp()
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
-		case key.Matches(msg, keys.Down):
-			m.searchBar.Blur()
-			m.sessionList.MoveDown()
-			m.detailVersion++
-			return m, m.loadSelectedDetailCmd()
 		default:
+			// All other keys (including j/k which alias Up/Down) are
+			// forwarded to the search text input so they appear as typed
+			// characters instead of triggering shortcuts.
 			var cmd tea.Cmd
 			sb := m.searchBar
 			sb, cmd = sb.Update(msg)
@@ -1095,6 +1094,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Right):
 		if m.sessionList.IsFolderSelected() {
 			m.sessionList.ExpandFolder()
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.ExpandCollapseAll):
+		if m.sessionList.AllExpanded() {
+			m.sessionList.CollapseAll()
+		} else {
+			m.sessionList.ExpandAll()
 		}
 		return m, nil
 
@@ -1672,6 +1679,13 @@ func (m Model) handleHeaderClick(x, y int) (tea.Model, tea.Cmd) {
 		case "pivotorder":
 			m.togglePivotOrder()
 			return m, m.loadSessionsCmd()
+		case "expandall":
+			if m.sessionList.AllExpanded() {
+				m.sessionList.CollapseAll()
+			} else {
+				m.sessionList.ExpandAll()
+			}
+			return m, nil
 		default:
 			if rest, ok := strings.CutPrefix(action, "time:"); ok {
 				cmd := m.setTimeRange(rest)
@@ -1725,11 +1739,11 @@ func (m Model) badgeClickAction(x int) string {
 	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
 	sortKeyRendered := styles.KeyStyle.Render("s")
 	sortKeyW := lipgloss.Width(sortKeyRendered)
-	sortPrefix := styles.DimmedStyle.Render(":Sort: ")
+	sortPrefix := styles.DimmedStyle.Render(": ")
 	sortPrefixW := lipgloss.Width(sortPrefix)
 	sortArrowRendered := styles.DimmedStyle.Render(arrow)
 	sortArrowW := lipgloss.Width(sortArrowRendered)
-	sortFullRendered := sortKeyRendered + styles.DimmedStyle.Render(":Sort: "+sortLabel)
+	sortFullRendered := sortKeyRendered + styles.DimmedStyle.Render(": "+sortLabel)
 	w := lipgloss.Width(sortFullRendered)
 	if x >= cursor && x < cursor+w {
 		// Click on the arrow portion toggles order; elsewhere cycles sort field.
@@ -1746,30 +1760,39 @@ func (m Model) badgeClickAction(x int) string {
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	hasPivotArrow := m.pivot != pivotNone
-	if hasPivotArrow {
-		pivotArrow := styles.IconSortDown()
-		if m.pivotOrder == data.Ascending {
-			pivotArrow = styles.IconSortUp()
-		}
-		pivotLabel = pivotArrow + " " + pivotLabel
+	pivotArrow := styles.IconSortDown()
+	if m.pivotOrder == data.Ascending {
+		pivotArrow = styles.IconSortUp()
 	}
+	pivotLabel = pivotArrow + " " + pivotLabel
 	pivotKeyRendered := styles.KeyStyle.Render("tab")
 	pivotKeyW := lipgloss.Width(pivotKeyRendered)
-	pivotPrefix := styles.DimmedStyle.Render(":Pivot: ")
+	pivotPrefix := styles.DimmedStyle.Render(": ")
 	pivotPrefixW := lipgloss.Width(pivotPrefix)
-	pivotRendered := pivotKeyRendered + styles.DimmedStyle.Render(":Pivot: "+pivotLabel)
+	pivotRendered := pivotKeyRendered + styles.DimmedStyle.Render(": "+pivotLabel)
 	pw := lipgloss.Width(pivotRendered)
 	if x >= cursor && x < cursor+pw {
-		if hasPivotArrow {
-			pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown())
-			pivotArrowW := lipgloss.Width(pivotArrowRendered)
-			arrowStart := cursor + pivotKeyW + pivotPrefixW
-			if x >= arrowStart && x < arrowStart+pivotArrowW {
-				return "pivotorder"
-			}
+		pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown())
+		pivotArrowW := lipgloss.Width(pivotArrowRendered)
+		arrowStart := cursor + pivotKeyW + pivotPrefixW
+		if x >= arrowStart && x < arrowStart+pivotArrowW {
+			return "pivotorder"
 		}
 		return "pivot"
+	}
+	cursor += pw + 2
+
+	// Expand/collapse all indicator — only in tree mode.
+	if m.pivot != pivotNone {
+		expandIcon := styles.IconSortUp() + styles.IconSortUp()
+		if m.sessionList.AllExpanded() {
+			expandIcon = styles.IconSortDown() + styles.IconSortDown()
+		}
+		expandRendered := styles.KeyStyle.Render("x") + styles.DimmedStyle.Render(": "+expandIcon)
+		ew := lipgloss.Width(expandRendered)
+		if x >= cursor && x < cursor+ew {
+			return "expandall"
+		}
 	}
 
 	return ""
@@ -1915,21 +1938,28 @@ func (m Model) renderBadges() string {
 		arrow = styles.IconSortUp()
 	}
 	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
-	parts = append(parts, styles.KeyStyle.Render("s")+styles.DimmedStyle.Render(":Sort: "+sortLabel))
+	parts = append(parts, styles.KeyStyle.Render("s")+styles.DimmedStyle.Render(": "+sortLabel))
 
 	// Pivot indicator with shortcut (always shown).
 	pivotLabel := m.pivot
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	if m.pivot != pivotNone {
-		pivotArrow := styles.IconSortDown()
-		if m.pivotOrder == data.Ascending {
-			pivotArrow = styles.IconSortUp()
-		}
-		pivotLabel = pivotArrow + " " + pivotLabel
+	pivotArrow := styles.IconSortDown()
+	if m.pivotOrder == data.Ascending {
+		pivotArrow = styles.IconSortUp()
 	}
-	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(":Pivot: "+pivotLabel))
+	pivotLabel = pivotArrow + " " + pivotLabel
+	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(": "+pivotLabel))
+
+	// Expand/collapse all indicator — only shown in tree mode.
+	if m.pivot != pivotNone {
+		expandIcon := styles.IconSortUp() + styles.IconSortUp()
+		if m.sessionList.AllExpanded() {
+			expandIcon = styles.IconSortDown() + styles.IconSortDown()
+		}
+		parts = append(parts, styles.KeyStyle.Render("x")+styles.DimmedStyle.Render(": "+expandIcon))
+	}
 
 	// Favorites filter indicator.
 	if m.showFavorited {

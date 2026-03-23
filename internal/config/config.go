@@ -136,6 +136,12 @@ type Config struct {
 	// Default is "right" when unset.
 	PreviewPosition string `json:"preview_position,omitempty"`
 
+	// DefaultCollapsed controls whether session header rows start in
+	// collapsed (single-line) or expanded (multi-line) state. When false
+	// (default), sessions are expanded showing full details. When true,
+	// sessions start collapsed showing only the compact indicator row.
+	DefaultCollapsed bool `json:"default_collapsed,omitempty"`
+
 	// ConversationNewestFirst controls the turn display order in the
 	// preview panel's Conversation section. When false (default), turns
 	// are shown oldest-first (ascending by TurnIndex). When true, turns

@@ -1123,17 +1123,17 @@ func TestRenderMainView_BadgesVisibleDuringSearch(t *testing.T) {
 					}
 				}
 
-				// Badges row must be present: look for "Sort:" which always
-				// appears in the badges row.
+				// Badges row must be present: look for ":1h" which always
+				// appears in the time-range portion of the badges row.
 				badgesFound := false
 				for _, line := range lines {
-					if strings.Contains(line, "Sort:") {
+					if strings.Contains(line, ":1h") {
 						badgesFound = true
 						break
 					}
 				}
 				if !badgesFound {
-					t.Errorf("badges row (containing 'Sort:') not found in output")
+					t.Errorf("badges row (containing ':1h') not found in output")
 					for i, line := range lines[:min(5, len(lines))] {
 						t.Logf("  line %d (w=%d): %q", i, lipgloss.Width(line), line)
 					}
@@ -2271,11 +2271,13 @@ func TestHandleKey_SearchFocused_UpDown(t *testing.T) {
 	m.searchBar.Focus()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 
-	// Up should blur search and move selection.
+	// Up arrow should be forwarded to the search text input (cursor
+	// movement), NOT blur the search bar. This prevents the "k" alias
+	// from leaking as a navigation shortcut while typing a query.
 	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	rm := result.(Model)
-	if rm.searchBar.Focused() {
-		t.Error("search bar should be blurred after Up")
+	if !rm.searchBar.Focused() {
+		t.Error("search bar should remain focused after Up — keys must not leak")
 	}
 }
 
@@ -2284,10 +2286,31 @@ func TestHandleKey_SearchFocused_Down(t *testing.T) {
 	m.searchBar.Focus()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 
+	// Down arrow should be forwarded to the search text input, NOT blur
+	// the search bar. This prevents the "j" alias from leaking.
 	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	rm := result.(Model)
-	if rm.searchBar.Focused() {
-		t.Error("search bar should be blurred after Down")
+	if !rm.searchBar.Focused() {
+		t.Error("search bar should remain focused after Down — keys must not leak")
+	}
+}
+
+func TestHandleKey_SearchFocused_CharKeysDoNotLeak(t *testing.T) {
+	// Regression test: character keys that alias navigation shortcuts
+	// (j→Down, k→Up) must be consumed by the search text input, not
+	// trigger session-list movement.
+	for _, ch := range []rune{'j', 'k', 's', 'f', 'x', 'q', 'p', 'r', 'h', 'a', 'd'} {
+		t.Run(string(ch), func(t *testing.T) {
+			m := newTestModel()
+			m.searchBar.Focus()
+			m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
+
+			result, _ := m.Update(tea.KeyPressMsg{Code: ch, Text: string(ch)})
+			rm := result.(Model)
+			if !rm.searchBar.Focused() {
+				t.Errorf("search bar lost focus after pressing %q — shortcut leaked", ch)
+			}
+		})
 	}
 }
 
