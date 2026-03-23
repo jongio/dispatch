@@ -1,10 +1,12 @@
 # Contributors
 
-Thank you to everyone who has contributed to Copilot Dispatch!
+Thank you to everyone who has contributed to dispatch!
 
 This file is auto-generated. Run `mage contributors` to update.
 
 ## Contributors
 
-- **Jon Gallant** (@jongio)
-- **Copilot** (AI pair programming assistant)
+- **Jon Gallant** (@jongio) -- 71 contributions
+- **Copilot** (@Copilot) -- 59 contributions
+- **Wallace Breza** -- 2 contributions
+- **Wallace Breza** -- 1 contribution
