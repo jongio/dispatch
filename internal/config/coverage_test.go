@@ -320,3 +320,90 @@ func TestReset_NoFile_NoError(t *testing.T) {
 		t.Errorf("Reset with no file should not error: %v", err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// DefaultCollapsed — default value, JSON round-trip, and Load from disk
+// ---------------------------------------------------------------------------
+
+func TestDefaultCollapsed_DefaultIsFalse(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if cfg.DefaultCollapsed {
+		t.Error("DefaultCollapsed should default to false")
+	}
+}
+
+func TestDefaultCollapsed_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		val  bool
+	}{
+		{"true", true},
+		{"false", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			original := &Config{DefaultCollapsed: tt.val}
+			data, err := json.Marshal(original)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			var restored Config
+			if err := json.Unmarshal(data, &restored); err != nil {
+				t.Fatalf("Unmarshal: %v", err)
+			}
+			if restored.DefaultCollapsed != tt.val {
+				t.Errorf("DefaultCollapsed = %v, want %v", restored.DefaultCollapsed, tt.val)
+			}
+		})
+	}
+}
+
+func TestDefaultCollapsed_LoadFromJSON(t *testing.T) {
+	tmp := setupTempConfig(t)
+
+	// Write a config file with default_collapsed set to true.
+	dir := filepath.Join(tmp, "dispatch")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cfgData := `{"default_collapsed": true}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfgData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.DefaultCollapsed {
+		t.Error("DefaultCollapsed should be true after loading from JSON")
+	}
+	// Other defaults should remain.
+	if !cfg.ShowPreview {
+		t.Error("ShowPreview should keep default true")
+	}
+	if cfg.MaxSessions != 100 {
+		t.Errorf("MaxSessions = %d, want 100 (default)", cfg.MaxSessions)
+	}
+}
+
+func TestDefaultCollapsed_SaveAndLoad(t *testing.T) {
+	setupTempConfig(t)
+
+	cfg := Default()
+	cfg.DefaultCollapsed = true
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !loaded.DefaultCollapsed {
+		t.Error("DefaultCollapsed should be true after Save/Load round-trip")
+	}
+}

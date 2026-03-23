@@ -306,6 +306,28 @@ func (s *SessionList) ExpandFolder() {
 	}
 }
 
+// ExpandAll expands every folder row and rebuilds the visible list.
+func (s *SessionList) ExpandAll() {
+	for _, item := range s.allItems {
+		if item.isFolder {
+			s.expanded[item.folderPath] = struct{}{}
+		}
+	}
+	s.rebuildVisible()
+}
+
+// AllExpanded returns true when every folder in allItems is currently expanded.
+func (s *SessionList) AllExpanded() bool {
+	for _, item := range s.allItems {
+		if item.isFolder {
+			if _, ok := s.expanded[item.folderPath]; !ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // IsFolderSelected returns true when the cursor is on a folder node.
 func (s *SessionList) IsFolderSelected() bool {
 	if s.cursor < 0 || s.cursor >= len(s.visItems) {

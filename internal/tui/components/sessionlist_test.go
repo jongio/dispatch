@@ -504,3 +504,143 @@ func TestAttentionDotNilMap(t *testing.T) {
 		t.Fatalf("View() with nil attentionMap has %d lines, want 10", len(lines))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ExpandAll / CollapseAll / AllExpanded tests
+// ---------------------------------------------------------------------------
+
+func TestExpandAll(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(3, 4)) // 3 folders × 4 sessions = 15 items total
+
+	// Collapse all folders first.
+	sl.CollapseAll()
+	// Only folder rows should be visible (3 folders).
+	if len(sl.visItems) != 3 {
+		t.Fatalf("after CollapseAll: visItems = %d, want 3", len(sl.visItems))
+	}
+
+	// ExpandAll should make everything visible: 3 folders + 12 sessions = 15.
+	sl.ExpandAll()
+	if len(sl.visItems) != 15 {
+		t.Fatalf("after ExpandAll: visItems = %d, want 15", len(sl.visItems))
+	}
+}
+
+func TestCollapseAll(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(3, 4))
+
+	// SetGroups defaults to all expanded, so 15 visible items.
+	if len(sl.visItems) != 15 {
+		t.Fatalf("precondition: visItems = %d, want 15", len(sl.visItems))
+	}
+
+	sl.CollapseAll()
+	// Only folder rows visible.
+	if len(sl.visItems) != 3 {
+		t.Fatalf("after CollapseAll: visItems = %d, want 3", len(sl.visItems))
+	}
+	// Every visible item should be a folder.
+	for _, vi := range sl.visItems {
+		if !sl.allItems[vi].isFolder {
+			t.Fatal("expected only folder items after CollapseAll")
+		}
+	}
+}
+
+func TestCollapseAllClampsCursor(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(2, 5)) // 2 folders × 5 sessions = 12 visible
+
+	// Move cursor to the last visible item.
+	sl.MoveTo(len(sl.visItems) - 1)
+	if sl.cursor != 11 {
+		t.Fatalf("precondition: cursor = %d, want 11", sl.cursor)
+	}
+
+	sl.CollapseAll()
+	// Now only 2 folder rows; cursor should be clamped.
+	if sl.cursor >= len(sl.visItems) {
+		t.Fatalf("cursor %d out of bounds for %d visible items", sl.cursor, len(sl.visItems))
+	}
+}
+
+func TestAllExpanded(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(3, 2))
+
+	// SetGroups defaults to all expanded.
+	if !sl.AllExpanded() {
+		t.Fatal("AllExpanded should be true after SetGroups")
+	}
+
+	// Collapse one folder.
+	sl.MoveTo(0)
+	sl.CollapseFolder()
+	if sl.AllExpanded() {
+		t.Fatal("AllExpanded should be false after collapsing one folder")
+	}
+
+	// Expand it back.
+	sl.MoveTo(0)
+	sl.ExpandFolder()
+	if !sl.AllExpanded() {
+		t.Fatal("AllExpanded should be true after re-expanding")
+	}
+}
+
+func TestAllExpandedEmptyList(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	// No items at all → vacuously true.
+	if !sl.AllExpanded() {
+		t.Fatal("AllExpanded on empty list should return true")
+	}
+}
+
+func TestAllExpandedFlatMode(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+	// Flat mode has no folders → vacuously true.
+	if !sl.AllExpanded() {
+		t.Fatal("AllExpanded in flat mode should return true")
+	}
+}
+
+func TestExpandAllAfterPartialCollapse(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(4, 3)) // 4 folders × 3 sessions = 16 items
+
+	// Collapse two of the four folders.
+	sl.MoveTo(0) // first folder
+	sl.CollapseFolder()
+	// Find and collapse the third folder.
+	for i, vi := range sl.visItems {
+		item := sl.allItems[vi]
+		if item.isFolder && item.folderPath == `D:\code\folderC` {
+			sl.MoveTo(i)
+			sl.CollapseFolder()
+			break
+		}
+	}
+
+	if sl.AllExpanded() {
+		t.Fatal("AllExpanded should be false after partial collapse")
+	}
+
+	sl.ExpandAll()
+	if !sl.AllExpanded() {
+		t.Fatal("AllExpanded should be true after ExpandAll")
+	}
+	// All 16 items should be visible.
+	if len(sl.visItems) != 16 {
+		t.Fatalf("after ExpandAll: visItems = %d, want 16", len(sl.visItems))
+	}
+}
