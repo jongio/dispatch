@@ -101,6 +101,7 @@ jobs:
           if ! git diff --quiet CONTRIBUTORS.md; then
             git add CONTRIBUTORS.md
             git commit -m "docs: update CONTRIBUTORS.md for $NEW_TAG"
+            git pull --rebase origin main
             git push origin HEAD:main
           fi
 
