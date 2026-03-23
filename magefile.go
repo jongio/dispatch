@@ -342,13 +342,42 @@ func ensurePath() error {
 		return nil
 	}
 
-	// Windows: ensure bin/ is in persistent PATH
+	// Windows: scrub stale dispatch worktree bins from persistent PATH,
+	// then ensure the current project's bin dir is registered.
 	machinePath, _ := cmdOutput("powershell", "-NoProfile", "-Command",
 		`[Environment]::GetEnvironmentVariable('Path','Machine')`)
 	machinePath = strings.TrimSpace(machinePath)
 
-	if containsPath(machinePath, binDir) {
-		// Already registered; just make sure the current session has it
+	userPath, _ := cmdOutput("powershell", "-NoProfile", "-Command",
+		`[Environment]::GetEnvironmentVariable('Path','User')`)
+	userPath = strings.TrimSpace(userPath)
+
+	cleanedMachine, removedMachine := scrubDispatchBins(machinePath, binDir)
+	if len(removedMachine) > 0 {
+		fmt.Println("\n=== Scrubbing stale dispatch bin dirs from Machine PATH ===")
+		for _, r := range removedMachine {
+			fmt.Printf("   Removed: %s\n", r)
+		}
+		if err := exec.Command("powershell", "-NoProfile", "-Command",
+			fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s','Machine')`, cleanedMachine)).Run(); err != nil {
+			fmt.Println("   Machine PATH update failed (need admin)")
+		}
+	}
+	machinePath = cleanedMachine
+
+	cleanedUser, removedUser := scrubDispatchBins(userPath, binDir)
+	if len(removedUser) > 0 {
+		fmt.Println("\n=== Scrubbing stale dispatch bin dirs from User PATH ===")
+		for _, r := range removedUser {
+			fmt.Printf("   Removed: %s\n", r)
+		}
+		exec.Command("powershell", "-NoProfile", "-Command",
+			fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s','User')`, cleanedUser)).Run()
+	}
+	userPath = cleanedUser
+
+	if containsPath(machinePath, binDir) || containsPath(userPath, binDir) {
+		// Already registered; just make sure the current session has it.
 		ensureSessionPath(binDir)
 		return nil
 	}
@@ -359,9 +388,6 @@ func ensurePath() error {
 		fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s','Machine')`, newPath)).Run()
 	if err != nil {
 		fmt.Println("   Machine PATH failed (need admin), trying User PATH...")
-		userPath, _ := cmdOutput("powershell", "-NoProfile", "-Command",
-			`[Environment]::GetEnvironmentVariable('Path','User')`)
-		userPath = strings.TrimSpace(userPath)
 		if !containsPath(userPath, binDir) {
 			exec.Command("powershell", "-NoProfile", "-Command",
 				fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s;%s','User')`, binDir, userPath)).Run()
@@ -375,11 +401,59 @@ func containsPath(pathList, dir string) bool {
 	return strings.Contains(strings.ToLower(pathList), strings.ToLower(dir))
 }
 
+// isDispatchBinDir reports whether a PATH entry looks like a dispatch
+// project or worktree bin directory: the path contains "dispatch"
+// (case-insensitive) and the final path component is "bin".  This
+// preserves the production install path (e.g.
+// C:\Users\jong\AppData\Local\Programs\dispatch) which does not end
+// with \bin.
+func isDispatchBinDir(entry string) bool {
+	clean := filepath.Clean(entry)
+	if !strings.Contains(strings.ToLower(clean), "dispatch") {
+		return false
+	}
+	return strings.EqualFold(filepath.Base(clean), "bin")
+}
+
+// scrubDispatchBins removes dispatch worktree/project bin directories
+// from pathList, keeping only the entry matching keep (case-insensitive
+// comparison).  If keep is empty, all dispatch bin dirs are removed.
+// Non-dispatch entries are always preserved.  Returns the cleaned path
+// and the list of removed entries.
+func scrubDispatchBins(pathList, keep string) (string, []string) {
+	sep := string(os.PathListSeparator)
+	entries := strings.Split(pathList, sep)
+	keepClean := ""
+	if keep != "" {
+		keepClean = filepath.Clean(keep)
+	}
+	var out []string
+	var removed []string
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+		clean := filepath.Clean(e)
+		if keepClean != "" && strings.EqualFold(clean, keepClean) {
+			out = append(out, e)
+			continue
+		}
+		if isDispatchBinDir(clean) {
+			removed = append(removed, e)
+			continue
+		}
+		out = append(out, e)
+	}
+	return strings.Join(out, sep), removed
+}
+
 func ensureSessionPath(binDir string) {
 	current := os.Getenv("Path")
-	if !containsPath(current, binDir) {
-		os.Setenv("Path", binDir+";"+current)
-	}
+	// Remove all dispatch bin dirs (including current if present), then
+	// prepend current so it takes priority over any other entry.
+	cleaned, _ := scrubDispatchBins(current, "")
+	os.Setenv("Path", binDir+string(os.PathListSeparator)+cleaned)
 }
 
 func verify() error {

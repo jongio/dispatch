@@ -19,6 +19,12 @@ type attentionEntry struct {
 	dot    func() string // icon renderer
 }
 
+// Checkbox glyphs used in the picker UI.
+const (
+	checkboxOff = "[ ]"
+	checkboxOn  = "[✓]"
+)
+
 // attentionEntries is the fixed list of statuses presented in the picker.
 var attentionEntries = []attentionEntry{
 	{data.AttentionWaiting, "Needs input", styles.IconAttentionWaiting},
@@ -160,9 +166,9 @@ func (p AttentionPicker) View() string {
 
 	for i, entry := range attentionEntries {
 		// Checkbox.
-		check := "[ ]"
+		check := checkboxOff
 		if _, ok := p.selected[entry.status]; ok {
-			check = "[✓]"
+			check = checkboxOn
 		}
 
 		// Coloured dot — resolve style dynamically for theme changes.
@@ -181,9 +187,9 @@ func (p AttentionPicker) View() string {
 
 	// "Has plan" row.
 	{
-		check := "[ ]"
+		check := checkboxOff
 		if p.filterPlans {
-			check = "[✓]"
+			check = checkboxOn
 		}
 		dot := styles.PlanIndicatorStyle.Render(styles.IconPlan())
 		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Has plan", p.planCount)

@@ -326,6 +326,39 @@ func (s *SessionList) SelectedFolderPath() string {
 	return item.folderPath
 }
 
+// SelectedFolderCwd returns the working directory to use when launching a
+// new session from the currently selected folder node:
+//   - folder pivot: the folder path itself (it IS a directory)
+//   - repo pivot:   the Cwd of the first child session in the group
+//   - branch/date:  "" (no meaningful directory to launch into)
+func (s *SessionList) SelectedFolderCwd() string {
+	if s.cursor < 0 || s.cursor >= len(s.visItems) {
+		return ""
+	}
+	idx := s.visItems[s.cursor]
+	item := s.allItems[idx]
+	if !item.isFolder {
+		return ""
+	}
+	switch s.pivotField {
+	case "folder":
+		return item.folderPath
+	case "repo":
+		// Walk forward to find the first child session's Cwd.
+		for i := idx + 1; i < len(s.allItems); i++ {
+			if s.allItems[i].isFolder {
+				break
+			}
+			if s.allItems[i].session.Cwd != "" {
+				return s.allItems[i].session.Cwd
+			}
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
 // Selected returns the currently highlighted session.
 func (s *SessionList) Selected() (data.Session, bool) {
 	if s.cursor < 0 || s.cursor >= len(s.visItems) {

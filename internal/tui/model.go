@@ -52,6 +52,10 @@ const (
 	// completes successfully.
 	statusReindexDone = "Reindexed ✓"
 
+	// statusCopiedID is the status message shown when a session ID is
+	// copied to the clipboard.
+	statusCopiedID = "Copied session ID ✓"
+
 	// statusReindexCancelled is the status message shown when the user
 	// cancels an in-flight reindex operation.
 	statusReindexCancelled = "Reindex cancelled"
@@ -1330,7 +1334,7 @@ func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
 		m.statusErr = "clipboard: " + err.Error()
 		return m, clearStatusAfter(2 * time.Second)
 	}
-	m.statusInfo = "Copied session ID ✓"
+	m.statusInfo = statusCopiedID
 	return m, clearStatusAfter(2 * time.Second)
 }
 
@@ -1517,7 +1521,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 						m.statusErr = "clipboard: " + err.Error()
 						return m, clearStatusAfter(2 * time.Second)
 					}
-					m.statusInfo = "Copied session ID ✓"
+					m.statusInfo = statusCopiedID
 					return m, clearStatusAfter(2 * time.Second)
 				}
 			}
@@ -2526,9 +2530,9 @@ func (m *Model) launchWithMode(mode string) tea.Cmd {
 }
 
 // launchNewInFolder starts a fresh Copilot session (no session ID) with the
-// working directory set to the selected folder's path.
+// working directory set based on the selected folder's pivot type.
 func (m *Model) launchNewInFolder(mode string) tea.Cmd {
-	cwd := m.sessionList.SelectedFolderPath()
+	cwd := m.sessionList.SelectedFolderCwd()
 	if cwd == "" {
 		return nil
 	}
@@ -2731,7 +2735,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, 0)
+			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
@@ -2941,7 +2945,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, 0)
+			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
+	"github.com/jongio/dispatch/internal/validate"
 )
 
 // sessionStateRel is the relative path from the user home directory to
@@ -80,6 +81,9 @@ func ScanAttention(threshold time.Duration, workspaceRecovery bool) map[string]A
 			continue
 		}
 		sessionID := e.Name()
+		if !validate.SessionID(sessionID) {
+			continue
+		}
 		dir := filepath.Join(stateDir, sessionID)
 
 		status := classifySession(dir, threshold, workspaceRecovery)
@@ -111,6 +115,9 @@ func ScanAttentionQuick(threshold time.Duration, workspaceRecovery bool) map[str
 			continue
 		}
 		sessionID := e.Name()
+		if !validate.SessionID(sessionID) {
+			continue
+		}
 		dir := filepath.Join(stateDir, sessionID)
 
 		pidRes := findSessionPID(dir)

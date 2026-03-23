@@ -2023,8 +2023,8 @@ func TestHandleKey_CopyID_Success(t *testing.T) {
 	if copied != "abc-123" {
 		t.Errorf("clipboard text = %q, want %q", copied, "abc-123")
 	}
-	if rm.statusInfo != "Copied session ID ✓" {
-		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, "Copied session ID ✓")
+	if rm.statusInfo != statusCopiedID {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusCopiedID)
 	}
 	if rm.statusErr != "" {
 		t.Errorf("statusErr = %q, want empty", rm.statusErr)
@@ -2970,12 +2970,29 @@ func TestHandleKey_Enter_FolderSelected(t *testing.T) {
 		{Label: "folder1", Sessions: []data.Session{{ID: "s1"}}},
 	}
 	m.sessionList.SetGroups(groups)
+	m.sessionList.SetPivotField(pivotFolder)
 	// When a folder is selected, Enter launches a new session in that folder.
 	result, cmd := m.Update(enterKeyMsg())
 	_ = result.(Model)
 	// Cmd should be non-nil (launch, not toggle)
 	if cmd == nil {
 		t.Error("Enter on folder should return a launch cmd")
+	}
+}
+
+func TestHandleKey_Enter_FolderSelected_BranchPivot(t *testing.T) {
+	m := newTestModel()
+	m.pivot = pivotBranch
+	groups := []data.SessionGroup{
+		{Label: "main", Sessions: []data.Session{{ID: "s1"}}},
+	}
+	m.sessionList.SetGroups(groups)
+	m.sessionList.SetPivotField(pivotBranch)
+	// Branch pivot folders have no meaningful cwd; Enter should be a no-op.
+	result, cmd := m.Update(enterKeyMsg())
+	_ = result.(Model)
+	if cmd != nil {
+		t.Error("Enter on branch-pivot folder should return nil cmd")
 	}
 }
 

@@ -32,6 +32,24 @@ func TestRunAll_NonexistentDir(t *testing.T) {
 	}
 }
 
+func TestRunAll_WriteError(t *testing.T) {
+	t.Parallel()
+	repoDir := createTempGitRepo(t)
+
+	// Create CONTRIBUTORS.md as a directory so os.WriteFile fails.
+	if err := os.Mkdir(filepath.Join(repoDir, "CONTRIBUTORS.md"), 0o755); err != nil {
+		t.Fatalf("creating blocking directory: %v", err)
+	}
+
+	err := runAll(repoDir)
+	if err == nil {
+		t.Fatal("expected error when CONTRIBUTORS.md path is a directory")
+	}
+	if !strings.Contains(err.Error(), "writing CONTRIBUTORS.md") {
+		t.Errorf("error should mention writing, got: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // runAll — success path with temp git repo
 // ---------------------------------------------------------------------------

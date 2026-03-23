@@ -288,6 +288,100 @@ func TestSessionList_SelectedFolderPath_OnSession(t *testing.T) {
 	}
 }
 
+func TestSessionList_SelectedFolderCwd_FolderPivot(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(1, 2))
+	sl.SetPivotField("folder")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd == "" {
+		t.Error("SelectedFolderCwd with folder pivot should return the folder path")
+	}
+	if cwd != sl.SelectedFolderPath() {
+		t.Errorf("SelectedFolderCwd = %q, want %q (same as SelectedFolderPath)", cwd, sl.SelectedFolderPath())
+	}
+}
+
+func TestSessionList_SelectedFolderCwd_RepoPivot(t *testing.T) {
+	t.Parallel()
+	groups := []data.SessionGroup{
+		{
+			Label: "jongio/dispatch",
+			Sessions: []data.Session{
+				{ID: "s1", Cwd: `D:\code\dispatch`},
+				{ID: "s2", Cwd: `D:\code\dispatch`},
+			},
+			Count: 2,
+		},
+	}
+	sl := NewSessionList()
+	sl.SetGroups(groups)
+	sl.SetPivotField("repo")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd != `D:\code\dispatch` {
+		t.Errorf("SelectedFolderCwd with repo pivot = %q, want %q", cwd, `D:\code\dispatch`)
+	}
+}
+
+func TestSessionList_SelectedFolderCwd_BranchPivot(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(1, 2))
+	sl.SetPivotField("branch")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd != "" {
+		t.Errorf("SelectedFolderCwd with branch pivot = %q, want empty", cwd)
+	}
+}
+
+func TestSessionList_SelectedFolderCwd_DatePivot(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(1, 2))
+	sl.SetPivotField("date")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd != "" {
+		t.Errorf("SelectedFolderCwd with date pivot = %q, want empty", cwd)
+	}
+}
+
+func TestSessionList_SelectedFolderCwd_OnSession(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(3))
+	sl.SetPivotField("folder")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd != "" {
+		t.Errorf("SelectedFolderCwd on session item = %q, want empty", cwd)
+	}
+}
+
+func TestSessionList_SelectedFolderCwd_RepoNoSessions(t *testing.T) {
+	t.Parallel()
+	groups := []data.SessionGroup{
+		{Label: "jongio/empty", Sessions: nil, Count: 0},
+	}
+	sl := NewSessionList()
+	sl.SetGroups(groups)
+	sl.SetPivotField("repo")
+	sl.SetSize(80, 10)
+
+	cwd := sl.SelectedFolderCwd()
+	if cwd != "" {
+		t.Errorf("SelectedFolderCwd with repo pivot and no sessions = %q, want empty", cwd)
+	}
+}
+
 func TestSessionList_SessionCount(t *testing.T) {
 	t.Parallel()
 	sl := NewSessionList()

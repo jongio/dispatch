@@ -278,7 +278,6 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 
 	var b strings.Builder
 	convLine := -1
-	idLine := -1
 
 	// ── Title ──
 	b.WriteString(styles.PreviewTitleStyle.Render(styles.IconSession()+"Session Detail") + "\n")
@@ -298,7 +297,7 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 	}
 
 	// Record the content line where "ID: ..." is rendered for click-to-copy.
-	idLine = strings.Count(b.String(), "\n")
+	idLine := strings.Count(b.String(), "\n")
 	field("ID", s.ID)
 	field("Folder", AbbrevPath(s.Cwd))
 
