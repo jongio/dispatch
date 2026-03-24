@@ -105,6 +105,9 @@ jobs:
             git push origin HEAD:main
           fi
 
+          # Move contrib-notes to temp dir so GoReleaser sees a clean git state
+          mv contrib-notes.md "$RUNNER_TEMP/contrib-notes.md" 2>/dev/null || true
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "v2.9.0"
@@ -113,19 +116,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add contributor notes to release
-        if: hashFiles('contrib-notes.md') != ''
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           TAG="v${{ steps.version.outputs.version }}"
-          if [ -f contrib-notes.md ] && [ -s contrib-notes.md ]; then
+          if [ -f "$RUNNER_TEMP/contrib-notes.md" ] && [ -s "$RUNNER_TEMP/contrib-notes.md" ]; then
             # Get current release body
             CURRENT_BODY=$(gh release view "$TAG" --json body --jq '.body')
             # Append contributor notes via stdin to avoid ARG_MAX limits (CWE-400)
             {
               printf '%s\n\n' "$CURRENT_BODY"
-              cat contrib-notes.md
+              cat "$RUNNER_TEMP/contrib-notes.md"
             } | gh release edit "$TAG" --notes-file -
           fi
 
