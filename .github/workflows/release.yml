@@ -74,13 +74,6 @@ jobs:
           echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
           echo "Bumping ${CURRENT} -> ${NEXT} (${{ inputs.bump }})"
 
-      - name: Create and push tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-
       - name: Generate contributor notes
         run: |
           set -euo pipefail
@@ -99,6 +92,8 @@ jobs:
 
           # Commit updated CONTRIBUTORS.md if changed
           if ! git diff --quiet CONTRIBUTORS.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
             git add CONTRIBUTORS.md
             git commit -m "docs: update CONTRIBUTORS.md for $NEW_TAG"
             git pull --rebase origin main
@@ -108,6 +103,13 @@ jobs:
           # Move contrib-notes to temp dir so GoReleaser sees a clean git state
           mv contrib-notes.md "$RUNNER_TEMP/contrib-notes.md" 2>/dev/null || true
 
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: "v2.9.0"
@@ -116,7 +118,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add contributor notes to release
-        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
