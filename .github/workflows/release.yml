@@ -81,10 +81,11 @@ jobs:
           NEW_TAG="v${{ steps.version.outputs.version }}"
 
           # Generate release contributor notes
+          # Use HEAD instead of $NEW_TAG because the tag hasn't been created yet
           if [ -n "$PREV_TAG" ]; then
-            go run ./cmd/contributors/ --release "$PREV_TAG" "$NEW_TAG" > contrib-notes.md
+            go run ./cmd/contributors/ --release "$PREV_TAG" HEAD > contrib-notes.md
           else
-            go run ./cmd/contributors/ --release "" "$NEW_TAG" > contrib-notes.md
+            go run ./cmd/contributors/ --release "" HEAD > contrib-notes.md
           fi
 
           # Update CONTRIBUTORS.md with all-time contributors
