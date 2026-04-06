@@ -80,11 +80,11 @@
     - Behavior: Toggles the ✓ selection indicator on the currently highlighted session. Does not open it.
     - Condition: Only when a session (not folder) is selected in session list view
 
-11. **O** → Open All Selected Sessions (or All in Folder)
+11. **L** → Launch All Selected Sessions (or All in Folder)
     - File: D:\code\dispatch\internal\tui\keys.go (multi-select handler)
-    - Code: key.NewBinding(key.WithKeys("O"))
+    - Code: key.NewBinding(key.WithKeys("L"))
     - Handler: D:\code\dispatch\internal\tui\model.go (multi-select handler)
-    - Behavior: Opens every session that has a ✓ selection indicator. If no sessions are selected and cursor is on a folder, opens all sessions under that folder. Each session opens via the configured launch mode.
+    - Behavior: Launches every session that has a ✓ selection indicator. If no sessions are selected and cursor is on a folder, opens all sessions under that folder. Each session opens via the configured launch mode.
     - Condition: In session list view; requires at least one selected session OR cursor on a folder
 
 12. **a** → Select All Visible Sessions
@@ -162,6 +162,20 @@
      - Behavior: Toggles conversation display order between oldest-first and newest-first in the preview pane. Also clickable via the sort arrow in the conversation header. Persisted in config.
      - Condition: Only when preview panel is visible (showPreview=true)
 
+20c. **v** → View Plan in Preview Pane
+     - File: D:\code\dispatch\internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view plan"))
+     - Handler: D:\code\dispatch\internal\tui\model.go
+     - Behavior: Renders the session's plan.md content in the preview pane
+     - Condition: Only when a session with a plan.md file is selected
+
+20d. **P** (Shift+P) → Cycle Preview Position
+     - File: D:\code\dispatch\internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "cycle preview position"))
+     - Handler: D:\code\dispatch\internal\tui\model.go (cyclePreviewPosition)
+     - Behavior: Cycles preview pane position: right → bottom → left → top → right. Persisted in config.
+     - Condition: In session list view
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: D:\code\dispatch\internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))
@@ -205,12 +219,14 @@
     - Behavior: Stars or unstars the currently selected session (persisted to config as favoriteSessions)
     - Condition: Only when a session is selected (not a folder)
 
-27. **F** (Shift+F) → Filter to Favorites Only
+27. **\*** → Toggle Favorite
     - File: D:\code\dispatch\internal\tui\keys.go
-    - Code: key.NewBinding(key.WithKeys("F"))
+    - Code: key.NewBinding(key.WithKeys("*"))
     - Handler: D:\code\dispatch\internal\tui\model.go
-    - Behavior: Toggles filter to show only sessions starred as favorites
-    - Condition: In session list view
+    - Behavior: Stars or unstars the currently selected session as a favorite
+    - Condition: Only when a session is selected (not a folder)
+
+    Note: Favorites filter was previously on `F` — now toggled via the `!` status picker "Favorites only" row.
 
 27b. **c** → Copy Session ID to Clipboard
      - File: D:\code\dispatch\internal\tui\keys.go
@@ -227,9 +243,9 @@
     - Behavior: Cycles to the next session with AttentionWaiting status
     - Condition: In session list view
 
-29. **R** (Shift+R) → Resume All Interrupted Sessions
+29. **N** (Shift+N) → Resume All Interrupted Sessions
     - File: D:\code\dispatch\internal\tui\keys.go
-    - Code: key.NewBinding(key.WithKeys("R"))
+    - Code: key.NewBinding(key.WithKeys("N"))
     - Handler: D:\code\dispatch\internal\tui\model.go (handleResumeInterrupted)
     - Behavior: Batch-resumes all sessions with AttentionInterrupted status via `ghcs --resume`
     - Condition: In session list view; requires at least one interrupted session
@@ -238,7 +254,7 @@
     - File: D:\code\dispatch\internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("!"))
     - Handler: D:\code\dispatch\internal\tui\model.go
-    - Behavior: Opens the attention picker overlay to filter sessions by one or more attention states (waiting, active, stale, interrupted, idle) and a "Has plan" row to filter sessions with plan.md files
+    - Behavior: Opens the attention picker overlay to filter sessions by one or more attention states (waiting, active, stale, interrupted, idle), a "Has plan" row, a "Favorites only" row, and work status rows
     - Condition: In session list view
 
 **Attention Status Indicators:**
@@ -248,6 +264,16 @@
 - ⚡ Interrupted (orange) — killed mid-work by crash/reboot (stale lock file + active event)
 - ○ Idle (gray) — not running
 - Has plan — sessions with a `plan.md` file
+- Favorites only — sessions starred as favorites
+
+30b. **R** (Shift+R) → Scan Work Status
+    - File: D:\code\dispatch\internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("R"))
+    - Handler: D:\code\dispatch\internal\tui\model.go
+    - Behavior: Scans all sessions with plans for work completion status (quick classification → full parse → optional AI analysis)
+    - Condition: In session list view; does not run on startup — must be explicitly triggered
+
+30c. Work status and plan filtering is also available via the **!** status picker (see 30 above). The picker includes "Has plan", "Favorites only", "Incomplete work", and "Complete work" rows below the attention statuses.
 
 ### Time Range Filter
 31. **1** → Set Time Range to 1 Hour

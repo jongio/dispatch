@@ -26,11 +26,12 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
-- **Multi-session open** (`Space` / `O` / `a` / `d`) — select multiple sessions with Space, open all at once with O, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
+- **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
-- **Plan indicator** (`v` / `M`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane, `M` to filter and show only sessions with plans
+- **Plan indicator** (`v`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane. Filter sessions with plans via the `!` status picker
+- **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
-- **Session favorites** (`*` / `F`) — star sessions as favorites, filter to show only favorites, persistent state
+- **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
 - **Settings panel** (`,`) — 10 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -150,7 +151,7 @@ dispatch
 | Key | Action |
 |---|---|
 | `Space` | Toggle selection on current session |
-| `O` | Open all selected sessions (or all in folder) |
+| `L` | Launch all selected sessions (or all in folder) |
 | `a` | Select all visible sessions |
 | `d` | Deselect all |
 
@@ -159,13 +160,12 @@ dispatch
 | Key | Action |
 |---|---|
 | `n` | Jump to next waiting session |
-| `R` | Resume all interrupted sessions |
-| `!` | Filter by attention status |
+| `N` | Resume all interrupted sessions |
+| `R` | Scan work status across sessions with plans |
+| `!` | Filter by attention status, plans, favorites, and work completion |
 | `h` | Hide/unhide current session |
 | `H` | Toggle visibility of hidden sessions |
 | `*` | Toggle favorite on current session |
-| `F` | Filter to show only favorites |
-| `M` | Filter to show only sessions with plans |
 
 #### Search & Filter
 

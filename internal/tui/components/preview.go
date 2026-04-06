@@ -17,13 +17,23 @@ type PreviewPanel struct {
 	width           int
 	height          int
 	scroll          int
-	totalLines      int    // cached line count for scroll clamping
-	newestFirst     bool   // conversation turn display order
-	convHeaderLine  int    // content line where "Conversation" label is rendered (-1 = none)
-	idFieldLine     int    // content line where "ID: ..." is rendered (-1 = none)
-	planContent     string // plan.md content (empty when no plan)
-	planViewMode    bool   // when true, render plan instead of session detail
-	hasPlan         bool   // whether the session has a plan.md file
+	totalLines      int                   // cached line count for scroll clamping
+	newestFirst     bool                  // conversation turn display order
+	convHeaderLine  int                   // content line where "Conversation" label is rendered (-1 = none)
+	idFieldLine     int                   // content line where "ID: ..." is rendered (-1 = none)
+	planContent     string                // plan.md content (empty when no plan)
+	planViewMode    bool                  // when true, render plan instead of session detail
+	hasPlan         bool                  // whether the session has a plan.md file
+	workStatus      data.WorkStatusResult // current session's work status
+
+	// Selection state — tracks click-drag text selection in the preview pane.
+	selStart     [2]int // [line, col] in rendered content
+	selEnd       [2]int
+	selecting    bool // true while dragging
+	hasSelection bool // true when a completed selection exists
+	// renderedLines stores the most recent output of the content rendering
+	// so that mouse coordinates can be mapped back to text for selection.
+	renderedLines []string
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -51,6 +61,7 @@ func (p *PreviewPanel) ToggleConversationSort() bool {
 func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
+	p.ClearSelection()
 	p.updateTotalLines()
 }
 
@@ -75,6 +86,7 @@ func (p *PreviewPanel) TogglePlanView() bool {
 	}
 	p.planViewMode = !p.planViewMode
 	p.scroll = 0
+	p.ClearSelection()
 	p.updateTotalLines()
 	return p.planViewMode
 }
@@ -96,6 +108,27 @@ func (p *PreviewPanel) SetHasPlan(has bool) {
 	p.updateTotalLines()
 }
 
+// SetWorkStatus sets the work status for the currently displayed session.
+func (p *PreviewPanel) SetWorkStatus(status data.WorkStatusResult) {
+	p.workStatus = status
+	p.updateTotalLines()
+}
+
+// ShowPlanView enters plan view mode if plan content is available.
+// Unlike TogglePlanView, this is idempotent — calling it when already
+// in plan view is a no-op.
+func (p *PreviewPanel) ShowPlanView() bool {
+	if p.planContent == "" {
+		return false
+	}
+	if !p.planViewMode {
+		p.planViewMode = true
+		p.scroll = 0
+		p.updateTotalLines()
+	}
+	return true
+}
+
 // ExitPlanView switches back to normal session detail view.
 func (p *PreviewPanel) ExitPlanView() {
 	if p.planViewMode {
@@ -114,6 +147,7 @@ func (p *PreviewPanel) SetSize(w, h int) {
 
 // ScrollUp scrolls the preview content up by n lines.
 func (p *PreviewPanel) ScrollUp(n int) {
+	p.ClearSelection()
 	p.scroll -= n
 	if p.scroll < 0 {
 		p.scroll = 0
@@ -122,6 +156,7 @@ func (p *PreviewPanel) ScrollUp(n int) {
 
 // ScrollDown scrolls the preview content down by n lines.
 func (p *PreviewPanel) ScrollDown(n int) {
+	p.ClearSelection()
 	p.scroll += n
 	viewportH := max(1, p.height-2)
 	maxScroll := max(0, p.totalLines-viewportH)
@@ -167,17 +202,172 @@ func (p *PreviewPanel) SessionID() string {
 	return p.detail.Session.ID
 }
 
+// Content returns the full text content currently displayed in the preview
+// pane. When in plan view mode, the plan content is returned; otherwise
+// the rendered session detail text is returned. Returns an empty string
+// when no content is available.
+func (p *PreviewPanel) Content() string {
+	if p.width <= 0 || p.height <= 0 {
+		return ""
+	}
+	if p.planViewMode && p.planContent != "" {
+		return p.renderPlanContent()
+	}
+	if p.detail == nil {
+		return ""
+	}
+	content, _, _ := p.renderContent()
+	return content
+}
+
+// ---------------------------------------------------------------------------
+// Text selection
+// ---------------------------------------------------------------------------
+
+// StartSelection begins a click-drag text selection at the given content
+// line and column. Call this on MouseClick in the preview content area.
+func (p *PreviewPanel) StartSelection(line, col int) {
+	p.selStart = [2]int{line, col}
+	p.selEnd = [2]int{line, col}
+	p.selecting = true
+	p.hasSelection = false
+}
+
+// UpdateSelection extends the current selection to the given position.
+// Call this on MouseMotion while the left button is held.
+func (p *PreviewPanel) UpdateSelection(line, col int) {
+	if !p.selecting {
+		return
+	}
+	p.selEnd = [2]int{line, col}
+	p.hasSelection = true
+}
+
+// FinalizeSelection completes the drag and returns the selected text.
+// The returned string is extracted from the stored renderedLines using
+// the normalised selection range. Returns empty string if no selection.
+func (p *PreviewPanel) FinalizeSelection() string {
+	p.selecting = false
+	if !p.hasSelection {
+		return ""
+	}
+
+	// Normalise so start <= end.
+	start, end := p.normalizedSelection()
+
+	if len(p.renderedLines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.renderedLines); lineIdx++ {
+		line := p.renderedLines[lineIdx]
+		runes := []rune(line)
+
+		startCol := 0
+		endCol := len(runes)
+		if lineIdx == start[0] {
+			startCol = min(start[1], len(runes))
+		}
+		if lineIdx == end[0] {
+			endCol = min(end[1]+1, len(runes))
+		}
+		if startCol > endCol {
+			startCol = endCol
+		}
+
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(string(runes[startCol:endCol]))
+	}
+	return b.String()
+}
+
+// ClearSelection resets all selection state.
+func (p *PreviewPanel) ClearSelection() {
+	p.selStart = [2]int{}
+	p.selEnd = [2]int{}
+	p.selecting = false
+	p.hasSelection = false
+}
+
+// HasSelection returns true when a completed text selection exists.
+func (p *PreviewPanel) HasSelection() bool {
+	return p.hasSelection
+}
+
+// SelectedText returns the currently selected text without clearing the
+// selection. Returns empty string if no selection or no rendered lines.
+func (p *PreviewPanel) SelectedText() string {
+	if !p.hasSelection || len(p.renderedLines) == 0 {
+		return ""
+	}
+	start, end := p.normalizedSelection()
+	var b strings.Builder
+	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.renderedLines); lineIdx++ {
+		line := p.renderedLines[lineIdx]
+		runes := []rune(line)
+		startCol := 0
+		endCol := len(runes)
+		if lineIdx == start[0] {
+			startCol = min(start[1], len(runes))
+		}
+		if lineIdx == end[0] {
+			endCol = min(end[1]+1, len(runes))
+		}
+		if startCol > endCol {
+			startCol = endCol
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(string(runes[startCol:endCol]))
+	}
+	return b.String()
+}
+
+// IsSelected reports whether the given content [line, col] falls within
+// the current selection range. Used by View() to highlight selected text.
+func (p *PreviewPanel) IsSelected(line, col int) bool {
+	if !p.hasSelection && !p.selecting {
+		return false
+	}
+	start, end := p.normalizedSelection()
+	if line < start[0] || line > end[0] {
+		return false
+	}
+	if line == start[0] && col < start[1] {
+		return false
+	}
+	if line == end[0] && col > end[1] {
+		return false
+	}
+	return true
+}
+
+// normalizedSelection returns start, end with start <= end (by line, then col).
+func (p *PreviewPanel) normalizedSelection() ([2]int, [2]int) {
+	s, e := p.selStart, p.selEnd
+	if s[0] > e[0] || (s[0] == e[0] && s[1] > e[1]) {
+		s, e = e, s
+	}
+	return s, e
+}
+
 // updateTotalLines recomputes the cached total line count for scroll clamping.
 func (p *PreviewPanel) updateTotalLines() {
 	if p.width <= 0 || p.height <= 0 {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.renderedLines = nil
 		return
 	}
 	if p.planViewMode && p.planContent != "" {
 		content := p.renderPlanContent()
-		p.totalLines = strings.Count(content, "\n") + 1
+		p.renderedLines = strings.Split(content, "\n")
+		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
 		return
@@ -186,10 +376,12 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.renderedLines = nil
 		return
 	}
 	content, convLine, idLine := p.renderContent()
-	p.totalLines = strings.Count(content, "\n") + 1
+	p.renderedLines = strings.Split(content, "\n")
+	p.totalLines = len(p.renderedLines)
 	p.convHeaderLine = convLine
 	p.idFieldLine = idLine
 }
@@ -231,11 +423,30 @@ func (p PreviewPanel) View() string {
 	}
 
 	// Scroll indicators — replace first/last visible line when content extends.
-	if scroll > 0 && len(lines) > 1 {
+	hasScrollUp := scroll > 0 && len(lines) > 1
+	hasScrollDown := false
+	if hasScrollUp {
 		lines[0] = styles.DimmedStyle.Render(fmt.Sprintf("  ▲ %d lines above", scroll))
 	}
 	if moreBelow := totalLines - scroll - innerH; moreBelow > 0 && len(lines) > 1 {
+		hasScrollDown = true
 		lines[len(lines)-1] = styles.DimmedStyle.Render(fmt.Sprintf("  ▼ %d lines below", moreBelow))
+	}
+
+	// Apply selection highlight to lines within the active selection range.
+	if p.hasSelection || p.selecting {
+		selStyle := lipgloss.NewStyle().Reverse(true)
+		start, end := p.normalizedSelection()
+		for i := range lines {
+			contentLine := scroll + i
+			// Skip scroll indicator lines.
+			if (i == 0 && hasScrollUp) || (i == len(lines)-1 && hasScrollDown) {
+				continue
+			}
+			if contentLine >= start[0] && contentLine <= end[0] {
+				lines[i] = selStyle.Render(lines[i])
+			}
+		}
 	}
 
 	viewportContent := strings.Join(lines, "\n")
@@ -322,6 +533,29 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 	if p.hasPlan {
 		planLabel := styles.PreviewLabelStyle.Render("Plan: ")
 		b.WriteString(planLabel + styles.PlanIndicatorStyle.Render(styles.IconPlan()+" Yes") + "\n")
+	}
+
+	// ── Work status indicator ──
+	if p.workStatus.Status != data.WorkStatusUnknown && p.workStatus.Status != data.WorkStatusNoPlan {
+		wsLabel := styles.PreviewLabelStyle.Render("Work: ")
+		var wsValue string
+		switch p.workStatus.Status {
+		case data.WorkStatusComplete:
+			wsValue = styles.WorkCompleteStyle.Render(styles.IconWorkComplete() + " Complete")
+		case data.WorkStatusIncomplete:
+			detail := p.workStatus.Detail
+			if detail == "" {
+				detail = "Incomplete"
+			}
+			wsValue = styles.WorkIncompleteStyle.Render(styles.IconWorkIncomplete() + " " + detail)
+		case data.WorkStatusAnalyzing:
+			wsValue = styles.WorkAnalyzingStyle.Render(styles.IconWorkAnalyzing() + " Analyzing...")
+		case data.WorkStatusError:
+			wsValue = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("Error")
+		case data.WorkStatusUnknown, data.WorkStatusNoPlan:
+			// Filtered by the outer condition; included for exhaustive switch compliance.
+		}
+		b.WriteString(wsLabel + wsValue + "\n")
 	}
 
 	field("Turns", FormatInt(s.TurnCount))

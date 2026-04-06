@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **"Has plan" status filter** — the `!` attention status picker now includes a "Has plan" row to filter sessions with `plan.md` files
 - **Plan indicator in preview** — sessions with a `plan.md` file show "Plan: Yes" in the preview pane metadata
 - **Conversation sort toggle** (`o`) — toggle between oldest-first and newest-first conversation display in the preview pane; also clickable via the sort arrow in the conversation header
+- **Work status detection** — analyze `plan.md` files to identify sessions with incomplete planned work
+  - New `WorkStatus` type: Unknown, Complete, Incomplete, NoPlan, Analyzing, Error
+  - Plan parsing to detect incomplete tasks (unchecked checkboxes, pending items)
+  - Copilot SDK `analyze_completion` tool for AI-powered completion analysis
+  - Colored dot indicators in session list showing work completion status
+  - Work status display in the preview panel metadata
+  - Work status filtering via `!` status picker (incomplete, complete)
+  - Status bar shows scan progress and completion summary
 - **Contributor recognition** — automated contributor attribution in releases
   - `mage contributors` target regenerates CONTRIBUTORS.md from git history
   - `go run ./cmd/contributors/` CLI tool for release-time contributor extraction
@@ -23,6 +31,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 
 - Copy session ID keybinding changed from `y` (yank) to `c` (copy) for better discoverability
+- `!` status picker now includes "Incomplete work", "Complete work", and "Favorites only" rows
+- Work status scan no longer runs on startup — press `R` to scan explicitly
+
+### Breaking — Keybinding Overhaul
+
+- **`O` → `L`**: "Open selected" renamed to "Launch selected" and moved to `L` (frees `O` so `o`/`O` are no longer an unrelated pair)
+- **`F` removed**: "Filter favorites" absorbed into `!` status picker as "Favorites only" row
+- **`M` removed**: "Filter plans" absorbed into `!` status picker as "Has plan" row
+- **`R` → `N`**: "Resume interrupted" moved to `N` (uppercase; `n` = next waiting — related concepts)
+- **`R` = Scan work status** (new): Explicitly scans all sessions with plans for work completion status
 
 ### Fixed
 

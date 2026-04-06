@@ -84,6 +84,9 @@ func SetTheme(t *Theme) {
 	AttentionIdleStyle = t.AttentionIdleStyle
 	AttentionInterruptedStyle = t.AttentionInterruptedStyle
 	PlanIndicatorStyle = t.PlanIndicatorStyle
+	WorkCompleteStyle = t.WorkCompleteStyle
+	WorkIncompleteStyle = t.WorkIncompleteStyle
+	WorkAnalyzingStyle = t.WorkAnalyzingStyle
 }
 
 // CurrentTheme returns the active Theme (never nil after init).
@@ -227,6 +230,15 @@ var (
 
 	// PlanIndicatorStyle renders the dot for sessions that have a plan.md file.
 	PlanIndicatorStyle lipgloss.Style
+
+	// WorkCompleteStyle renders indicators for sessions with all planned work complete.
+	WorkCompleteStyle lipgloss.Style
+
+	// WorkIncompleteStyle renders indicators for sessions with remaining planned work.
+	WorkIncompleteStyle lipgloss.Style
+
+	// WorkAnalyzingStyle renders indicators for sessions being analyzed.
+	WorkAnalyzingStyle lipgloss.Style
 )
 
 // applyLegacyDefaults initialises the exported variables with the original
@@ -320,6 +332,9 @@ func applyLegacyDefaults(isDark bool) {
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lightDark(c("#EA580C"), c("#F97316"))).Bold(true)
 	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE"))).Bold(true)
+	WorkCompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80"))).Bold(true)
+	WorkIncompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#CA8A04"), c("#FACC15"))).Bold(true)
+	WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#9333EA"), c("#C084FC")))
 
 	// Build a Theme struct so CurrentTheme() is never nil.
 	primary := "#7C6FF4"

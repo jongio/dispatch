@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 )
@@ -126,4 +127,32 @@ type planContentMsg struct {
 	sessionID string
 	content   string
 	err       error
+}
+
+// ---------------------------------------------------------------------------
+// Work status scan messages
+// ---------------------------------------------------------------------------
+
+// workStatusQuickScannedMsg delivers quick-pass work status classification
+// (NoPlan vs Unknown) from the plan map.
+type workStatusQuickScannedMsg struct {
+	statuses map[string]data.WorkStatusResult
+}
+
+// workStatusScannedMsg delivers full work status analysis results.
+type workStatusScannedMsg struct {
+	statuses map[string]data.WorkStatusResult
+}
+
+// workStatusAIScannedMsg delivers AI-enhanced work status analysis results
+// from the Copilot SDK AnalyzeCompletion method.
+type workStatusAIScannedMsg struct {
+	analyses map[string]*copilot.CompletionAnalysis
+}
+
+// continuationPlanCreatedMsg reports the result of writing continuation
+// plans for sessions with incomplete work.
+type continuationPlanCreatedMsg struct {
+	updated int // number of plans successfully written
+	err     error
 }

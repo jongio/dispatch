@@ -212,6 +212,57 @@ func TestPreviewPanel_ExitPlanView(t *testing.T) {
 	}
 }
 
+func TestPreviewPanel_ShowPlanView_NoPlan(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 24)
+
+	got := p.ShowPlanView()
+	if got {
+		t.Error("ShowPlanView with no plan should return false")
+	}
+	if p.PlanViewMode() {
+		t.Error("should not be in plan view mode")
+	}
+}
+
+func TestPreviewPanel_ShowPlanView_WithPlan(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 24)
+	p.SetPlanContent("# Plan\nContent")
+
+	got := p.ShowPlanView()
+	if !got {
+		t.Error("ShowPlanView should return true when plan content is set")
+	}
+	if !p.PlanViewMode() {
+		t.Error("should be in plan view mode")
+	}
+}
+
+func TestPreviewPanel_ShowPlanView_Idempotent(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 24)
+	p.SetPlanContent("# Plan\nContent")
+
+	// First call enters plan view.
+	p.ShowPlanView()
+	if !p.PlanViewMode() {
+		t.Fatal("should be in plan view mode after first ShowPlanView")
+	}
+
+	// Second call is a no-op (idempotent, unlike TogglePlanView).
+	got := p.ShowPlanView()
+	if !got {
+		t.Error("ShowPlanView should still return true")
+	}
+	if !p.PlanViewMode() {
+		t.Error("should remain in plan view mode after second ShowPlanView")
+	}
+}
+
 func TestPreviewPanel_ExitPlanView_NotInPlanMode(t *testing.T) {
 	t.Parallel()
 	p := NewPreviewPanel()

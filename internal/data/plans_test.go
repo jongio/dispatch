@@ -203,3 +203,299 @@ func TestScanAllPlans_NoStateDir(t *testing.T) {
 		t.Errorf("expected 0 plans when state dir missing, got %d", len(plans))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// WriteContinuationPlan
+// ---------------------------------------------------------------------------
+
+func TestWriteContinuationPlan_NewFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "new-plan-session"
+	// Directory exists but no plan.md yet.
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+
+	remaining := []string{"implement auth", "add tests"}
+	err := WriteContinuationPlan(sessionID, remaining, "2 items left")
+	if err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+
+	if !strings.Contains(content, remainingWorkHeader) {
+		t.Error("expected remaining work header in plan")
+	}
+	if !strings.Contains(content, "- [ ] implement auth") {
+		t.Error("expected 'implement auth' checkbox")
+	}
+	if !strings.Contains(content, "- [ ] add tests") {
+		t.Error("expected 'add tests' checkbox")
+	}
+	if !strings.Contains(content, "Summary: 2 items left") {
+		t.Error("expected summary line")
+	}
+}
+
+func TestWriteContinuationPlan_AppendToExisting(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "existing-plan-session"
+	existingContent := "# My Plan\n\n- [x] setup project\n- [ ] implement auth\n"
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+	os.WriteFile(filepath.Join(dir, sessionID, "plan.md"), []byte(existingContent), 0o644)
+
+	remaining := []string{"implement auth", "write docs"}
+	err := WriteContinuationPlan(sessionID, remaining, "needs work")
+	if err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+
+	// Original content preserved.
+	if !strings.Contains(content, "# My Plan") {
+		t.Error("expected original heading preserved")
+	}
+	if !strings.Contains(content, "- [x] setup project") {
+		t.Error("expected original checkbox preserved")
+	}
+	// New section appended.
+	if !strings.Contains(content, remainingWorkHeader) {
+		t.Error("expected remaining work header")
+	}
+	if !strings.Contains(content, "- [ ] write docs") {
+		t.Error("expected new checkbox")
+	}
+}
+
+func TestWriteContinuationPlan_ReplaceExistingSection(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "replace-section-session"
+	existing := "# Plan\n\n" + remainingWorkHeader + "\n\n" +
+		"The following items were identified as incomplete:\n\n" +
+		"- [ ] old item one\n- [ ] old item two\n\nSummary: old summary\n"
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+	os.WriteFile(filepath.Join(dir, sessionID, "plan.md"), []byte(existing), 0o644)
+
+	remaining := []string{"new item only"}
+	err := WriteContinuationPlan(sessionID, remaining, "refreshed")
+	if err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+
+	// Old items gone.
+	if strings.Contains(content, "old item one") {
+		t.Error("expected old items removed")
+	}
+	if strings.Contains(content, "old summary") {
+		t.Error("expected old summary removed")
+	}
+	// New items present.
+	if !strings.Contains(content, "- [ ] new item only") {
+		t.Error("expected new checkbox")
+	}
+	if !strings.Contains(content, "Summary: refreshed") {
+		t.Error("expected new summary")
+	}
+	// Header still appears exactly once.
+	if strings.Count(content, remainingWorkHeader) != 1 {
+		t.Errorf("expected exactly 1 header, got %d", strings.Count(content, remainingWorkHeader))
+	}
+}
+
+func TestWriteContinuationPlan_Idempotent(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "idempotent-session"
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+	os.WriteFile(filepath.Join(dir, sessionID, "plan.md"), []byte("# Plan\n"), 0o644)
+
+	remaining := []string{"task A", "task B"}
+
+	// Write twice with the same data.
+	for range 2 {
+		if err := WriteContinuationPlan(sessionID, remaining, "same summary"); err != nil {
+			t.Fatalf("WriteContinuationPlan: %v", err)
+		}
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+
+	// Header should appear exactly once even after two writes.
+	if count := strings.Count(content, remainingWorkHeader); count != 1 {
+		t.Errorf("expected 1 remaining work header, got %d\ncontent:\n%s", count, content)
+	}
+}
+
+func TestWriteContinuationPlan_EmptyRemaining(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "empty-remaining"
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+	os.WriteFile(filepath.Join(dir, sessionID, "plan.md"), []byte("# Plan\n"), 0o644)
+
+	// Empty remaining + empty summary → no-op.
+	if err := WriteContinuationPlan(sessionID, nil, ""); err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+	if strings.Contains(content, remainingWorkHeader) {
+		t.Error("expected no remaining work section for empty remaining")
+	}
+}
+
+func TestWriteContinuationPlan_InvalidSessionID(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	err := WriteContinuationPlan("../traversal", []string{"task"}, "summary")
+	if err == nil {
+		t.Error("expected error for path traversal session ID")
+	}
+}
+
+func TestWriteContinuationPlan_PreservesTrailingContent(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "trailing-content"
+	existing := "# Plan\n\n" + remainingWorkHeader + "\n\n" +
+		"- [ ] old item\n\n" +
+		"## Notes\n\nSome notes here.\n"
+	os.MkdirAll(filepath.Join(dir, sessionID), 0o755)
+	os.WriteFile(filepath.Join(dir, sessionID, "plan.md"), []byte(existing), 0o644)
+
+	remaining := []string{"updated item"}
+	if err := WriteContinuationPlan(sessionID, remaining, "new"); err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+
+	// The Notes section after the remaining work section should be preserved.
+	if !strings.Contains(content, "## Notes") {
+		t.Error("expected Notes section preserved after replacement")
+	}
+	if !strings.Contains(content, "Some notes here.") {
+		t.Error("expected Notes content preserved")
+	}
+	if !strings.Contains(content, "- [ ] updated item") {
+		t.Error("expected updated item")
+	}
+	if strings.Contains(content, "old item") {
+		t.Error("expected old item removed")
+	}
+}
+
+func TestWriteContinuationPlan_CreatesMissingDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "no-dir-yet"
+	// Deliberately do NOT create the session directory.
+
+	remaining := []string{"first task"}
+	err := WriteContinuationPlan(sessionID, remaining, "auto-created")
+	if err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+
+	content, err := ReadPlanContent(sessionID)
+	if err != nil {
+		t.Fatalf("ReadPlanContent: %v", err)
+	}
+	if !strings.Contains(content, "- [ ] first task") {
+		t.Error("expected task in auto-created plan")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// buildRemainingSection
+// ---------------------------------------------------------------------------
+
+func TestBuildRemainingSection(t *testing.T) {
+	t.Parallel()
+
+	section := buildRemainingSection([]string{"task A", "task B"}, "two items")
+	if !strings.HasPrefix(section, remainingWorkHeader) {
+		t.Error("expected section to start with header")
+	}
+	if !strings.Contains(section, "- [ ] task A\n") {
+		t.Error("expected task A checkbox")
+	}
+	if !strings.Contains(section, "- [ ] task B\n") {
+		t.Error("expected task B checkbox")
+	}
+	if !strings.Contains(section, "Summary: two items") {
+		t.Error("expected summary")
+	}
+}
+
+func TestBuildRemainingSection_NoSummary(t *testing.T) {
+	t.Parallel()
+
+	section := buildRemainingSection([]string{"only task"}, "")
+	if strings.Contains(section, "Summary:") {
+		t.Error("expected no summary line when summary is empty")
+	}
+	if !strings.Contains(section, "- [ ] only task") {
+		t.Error("expected task checkbox")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// mergeRemainingSection
+// ---------------------------------------------------------------------------
+
+func TestMergeRemainingSection_EmptyExisting(t *testing.T) {
+	t.Parallel()
+
+	section := buildRemainingSection([]string{"task"}, "s")
+	result := mergeRemainingSection("", section)
+	if result != section {
+		t.Errorf("expected section as-is, got:\n%s", result)
+	}
+}
+
+func TestMergeRemainingSection_NoExistingHeader(t *testing.T) {
+	t.Parallel()
+
+	existing := "# My Plan\n\nSome content."
+	section := buildRemainingSection([]string{"task"}, "s")
+	result := mergeRemainingSection(existing, section)
+
+	if !strings.Contains(result, "# My Plan") {
+		t.Error("expected original content preserved")
+	}
+	if !strings.Contains(result, remainingWorkHeader) {
+		t.Error("expected new section appended")
+	}
+}

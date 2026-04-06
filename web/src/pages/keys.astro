@@ -41,11 +41,11 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Multi-Select</h3>
             <KeyTable rows={[
               { keys: 'Space', action: 'Toggle selection on current session' },
-              { keys: 'O', action: 'Open all selected sessions (or all in folder)' },
+              { keys: 'L', action: 'Launch all selected sessions (or all in folder)' },
               { keys: 'a', action: 'Select all visible sessions' },
               { keys: 'd', action: 'Deselect all' },
             ]} />
-            <p class="text-secondary text-sm">When no sessions are selected, O on a folder opens all sessions under it. Selected sessions show a ✓ indicator.</p>
+            <p class="text-secondary text-sm">When no sessions are selected, L on a folder opens all sessions under it. Selected sessions show a ✓ indicator.</p>
           </div>
 
           <div id="search-filter" class="shortcut-group">
@@ -90,15 +90,14 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Attention & Status</h3>
             <KeyTable rows={[
               { keys: 'n', action: 'Jump to next waiting session' },
-              { keys: 'R', action: 'Resume all interrupted sessions' },
-              { keys: '!', action: 'Filter by attention status' },
+              { keys: 'N', action: 'Resume all interrupted sessions' },
+              { keys: 'R', action: 'Scan work status across sessions with plans' },
+              { keys: '!', action: 'Filter by attention status, plans, favorites, and work completion' },
               { keys: 'h', action: 'Hide/unhide current session' },
               { keys: 'H', action: 'Toggle visibility of hidden sessions' },
               { keys: '*', action: 'Toggle favorite on current session' },
-              { keys: 'F', action: 'Filter to show only favorites' },
-              { keys: 'M', action: 'Filter to show only sessions with plans' },
             ]} />
-            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses, including a "Has plan" row to filter sessions with a <code>plan.md</code> file. Press <kbd>R</kbd> to batch-resume all interrupted sessions. Press <kbd>M</kbd> to toggle the plan filter, showing only sessions with a <code>plan.md</code> file.</p>
+            <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses, including "Has plan", "Favorites only", "Incomplete work", and "Complete work" rows. Press <kbd>N</kbd> to batch-resume all interrupted sessions. Press <kbd>R</kbd> to scan work status across sessions with plans.</p>
           </div>
 
           <div id="general-keys" class="shortcut-group">

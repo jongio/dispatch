@@ -35,12 +35,29 @@ const searchRetryDelay = 500 * time.Millisecond
 // closed" errors.
 const searchOperationTimeout = 30 * time.Second
 
+// analysisOperationTimeout is the timeout for AnalyzeCompletion SDK
+// operations.  Analysis is more expensive than search — the model creates
+// a session with a system prompt, receives a full plan + analysis prompt,
+// may invoke tools to retrieve session context, and returns structured
+// JSON.  120 s gives sufficient headroom.
+const analysisOperationTimeout = 120 * time.Second
+
 // testHooks allows tests to override internal behaviour without a real
 // Copilot SDK process. Only tests in this package set these fields;
 // production code leaves hooks nil.
 type testHooks struct {
-	doSearch func(ctx context.Context, query string) ([]string, error)
-	doInit   func(ctx context.Context) error
+	doSearch  func(ctx context.Context, query string) ([]string, error)
+	doInit    func(ctx context.Context) error
+	doAnalyze func(ctx context.Context, sessionID, planContent string) (*CompletionAnalysis, error)
+}
+
+// CompletionAnalysis holds the AI-generated analysis of session work completion.
+type CompletionAnalysis struct {
+	Complete       bool     `json:"complete"`
+	TotalTasks     int      `json:"total_tasks"`
+	CompletedTasks int      `json:"completed_tasks"`
+	RemainingItems []string `json:"remaining_items"`
+	Summary        string   `json:"summary"`
 }
 
 // Client wraps the Copilot SDK to provide search and streaming chat.
@@ -447,6 +464,230 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 		return nil, nil
 	}
 	return parseSessionIDs(*resp.Data.Content), nil
+}
+
+// AnalyzeCompletion uses the Copilot SDK to analyze whether a session's
+// planned work has been completed. It sends the plan content and session
+// context to the AI model and returns a structured completion assessment.
+//
+// Returns a CompletionAnalysis struct with status, task counts, and
+// remaining items. Returns (nil, nil) if the SDK is unavailable.
+func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planContent string) (*CompletionAnalysis, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	analysisStart := time.Now()
+	slog.Debug("copilot analyze_completion starting", "session_id", sessionID)
+
+	// Bail immediately if the caller already cancelled.
+	if err := ctx.Err(); err != nil {
+		slog.Debug("copilot analyze_completion: context already cancelled", "error", err)
+		return nil, nil
+	}
+
+	// Serialise SDK calls so only one goroutine uses the pipe at a time.
+	c.searchMu.Lock()
+	defer c.searchMu.Unlock()
+
+	// Re-check after acquiring the lock.
+	if err := ctx.Err(); err != nil {
+		slog.Debug("copilot analyze_completion: context cancelled while waiting for lock", "error", err)
+		return nil, nil
+	}
+
+	// Ensure the SDK is initialised before analysis.
+	initCtx, initCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+	defer initCancel()
+	if err := c.Init(initCtx); err != nil {
+		if isTransportError(err) {
+			slog.Debug("copilot analyze_completion: cached transport error, resetting", "error", err)
+			c.resetSDK()
+			if retryErr := c.Init(initCtx); retryErr != nil {
+				slog.Debug("copilot analyze_completion: reinit failed, giving up", "error", retryErr)
+				return nil, nil
+			}
+		} else {
+			slog.Debug("copilot analyze_completion: init failed (non-transport)", "error", err)
+			return nil, nil
+		}
+	}
+
+	// Re-check caller's context after init.
+	if ctx.Err() != nil {
+		slog.Debug("copilot analyze_completion: context cancelled after init")
+		return nil, nil
+	}
+
+	result, err := c.doAnalyze(ctx, sessionID, planContent)
+
+	// If the context was cancelled, the SDK operations completed cleanly
+	// on their own background context — the pipe is healthy and reusable.
+	if ctx.Err() != nil {
+		slog.Debug("copilot analyze_completion: context cancelled, discarding results (pipe healthy)",
+			"ctxErr", ctx.Err())
+		return nil, nil
+	}
+
+	if err == nil {
+		slog.Debug("copilot analyze_completion complete",
+			"session_id", sessionID, "duration", time.Since(analysisStart))
+		return result, nil
+	}
+
+	// Retry loop on any doAnalyze error (same rationale as Search).
+	for attempt := 1; attempt <= searchMaxRetries; attempt++ {
+		slog.Debug("copilot analyze_completion: error, retrying with fresh SDK",
+			"attempt", attempt,
+			"maxRetries", searchMaxRetries,
+			"error", err)
+
+		select {
+		case <-ctx.Done():
+			slog.Debug("copilot analyze_completion: cancelled during retry delay")
+			return nil, nil
+		case <-time.After(searchRetryDelay):
+		}
+
+		c.resetSDK()
+		if ctx.Err() != nil {
+			return nil, nil
+		}
+		retryInitCtx, retryInitCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+		if initErr := c.Init(retryInitCtx); initErr != nil {
+			retryInitCancel()
+			err = fmt.Errorf("reinit attempt %d: %w", attempt, initErr)
+			continue
+		}
+		retryInitCancel()
+
+		if ctx.Err() != nil {
+			return nil, nil
+		}
+		result, err = c.doAnalyze(ctx, sessionID, planContent)
+		if ctx.Err() != nil {
+			slog.Debug("copilot analyze_completion: context cancelled during retry, discarding",
+				"attempt", attempt)
+			return nil, nil
+		}
+		if err == nil {
+			slog.Debug("copilot analyze_completion: retry succeeded",
+				"attempt", attempt, "session_id", sessionID,
+				"duration", time.Since(analysisStart))
+			return result, nil
+		}
+	}
+
+	// All retries exhausted — clear cached errors for the next call.
+	c.resetSDK()
+	slog.Debug("copilot analyze_completion: all retries exhausted",
+		"duration", time.Since(analysisStart), "error", err)
+	return nil, fmt.Errorf("analyze_completion unavailable after %d retries: %w", searchMaxRetries, err)
+}
+
+// doAnalyze performs a single analysis attempt against the SDK.
+//
+// Like doSearch, SDK operations use a non-cancellable background context
+// to prevent context cancellation from corrupting the JSON-RPC pipe.
+func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent string) (*CompletionAnalysis, error) {
+	// Test hook: allows tests to inject analysis behaviour.
+	if c.hooks != nil && c.hooks.doAnalyze != nil {
+		return c.hooks.doAnalyze(ctx, sessionID, planContent)
+	}
+
+	c.mu.Lock()
+	if !c.available || c.sdk == nil {
+		c.mu.Unlock()
+		return nil, nil
+	}
+	sdkClient := c.sdk
+	store := c.store
+	c.mu.Unlock()
+
+	// Use a non-cancellable context for SDK pipe operations.
+	// Analysis needs a longer timeout than search — the model creates a
+	// session, processes the plan, may call tools, and returns structured JSON.
+	sdkCtx, sdkCancel := context.WithTimeout(context.Background(), analysisOperationTimeout)
+	defer sdkCancel()
+
+	// Create a dedicated non-streaming session for analysis.
+	tools := defineTools(store)
+	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
+		Model:               "gpt-4.1",
+		Streaming:           false,
+		Tools:               tools,
+		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
+		SystemMessage: &sdk.SystemMessageConfig{
+			Content: "You are analyzing whether planned work in a Copilot CLI session was completed. " +
+				"You have access to tools that can retrieve session details including files changed, " +
+				"checkpoints, and conversation turns. Analyze the plan content against the session " +
+				"activity and return ONLY a JSON object with these fields:\n" +
+				"- complete: boolean (true if all planned work appears done)\n" +
+				"- total_tasks: number of distinct tasks identified in the plan\n" +
+				"- completed_tasks: number of tasks that appear completed based on evidence\n" +
+				"- remaining_items: array of strings describing tasks that appear incomplete\n" +
+				"- summary: brief one-sentence assessment\n\n" +
+				"Do not include any text outside the JSON object.",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating analysis session: %w", err)
+	}
+	defer func() { _ = session.Disconnect() }()
+
+	// Bail between SDK operations if caller cancelled.
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	prompt := "Analyze completion for session " + QuoteUntrusted(sessionID) + ".\n\n" +
+		"Call the analyze_completion tool with session_id " + QuoteUntrusted(sessionID) +
+		" and the following plan_content to retrieve session context, " +
+		"then return your completion analysis as a JSON object.\n\n" +
+		"Plan content:\n" + SanitizeExternalContent(planContent)
+
+	resp, err := session.SendAndWait(sdkCtx, sdk.MessageOptions{
+		Prompt: prompt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("analysis query failed: %w", err)
+	}
+
+	if resp == nil || resp.Data.Content == nil {
+		return nil, nil
+	}
+	return parseCompletionAnalysis(*resp.Data.Content)
+}
+
+// parseCompletionAnalysis extracts a CompletionAnalysis from the model's
+// response text.  It expects a JSON object, optionally wrapped in markdown
+// fencing.
+func parseCompletionAnalysis(text string) (*CompletionAnalysis, error) {
+	text = strings.TrimSpace(text)
+
+	// Strip markdown fencing if present (```json ... ```).
+	if rest, ok := strings.CutPrefix(text, "```"); ok {
+		if i := strings.Index(rest, "\n"); i >= 0 {
+			text = rest[i+1:]
+		}
+		if trimmed, ok := strings.CutSuffix(text, "```"); ok {
+			text = trimmed
+		}
+		text = strings.TrimSpace(text)
+	}
+
+	// Find the JSON object boundaries.
+	start := strings.IndexByte(text, '{')
+	end := strings.LastIndexByte(text, '}')
+	if start < 0 || end < 0 || end <= start {
+		return nil, fmt.Errorf("no JSON object found in response")
+	}
+	text = text[start : end+1]
+
+	var analysis CompletionAnalysis
+	if err := json.Unmarshal([]byte(text), &analysis); err != nil {
+		return nil, fmt.Errorf("parsing completion analysis: %w", err)
+	}
+	return &analysis, nil
 }
 
 // isTransportError returns true if the error indicates the SDK's

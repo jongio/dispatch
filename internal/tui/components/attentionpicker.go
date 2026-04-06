@@ -9,9 +9,6 @@ import (
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
-// totalRows returns the number of rows in the picker (attention entries + plan row).
-func totalRows() int { return len(attentionEntries) + 1 }
-
 // attentionEntry defines one row in the attention status picker.
 type attentionEntry struct {
 	status data.AttentionStatus
@@ -52,9 +49,18 @@ func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
 	}
 }
 
-// planRowIndex is the fixed index of the "Has plan" row, placed after
-// all attention entries.
-var planRowIndex = len(attentionEntries)
+// totalRows returns the number of rows in the picker
+// (attention entries + plan row + favorites row + separator + 2 work status rows).
+func totalRows() int { return len(attentionEntries) + 1 + 1 + 1 + 2 } // +1 plan, +1 favorites, +1 separator, +2 work
+
+// Row indices for non-attention entries.
+var (
+	planRowIndex          = len(attentionEntries)
+	favoritesRowIndex     = planRowIndex + 1
+	workSeparatorRowIndex = favoritesRowIndex + 1
+	workIncompleteIndex   = workSeparatorRowIndex + 1
+	workCompleteIndex     = workIncompleteIndex + 1
+)
 
 // AttentionPicker renders a compact overlay for selecting which attention
 // statuses to include when filtering the session list.
@@ -64,15 +70,27 @@ type AttentionPicker struct {
 	counts      map[data.AttentionStatus]int      // session counts per status
 	filterPlans bool                              // "Has plan" row checked
 	planCount   int                               // sessions with a plan doc
-	width       int
-	height      int
+
+	// Favorites filter row.
+	filterFavorites bool // "Favorites only" row checked
+	favoriteCount   int  // sessions that are favorited
+
+	// Work status filter rows.
+	workStatusFilter  map[data.WorkStatus]struct{} // checked work statuses
+	workStatusCounts  map[data.WorkStatus]int      // session counts per work status
+	workStatusScanned bool                         // true when work scan has completed
+
+	width  int
+	height int
 }
 
 // NewAttentionPicker returns a picker with no statuses selected (show all).
 func NewAttentionPicker() AttentionPicker {
 	return AttentionPicker{
-		selected: make(map[data.AttentionStatus]struct{}),
-		counts:   make(map[data.AttentionStatus]int),
+		selected:         make(map[data.AttentionStatus]struct{}),
+		counts:           make(map[data.AttentionStatus]int),
+		workStatusFilter: make(map[data.WorkStatus]struct{}),
+		workStatusCounts: make(map[data.WorkStatus]int),
 	}
 }
 
@@ -83,16 +101,24 @@ func (p *AttentionPicker) SetSize(w, h int) {
 }
 
 // MoveUp moves the cursor up, wrapping to the bottom.
+// Skips the separator row.
 func (p *AttentionPicker) MoveUp() {
 	p.cursor--
+	if p.cursor == workSeparatorRowIndex {
+		p.cursor-- // skip separator
+	}
 	if p.cursor < 0 {
 		p.cursor = totalRows() - 1
 	}
 }
 
 // MoveDown moves the cursor down, wrapping to the top.
+// Skips the separator row.
 func (p *AttentionPicker) MoveDown() {
 	p.cursor = (p.cursor + 1) % totalRows()
+	if p.cursor == workSeparatorRowIndex {
+		p.cursor = (p.cursor + 1) % totalRows()
+	}
 }
 
 // Toggle toggles the status at the current cursor position.
@@ -100,16 +126,35 @@ func (p *AttentionPicker) Toggle() {
 	if p.cursor < 0 || p.cursor >= totalRows() {
 		return
 	}
-	// Plan row is the last entry.
-	if p.cursor == planRowIndex {
+	switch p.cursor {
+	case planRowIndex:
 		p.filterPlans = !p.filterPlans
-		return
-	}
-	status := attentionEntries[p.cursor].status
-	if _, ok := p.selected[status]; ok {
-		delete(p.selected, status)
-	} else {
-		p.selected[status] = struct{}{}
+	case favoritesRowIndex:
+		p.filterFavorites = !p.filterFavorites
+	case workSeparatorRowIndex:
+		// Separator — no-op.
+	case workIncompleteIndex:
+		if _, ok := p.workStatusFilter[data.WorkStatusIncomplete]; ok {
+			delete(p.workStatusFilter, data.WorkStatusIncomplete)
+		} else {
+			p.workStatusFilter[data.WorkStatusIncomplete] = struct{}{}
+		}
+	case workCompleteIndex:
+		if _, ok := p.workStatusFilter[data.WorkStatusComplete]; ok {
+			delete(p.workStatusFilter, data.WorkStatusComplete)
+		} else {
+			p.workStatusFilter[data.WorkStatusComplete] = struct{}{}
+		}
+	default:
+		// Attention status row.
+		if p.cursor < len(attentionEntries) {
+			status := attentionEntries[p.cursor].status
+			if _, ok := p.selected[status]; ok {
+				delete(p.selected, status)
+			} else {
+				p.selected[status] = struct{}{}
+			}
+		}
 	}
 }
 
@@ -136,10 +181,9 @@ func (p *AttentionPicker) SetCounts(counts map[data.AttentionStatus]int) {
 	p.counts = counts
 }
 
-// HasSelection returns true when at least one status is checked or
-// the plan filter is active.
+// HasSelection returns true when at least one filter is active.
 func (p *AttentionPicker) HasSelection() bool {
-	return len(p.selected) > 0 || p.filterPlans
+	return len(p.selected) > 0 || p.filterPlans || p.filterFavorites || len(p.workStatusFilter) > 0
 }
 
 // FilterPlans returns whether the "Has plan" row is checked.
@@ -155,6 +199,48 @@ func (p *AttentionPicker) SetFilterPlans(v bool) {
 // SetPlanCount sets the session count shown beside the "Has plan" row.
 func (p *AttentionPicker) SetPlanCount(n int) {
 	p.planCount = n
+}
+
+// FilterFavorites returns whether the "Favorites only" row is checked.
+func (p *AttentionPicker) FilterFavorites() bool {
+	return p.filterFavorites
+}
+
+// SetFilterFavorites sets the "Favorites only" row state.
+func (p *AttentionPicker) SetFilterFavorites(v bool) {
+	p.filterFavorites = v
+}
+
+// SetFavoriteCount sets the session count shown beside the "Favorites only" row.
+func (p *AttentionPicker) SetFavoriteCount(n int) {
+	p.favoriteCount = n
+}
+
+// WorkStatusFilter returns a copy of the checked work status set.
+func (p *AttentionPicker) WorkStatusFilter() map[data.WorkStatus]struct{} {
+	out := make(map[data.WorkStatus]struct{}, len(p.workStatusFilter))
+	for k, v := range p.workStatusFilter {
+		out[k] = v
+	}
+	return out
+}
+
+// SetWorkStatusFilter initialises the picker with a pre-existing work status selection.
+func (p *AttentionPicker) SetWorkStatusFilter(set map[data.WorkStatus]struct{}) {
+	p.workStatusFilter = make(map[data.WorkStatus]struct{}, len(set))
+	for k, v := range set {
+		p.workStatusFilter[k] = v
+	}
+}
+
+// SetWorkStatusCounts provides the per-work-status session counts.
+func (p *AttentionPicker) SetWorkStatusCounts(counts map[data.WorkStatus]int) {
+	p.workStatusCounts = counts
+}
+
+// SetWorkStatusScanned records whether the work status scan has completed.
+func (p *AttentionPicker) SetWorkStatusScanned(v bool) {
+	p.workStatusScanned = v
 }
 
 // View renders the attention picker overlay.
@@ -194,6 +280,62 @@ func (p AttentionPicker) View() string {
 		dot := styles.PlanIndicatorStyle.Render(styles.IconPlan())
 		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Has plan", p.planCount)
 		if p.cursor == planRowIndex {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// "Favorites only" row.
+	{
+		check := checkboxOff
+		if p.filterFavorites {
+			check = checkboxOn
+		}
+		dot := styles.FavoritedStyle.Render("★")
+		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Favorites only", p.favoriteCount)
+		if p.cursor == favoritesRowIndex {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// Separator between plan/attention rows and work status rows.
+	{
+		sep := styles.DimmedStyle.Render("  ─────────────────────────────")
+		body.WriteString(sep + "\n")
+	}
+
+	// Work status: Incomplete.
+	{
+		check := checkboxOff
+		if _, ok := p.workStatusFilter[data.WorkStatusIncomplete]; ok {
+			check = checkboxOn
+		}
+		dot := styles.WorkIncompleteStyle.Render(styles.IconWorkIncomplete())
+		countStr := "(?)"
+		if p.workStatusScanned {
+			countStr = fmt.Sprintf("(%d)", p.workStatusCounts[data.WorkStatusIncomplete])
+		}
+		line := fmt.Sprintf("  %s %s %-16s %s", check, dot, "Incomplete work", countStr)
+		if p.cursor == workIncompleteIndex {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// Work status: Complete.
+	{
+		check := checkboxOff
+		if _, ok := p.workStatusFilter[data.WorkStatusComplete]; ok {
+			check = checkboxOn
+		}
+		dot := styles.WorkCompleteStyle.Render(styles.IconWorkComplete())
+		countStr := "(?)"
+		if p.workStatusScanned {
+			countStr = fmt.Sprintf("(%d)", p.workStatusCounts[data.WorkStatusComplete])
+		}
+		line := fmt.Sprintf("  %s %s %-16s %s", check, dot, "Complete work", countStr)
+		if p.cursor == workCompleteIndex {
 			line = styles.SelectedStyle.Render(line)
 		}
 		body.WriteString(line + "\n")

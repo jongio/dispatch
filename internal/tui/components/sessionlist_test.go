@@ -644,3 +644,163 @@ func TestExpandAllAfterPartialCollapse(t *testing.T) {
 		t.Fatalf("after ExpandAll: visItems = %d, want 16", len(sl.visItems))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// WorkStatus dot rendering
+// ---------------------------------------------------------------------------
+
+func TestWorkStatusDotRendering(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := makeSessions(4)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	// Set work status for each session.
+	wsMap := map[string]data.WorkStatusResult{
+		sessions[0].ID: {Status: data.WorkStatusComplete, TotalTasks: 3, DoneTasks: 3},
+		sessions[1].ID: {Status: data.WorkStatusIncomplete, TotalTasks: 5, DoneTasks: 2},
+		sessions[2].ID: {Status: data.WorkStatusAnalyzing},
+		sessions[3].ID: {Status: data.WorkStatusNoPlan},
+	}
+	sl.SetWorkStatuses(wsMap)
+
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("View() has %d lines, want 10", len(lines))
+	}
+}
+
+func TestWorkStatusDotNilMap(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := makeSessions(3)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	// Explicitly set nil work status map.
+	sl.SetWorkStatuses(nil)
+
+	// Should render without panic.
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("View() with nil workStatusMap has %d lines, want 10", len(lines))
+	}
+}
+
+func TestWorkStatusDotEmptyMap(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := makeSessions(3)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	sl.SetWorkStatuses(map[string]data.WorkStatusResult{})
+
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("View() with empty workStatusMap has %d lines, want 10", len(lines))
+	}
+}
+
+func TestWorkStatusDotUnknownStatus(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := makeSessions(2)
+	sl.SetSessions(sessions)
+	sl.SetSize(120, 10)
+
+	// WorkStatusUnknown should produce spaces (no dot).
+	wsMap := map[string]data.WorkStatusResult{
+		sessions[0].ID: {Status: data.WorkStatusUnknown},
+		sessions[1].ID: {Status: data.WorkStatusError},
+	}
+	sl.SetWorkStatuses(wsMap)
+
+	view := sl.View()
+	if view == "" {
+		t.Fatal("View() returned empty string")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// VisibleSessionIDs tests
+// ---------------------------------------------------------------------------
+
+func TestVisibleSessionIDs_FlatMode(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := makeSessions(5)
+	sl.SetSessions(sessions)
+
+	ids := sl.VisibleSessionIDs()
+	if len(ids) != 5 {
+		t.Fatalf("VisibleSessionIDs len = %d, want 5", len(ids))
+	}
+	for i, id := range ids {
+		if id != sessions[i].ID {
+			t.Errorf("VisibleSessionIDs[%d] = %q, want %q", i, id, sessions[i].ID)
+		}
+	}
+}
+
+func TestVisibleSessionIDs_TreeMode(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	groups := makeGroups(2, 3) // 2 folders × 3 sessions
+	sl.SetGroups(groups)
+
+	ids := sl.VisibleSessionIDs()
+	// Should return only session IDs, not folder paths.
+	if len(ids) != 6 {
+		t.Fatalf("VisibleSessionIDs len = %d, want 6", len(ids))
+	}
+	// Verify none are empty (folder items would have empty session.ID).
+	for i, id := range ids {
+		if id == "" {
+			t.Errorf("VisibleSessionIDs[%d] is empty", i)
+		}
+	}
+}
+
+func TestVisibleSessionIDs_CollapsedFolders(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	groups := makeGroups(2, 3) // 2 folders × 3 sessions = 6 sessions
+	sl.SetGroups(groups)
+
+	// Collapse first folder — its 3 sessions become hidden.
+	sl.MoveTo(0)
+	sl.CollapseFolder()
+
+	ids := sl.VisibleSessionIDs()
+	// Only the 3 sessions from the second folder should be visible.
+	if len(ids) != 3 {
+		t.Fatalf("VisibleSessionIDs after collapse = %d, want 3", len(ids))
+	}
+	// All returned IDs should be from the second group.
+	for _, id := range ids {
+		found := false
+		for _, s := range groups[1].Sessions {
+			if s.ID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("unexpected session ID %q after collapsing first folder", id)
+		}
+	}
+}
+
+func TestVisibleSessionIDs_Empty(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	ids := sl.VisibleSessionIDs()
+	if len(ids) != 0 {
+		t.Fatalf("VisibleSessionIDs on empty list = %d, want 0", len(ids))
+	}
+}
