@@ -31,7 +31,6 @@ type keyMap struct {
 	Hide              key.Binding
 	ToggleHidden      key.Binding
 	Star              key.Binding
-	FilterFavorites   key.Binding
 	LaunchWindow      key.Binding
 	LaunchTab         key.Binding
 	LaunchPane        key.Binding
@@ -46,14 +45,15 @@ type keyMap struct {
 	PreviewPosition   key.Binding
 	ResumeInterrupted key.Binding
 	ViewPlan          key.Binding
-	FilterPlans       key.Binding
 	CopyID            key.Binding
+	CopyPreview       key.Binding
 	ExpandCollapseAll key.Binding
+	ScanWorkStatus    key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.FilterPlans, k.Hide, k.Star, k.CopyID, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ExpandCollapseAll, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Hide, k.Star, k.CopyID, k.CopyPreview, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -63,8 +63,8 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.Reindex, k.Config},
-		{k.Hide, k.ToggleHidden, k.Star, k.FilterFavorites, k.JumpNextAttention, k.FilterAttention, k.FilterPlans, k.ResumeInterrupted},
+		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Reindex, k.ScanWorkStatus, k.Config},
+		{k.Hide, k.ToggleHidden, k.Star, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
 	}
@@ -97,7 +97,6 @@ var keys = keyMap{
 	Hide:              key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "hide session")),
 	ToggleHidden:      key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "show hidden")),
 	Star:              key.NewBinding(key.WithKeys("*"), key.WithHelp("*", "toggle favorite")),
-	FilterFavorites:   key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "filter favorites")),
 	LaunchWindow:      key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "open in window")),
 	LaunchTab:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "open in tab")),
 	LaunchPane:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open in pane")),
@@ -105,14 +104,15 @@ var keys = keyMap{
 	PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
 	JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
 	FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "filter by status")),
-	LaunchAll:         key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open selected")),
+	LaunchAll:         key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "launch selected")),
 	SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 	DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 	ConversationSort:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order")),
 	PreviewPosition:   key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "cycle preview position")),
-	ResumeInterrupted: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resume interrupted")),
+	ResumeInterrupted: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "resume interrupted")),
 	ViewPlan:          key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view plan")),
-	FilterPlans:       key.NewBinding(key.WithKeys("M"), key.WithHelp("M", "filter plans")),
 	CopyID:            key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID")),
+	CopyPreview:       key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy preview")),
 	ExpandCollapseAll: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "expand/collapse all")),
+	ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
 }

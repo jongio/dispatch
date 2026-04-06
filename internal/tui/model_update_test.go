@@ -2059,6 +2059,204 @@ func TestHandleKey_CopyID_Error(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// CopyPreview (y key)
+// ---------------------------------------------------------------------------
+
+func TestHandleKey_CopyPreview_NoPreview(t *testing.T) {
+	m := newTestModel()
+	m.showPreview = false
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if rm.statusInfo != "" {
+		t.Errorf("statusInfo = %q, want empty when preview not shown", rm.statusInfo)
+	}
+	if cmd != nil {
+		t.Error("CopyPreview with no preview should return nil cmd")
+	}
+}
+
+func TestHandleKey_CopyPreview_DetailView(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "copy-test", Cwd: "/tmp"},
+		Turns:   []data.Turn{{UserMessage: "hello", AssistantResponse: "world"}},
+	}
+	m.preview.SetDetail(m.detail)
+	m.sessionList.SetSessions([]data.Session{{ID: "copy-test", Cwd: "/tmp"}})
+
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if copied == "" {
+		t.Error("clipboard should have received content")
+	}
+	if rm.statusInfo != statusCopiedPreview {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusCopiedPreview)
+	}
+	if cmd == nil {
+		t.Error("CopyPreview success should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyPreview_PlanView(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "plan-test", Cwd: "/tmp"},
+	}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetPlanContent("# My Plan\n\nTask 1 done.")
+	m.preview.TogglePlanView()
+	m.sessionList.SetSessions([]data.Session{{ID: "plan-test", Cwd: "/tmp"}})
+
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if copied == "" {
+		t.Error("clipboard should have received plan content")
+	}
+	if rm.statusInfo != statusCopiedPreview {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusCopiedPreview)
+	}
+	if cmd == nil {
+		t.Error("CopyPreview plan success should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyPreview_WithSelection(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "sel-test", Cwd: "/tmp"},
+	}
+	m.preview.SetDetail(m.detail)
+	m.sessionList.SetSessions([]data.Session{{ID: "sel-test", Cwd: "/tmp"}})
+
+	// Create a selection.
+	m.preview.StartSelection(0, 0)
+	m.preview.UpdateSelection(0, 5)
+
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if copied == "" {
+		t.Error("clipboard should have received selected text")
+	}
+	if rm.statusInfo != statusCopiedSelection {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusCopiedSelection)
+	}
+	// Selection should be cleared after copy.
+	if rm.preview.HasSelection() {
+		t.Error("selection should be cleared after copy")
+	}
+	if cmd == nil {
+		t.Error("CopyPreview with selection should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyPreview_Error(t *testing.T) {
+	orig := clipboardWrite
+	clipboardWrite = func(string) error {
+		return errors.New("no display")
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "err-test", Cwd: "/tmp"},
+	}
+	m.preview.SetDetail(m.detail)
+	m.sessionList.SetSessions([]data.Session{{ID: "err-test", Cwd: "/tmp"}})
+
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if rm.statusErr == "" {
+		t.Error("statusErr should be set on clipboard error")
+	}
+	if !strings.Contains(rm.statusErr, "clipboard:") {
+		t.Errorf("statusErr = %q, want prefix 'clipboard:'", rm.statusErr)
+	}
+	if cmd == nil {
+		t.Error("CopyPreview error should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyPreview_EmptyContent(t *testing.T) {
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	// No detail set → Content() returns "".
+	result, cmd := m.Update(runeKeyMsg('y'))
+	rm := result.(Model)
+	if rm.statusInfo != "" {
+		t.Errorf("statusInfo = %q, want empty when no content", rm.statusInfo)
+	}
+	if cmd != nil {
+		t.Error("CopyPreview with empty content should return nil cmd")
+	}
+}
+
+func TestHandleKey_Escape_ClearsSelection(t *testing.T) {
+	m := newTestModel()
+	m.showPreview = true
+	m.width = 120
+	m.height = 50
+	m.recalcLayout()
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "esc-test", Cwd: "/tmp"},
+	}
+	m.preview.SetDetail(m.detail)
+	m.sessionList.SetSessions([]data.Session{{ID: "esc-test", Cwd: "/tmp"}})
+
+	// Create a selection.
+	m.preview.StartSelection(0, 0)
+	m.preview.UpdateSelection(1, 5)
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	rm := result.(Model)
+	if rm.preview.HasSelection() {
+		t.Error("Escape should clear selection")
+	}
+}
+
 func TestHandleKey_TimeRange1(t *testing.T) {
 	m := newTestModel()
 	result, cmd := m.Update(runeKeyMsg('1'))

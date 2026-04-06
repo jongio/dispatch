@@ -26,22 +26,23 @@ type displayItem struct {
 // SessionList renders a vertical list of sessions with optional collapsible
 // folder tree grouping when pivoting is active.
 type SessionList struct {
-	allItems     []displayItem                   // every item (folders + sessions)
-	visItems     []int                           // indices into allItems that are currently visible
-	expanded     map[string]struct{}             // folder path → expanded state (tree mode)
-	hiddenSet    map[string]struct{}             // session ID → hidden sessions
-	favoritedSet map[string]struct{}             // session ID → favorited sessions
-	aiSet        map[string]struct{}             // session ID → AI-found sessions
-	attentionMap map[string]data.AttentionStatus // session ID → attention status
-	planMap      map[string]bool                 // session ID → has plan.md
-	selected     map[string]struct{}             // session ID → selected for multi-open
-	treeMode     bool                            // true when showing grouped/tree view
-	pivotField   string                          // current pivot mode (e.g. "folder", "repo")
-	cursor       int                             // position within visItems
-	anchor       int                             // anchor for Shift+click range selection
-	scrollOffset int                             // first visible position within visItems
-	width        int
-	height       int
+	allItems      []displayItem                    // every item (folders + sessions)
+	visItems      []int                            // indices into allItems that are currently visible
+	expanded      map[string]struct{}              // folder path → expanded state (tree mode)
+	hiddenSet     map[string]struct{}              // session ID → hidden sessions
+	favoritedSet  map[string]struct{}              // session ID → favorited sessions
+	aiSet         map[string]struct{}              // session ID → AI-found sessions
+	attentionMap  map[string]data.AttentionStatus  // session ID → attention status
+	planMap       map[string]bool                  // session ID → has plan.md
+	workStatusMap map[string]data.WorkStatusResult // session ID → work status
+	selected      map[string]struct{}              // session ID → selected for multi-open
+	treeMode      bool                             // true when showing grouped/tree view
+	pivotField    string                           // current pivot mode (e.g. "folder", "repo")
+	cursor        int                              // position within visItems
+	anchor        int                              // anchor for Shift+click range selection
+	scrollOffset  int                              // first visible position within visItems
+	width         int
+	height        int
 }
 
 // NewSessionList returns an empty SessionList.
@@ -123,6 +124,12 @@ func (s *SessionList) SetAttentionStatuses(m map[string]data.AttentionStatus) {
 // indicator dots next to sessions that have a plan.md file.
 func (s *SessionList) SetPlanStatuses(m map[string]bool) {
 	s.planMap = m
+}
+
+// SetWorkStatuses updates the work status map used to render work status
+// indicators on each session row.
+func (s *SessionList) SetWorkStatuses(m map[string]data.WorkStatusResult) {
+	s.workStatusMap = m
 }
 
 // SetSize updates the available rendering dimensions.
@@ -230,6 +237,19 @@ func (s *SessionList) AllSessions() []data.Session {
 		item := s.allItems[idx]
 		if !item.isFolder {
 			out = append(out, item.session)
+		}
+	}
+	return out
+}
+
+// VisibleSessionIDs returns the session IDs of all currently visible
+// (non-folder) items. This is used to scope scans to only filtered sessions.
+func (s *SessionList) VisibleSessionIDs() []string {
+	out := make([]string, 0, len(s.visItems))
+	for _, idx := range s.visItems {
+		item := s.allItems[idx]
+		if !item.isFolder {
+			out = append(out, item.session.ID)
 		}
 	}
 	return out
@@ -648,6 +668,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	// Plan dot — 2 chars (dot + space) if plan exists, else 2 spaces.
 	plnDot := s.planDot(sess.ID, selected)
 
+	// Work status dot — 2 chars (icon + space) if work status known, else 2 spaces.
+	wrkDot := s.workStatusDot(sess.ID, selected)
+
 	// In tree mode, indent sessions under their folder.
 	indent := ""
 	if s.treeMode {
@@ -667,14 +690,15 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	const dotW = 2     // attention dot + space
 	const planDotW = 2 // plan dot + space
+	const wrkDotW = 2  // work status dot + space
 	const timeW = 9
 	const turnsW = 5
 	const spacing = 2
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-planDotW-2-timeW-spacing)
-		line := indent + checkMark + indicator + attDot + plnDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-2-dotW-planDotW-wrkDotW-2-timeW-spacing)
+		line := indent + checkMark + indicator + attDot + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
 			return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 		}
@@ -696,7 +720,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - 2 - dotW - planDotW - 2 - timeW - turnsW - 2*spacing
+	summaryW := w - 2 - dotW - planDotW - wrkDotW - 2 - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -713,6 +737,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(indicator)
 	b.WriteString(attDot)
 	b.WriteString(plnDot)
+	b.WriteString(wrkDot)
 	b.WriteString(PadRight(summary, summaryW))
 	if folderW > 0 {
 		b.WriteString("  ")
@@ -805,4 +830,38 @@ func (s SessionList) planDot(sessionID string, selected bool) string {
 		return icon + " "
 	}
 	return styles.PlanIndicatorStyle.Render(icon + " ")
+}
+
+// workStatusDot returns a styled 2-character string (icon + space) representing
+// the work status of the given session. Returns two spaces if no work status
+// data is available or the session hasn't been analyzed.
+func (s SessionList) workStatusDot(sessionID string, selected bool) string {
+	if s.workStatusMap == nil {
+		return "  "
+	}
+	result, ok := s.workStatusMap[sessionID]
+	if !ok || result.Status == data.WorkStatusUnknown || result.Status == data.WorkStatusNoPlan {
+		return "  "
+	}
+
+	var dotStyle lipgloss.Style
+	var icon string
+	switch result.Status {
+	case data.WorkStatusComplete:
+		dotStyle = styles.WorkCompleteStyle
+		icon = styles.IconWorkComplete()
+	case data.WorkStatusIncomplete:
+		dotStyle = styles.WorkIncompleteStyle
+		icon = styles.IconWorkIncomplete()
+	case data.WorkStatusAnalyzing:
+		dotStyle = styles.WorkAnalyzingStyle
+		icon = styles.IconWorkAnalyzing()
+	default:
+		return "  "
+	}
+
+	if selected {
+		return icon + " "
+	}
+	return dotStyle.Render(icon + " ")
 }

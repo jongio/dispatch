@@ -46,6 +46,37 @@ type ListReposParams struct {
 	Filter string `json:"filter,omitempty" jsonschema:"Optional substring to filter repository names"`
 }
 
+// AnalyzeCompletionParams are the arguments for the analyze_completion tool.
+type AnalyzeCompletionParams struct {
+	SessionID   string `json:"session_id"    jsonschema:"The session ID to analyze"`
+	PlanContent string `json:"plan_content"  jsonschema:"The plan.md content for this session"`
+}
+
+// analysisFilesLimit caps the number of file paths included in the
+// completion analysis context to keep the AI prompt reasonably sized.
+const analysisFilesLimit = 50
+
+// analysisContext is the structured data returned by the analyze_completion
+// tool for the AI to reason about.
+type analysisContext struct {
+	SessionID    string              `json:"session_id"`
+	Summary      string              `json:"summary"`
+	Repository   string              `json:"repository"`
+	Branch       string              `json:"branch"`
+	TurnCount    int                 `json:"turn_count"`
+	FilesTouched []string            `json:"files_touched"`
+	Checkpoints  []checkpointSummary `json:"checkpoints"`
+	PlanContent  string              `json:"plan_content"`
+}
+
+// checkpointSummary contains the checkpoint fields relevant to
+// completion analysis — title, what was done, and what remains.
+type checkpointSummary struct {
+	Title     string `json:"title"`
+	WorkDone  string `json:"work_done"`
+	NextSteps string `json:"next_steps"`
+}
+
 // ---------------------------------------------------------------------------
 // Tool definitions
 // ---------------------------------------------------------------------------
@@ -57,6 +88,7 @@ func defineTools(store *data.Store) []sdk.Tool {
 		defineGetSessionDetailTool(store),
 		defineListRepositoriesTool(store),
 		defineSearchDeepTool(store),
+		defineAnalyzeCompletionTool(store),
 	}
 }
 
@@ -184,6 +216,65 @@ func defineSearchDeepTool(store *data.Store) sdk.Tool {
 				return "No results found.", nil
 			}
 			raw, err := marshalJSON(results)
+			if err != nil {
+				return "", err
+			}
+			return SanitizeExternalContent(raw), nil
+		},
+	)
+}
+
+func defineAnalyzeCompletionTool(store *data.Store) sdk.Tool {
+	return sdk.DefineTool(
+		"analyze_completion",
+		"Analyze whether planned work in a session has been completed by examining "+
+			"the plan against session activity (turns, files changed, checkpoints). "+
+			"Returns a JSON assessment with completion status, task counts, and remaining items.",
+		func(params AnalyzeCompletionParams, _ sdk.ToolInvocation) (string, error) {
+			if params.SessionID == "" {
+				return "", errors.New("session_id is required")
+			}
+			detail, err := store.GetSession(params.SessionID)
+			if err != nil {
+				return "", fmt.Errorf("loading session %s: %w", params.SessionID, err)
+			}
+
+			// Collect unique file paths, capped to keep context manageable.
+			seen := make(map[string]struct{}, len(detail.Files))
+			files := make([]string, 0, min(len(detail.Files), analysisFilesLimit))
+			for _, f := range detail.Files {
+				if _, ok := seen[f.FilePath]; !ok {
+					seen[f.FilePath] = struct{}{}
+					files = append(files, f.FilePath)
+					if len(files) >= analysisFilesLimit {
+						break
+					}
+				}
+			}
+
+			// Build checkpoint summaries with only the fields relevant to
+			// completion analysis.
+			cps := make([]checkpointSummary, 0, len(detail.Checkpoints))
+			for _, cp := range detail.Checkpoints {
+				cps = append(cps, checkpointSummary{
+					Title:     cp.Title,
+					WorkDone:  cp.WorkDone,
+					NextSteps: cp.NextSteps,
+				})
+			}
+
+			actx := analysisContext{
+				SessionID:    detail.Session.ID,
+				Summary:      detail.Session.Summary,
+				Repository:   detail.Session.Repository,
+				Branch:       detail.Session.Branch,
+				TurnCount:    detail.Session.TurnCount,
+				FilesTouched: files,
+				Checkpoints:  cps,
+				PlanContent:  params.PlanContent,
+			}
+
+			raw, err := marshalJSON(actx)
 			if err != nil {
 				return "", err
 			}

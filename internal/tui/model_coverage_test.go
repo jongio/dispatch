@@ -738,26 +738,18 @@ func TestCovHandleToggleFavorite_NoSelection(t *testing.T) {
 // Key handler: 'F' toggles showFavorited filter
 // ---------------------------------------------------------------------------
 
-func TestCovFilterFavorites_ToggleShowFavorited(t *testing.T) {
+func TestCovFilterFavorites_ViaPickerToggle(t *testing.T) {
 	m := newTestModel()
 	m.favoritedSet = make(map[string]struct{})
 	m.state = stateSessionList
 	m.showFavorited = false
 
-	// Toggle ON.
+	// 'F' no longer toggles favorites — verify it's a no-op.
 	result, _ := m.Update(runeKeyMsg('F'))
 	rm := result.(Model)
 
-	if !rm.showFavorited {
-		t.Error("pressing 'F' should enable showFavorited")
-	}
-
-	// Toggle OFF.
-	result, _ = rm.Update(runeKeyMsg('F'))
-	rm = result.(Model)
-
 	if rm.showFavorited {
-		t.Error("pressing 'F' again should disable showFavorited")
+		t.Error("pressing 'F' should no longer enable showFavorited")
 	}
 }
 

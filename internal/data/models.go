@@ -124,6 +124,59 @@ func (a AttentionStatus) String() string {
 }
 
 // ---------------------------------------------------------------------------
+// Work status — computed by analyzing plan.md against code state
+// ---------------------------------------------------------------------------
+
+// WorkStatus indicates whether a session's planned work has been completed.
+// It is determined by parsing the plan.md file and optionally cross-referencing
+// against the session's git branch state.
+type WorkStatus int
+
+const (
+	// WorkStatusUnknown means the session has not been analyzed yet.
+	WorkStatusUnknown WorkStatus = iota
+	// WorkStatusComplete means all planned work appears to be done.
+	WorkStatusComplete
+	// WorkStatusIncomplete means there are outstanding tasks remaining.
+	WorkStatusIncomplete
+	// WorkStatusNoPlan means the session has no plan.md file.
+	WorkStatusNoPlan
+	// WorkStatusAnalyzing means analysis is currently in progress.
+	WorkStatusAnalyzing
+	// WorkStatusError means the analysis failed.
+	WorkStatusError
+)
+
+// String returns a human-readable label for the work status.
+func (w WorkStatus) String() string {
+	switch w {
+	case WorkStatusComplete:
+		return "complete"
+	case WorkStatusIncomplete:
+		return "incomplete"
+	case WorkStatusNoPlan:
+		return "no plan"
+	case WorkStatusAnalyzing:
+		return "analyzing"
+	case WorkStatusError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
+// WorkStatusResult holds the computed work status for a session along with
+// detail about the tasks found in the plan.
+type WorkStatusResult struct {
+	Status         WorkStatus
+	TotalTasks     int      // total tasks found in plan
+	DoneTasks      int      // tasks marked as complete
+	Detail         string   // human-readable summary (e.g., "3/7 tasks complete")
+	RemainingItems []string // outstanding items from plan parsing or AI analysis (may be nil)
+	Error          error    // non-nil when Status == WorkStatusError
+}
+
+// ---------------------------------------------------------------------------
 // Filter, sort, and pivot types
 // ---------------------------------------------------------------------------
 

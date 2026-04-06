@@ -116,3 +116,45 @@ func (m *Model) cyclePreviewPosition() {
 		m.previewPosition = config.PreviewPositionBottom
 	}
 }
+
+// previewContentCoords maps absolute mouse coordinates (x, y) to a content
+// line index and column offset within the preview panel. Returns (-1, 0)
+// when the coordinates fall outside the renderable content area (e.g.
+// on the border or padding).
+func (m *Model) previewContentCoords(x, y int) (contentLine, col int) {
+	var previewRow int
+	switch m.layout.previewPosition {
+	case config.PreviewPositionTop:
+		previewRow = y - styles.HeaderLines - 1 // -1 for top border
+	case config.PreviewPositionBottom:
+		previewRow = y - styles.HeaderLines - m.layout.listHeight - 1 - 1 // gap + top border
+	case config.PreviewPositionLeft:
+		previewRow = y - styles.HeaderLines - 1
+	default: // right
+		previewRow = y - styles.HeaderLines - 1
+	}
+	if previewRow < 0 {
+		return -1, 0
+	}
+
+	contentLine = previewRow + m.preview.ScrollOffset()
+
+	// Compute column relative to the preview panel's content area.
+	// The preview border adds 1 char on each side and padding adds 1 char on each side.
+	// Horizontal offset depends on preview position.
+	var previewStartX int
+	switch m.layout.previewPosition {
+	case config.PreviewPositionLeft:
+		previewStartX = 0
+	case config.PreviewPositionTop, config.PreviewPositionBottom:
+		previewStartX = 0
+	default: // right
+		previewStartX = m.layout.listWidth + gapWidth
+	}
+	// Border(1) + padding(1) = 2 chars inset from preview left edge.
+	col = x - previewStartX - 2
+	if col < 0 {
+		col = 0
+	}
+	return contentLine, col
+}

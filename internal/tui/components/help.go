@@ -96,7 +96,7 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(catStyle.Render("Multi-Select"))
 	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("Space", "Toggle select", "O", "Open selected"))
+	sb.WriteString(shortcutRow("Space", "Toggle select", "L", "Launch selected"))
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("a", "Select all", "d", "Deselect all"))
 
@@ -114,7 +114,11 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("h", "Hide session", "H", "Show hidden"))
 	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("*", "Toggle favorite", "F", "Filter favorites"))
+	sb.WriteString(shortcutRow("*", "Toggle favorite", "", ""))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("v", "View plan", "R", "Scan work status"))
+	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("c", "Copy session ID", "y", "Copy preview"))
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("r", "Reindex", "", ""))
 
@@ -145,7 +149,7 @@ func (h HelpOverlay) View() string {
 		"", "",
 	))
 	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("n", "Next waiting", "R", "Resume interrupted"))
+	sb.WriteString(shortcutRow("n", "Next waiting", "N", "Resume interrupted"))
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("!", "Filter by status", "", ""))
 

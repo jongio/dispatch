@@ -188,6 +188,15 @@ func IconAttentionInterrupted() string { return icon("\uf0e7", "⚡") }
 // IconPlan returns a filled dot for sessions that have a plan.md file.
 func IconPlan() string { return icon(nfBullet, fbAttentionDot) }
 
+// IconWorkComplete returns a check icon for sessions with all planned work complete.
+func IconWorkComplete() string { return icon(nfCheck, fbCheck) }
+
+// IconWorkIncomplete returns a warning icon for sessions with remaining planned work.
+func IconWorkIncomplete() string { return icon("\uf071", "!") } // nf-fa-warning
+
+// IconWorkAnalyzing returns a spinner icon for sessions being analyzed.
+func IconWorkAnalyzing() string { return icon("\uf110", "~") } // nf-fa-spinner
+
 // PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
 // The pivot string matches data.PivotField values ("cwd", "repository",
 // "branch", "date") or the TUI pivot mode constants ("folder", "repo", etc).

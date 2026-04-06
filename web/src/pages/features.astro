@@ -245,16 +245,16 @@ import Carousel from '../components/Carousel.astro';
           <h2>Multi-Session Open</h2>
           <p>
             Select multiple sessions with <kbd>Space</kbd>, then open them all
-            at once with <kbd>O</kbd>. Use <kbd>Ctrl</kbd>+click for
+            at once with <kbd>L</kbd>. Use <kbd>Ctrl</kbd>+click for
             mouse selection, or <kbd>Shift</kbd>+click for range select. Works
-            with folders too — <kbd>O</kbd> on a folder opens every
+            with folders too — <kbd>L</kbd> on a folder opens every
             session under it.
           </p>
           <ul>
             <li><kbd>Space</kbd> toggles selection on the current session (✓ indicator)</li>
             <li><kbd>a</kbd> selects all visible sessions</li>
             <li><kbd>d</kbd> deselects all</li>
-            <li><kbd>O</kbd> opens all selected sessions, or all in a folder</li>
+            <li><kbd>L</kbd> launches all selected sessions, or all in a folder</li>
             <li>Selection count shown in footer</li>
           </ul>
         </div>
@@ -282,8 +282,9 @@ import Carousel from '../components/Carousel.astro';
             <li><strong>Interrupted</strong> (orange ⚡) — session was killed by crash/reboot mid-work</li>
             <li><strong>Idle</strong> (gray ○) — session not running</li>
             <li><kbd>n</kbd> to jump to next waiting session</li>
-            <li><kbd>R</kbd> to resume all interrupted sessions</li>
-            <li><kbd>!</kbd> to open the attention status filter picker (includes a "Has plan" row)</li>
+            <li><kbd>N</kbd> to resume all interrupted sessions</li>
+            <li><kbd>R</kbd> to scan work status across sessions with plans</li>
+            <li><kbd>!</kbd> to open the attention status filter picker (includes "Has plan", "Favorites only", and work status rows)</li>
           </ul>
         </div>
         <div class="feature-screenshots">
@@ -306,14 +307,37 @@ import Carousel from '../components/Carousel.astro';
           <ul>
             <li>Dot indicator on sessions with a plan file</li>
             <li><kbd>v</kbd> to view the rendered plan in the preview pane</li>
-            <li><kbd>M</kbd> to filter and show only sessions that have plans</li>
-            <li>Footer badge shows <strong>M plans</strong> when the filter is active</li>
+            <li>Filter via the <kbd>!</kbd> status picker "Has plan" row</li>
+            <li>Footer badge shows <strong>! plans</strong> when the filter is active</li>
           </ul>
         </div>
         <div class="feature-screenshots">
           <Screenshot src="one-half-light/plan-indicator.png" alt="Session list showing plan indicator dots on sessions with plan.md files" caption="Plan indicator dots in session list" />
           <Screenshot src="one-half-light/plan-preview.png" alt="Preview pane showing rendered plan.md content" caption="Plan preview pane" />
           <Screenshot src="one-half-light/plan-filter.png" alt="Session list filtered to show only sessions with plans" caption="Plan filter active — only sessions with plans shown" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Work Status Detection -->
+    <section class="section" id="work-status">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Work Status Detection</h2>
+          <p>
+            Dispatch analyzes <code>plan.md</code> files to identify sessions with
+            incomplete planned work. Sessions with unchecked tasks or pending items
+            display colored dot indicators in the session list, helping you quickly
+            find work that still needs attention.
+          </p>
+          <ul>
+            <li>Automatic plan parsing detects incomplete tasks (unchecked checkboxes, pending items)</li>
+            <li>Copilot SDK <code>analyze_completion</code> tool for AI-powered completion analysis</li>
+            <li>Colored dot indicators in the session list showing work completion status</li>
+            <li>Work status display in the preview panel metadata</li>
+            <li>Filter by work completion via the <kbd>!</kbd> status picker (incomplete, complete)</li>
+            <li>Press <kbd>R</kbd> to scan work status across all sessions with plans</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -348,7 +372,7 @@ import Carousel from '../components/Carousel.astro';
           <h2>Session Favorites</h2>
           <p>
             <kbd>*</kbd> stars or unstars the currently selected session.
-            <kbd>F</kbd> (Shift+F) filters the list to show only favorited sessions.
+            Use the <kbd>!</kbd> status picker "Favorites only" row to filter the list to show only favorited sessions.
             Starred sessions display a ★ indicator. Favorites are persisted
             in config as <code>favoriteSessions</code>.
           </p>

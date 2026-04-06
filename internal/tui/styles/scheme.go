@@ -170,6 +170,11 @@ type Theme struct {
 
 	// Plan indicator style.
 	PlanIndicatorStyle lipgloss.Style
+
+	// Work status indicator styles.
+	WorkCompleteStyle   lipgloss.Style
+	WorkIncompleteStyle lipgloss.Style
+	WorkAnalyzingStyle  lipgloss.Style
 }
 
 // DeriveTheme produces a complete Theme from a raw ColorScheme.
@@ -317,6 +322,11 @@ func (t *Theme) buildStyles() {
 
 	// Plan indicator — BrightCyan from the ANSI palette.
 	t.PlanIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14])).Bold(true)
+
+	// Work status indicators — green (complete), yellow (incomplete), magenta (analyzing).
+	t.WorkCompleteStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10])).Bold(true)   // BrightGreen
+	t.WorkIncompleteStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true) // BrightYellow
+	t.WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))             // BrightMagenta (dim)
 }
 
 // ---------------------------------------------------------------------------

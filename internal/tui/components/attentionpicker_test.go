@@ -76,7 +76,9 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 	t.Parallel()
 	p := NewAttentionPicker()
 
-	// Start at 0, move down through all entries (5 attention + 1 plan = 6).
+	// Start at 0, move down through all entries:
+	// 5 attention + 1 plan + 1 separator (skipped) + 2 work = 9 total rows,
+	// but cursor skips separator, so navigable positions: 0-5, 7-8.
 	p.MoveDown()
 	if p.cursor != 1 {
 		t.Errorf("after MoveDown cursor = %d, want 1", p.cursor)
@@ -98,6 +100,23 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 		t.Errorf("after 5th MoveDown cursor = %d, want 5 (plan row)", p.cursor)
 	}
 
+	// Next down should land on favorites row (index 6).
+	p.MoveDown()
+	if p.cursor != favoritesRowIndex {
+		t.Errorf("after 6th MoveDown cursor = %d, want %d (favorites row)", p.cursor, favoritesRowIndex)
+	}
+
+	// Next down should skip separator (index 7) and land on work incomplete (index 8).
+	p.MoveDown()
+	if p.cursor != workIncompleteIndex {
+		t.Errorf("after 7th MoveDown cursor = %d, want %d (work incomplete)", p.cursor, workIncompleteIndex)
+	}
+
+	p.MoveDown()
+	if p.cursor != workCompleteIndex {
+		t.Errorf("after 8th MoveDown cursor = %d, want %d (work complete)", p.cursor, workCompleteIndex)
+	}
+
 	// Wrap to top.
 	p.MoveDown()
 	if p.cursor != 0 {
@@ -106,13 +125,25 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 
 	// Wrap to bottom.
 	p.MoveUp()
-	if p.cursor != 5 {
-		t.Errorf("MoveUp should wrap: cursor = %d, want 5", p.cursor)
+	if p.cursor != workCompleteIndex {
+		t.Errorf("MoveUp should wrap: cursor = %d, want %d", p.cursor, workCompleteIndex)
 	}
 
 	p.MoveUp()
-	if p.cursor != 4 {
-		t.Errorf("after MoveUp cursor = %d, want 4", p.cursor)
+	if p.cursor != workIncompleteIndex {
+		t.Errorf("after MoveUp cursor = %d, want %d", p.cursor, workIncompleteIndex)
+	}
+
+	// Up from work incomplete should skip separator and land on favorites row.
+	p.MoveUp()
+	if p.cursor != favoritesRowIndex {
+		t.Errorf("MoveUp from work incomplete should skip separator: cursor = %d, want %d", p.cursor, favoritesRowIndex)
+	}
+
+	// Up from favorites should land on plan row.
+	p.MoveUp()
+	if p.cursor != planRowIndex {
+		t.Errorf("MoveUp from favorites should land on plan row: cursor = %d, want %d", p.cursor, planRowIndex)
 	}
 }
 
@@ -329,6 +360,18 @@ func TestAttentionPicker_HasSelection_IncludesPlan(t *testing.T) {
 	}
 }
 
+func TestAttentionPicker_HasSelection_IncludesWorkStatus(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.HasSelection() {
+		t.Error("empty picker should have no selection")
+	}
+	p.SetWorkStatusFilter(map[data.WorkStatus]struct{}{data.WorkStatusIncomplete: {}})
+	if !p.HasSelection() {
+		t.Error("HasSelection should be true when work status filter is set")
+	}
+}
+
 func TestAttentionPicker_SetPlanCount(t *testing.T) {
 	t.Parallel()
 	p := NewAttentionPicker()
@@ -396,9 +439,212 @@ func TestAttentionPicker_View_ContainsAllLabelsIncludingPlan(t *testing.T) {
 	p := NewAttentionPicker()
 	p.SetSize(80, 40)
 	view := p.View()
-	for _, label := range []string{"Needs input", "AI working", "Running, quiet", "Interrupted", "Not running", "Has plan"} {
+	for _, label := range []string{"Needs input", "AI working", "Running, quiet", "Interrupted", "Not running", "Has plan", "Favorites only", "Incomplete work", "Complete work"} {
 		if !strings.Contains(view, label) {
 			t.Errorf("View should contain label %q", label)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Favorites filter row
+// ---------------------------------------------------------------------------
+
+func TestAttentionPicker_FilterFavorites_DefaultFalse(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.FilterFavorites() {
+		t.Error("new picker should have FilterFavorites = false")
+	}
+}
+
+func TestAttentionPicker_SetFilterFavorites(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetFilterFavorites(true)
+	if !p.FilterFavorites() {
+		t.Error("FilterFavorites should be true after SetFilterFavorites(true)")
+	}
+	p.SetFilterFavorites(false)
+	if p.FilterFavorites() {
+		t.Error("FilterFavorites should be false after SetFilterFavorites(false)")
+	}
+}
+
+func TestAttentionPicker_ToggleFavoritesRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Move cursor to the favorites row.
+	p.cursor = favoritesRowIndex
+
+	// Toggle on.
+	p.Toggle()
+	if !p.FilterFavorites() {
+		t.Error("FilterFavorites should be true after toggling favorites row")
+	}
+
+	// Toggle off.
+	p.Toggle()
+	if p.FilterFavorites() {
+		t.Error("FilterFavorites should be false after toggling favorites row again")
+	}
+}
+
+func TestAttentionPicker_HasSelection_IncludesFavorites(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.HasSelection() {
+		t.Error("empty picker should have no selection")
+	}
+	p.SetFilterFavorites(true)
+	if !p.HasSelection() {
+		t.Error("HasSelection should be true when filterFavorites is set")
+	}
+}
+
+func TestAttentionPicker_SetFavoriteCount(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetFavoriteCount(5)
+	if p.favoriteCount != 5 {
+		t.Errorf("favoriteCount = %d, want 5", p.favoriteCount)
+	}
+}
+
+func TestAttentionPicker_View_ContainsFavoritesRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	p.SetFavoriteCount(4)
+	view := p.View()
+	if !strings.Contains(view, "Favorites only") {
+		t.Error("View should contain 'Favorites only' label")
+	}
+	if !strings.Contains(view, "(4)") {
+		t.Error("View should contain favorite count (4)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Work status filter rows
+// ---------------------------------------------------------------------------
+
+func TestAttentionPicker_ToggleWorkIncomplete(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Navigate to work incomplete row.
+	p.cursor = workIncompleteIndex
+	p.Toggle()
+
+	ws := p.WorkStatusFilter()
+	if _, ok := ws[data.WorkStatusIncomplete]; !ok {
+		t.Error("expected WorkStatusIncomplete to be selected after toggle")
+	}
+	if p.HasSelection() != true {
+		t.Error("HasSelection should be true with work status filter")
+	}
+
+	// Toggle off.
+	p.Toggle()
+	ws = p.WorkStatusFilter()
+	if _, ok := ws[data.WorkStatusIncomplete]; ok {
+		t.Error("WorkStatusIncomplete should be deselected after second toggle")
+	}
+}
+
+func TestAttentionPicker_ToggleWorkComplete(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	p.cursor = workCompleteIndex
+	p.Toggle()
+
+	ws := p.WorkStatusFilter()
+	if _, ok := ws[data.WorkStatusComplete]; !ok {
+		t.Error("expected WorkStatusComplete to be selected after toggle")
+	}
+
+	p.Toggle()
+	ws = p.WorkStatusFilter()
+	if _, ok := ws[data.WorkStatusComplete]; ok {
+		t.Error("WorkStatusComplete should be deselected after second toggle")
+	}
+}
+
+func TestAttentionPicker_WorkStatusCountsDisplay(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	p.SetWorkStatusScanned(true)
+	p.SetWorkStatusCounts(map[data.WorkStatus]int{
+		data.WorkStatusIncomplete: 3,
+		data.WorkStatusComplete:   7,
+	})
+	view := p.View()
+	if !strings.Contains(view, "(3)") {
+		t.Error("View should show incomplete count (3)")
+	}
+	if !strings.Contains(view, "(7)") {
+		t.Error("View should show complete count (7)")
+	}
+}
+
+func TestAttentionPicker_WorkStatusUnscannedShowsQuestionMark(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	// workStatusScanned defaults to false.
+	view := p.View()
+	if !strings.Contains(view, "(?)") {
+		t.Error("View should show (?) when work status scan hasn't completed")
+	}
+}
+
+func TestAttentionPicker_SetWorkStatusFilter(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	initial := map[data.WorkStatus]struct{}{
+		data.WorkStatusIncomplete: {},
+	}
+	p.SetWorkStatusFilter(initial)
+
+	ws := p.WorkStatusFilter()
+	if len(ws) != 1 {
+		t.Fatalf("WorkStatusFilter len = %d, want 1", len(ws))
+	}
+	if _, ok := ws[data.WorkStatusIncomplete]; !ok {
+		t.Error("expected WorkStatusIncomplete")
+	}
+
+	// Verify it's a copy.
+	delete(ws, data.WorkStatusIncomplete)
+	ws2 := p.WorkStatusFilter()
+	if _, ok := ws2[data.WorkStatusIncomplete]; !ok {
+		t.Error("mutating returned map should not affect picker state")
+	}
+}
+
+func TestAttentionPicker_SeparatorNoOp(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Force cursor to separator row.
+	p.cursor = workSeparatorRowIndex
+	p.Toggle() // should do nothing
+
+	if p.HasSelection() {
+		t.Error("toggling separator should not create any selection")
+	}
+}
+
+func TestAttentionPicker_View_ContainsSeparator(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	view := p.View()
+	if !strings.Contains(view, "───") {
+		t.Error("View should contain separator line")
 	}
 }

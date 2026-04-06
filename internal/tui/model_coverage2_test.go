@@ -61,6 +61,10 @@ func TestRenderFooter_FilterPlans(t *testing.T) {
 	if !strings.Contains(output, "plans") {
 		t.Error("renderFooter should show plans filter badge")
 	}
+	// Badge should use ! prefix (toggled via status picker).
+	if !strings.Contains(output, "!") {
+		t.Error("renderFooter plans badge should use ! prefix")
+	}
 }
 
 func TestRenderFooter_StatusErr(t *testing.T) {
@@ -465,32 +469,71 @@ func TestHandleKey_H_ToggleHidden(t *testing.T) {
 	}
 }
 
-func TestHandleKey_F_ToggleFavorites(t *testing.T) {
+func TestHandleKey_F_NoOp(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
 	origFav := m.showFavorited
 
-	// 'F' (uppercase) toggles favorites filter
+	// 'F' (uppercase) no longer has a dedicated handler; favorites are toggled via ! picker.
 	msg := tea.KeyPressMsg{Code: 'F', Text: "F"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	if rm.showFavorited == origFav {
-		t.Error("pressing 'F' should toggle showFavorited")
+	if rm.showFavorited != origFav {
+		t.Error("pressing 'F' should no longer toggle showFavorited (use ! picker)")
 	}
 }
 
-func TestHandleKey_M_TogglePlans(t *testing.T) {
+func TestHandleKey_M_NoOp(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
 
-	// 'M' (uppercase) toggles plans filter
+	// 'M' no longer has a dedicated handler; plan filter is toggled via ! picker.
 	msg := tea.KeyPressMsg{Code: 'M', Text: "M"}
-	result, _ := m.Update(msg)
+	result, cmd := m.Update(msg)
 	rm := result.(Model)
-	if rm.filterPlans == m.filterPlans {
-		t.Error("pressing 'M' should toggle plans filter")
+	if rm.filterPlans {
+		t.Error("pressing 'M' should no longer toggle filterPlans (use ! picker)")
+	}
+	if cmd != nil {
+		t.Error("pressing 'M' should not return a command")
+	}
+}
+
+func TestHandleKey_R_ScanWorkStatus(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.planMap = map[string]bool{"s1": true}
+	m.workStatusScanning = false
+
+	// 'R' should trigger work status scan.
+	msg := tea.KeyPressMsg{Code: 'R', Text: "R"}
+	result, cmd := m.Update(msg)
+	rm := result.(Model)
+	if !rm.workStatusScanning {
+		t.Error("pressing 'R' should set workStatusScanning to true")
+	}
+	if rm.statusInfo != "Scanning work status..." {
+		t.Errorf("expected status 'Scanning work status...', got %q", rm.statusInfo)
+	}
+	if cmd == nil {
+		t.Error("pressing 'R' should return a scan command")
+	}
+}
+
+func TestHandleKey_R_ScanWorkStatus_AlreadyScanning(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.workStatusScanning = true // already scanning
+
+	// 'R' while already scanning should be a no-op.
+	msg := tea.KeyPressMsg{Code: 'R', Text: "R"}
+	_, cmd := m.Update(msg)
+	if cmd != nil {
+		t.Error("pressing 'R' while scanning should not return a command")
 	}
 }
 
