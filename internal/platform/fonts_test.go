@@ -11,6 +11,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestHasNerdFontFiles_EmptyDir(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if hasNerdFontFiles(dir) {
 		t.Error("hasNerdFontFiles should return false for empty directory")
@@ -18,12 +19,14 @@ func TestHasNerdFontFiles_EmptyDir(t *testing.T) {
 }
 
 func TestHasNerdFontFiles_NonExistentDir(t *testing.T) {
+	t.Parallel()
 	if hasNerdFontFiles("/nonexistent/path/xyz123") {
 		t.Error("hasNerdFontFiles should return false for non-existent directory")
 	}
 }
 
 func TestHasNerdFontFiles_WithNerdFont(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	f, err := os.Create(filepath.Join(dir, "JetBrainsMonoNerdFont-Regular.ttf"))
 	if err != nil {
@@ -37,6 +40,7 @@ func TestHasNerdFontFiles_WithNerdFont(t *testing.T) {
 }
 
 func TestHasNerdFontFiles_CaseInsensitive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	f, err := os.Create(filepath.Join(dir, "SomeNERDFont.ttf"))
 	if err != nil {
@@ -50,6 +54,7 @@ func TestHasNerdFontFiles_CaseInsensitive(t *testing.T) {
 }
 
 func TestHasNerdFontFiles_NonTTFIgnored(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	f, err := os.Create(filepath.Join(dir, "NerdFont.otf"))
 	if err != nil {
@@ -63,6 +68,7 @@ func TestHasNerdFontFiles_NonTTFIgnored(t *testing.T) {
 }
 
 func TestHasNerdFontFiles_NonNerdTTFIgnored(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	f, err := os.Create(filepath.Join(dir, "Arial.ttf"))
 	if err != nil {
@@ -76,6 +82,7 @@ func TestHasNerdFontFiles_NonNerdTTFIgnored(t *testing.T) {
 }
 
 func TestHasNerdFontFiles_TableDriven(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		files    []string
@@ -91,6 +98,7 @@ func TestHasNerdFontFiles_TableDriven(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dir := t.TempDir()
 			for _, name := range tt.files {
 				f, err := os.Create(filepath.Join(dir, name))
@@ -112,6 +120,7 @@ func TestHasNerdFontFiles_TableDriven(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIsNerdFontInstalled_ReturnsBool(t *testing.T) {
+	t.Parallel()
 	// Result depends on system; verify no crash and log result for visibility.
 	installed := IsNerdFontInstalled()
 	t.Logf("IsNerdFontInstalled() = %v", installed)

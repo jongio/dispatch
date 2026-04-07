@@ -18,6 +18,9 @@ coverage/
 coverage_config/
 coverage_store/
 coverage.html
+coverage_full.txt
+zero_coverage.txt
+test_output.txt
 mq_coverage
 copilot_cov
 
@@ -35,6 +38,7 @@ CON
 
 # ── Project-specific ────────────────────────────────────────
 .copilot/
+.claude/skills/
 
 # ── Web (Astro) ─────────────────────────────────────────────
 web/node_modules/

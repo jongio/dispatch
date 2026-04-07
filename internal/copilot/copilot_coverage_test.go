@@ -1768,9 +1768,15 @@ func TestSearch_concurrentCallsSerialised(t *testing.T) {
 func TestSearch_cancelledContextReleasesLock(t *testing.T) {
 	// Verify that cancelling a search's context while it's queued behind
 	// another search causes the queued search to return quickly.
+	lockAcquired := make(chan struct{}, 1)
 	c := newHookedClient(t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
+			// Signal that we hold the lock (doSearch is called inside searchMu).
+			select {
+			case lockAcquired <- struct{}{}:
+			default:
+			}
 			// Simulate a long search.
 			select {
 			case <-ctx.Done():
@@ -1789,8 +1795,8 @@ func TestSearch_cancelledContextReleasesLock(t *testing.T) {
 		_, _ = c.Search(context.Background(), "slow")
 	}()
 
-	// Give it a moment to acquire the lock.
-	time.Sleep(50 * time.Millisecond)
+	// Wait for the goroutine to acquire the lock (replaces flaky time.Sleep).
+	<-lockAcquired
 
 	// Start a second search with a context that we cancel immediately.
 	ctx, cancel := context.WithCancel(context.Background())

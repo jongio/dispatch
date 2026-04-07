@@ -186,7 +186,10 @@ func TestIntegration_SendMessage_withRealSession(t *testing.T) {
 		t.Log("no text delta received (may be expected for some models)")
 	}
 	if !gotDone {
-		t.Log("no done event received")
+		// The done event is a protocol guarantee; flag as a soft warning.
+		// We don't t.Error here because streaming behaviour can vary by
+		// model or network conditions during manual integration runs.
+		t.Log("WARNING: no done event received — verify SDK streaming is healthy")
 	}
 
 	c.Close()

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -405,5 +406,76 @@ func TestDefaultCollapsed_SaveAndLoad(t *testing.T) {
 	}
 	if !loaded.DefaultCollapsed {
 		t.Error("DefaultCollapsed should be true after Save/Load round-trip")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EffectiveAttentionThreshold — edge cases and error paths
+// ---------------------------------------------------------------------------
+
+func TestEffectiveAttentionThreshold_EmptyString(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{AttentionThreshold: ""}
+	got := cfg.EffectiveAttentionThreshold()
+	if got != 15*time.Minute {
+		t.Errorf("EffectiveAttentionThreshold() = %v, want %v", got, 15*time.Minute)
+	}
+}
+
+func TestEffectiveAttentionThreshold_InvalidDuration(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{AttentionThreshold: "notaduration"}
+	got := cfg.EffectiveAttentionThreshold()
+	if got != 15*time.Minute {
+		t.Errorf("EffectiveAttentionThreshold() = %v, want %v for invalid input", got, 15*time.Minute)
+	}
+}
+
+func TestEffectiveAttentionThreshold_NegativeDuration(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{AttentionThreshold: "-5m"}
+	got := cfg.EffectiveAttentionThreshold()
+	if got != 15*time.Minute {
+		t.Errorf("EffectiveAttentionThreshold() = %v, want %v for negative duration", got, 15*time.Minute)
+	}
+}
+
+func TestEffectiveAttentionThreshold_ValidDuration(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{AttentionThreshold: "30m"}
+	got := cfg.EffectiveAttentionThreshold()
+	if got != 30*time.Minute {
+		t.Errorf("EffectiveAttentionThreshold() = %v, want %v", got, 30*time.Minute)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EffectiveLaunchMode — additional coverage for legacy fallback
+// ---------------------------------------------------------------------------
+
+func TestEffectiveLaunchMode_Unset(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{LaunchMode: "", LaunchInPlace: false}
+	got := cfg.EffectiveLaunchMode()
+	if got != LaunchModeTab {
+		t.Errorf("EffectiveLaunchMode() = %q, want %q", got, LaunchModeTab)
+	}
+}
+
+func TestEffectiveLaunchMode_LaunchInPlace(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{LaunchMode: "", LaunchInPlace: true}
+	got := cfg.EffectiveLaunchMode()
+	if got != LaunchModeInPlace {
+		t.Errorf("EffectiveLaunchMode() = %q, want %q", got, LaunchModeInPlace)
+	}
+}
+
+func TestEffectiveLaunchMode_ExplicitOverridesLegacy(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{LaunchMode: LaunchModeWindow, LaunchInPlace: true}
+	got := cfg.EffectiveLaunchMode()
+	if got != LaunchModeWindow {
+		t.Errorf("EffectiveLaunchMode() = %q, want %q (explicit should override LaunchInPlace)", got, LaunchModeWindow)
 	}
 }

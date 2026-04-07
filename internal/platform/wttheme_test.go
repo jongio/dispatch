@@ -11,6 +11,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestParseWTSettings_SimpleScheme(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{
 		"defaultProfile": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
 		"profiles": {
@@ -63,6 +64,7 @@ func TestParseWTSettings_SimpleScheme(t *testing.T) {
 }
 
 func TestParseWTSettings_ObjectColorScheme(t *testing.T) {
+	t.Parallel()
 	// WT supports {"dark":"...", "light":"..."} object for colorScheme.
 	data := []byte(`{
 		"defaultProfile": "{abc}",
@@ -113,6 +115,7 @@ func TestParseWTSettings_ObjectColorScheme(t *testing.T) {
 }
 
 func TestParseWTSettings_DefaultsFallback(t *testing.T) {
+	t.Parallel()
 	// When profile has no colorScheme, fall back to profiles.defaults.
 	data := []byte(`{
 		"defaultProfile": "{abc}",
@@ -164,6 +167,7 @@ func TestParseWTSettings_DefaultsFallback(t *testing.T) {
 }
 
 func TestParseWTSettings_NoSchemeConfigured(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{
 		"defaultProfile": "{abc}",
 		"profiles": {
@@ -187,6 +191,7 @@ func TestParseWTSettings_NoSchemeConfigured(t *testing.T) {
 }
 
 func TestParseWTSettings_MissingProfile(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{
 		"defaultProfile": "{does-not-exist}",
 		"profiles": {
@@ -210,6 +215,7 @@ func TestParseWTSettings_MissingProfile(t *testing.T) {
 }
 
 func TestParseWTSettings_SchemeNotFound(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{
 		"defaultProfile": "{abc}",
 		"profiles": {
@@ -234,6 +240,7 @@ func TestParseWTSettings_SchemeNotFound(t *testing.T) {
 }
 
 func TestParseWTSettings_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{not valid json}`)
 	_, err := parseWTSettingsData(data)
 	if err == nil {
