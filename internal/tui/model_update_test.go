@@ -1722,6 +1722,83 @@ func TestHandleHideSession_Unhide(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// handleKey: shift+arrow range selection
+// ---------------------------------------------------------------------------
+
+func TestHandleKey_ShiftDown_SelectsRange(t *testing.T) {
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{
+		{ID: "s1"}, {ID: "s2"}, {ID: "s3"},
+	})
+
+	// Simulate shift+down key press.
+	msg := tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}
+	result, _ := m.Update(msg)
+	rm := result.(Model)
+
+	// Should have selected sessions s1 and s2 (anchor=0, cursor=1).
+	if rm.sessionList.SelectionCount() != 2 {
+		t.Fatalf("SelectionCount = %d, want 2", rm.sessionList.SelectionCount())
+	}
+	if !rm.sessionList.IsSelected("s1") {
+		t.Error("s1 should be selected")
+	}
+	if !rm.sessionList.IsSelected("s2") {
+		t.Error("s2 should be selected")
+	}
+	if rm.sessionList.IsShifting() != true {
+		t.Error("should be in shifting state")
+	}
+}
+
+func TestHandleKey_ShiftUp_SelectsRange(t *testing.T) {
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{
+		{ID: "s1"}, {ID: "s2"}, {ID: "s3"},
+	})
+	m.sessionList.MoveTo(2)
+
+	// Simulate shift+up key press.
+	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+	result, _ := m.Update(msg)
+	rm := result.(Model)
+
+	// Should have selected sessions s2 and s3 (anchor=2, cursor=1).
+	if rm.sessionList.SelectionCount() != 2 {
+		t.Fatalf("SelectionCount = %d, want 2", rm.sessionList.SelectionCount())
+	}
+	if !rm.sessionList.IsSelected("s2") {
+		t.Error("s2 should be selected")
+	}
+	if !rm.sessionList.IsSelected("s3") {
+		t.Error("s3 should be selected")
+	}
+}
+
+func TestHandleKey_PlainDown_ResetsShift(t *testing.T) {
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{
+		{ID: "s1"}, {ID: "s2"}, {ID: "s3"},
+	})
+
+	// Shift+down first.
+	shiftMsg := tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}
+	result, _ := m.Update(shiftMsg)
+	rm := result.(Model)
+	if !rm.sessionList.IsShifting() {
+		t.Fatal("should be shifting after shift+down")
+	}
+
+	// Plain down should reset shifting.
+	plainMsg := tea.KeyPressMsg{Code: tea.KeyDown}
+	result, _ = rm.Update(plainMsg)
+	rm = result.(Model)
+	if rm.sessionList.IsShifting() {
+		t.Error("should not be shifting after plain down")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // handleKey: overlay states
 // ---------------------------------------------------------------------------
 

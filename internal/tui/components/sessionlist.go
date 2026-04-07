@@ -40,6 +40,7 @@ type SessionList struct {
 	pivotField    string                           // current pivot mode (e.g. "folder", "repo")
 	cursor        int                              // position within visItems
 	anchor        int                              // anchor for Shift+click range selection
+	shifting      bool                             // true while shift+arrow range selection is active
 	scrollOffset  int                              // first visible position within visItems
 	width         int
 	height        int
@@ -497,6 +498,39 @@ func (s *SessionList) IsSelected(id string) bool {
 // SelectionCount returns the number of currently selected sessions.
 func (s *SessionList) SelectionCount() int {
 	return len(s.selected)
+}
+
+// MoveUpShift moves cursor up and extends range selection.
+// On first shift press, sets anchor at current position before moving.
+func (s *SessionList) MoveUpShift() {
+	if !s.shifting {
+		s.shifting = true
+		s.anchor = s.cursor
+	}
+	s.MoveUp()
+	s.SelectRange(s.anchor, s.cursor)
+}
+
+// MoveDownShift moves cursor down and extends range selection.
+// On first shift press, sets anchor at current position before moving.
+func (s *SessionList) MoveDownShift() {
+	if !s.shifting {
+		s.shifting = true
+		s.anchor = s.cursor
+	}
+	s.MoveDown()
+	s.SelectRange(s.anchor, s.cursor)
+}
+
+// ResetShift clears the shift-selection state.
+// Called when regular (non-shift) navigation occurs.
+func (s *SessionList) ResetShift() {
+	s.shifting = false
+}
+
+// IsShifting returns true if shift-selection is active.
+func (s *SessionList) IsShifting() bool {
+	return s.shifting
 }
 
 // SelectedSessions returns all selected sessions in display order.

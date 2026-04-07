@@ -1208,12 +1208,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.state = stateFilterPanel
 		return m, loadFilterDataCmd(m.store)
 
+	case key.Matches(msg, keys.ShiftUp):
+		m.sessionList.MoveUpShift()
+		m.updateSelectionStatus()
+		m.detailVersion++
+		return m, m.loadSelectedDetailCmd()
+
+	case key.Matches(msg, keys.ShiftDown):
+		m.sessionList.MoveDownShift()
+		m.updateSelectionStatus()
+		m.detailVersion++
+		return m, m.loadSelectedDetailCmd()
+
 	case key.Matches(msg, keys.Up):
+		m.sessionList.ResetShift()
 		m.sessionList.MoveUp()
 		m.detailVersion++
 		return m, m.loadSelectedDetailCmd()
 
 	case key.Matches(msg, keys.Down):
+		m.sessionList.ResetShift()
 		m.sessionList.MoveDown()
 		m.detailVersion++
 		return m, m.loadSelectedDetailCmd()

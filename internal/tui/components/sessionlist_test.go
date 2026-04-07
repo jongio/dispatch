@@ -804,3 +804,191 @@ func TestVisibleSessionIDs_Empty(t *testing.T) {
 		t.Fatalf("VisibleSessionIDs on empty list = %d, want 0", len(ids))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Shift+arrow range selection tests
+// ---------------------------------------------------------------------------
+
+func TestMoveDownShift(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	// Cursor starts at 0. Shift+down should anchor at 0 and move to 1.
+	sl.MoveDownShift()
+	if !sl.IsShifting() {
+		t.Fatal("IsShifting should be true after MoveDownShift")
+	}
+	if sl.Anchor() != 0 {
+		t.Fatalf("Anchor = %d, want 0", sl.Anchor())
+	}
+	if sl.Cursor() != 1 {
+		t.Fatalf("Cursor = %d, want 1", sl.Cursor())
+	}
+	// Sessions 0 and 1 should be selected.
+	if sl.SelectionCount() != 2 {
+		t.Fatalf("SelectionCount = %d, want 2", sl.SelectionCount())
+	}
+
+	// Second shift+down: anchor stays, cursor moves to 2.
+	sl.MoveDownShift()
+	if sl.Anchor() != 0 {
+		t.Fatalf("Anchor after second shift+down = %d, want 0", sl.Anchor())
+	}
+	if sl.Cursor() != 2 {
+		t.Fatalf("Cursor = %d, want 2", sl.Cursor())
+	}
+	if sl.SelectionCount() != 3 {
+		t.Fatalf("SelectionCount = %d, want 3", sl.SelectionCount())
+	}
+}
+
+func TestMoveUpShift(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	// Move cursor to position 3 first.
+	sl.MoveTo(3)
+
+	// Shift+up should anchor at 3 and move to 2.
+	sl.MoveUpShift()
+	if !sl.IsShifting() {
+		t.Fatal("IsShifting should be true after MoveUpShift")
+	}
+	if sl.Anchor() != 3 {
+		t.Fatalf("Anchor = %d, want 3", sl.Anchor())
+	}
+	if sl.Cursor() != 2 {
+		t.Fatalf("Cursor = %d, want 2", sl.Cursor())
+	}
+	// Sessions 2 and 3 should be selected.
+	if sl.SelectionCount() != 2 {
+		t.Fatalf("SelectionCount = %d, want 2", sl.SelectionCount())
+	}
+}
+
+func TestShiftDownThenUp(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	// Start at 1.
+	sl.MoveTo(1)
+
+	// Shift+down twice: anchor=1, cursor=3, selected={1,2,3}.
+	sl.MoveDownShift()
+	sl.MoveDownShift()
+	if sl.SelectionCount() != 3 {
+		t.Fatalf("after 2x shift+down: SelectionCount = %d, want 3", sl.SelectionCount())
+	}
+
+	// Shift+up: anchor=1, cursor=2, selected={1,2}.
+	sl.MoveUpShift()
+	if sl.Cursor() != 2 {
+		t.Fatalf("Cursor = %d, want 2", sl.Cursor())
+	}
+	if sl.SelectionCount() != 2 {
+		t.Fatalf("after shift+up: SelectionCount = %d, want 2", sl.SelectionCount())
+	}
+
+	// Shift+up again: anchor=1, cursor=1, selected={1}.
+	sl.MoveUpShift()
+	if sl.Cursor() != 1 {
+		t.Fatalf("Cursor = %d, want 1", sl.Cursor())
+	}
+	if sl.SelectionCount() != 1 {
+		t.Fatalf("after 2x shift+up: SelectionCount = %d, want 1", sl.SelectionCount())
+	}
+
+	// Shift+up past anchor: anchor=1, cursor=0, selected={0,1}.
+	sl.MoveUpShift()
+	if sl.Cursor() != 0 {
+		t.Fatalf("Cursor = %d, want 0", sl.Cursor())
+	}
+	if sl.SelectionCount() != 2 {
+		t.Fatalf("after shift+up past anchor: SelectionCount = %d, want 2", sl.SelectionCount())
+	}
+}
+
+func TestResetShift(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(5))
+
+	// Enter shift mode.
+	sl.MoveDownShift()
+	if !sl.IsShifting() {
+		t.Fatal("should be shifting after MoveDownShift")
+	}
+
+	// Plain movement resets shift.
+	sl.ResetShift()
+	if sl.IsShifting() {
+		t.Fatal("should not be shifting after ResetShift")
+	}
+
+	// Next shift+down should re-anchor at current position.
+	sl.MoveTo(3)
+	sl.MoveDownShift()
+	if sl.Anchor() != 3 {
+		t.Fatalf("Anchor after re-shift = %d, want 3", sl.Anchor())
+	}
+}
+
+func TestShiftSkipsFolders(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetGroups(makeGroups(2, 3))
+	// Layout: folder0, s0, s1, s2, folder1, s3, s4, s5
+	// visItems has 8 entries.
+
+	// Start at first session (index 1, under folder0).
+	sl.MoveTo(1)
+
+	// Shift+down 5 times to go across folder boundary.
+	for i := 0; i < 5; i++ {
+		sl.MoveDownShift()
+	}
+	// Cursor should be at index 6 (s4 under folder1).
+	// Selected range 1..6 includes folder1 at index 4, which should be skipped.
+	// So selection should contain 5 sessions (s0, s1, s2, s3, s4).
+	if sl.SelectionCount() != 5 {
+		t.Fatalf("SelectionCount across folders = %d, want 5", sl.SelectionCount())
+	}
+}
+
+func TestMoveDownShift_AtBottom(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(3))
+
+	// Move to last item.
+	sl.MoveTo(2)
+
+	// Shift+down at bottom should not panic and should select just current item.
+	sl.MoveDownShift()
+	if sl.Cursor() != 2 {
+		t.Fatalf("Cursor = %d, want 2 (should stay at bottom)", sl.Cursor())
+	}
+	// Anchor=2, cursor=2, so range is just item 2.
+	if sl.SelectionCount() != 1 {
+		t.Fatalf("SelectionCount = %d, want 1", sl.SelectionCount())
+	}
+}
+
+func TestMoveUpShift_AtTop(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(3))
+
+	// Cursor starts at 0.
+	sl.MoveUpShift()
+	if sl.Cursor() != 0 {
+		t.Fatalf("Cursor = %d, want 0 (should stay at top)", sl.Cursor())
+	}
+	// Anchor=0, cursor=0, so range is just item 0.
+	if sl.SelectionCount() != 1 {
+		t.Fatalf("SelectionCount = %d, want 1", sl.SelectionCount())
+	}
+}

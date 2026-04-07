@@ -49,6 +49,8 @@ type keyMap struct {
 	CopyPreview       key.Binding
 	ExpandCollapseAll key.Binding
 	ScanWorkStatus    key.Binding
+	ShiftUp           key.Binding
+	ShiftDown         key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
@@ -60,7 +62,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
-		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll},
+		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
 		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Reindex, k.ScanWorkStatus, k.Config},
@@ -115,4 +117,6 @@ var keys = keyMap{
 	CopyPreview:       key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy preview")),
 	ExpandCollapseAll: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "expand/collapse all")),
 	ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
+	ShiftUp:           key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("shift+↑", "extend select up")),
+	ShiftDown:         key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+↓", "extend select down")),
 }
