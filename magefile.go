@@ -205,8 +205,12 @@ func Preflight() error {
 	}
 
 	fmt.Println("\n=== 8/13 Testing (race detector) ===")
-	if err := run("go", "test", "-race", "./...", "-count=1"); err != nil {
-		return fmt.Errorf("race test: %w", err)
+	if raceDetectorAvailable() {
+		if err := run("go", "test", "-race", "./...", "-count=1"); err != nil {
+			return fmt.Errorf("race test: %w", err)
+		}
+	} else {
+		fmt.Println("   Skipped (requires gcc/CGO on Windows)")
 	}
 
 	fmt.Println("\n=== 9/13 Testing (WSL) ===")

@@ -160,6 +160,13 @@ func WriteContinuationPlan(sessionID string, remaining []string, summary string)
 	newSection := buildRemainingSection(remaining, summary)
 	updated := mergeRemainingSection(existing, newSection)
 
+	// Re-check the target before writing: reject symlinks or non-regular
+	// files that may have appeared since readFileIfExists ran (TOCTOU
+	// defence).  A missing file is fine — WriteFile will create it.
+	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
+		return &os.PathError{Op: "write", Path: path, Err: os.ErrInvalid}
+	}
+
 	//nolint:gosec // 0644 is the standard permission for plan.md files
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return fmt.Errorf("writing plan: %w", err)

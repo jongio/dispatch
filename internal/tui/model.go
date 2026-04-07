@@ -644,7 +644,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.scanWorkStatusCmd()
 
 	case workStatusScannedMsg:
-		m.workStatusMap = msg.statuses
+		// Merge full-scan results into the existing map so that NoPlan
+		// entries from the quick scan are preserved (the full scan only
+		// covers sessions with plans).
+		if m.workStatusMap == nil {
+			m.workStatusMap = msg.statuses
+		} else {
+			maps.Copy(m.workStatusMap, msg.statuses)
+		}
 		m.sessionList.SetWorkStatuses(m.workStatusMap)
 		if sel, ok := m.sessionList.Selected(); ok {
 			if result, exists := m.workStatusMap[sel.ID]; exists {
@@ -701,7 +708,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			existing.RemainingItems = analysis.RemainingItems
 			m.workStatusMap[id] = existing
 
-			if len(analysis.RemainingItems) > 0 {
+			// Only queue continuation plan writes for sessions that remain
+			// incomplete after AI analysis — don't write "remaining work"
+			// into plans the AI classified as complete.
+			if existing.Status == data.WorkStatusIncomplete && len(analysis.RemainingItems) > 0 {
 				sessionsWithRemaining = append(sessionsWithRemaining, id)
 			}
 		}
@@ -1425,7 +1435,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.workStatusScanning {
 			m.workStatusScanning = true
 			m.statusInfo = "Scanning work status..."
-			return m, m.scanWorkStatusQuickCmd()
+			// Trigger a fresh plan scan first — the plansScannedMsg
+			// handler chains into scanWorkStatusQuickCmd when
+			// workStatusScanning is set.  This ensures newly created
+			// or deleted plan.md files are picked up.
+			return m, m.scanPlansCmd()
 		}
 		return m, nil
 
@@ -3219,11 +3233,9 @@ func (m *Model) scanWorkStatusAICmd() tea.Cmd {
 	}
 
 	// Collect visible sessions with incomplete work that have plan content.
-	type candidate struct {
-		id      string
-		content string
-	}
-	var candidates []candidate
+	// Only capture session IDs here — file I/O (ReadPlanContent) is
+	// deferred to the background closure to avoid blocking the UI thread.
+	var candidateIDs []string
 	for id, result := range m.workStatusMap {
 		if result.Status != data.WorkStatusIncomplete {
 			continue
@@ -3232,32 +3244,32 @@ func (m *Model) scanWorkStatusAICmd() tea.Cmd {
 		if _, visible := visibleSet[id]; !visible {
 			continue
 		}
-		content, err := data.ReadPlanContent(id)
-		if err != nil || content == "" {
-			continue
-		}
-		candidates = append(candidates, candidate{id: id, content: content})
-		if len(candidates) >= maxAIAnalysisBatch {
+		candidateIDs = append(candidateIDs, id)
+		if len(candidateIDs) >= maxAIAnalysisBatch {
 			break
 		}
 	}
-	if len(candidates) == 0 {
+	if len(candidateIDs) == 0 {
 		return nil
 	}
 
 	return func() tea.Msg {
-		results := make(map[string]*copilot.CompletionAnalysis, len(candidates))
-		for _, c := range candidates {
+		results := make(map[string]*copilot.CompletionAnalysis, len(candidateIDs))
+		for _, id := range candidateIDs {
+			content, err := data.ReadPlanContent(id)
+			if err != nil || content == "" {
+				continue
+			}
 			// Use context.Background to prevent JSON-RPC pipe corruption —
 			// same pattern as copilotSearchCmd / AnalyzeCompletion internals.
-			analysis, err := client.AnalyzeCompletion(context.Background(), c.id, c.content)
+			analysis, err := client.AnalyzeCompletion(context.Background(), id, content)
 			if err != nil {
 				slog.Debug("AI completion analysis failed",
-					"session", c.id, "error", err)
+					"session", id, "error", err)
 				continue
 			}
 			if analysis != nil {
-				results[c.id] = analysis
+				results[id] = analysis
 			}
 		}
 		return workStatusAIScannedMsg{analyses: results}
