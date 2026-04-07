@@ -235,6 +235,7 @@ type Model struct {
 	filterWorkStatus   map[data.WorkStatus]struct{} // when non-empty, only show sessions with matching work status
 	workStatusScanned  bool                         // true after first successful work status scan
 	workStatusScanning bool                         // true while work status scan chain is in progress
+	workStatusAICancel context.CancelFunc           // cancels in-flight AI work status analysis
 	autoShowPlan       bool                         // when true, auto-switch to plan view on next planContentMsg
 }
 
@@ -715,6 +716,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				sessionsWithRemaining = append(sessionsWithRemaining, id)
 			}
 		}
+		// Also include sessions that were incomplete with local remaining
+		// items but weren't in the AI results (AI failure/timeout/skipped).
+		// This ensures continuation plans are written even when AI is partial.
+		for id, result := range m.workStatusMap {
+			if _, hadAI := msg.analyses[id]; hadAI {
+				continue // already handled above
+			}
+			if result.Status == data.WorkStatusIncomplete && len(result.RemainingItems) > 0 {
+				sessionsWithRemaining = append(sessionsWithRemaining, id)
+			}
+		}
 		m.sessionList.SetWorkStatuses(m.workStatusMap)
 		if sel, ok := m.sessionList.Selected(); ok {
 			if result, exists := m.workStatusMap[sel.ID]; exists {
@@ -767,6 +779,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.sessions != nil {
 			m.sessions = m.filterHiddenSessions(msg.sessions)
 			m.sessions = m.filterFavoritedSessions(m.sessions)
+			m.sessions = m.filterAttentionSessions(m.sessions)
+			m.sessions = m.filterPlanSessions(m.sessions)
+			m.sessions = m.filterWorkStatusSessions(m.sessions)
 			m.groups = nil
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
@@ -862,9 +877,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.sessions) == 0 {
 			return m, nil
 		}
-		// Filter out hidden/excluded sessions before merging.
+		// Apply full filter chain before merging (matches sessionsLoadedMsg).
 		incoming := m.filterHiddenSessions(msg.sessions)
 		incoming = m.filterFavoritedSessions(incoming)
+		incoming = m.filterAttentionSessions(incoming)
+		incoming = m.filterPlanSessions(incoming)
+		incoming = m.filterWorkStatusSessions(incoming)
 		if len(incoming) == 0 {
 			return m, nil
 		}
@@ -879,6 +897,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.sessions = append(m.sessions, s)
 				}
 			}
+			m.sortByAttention(m.sessions)
 			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.sessionList.SetSessions(m.sessions)
@@ -2684,6 +2703,8 @@ func attentionPriority(status data.AttentionStatus) int {
 	switch status {
 	case data.AttentionWaiting:
 		return 3
+	case data.AttentionInterrupted:
+		return 2
 	case data.AttentionActive:
 		return 2
 	case data.AttentionStale:
@@ -3267,15 +3288,29 @@ func (m *Model) scanWorkStatusAICmd() tea.Cmd {
 		return nil
 	}
 
+	// Cancel any previous AI analysis and create a fresh cancellable context.
+	if m.workStatusAICancel != nil {
+		m.workStatusAICancel()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	m.workStatusAICancel = cancel
+
 	return func() tea.Msg {
 		results := make(map[string]*copilot.CompletionAnalysis, len(candidateIDs))
 		for _, id := range candidateIDs {
+			// Check for cancellation between iterations to allow the user
+			// to interrupt long-running AI analysis batches.
+			if ctx.Err() != nil {
+				slog.Debug("AI work status analysis cancelled", "completed", len(results))
+				break
+			}
 			content, err := data.ReadPlanContent(id)
 			if err != nil || content == "" {
 				continue
 			}
-			// Use context.Background to prevent JSON-RPC pipe corruption —
-			// same pattern as copilotSearchCmd / AnalyzeCompletion internals.
+			// Use the outer ctx for cancellation awareness, but pass
+			// context.Background() to AnalyzeCompletion to prevent
+			// JSON-RPC pipe corruption (same pattern as copilotSearchCmd).
 			analysis, err := client.AnalyzeCompletion(context.Background(), id, content)
 			if err != nil {
 				slog.Debug("AI completion analysis failed",

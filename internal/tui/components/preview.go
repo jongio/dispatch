@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui/markdown"
 	"github.com/jongio/dispatch/internal/tui/styles"
@@ -34,6 +35,9 @@ type PreviewPanel struct {
 	// renderedLines stores the most recent output of the content rendering
 	// so that mouse coordinates can be mapped back to text for selection.
 	renderedLines []string
+	// plainLines stores ANSI-stripped versions of renderedLines for
+	// selection coordinate math and clipboard copy.
+	plainLines []string
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -255,13 +259,13 @@ func (p *PreviewPanel) FinalizeSelection() string {
 	// Normalise so start <= end.
 	start, end := p.normalizedSelection()
 
-	if len(p.renderedLines) == 0 {
+	if len(p.plainLines) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
-	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.renderedLines); lineIdx++ {
-		line := p.renderedLines[lineIdx]
+	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.plainLines); lineIdx++ {
+		line := p.plainLines[lineIdx]
 		runes := []rune(line)
 
 		startCol := 0
@@ -300,13 +304,13 @@ func (p *PreviewPanel) HasSelection() bool {
 // SelectedText returns the currently selected text without clearing the
 // selection. Returns empty string if no selection or no rendered lines.
 func (p *PreviewPanel) SelectedText() string {
-	if !p.hasSelection || len(p.renderedLines) == 0 {
+	if !p.hasSelection || len(p.plainLines) == 0 {
 		return ""
 	}
 	start, end := p.normalizedSelection()
 	var b strings.Builder
-	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.renderedLines); lineIdx++ {
-		line := p.renderedLines[lineIdx]
+	for lineIdx := start[0]; lineIdx <= end[0] && lineIdx < len(p.plainLines); lineIdx++ {
+		line := p.plainLines[lineIdx]
 		runes := []rune(line)
 		startCol := 0
 		endCol := len(runes)
@@ -362,11 +366,13 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
 		p.renderedLines = nil
+		p.plainLines = nil
 		return
 	}
 	if p.planViewMode && p.planContent != "" {
 		content := p.renderPlanContent()
 		p.renderedLines = strings.Split(content, "\n")
+		p.plainLines = stripLines(p.renderedLines)
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
@@ -377,13 +383,24 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
 		p.renderedLines = nil
+		p.plainLines = nil
 		return
 	}
 	content, convLine, idLine := p.renderContent()
 	p.renderedLines = strings.Split(content, "\n")
+	p.plainLines = stripLines(p.renderedLines)
 	p.totalLines = len(p.renderedLines)
 	p.convHeaderLine = convLine
 	p.idFieldLine = idLine
+}
+
+// stripLines returns a copy of lines with ANSI escape sequences removed.
+func stripLines(lines []string) []string {
+	plain := make([]string, len(lines))
+	for i, l := range lines {
+		plain[i] = ansi.Strip(l)
+	}
+	return plain
 }
 
 // View renders the preview panel content.

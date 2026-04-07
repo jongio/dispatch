@@ -42,12 +42,17 @@ func TestSanitizeExternalContent_DefusesDelimiters(t *testing.T) {
 		t.Errorf("expected exactly 1 end marker, got %d", strings.Count(got, "[EXTERNAL_DATA_END]"))
 	}
 
-	// Defused versions should be present (without underscores)
-	if !strings.Contains(got, "[EXTERNAL DATA END]") {
-		t.Error("embedded end marker not defused")
+	// Embedded delimiters (both underscored and spaced variants) should be
+	// fully removed from the content body to prevent bypass.
+	body := got
+	// Strip the real envelope markers for body inspection.
+	body = strings.Replace(body, "[EXTERNAL_DATA_START]\n", "", 1)
+	body = strings.Replace(body, "\n[EXTERNAL_DATA_END]", "", 1)
+	if strings.Contains(body, "[EXTERNAL DATA START]") {
+		t.Error("spaced start delimiter variant not stripped from body")
 	}
-	if !strings.Contains(got, "[EXTERNAL DATA START]") {
-		t.Error("embedded start marker not defused")
+	if strings.Contains(body, "[EXTERNAL DATA END]") {
+		t.Error("spaced end delimiter variant not stripped from body")
 	}
 }
 
@@ -101,15 +106,18 @@ func TestStripDelimiters(t *testing.T) {
 	input := "[EXTERNAL_DATA_START] middle [EXTERNAL_DATA_END]"
 	got := stripDelimiters(input)
 	if strings.Contains(got, "[EXTERNAL_DATA_START]") {
-		t.Error("start delimiter not stripped")
+		t.Error("underscored start delimiter not stripped")
 	}
 	if strings.Contains(got, "[EXTERNAL_DATA_END]") {
-		t.Error("end delimiter not stripped")
+		t.Error("underscored end delimiter not stripped")
 	}
-	if !strings.Contains(got, "[EXTERNAL DATA START]") {
-		t.Error("expected defused start delimiter")
+	if strings.Contains(got, "[EXTERNAL DATA START]") {
+		t.Error("spaced start delimiter not stripped")
 	}
-	if !strings.Contains(got, "[EXTERNAL DATA END]") {
-		t.Error("expected defused end delimiter")
+	if strings.Contains(got, "[EXTERNAL DATA END]") {
+		t.Error("spaced end delimiter not stripped")
+	}
+	if !strings.Contains(got, "middle") {
+		t.Error("non-delimiter content was removed")
 	}
 }

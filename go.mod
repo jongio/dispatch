@@ -9,6 +9,7 @@ require (
 	github.com/UserExistsError/conpty v0.1.4
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/glamour v1.0.0
+	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/creack/pty v1.1.24
 	github.com/github/copilot-sdk/go v0.2.0
 	github.com/lucasb-eyer/go-colorful v1.3.0
@@ -23,7 +24,6 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260205113103-524a6607adb8 // indirect
-	github.com/charmbracelet/x/ansi v0.11.6 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect

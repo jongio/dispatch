@@ -160,38 +160,49 @@ func WriteContinuationPlan(sessionID string, remaining []string, summary string)
 	newSection := buildRemainingSection(remaining, summary)
 	updated := mergeRemainingSection(existing, newSection)
 
-	// Re-check the target before writing: reject symlinks or non-regular
-	// files that may have appeared since readFileIfExists ran (TOCTOU
-	// defence).  A missing file is fine — WriteFile will create it.
-	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
+	// Open-then-Fstat eliminates the TOCTOU window between Lstat and
+	// WriteFile: we verify the opened fd itself is a regular file (or
+	// newly created) before writing any bytes.
+	//nolint:gosec // 0644 is the standard permission for plan.md files
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("opening plan for write: %w", err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("stat plan fd: %w", err)
+	}
+	if !info.Mode().IsRegular() {
 		return &os.PathError{Op: "write", Path: path, Err: os.ErrInvalid}
 	}
 
-	//nolint:gosec // 0644 is the standard permission for plan.md files
-	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+	if _, err := f.WriteString(updated); err != nil {
 		return fmt.Errorf("writing plan: %w", err)
 	}
 	return nil
 }
 
 // readFileIfExists reads a regular file at path. It returns ("", nil) if
-// the file does not exist or is not a regular file.
+// the file does not exist or is not a regular file. Uses open-then-Fstat
+// to avoid a TOCTOU window between stat and open.
 func readFileIfExists(path string) (string, error) {
-	info, err := os.Lstat(path)
+	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil
 		}
 		return "", err
 	}
-	if !info.Mode().IsRegular() {
-		return "", nil
-	}
-	f, err := os.Open(path)
+	defer f.Close()
+	info, err := f.Stat()
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	if !info.Mode().IsRegular() {
+		return "", nil
+	}
 	content, err := io.ReadAll(io.LimitReader(f, maxPlanFileSize))
 	if err != nil {
 		return "", err

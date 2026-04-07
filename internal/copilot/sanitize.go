@@ -31,5 +31,8 @@ func QuoteUntrusted(s string) string {
 func stripDelimiters(s string) string {
 	s = strings.ReplaceAll(s, "[EXTERNAL_DATA_START]", "[EXTERNAL DATA START]")
 	s = strings.ReplaceAll(s, "[EXTERNAL_DATA_END]", "[EXTERNAL DATA END]")
+	// Also strip the spaced variants to prevent bypass via pre-spaced input.
+	s = strings.ReplaceAll(s, "[EXTERNAL DATA START]", "")
+	s = strings.ReplaceAll(s, "[EXTERNAL DATA END]", "")
 	return s
 }

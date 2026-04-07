@@ -207,6 +207,8 @@ func TestAttentionStatusCounts(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestScanAttentionCmd_ReturnsCmdFunc(t *testing.T) {
+	// Isolate from real session-state directory to avoid hanging on locked files.
+	t.Setenv("DISPATCH_SESSION_STATE", t.TempDir())
 	m := newTestModel()
 
 	cmd := m.scanAttentionCmd()
