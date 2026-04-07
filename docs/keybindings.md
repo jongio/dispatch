@@ -101,15 +101,29 @@
     - Behavior: Clears all ✓ selection indicators, returning to normal single-cursor mode.
     - Condition: In session list view
 
+14. **Shift+↑** → Extend Selection Upward
+    - File: D:\code\dispatch\internal\tui\keys.go (ShiftUp binding)
+    - Code: key.NewBinding(key.WithKeys("shift+up"))
+    - Handler: D:\code\dispatch\internal\tui\model.go (shift-arrow handler)
+    - Behavior: Moves cursor up and extends selection range from anchor to cursor. Anchor is set automatically on first shift-press. Skips folder nodes in tree mode.
+    - Condition: In session list view
+
+15. **Shift+↓** → Extend Selection Downward
+    - File: D:\code\dispatch\internal\tui\keys.go (ShiftDown binding)
+    - Code: key.NewBinding(key.WithKeys("shift+down"))
+    - Handler: D:\code\dispatch\internal\tui\model.go (shift-arrow handler)
+    - Behavior: Moves cursor down and extends selection range from anchor to cursor. Anchor is set automatically on first shift-press. Plain up/down resets the anchor. Skips folder nodes in tree mode.
+    - Condition: In session list view
+
 ### Search and Filtering
-14. **/** → Focus Search Bar / Open Search
+16. **/** → Focus Search Bar / Open Search
    - File: D:\code\dispatch\internal\tui\keys.go (line 66)
    - Code: key.NewBinding(key.WithKeys("/"))
    - Handler: D:\code\dispatch\internal\tui\model.go (lines 823-825)
    - Behavior: Focuses search bar for typing queries
    - Condition: In session list view
 
-15. **Esc** → Clear Search Query or Back to List
+17. **Esc** → Clear Search Query or Back to List
     - File: D:\code\dispatch\internal\tui\keys.go (line 67)
     - Code: key.NewBinding(key.WithKeys("esc"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 788-802)

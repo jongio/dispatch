@@ -26,7 +26,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
-- **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Ctrl+click and Shift+click for mouse selection
+- **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Shift+↑/↓ for range selection, Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
 - **Plan indicator** (`v`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane. Filter sessions with plans via the `!` status picker
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
@@ -151,6 +151,8 @@ dispatch
 | Key | Action |
 |---|---|
 | `Space` | Toggle selection on current session |
+| `Shift+↑` | Extend selection upward (range select) |
+| `Shift+↓` | Extend selection downward (range select) |
 | `L` | Launch all selected sessions (or all in folder) |
 | `a` | Select all visible sessions |
 | `d` | Deselect all |

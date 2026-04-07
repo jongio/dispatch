@@ -41,6 +41,8 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Multi-Select</h3>
             <KeyTable rows={[
               { keys: 'Space', action: 'Toggle selection on current session' },
+              { keys: 'Shift+↑', action: 'Extend selection upward (range select)' },
+              { keys: 'Shift+↓', action: 'Extend selection downward (range select)' },
               { keys: 'L', action: 'Launch all selected sessions (or all in folder)' },
               { keys: 'a', action: 'Select all visible sessions' },
               { keys: 'd', action: 'Deselect all' },
