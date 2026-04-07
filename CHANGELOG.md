@@ -8,12 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
-- **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard with the `c` key. Click the ID row in the preview pane for the same effect
-- **"Has plan" status filter** — the `!` attention status picker now includes a "Has plan" row to filter sessions with `plan.md` files
-- **Plan indicator in preview** — sessions with a `plan.md` file show "Plan: Yes" in the preview pane metadata
-- **Conversation sort toggle** (`o`) — toggle between oldest-first and newest-first conversation display in the preview pane; also clickable via the sort arrow in the conversation header
-- **Shift+arrow range selection** (`Shift+↑` / `Shift+↓`) — select a contiguous range of sessions using Shift+Up/Down arrow keys, matching standard OS file manager behavior. Anchor is set on first shift-press; plain arrow resets. Correctly skips folder nodes in tree mode
-- **Work status detection** — analyze `plan.md` files to identify sessions with incomplete planned work
+- **Work status detection** — analyze `plan.md` files to identify sessions with incomplete planned work (#32)
   - New `WorkStatus` type: Unknown, Complete, Incomplete, NoPlan, Analyzing, Error
   - Plan parsing to detect incomplete tasks (unchecked checkboxes, pending items)
   - Copilot SDK `analyze_completion` tool for AI-powered completion analysis
@@ -21,17 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Work status display in the preview panel metadata
   - Work status filtering via `!` status picker (incomplete, complete)
   - Status bar shows scan progress and completion summary
-- **Contributor recognition** — automated contributor attribution in releases
-  - `mage contributors` target regenerates CONTRIBUTORS.md from git history
-  - `go run ./cmd/contributors/` CLI tool for release-time contributor extraction
-  - Co-authored-by trailer parsing (recognizes AI pair programming)
-  - Bot filtering (excludes CI bots, keeps Copilot co-authorship)
-  - First-time contributor detection and highlighting
-  - Contributors section in changelog entries and GitHub Release notes
+- **Shift+arrow range selection** (`Shift+↑` / `Shift+↓`) — select a contiguous range of sessions using Shift+Up/Down arrow keys, matching standard OS file manager behavior (#33). Anchor is set on first shift-press; plain arrow resets. Correctly skips folder nodes in tree mode
 
 ### Changed
 
-- Copy session ID keybinding changed from `y` (yank) to `c` (copy) for better discoverability
 - `!` status picker now includes "Incomplete work", "Complete work", and "Favorites only" rows
 - Work status scan no longer runs on startup — press `R` to scan explicitly
 
@@ -51,7 +39,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `R` key now re-scans plans before work status for fresh data
 - Race detector guard in `mage preflight` — step 8 now skips gracefully when CGO/gcc unavailable
 - Flaky test timing in copilot search lock test — replaced `time.Sleep` with channel-based synchronization
-- Test reliability — fixed flaky session launch test
+
+## [v0.7.0] - 2026-03-23
+
+### Fixed
+
+- Release workflow: move contributor notes to temp dir before goreleaser to avoid archive contamination
+
+## [v0.6.0] - 2026-03-23
+
+### Fixed
+
+- CI: add rebase before push in release workflow to prevent non-fast-forward failures
+
+## [v0.5.0] - 2026-03-23
+
+Re-release of v0.4.0 — no functional changes. Tag correction.
+
+## [v0.4.0] - 2026-03-23
+
+### Added
+
+- **Expand/collapse all toggle** — collapse or expand all folder groups in tree view with a single key (#31). New `default_collapsed` config option
+- **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Click the ID row in the preview pane for the same effect (#27)
+- **"Has plan" status filter** — the `!` attention status picker now includes a "Has plan" row to filter sessions with `plan.md` files (#29)
+- **Plan indicator in preview** — sessions with a `plan.md` file show "Plan: Yes" in the preview pane metadata (#22)
+- **Configurable preview position** — move the preview pane to right, bottom, left, or top (#18)
+- **Conversation sort toggle** (`o`) — toggle between oldest-first and newest-first conversation display in the preview pane; also clickable via the sort arrow in the conversation header
+- **Contributor recognition** — automated contributor attribution in releases (#24)
+  - `mage contributors` target regenerates CONTRIBUTORS.md from git history
+  - `go run ./cmd/contributors/` CLI tool for release-time contributor extraction
+  - Co-authored-by trailer parsing (recognizes AI pair programming)
+  - Bot filtering (excludes CI bots, keeps Copilot co-authorship)
+  - First-time contributor detection and highlighting
+- **Charm ecosystem v2** — upgraded bubbletea, bubbles, lipgloss, glamour, and copilot-sdk to v2 (#26)
+
+### Changed
+
+- Copy session ID keybinding changed from `y` (yank) to `c` (copy) for better discoverability
+- CI skips runs for non-code changes (docs, markdown); pages actions pinned to SHA
+
+### Fixed
+
+- Git Bash MinTTY detection and path quoting (#15, #16)
+- Windows Terminal split-pane flags corrected (`-H`/`-V` instead of invalid `--direction`) (#20)
+- Worktree PATH shadowing, session ID validation, folder launch constant extraction
+- M-03 and M-05 security findings from red team audit
+- LF line endings enforced via `.gitattributes` (`eol=lf`)
+- TestLaunchSession no longer spawns zombie terminal processes (#28)
+- gofmt formatting stabilized across doc comments
 
 ## [v0.3.0] - 2026-03-19
 
@@ -63,39 +99,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Ctrl+click for mouse selection, Shift+click for range select
   - Selection count displayed in footer
   - ✓ indicator on selected sessions
-
 - **Attention indicators** — colored dots showing real-time session AI activity status
   - Five states: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray)
   - Determined by scanning session-state lock files and event logs
   - `n` to jump to next waiting session
   - `!` to open attention status filter picker
   - Auto-refreshes on every reindex
-
 - **Workspace recovery** — detect sessions interrupted by crash/reboot and resume them
   - New "interrupted" attention status (orange ⚡) for sessions killed mid-work
   - Stale lock file detection with 72-hour window (covers weekend crashes)
   - `R` to batch-resume all interrupted sessions
   - `workspace_recovery` config toggle (default: on)
   - Defensive lock file parsing with graceful degradation
-
 - **Self-update** (`dispatch update`) — downloads latest release from GitHub and replaces in-place
   - SHA-256 checksum verification
   - Interprocess lock prevents concurrent updates
   - Background version check on every launch with 24-hour cache
   - Post-exit notification when a new version is available
-
-- Preview pane shows absolute local timestamps with timezone (e.g. `Jan 2 3:04 PM PST`) for Created and Active fields instead of relative time
+- Preview pane shows absolute local timestamps with timezone
 - Preview pane shows full session ID (no longer truncated)
-- **Conversation sort toggle** (`o` key or click) — switch between oldest-first and newest-first, persisted in config
-  - Sort arrow clickable in preview pane conversation header
-
-- Demo mode enhancements
-  - Fake attention status data showing all four indicator states
-  - Session timestamps shifted relative to launch time for realistic time ranges
-  - Sessions distributed across 1h, 1d, and 7d time windows
-
+- Demo mode enhancements (fake attention data, realistic timestamps)
 - WSL cross-testing (`mage testWSL`) for Unix code path coverage
-- Race detection as separate preflight step (step 7/11)
+- Race detection as separate preflight step
 - Install verification as preflight step
 
 ### Changed
@@ -104,14 +129,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
-- Demo mode timestamp format mismatch — timestamps now use RFC3339 format matching the TUI filter, fixing 1-hour time range showing no sessions
+- Demo mode timestamp format mismatch — timestamps now use RFC3339 format (fixes 1h range showing no sessions)
 - Date pivot now groups sessions by local timezone instead of UTC (fixes #5)
 - Reindex cancel crash — stale log pump messages discarded after cancel
 - Reindex overlay log text left-alignment fixed
 - Removed excluded directory count from header badges
 - Removed hidden session count from footer
 
-## [0.1.0] - 2026-03-10
+## [v0.1.0] - 2026-03-10
 
 ### Added
 
