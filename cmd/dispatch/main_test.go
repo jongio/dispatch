@@ -194,15 +194,15 @@ func TestCreateDemoPlanFiles(t *testing.T) {
 	}
 
 	// Verify plan files were created for each configured session.
-	for _, id := range demoPlanSessions {
-		planPath := filepath.Join(stateDir, id, "plan.md")
+	for _, dp := range demoPlanSessions {
+		planPath := filepath.Join(stateDir, dp.sessionID, "plan.md")
 		data, err := os.ReadFile(planPath)
 		if err != nil {
-			t.Errorf("plan.md missing for session %s: %v", id, err)
+			t.Errorf("plan.md missing for session %s: %v", dp.sessionID, err)
 			continue
 		}
-		if !strings.Contains(string(data), "Implementation Plan") {
-			t.Errorf("plan.md for %s should contain 'Implementation Plan'", id)
+		if !strings.Contains(string(data), "## Tasks") {
+			t.Errorf("plan.md for %s should contain '## Tasks'", dp.sessionID)
 		}
 	}
 }
@@ -574,7 +574,7 @@ func TestCreateDemoPlanFiles_WriteFileError(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	// Pre-create a directory at the plan.md path to block file creation.
-	sessDir := filepath.Join(stateDir, demoPlanSessions[0])
+	sessDir := filepath.Join(stateDir, demoPlanSessions[0].sessionID)
 	if err := os.MkdirAll(sessDir, 0o700); err != nil {
 		t.Fatal(err)
 	}

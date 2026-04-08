@@ -244,34 +244,78 @@ func createDemoSessionState(stateDir string) error {
 	return nil
 }
 
-// demoPlanSessions lists session IDs that get a plan.md file in demo mode.
-// Chosen to overlap with interesting attention states (one waiting, one active,
-// one stale, one interrupted) so the dot indicator is clearly visible.
-var demoPlanSessions = []string{
-	"fa800b7b-3a24-4e3b-9f2d-a414198b27ab", // Waiting (purple)
-	"ses-026",                              // Active (green)
-	"ses-003",                              // Stale (yellow)
-	"ses-005",                              // Interrupted (orange ⚡)
+// demoPlanSession pairs a session ID with its plan.md content so demo
+// mode can show varied work-status indicators (triangle for incomplete,
+// check for complete).
+type demoPlanSession struct {
+	sessionID string
+	plan      string
 }
 
-// createDemoPlanFiles writes minimal plan.md files into session-state
-// directories so the plan indicator dot appears in demo mode.
-func createDemoPlanFiles(stateDir string) error {
-	planContent := `# Implementation Plan
+// demoPlanSessions lists sessions that get a plan.md file in demo mode.
+// Chosen to overlap with interesting attention states so the work-status
+// icons (triangle !, check ✓) are clearly visible alongside attention dots.
+var demoPlanSessions = []demoPlanSession{
+	// Incomplete — 1/3 done → yellow triangle (Waiting session)
+	{
+		sessionID: "fa800b7b-3a24-4e3b-9f2d-a414198b27ab",
+		plan: `# Auth API Migration
 
 ## Tasks
-- [ ] Design API endpoints
-- [ ] Implement database schema
+- [ ] Design OAuth2 token endpoints
+- [ ] Implement refresh token rotation
 - [x] Set up project structure
-`
+`,
+	},
+	// Incomplete — 2/5 done → yellow triangle (Active session)
+	{
+		sessionID: "ses-026",
+		plan: `# Fleet Dashboard
 
-	for _, id := range demoPlanSessions {
-		sessDir := filepath.Join(stateDir, id)
+## Tasks
+- [x] Create dashboard layout component
+- [x] Add real-time WebSocket connection
+- [ ] Build service health grid
+- [ ] Add latency sparkline charts
+- [ ] Implement alert threshold config
+`,
+	},
+	// Incomplete — 1/4 done → yellow triangle (Interrupted session)
+	{
+		sessionID: "ses-005",
+		plan: `# Login Flow Fix
+
+## Tasks
+- [x] Reproduce SSO redirect loop
+- [ ] Fix SAML assertion parsing
+- [ ] Add session cookie SameSite attribute
+- [ ] Write integration tests for login redirect
+`,
+	},
+	// All complete — 3/3 done → green check (Stale session)
+	{
+		sessionID: "ses-003",
+		plan: `# Metrics Pipeline
+
+## Tasks
+- [x] Define Prometheus metric types
+- [x] Instrument HTTP handler middleware
+- [x] Add Grafana dashboard JSON export
+`,
+	},
+}
+
+// createDemoPlanFiles writes varied plan.md files into session-state
+// directories so the work-status indicators (triangle for incomplete,
+// check for complete) appear in demo mode and screenshots.
+func createDemoPlanFiles(stateDir string) error {
+	for _, dp := range demoPlanSessions {
+		sessDir := filepath.Join(stateDir, dp.sessionID)
 		if err := os.MkdirAll(sessDir, 0o700); err != nil {
 			return err
 		}
 		planPath := filepath.Join(sessDir, "plan.md")
-		if err := os.WriteFile(planPath, []byte(planContent), 0o600); err != nil {
+		if err := os.WriteFile(planPath, []byte(dp.plan), 0o600); err != nil {
 			return err
 		}
 	}

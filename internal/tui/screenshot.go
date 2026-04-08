@@ -7,6 +7,14 @@
 package tui
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
@@ -49,6 +57,7 @@ type captureCtx struct {
 	themeNames    []string
 	attentionMap  map[string]data.AttentionStatus
 	planMap       map[string]bool
+	workStatusMap map[string]data.WorkStatusResult
 }
 
 // captureFeatures captures the full set of feature screenshots using the
@@ -80,10 +89,12 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.pivot = pivotFolder
 		m.groups = c.folderGroups
 		m.planMap = c.planMap
+		m.workStatusMap = c.workStatusMap
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.sessionList.SetAttentionStatuses(c.attentionMap)
 		m.sessionList.SetPlanStatuses(c.planMap)
+		m.sessionList.SetWorkStatuses(c.workStatusMap)
 		m.timeRange = "7d"
 		m.recalcLayout()
 		return m
@@ -392,6 +403,16 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		add("plan-filter", m)
 	}
 
+	// ── Work status indicators ──────────────────────────────────────
+	// Shows triangle (!) for incomplete work and check (✓) for complete
+	// in the session list, with preview showing work status metadata.
+	{
+		m := newBase()
+		m.showPreview = false
+		m.recalcLayout()
+		add("work-status-indicators", m)
+	}
+
 	// ── Tree collapsed / expanded ─────────────────────────────────────
 	{
 		m := newBase()
@@ -501,7 +522,16 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	// instead of the ⚡ fallback.
 	styles.SetNerdFontEnabled(true)
 
-	store, err := data.OpenPath(dbPath)
+	// Copy the demo DB to a temp file and shift all timestamps so the
+	// newest session is ~5 minutes ago. Without this, the 7d time filter
+	// excludes every session once the static DB ages past a week.
+	freshPath, cleanup, err := freshenDB(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("freshen demo db: %w", err)
+	}
+	defer cleanup()
+
+	store, err := data.OpenPath(freshPath)
 	if err != nil {
 		return nil, err
 	}
@@ -562,22 +592,45 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": true, // Waiting — plan dot visible
 		"ses-026":                              true, // Active — plan dot visible
 		"ses-003":                              true, // Stale — plan dot visible
+		"ses-005":                              true, // Interrupted — plan dot visible
+	}
+
+	// Build a fake work status map so screenshots show work-status icons
+	// (triangle ! for incomplete, check ✓ for complete) next to sessions.
+	workStatusMap := map[string]data.WorkStatusResult{
+		"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": {
+			Status: data.WorkStatusIncomplete, TotalTasks: 3, DoneTasks: 1,
+			Detail: "1/3 tasks complete",
+		},
+		"ses-026": {
+			Status: data.WorkStatusIncomplete, TotalTasks: 5, DoneTasks: 2,
+			Detail: "2/5 tasks complete",
+		},
+		"ses-005": {
+			Status: data.WorkStatusIncomplete, TotalTasks: 4, DoneTasks: 1,
+			Detail: "1/4 tasks complete",
+		},
+		"ses-003": {
+			Status: data.WorkStatusComplete, TotalTasks: 3, DoneTasks: 3,
+			Detail: "3/3 tasks complete",
+		},
 	}
 
 	ctx := &captureCtx{
 		width: width, height: height,
-		store:        store,
-		sessions:     sessions,
-		folders:      folders,
-		folderGroups: folderGroups,
-		repoGroups:   repoGroups,
-		branchGroups: branchGroups,
-		dateGroups:   dateGroups,
-		detail:       detail,
-		flatFilter:   flatFilter,
-		flatSort:     flatSort,
-		attentionMap: attentionMap,
-		planMap:      planMap,
+		store:         store,
+		sessions:      sessions,
+		folders:       folders,
+		folderGroups:  folderGroups,
+		repoGroups:    repoGroups,
+		branchGroups:  branchGroups,
+		dateGroups:    dateGroups,
+		detail:        detail,
+		flatFilter:    flatFilter,
+		flatSort:      flatSort,
+		attentionMap:  attentionMap,
+		planMap:       planMap,
+		workStatusMap: workStatusMap,
 		configVals: components.ConfigValues{
 			YoloMode:          false,
 			Agent:             "copilot",
@@ -610,4 +663,92 @@ func newScreenshotModel(width, height int) *Model {
 	m.width = width
 	m.height = height
 	return &m
+}
+
+// freshenDB copies the demo database to a temp file and shifts all
+// timestamps so the newest session updated_at is ~5 minutes ago. This
+// prevents the 7d time filter from excluding sessions when the static
+// demo DB ages past a week. Returns the temp path and a cleanup func.
+func freshenDB(srcPath string) (string, func(), error) {
+	const targetAge = 5 * time.Minute
+	noop := func() {}
+
+	// Copy source DB to a temp file.
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return "", noop, err
+	}
+	defer src.Close()
+
+	tmp, err := os.CreateTemp("", "dispatch-screenshots-*.db")
+	if err != nil {
+		return "", noop, err
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { os.Remove(tmpPath) }
+
+	if _, err := io.Copy(tmp, src); err != nil {
+		tmp.Close()
+		cleanup()
+		return "", noop, err
+	}
+	tmp.Close()
+
+	// Shift timestamps in the copy.
+	db, err := sql.Open("sqlite", tmpPath)
+	if err != nil {
+		cleanup()
+		return "", noop, err
+	}
+	defer db.Close()
+
+	var maxTS string
+	ctx := context.Background()
+	if err := db.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM sessions`).Scan(&maxTS); err != nil {
+		cleanup()
+		return "", noop, err
+	}
+	newest, err := time.Parse(time.RFC3339, maxTS)
+	if err != nil {
+		cleanup()
+		return "", noop, err
+	}
+
+	delta := time.Since(newest) - targetAge
+	deltaSec := int(delta.Seconds())
+	if deltaSec <= 0 {
+		return tmpPath, cleanup, nil // already fresh
+	}
+
+	shift := strconv.Itoa(deltaSec)
+	shiftExpr := func(col string) string {
+		return "strftime('%Y-%m-%dT%H:%M:%SZ', " + col + ", '+" + shift + " seconds')"
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		cleanup()
+		return "", noop, err
+	}
+
+	updates := []string{
+		`UPDATE sessions SET created_at = ` + shiftExpr("created_at") + `, updated_at = ` + shiftExpr("updated_at"),
+		`UPDATE turns SET timestamp = ` + shiftExpr("timestamp"),
+		`UPDATE checkpoints SET created_at = ` + shiftExpr("created_at"),
+		`UPDATE session_files SET first_seen_at = ` + shiftExpr("first_seen_at"),
+		`UPDATE session_refs SET created_at = ` + shiftExpr("created_at"),
+	}
+	for _, q := range updates {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			_ = tx.Rollback()
+			cleanup()
+			return "", noop, fmt.Errorf("shift timestamps: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		cleanup()
+		return "", noop, err
+	}
+
+	return tmpPath, cleanup, nil
 }
