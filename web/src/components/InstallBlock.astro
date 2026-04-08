@@ -3,6 +3,7 @@ interface Tab {
   label: string;
   id: string;
   code: string;
+  icon?: string;
   lang?: string;
 }
 
@@ -11,13 +12,20 @@ interface Props {
 }
 
 const { tabs } = Astro.props;
+
+const icons: Record<string, string> = {
+  linux: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.43.868.07 1.681-.39 1.737-1.46.025-.445-.14-.89-.367-1.333-.35-.667-.819-1.332-.819-1.665 0-.168.027-.334.05-.333.025.336.14.401.346.401.674 0 1.32-.734 1.32-1.87 0-.466-.14-.87-.38-1.14-.661-.744-1.475-.396-2.17-.869-.342-.07-.498-.6-.498-.932 0-.066.009-.135.025-.2a1.375 1.375 0 00.156-.468c.039-.4-.168-.736-.486-.869l-.003-.003c-.003-.8-.003-1.465-.003-2 0-.68-.134-1.264-.502-1.736-1.3-1.666-2.89-3.134-4.152-5.016-.21-.313-.355-.551-.409-.936a5.01 5.01 0 00-.1-.933C13.163.466 12.938 0 12.504 0z"/></svg>',
+  apple: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>',
+  windows: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>',
+  source: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+};
 ---
 
 <div class="install-strip">
-  <div class="tabs" role="tablist">
+  <div class="install-tabs" role="tablist">
     {tabs.map((tab, i) => (
       <button
-        class="tab"
+        class="install-tab"
         role="tab"
         id={`tab-${tab.id}`}
         aria-selected={i === 0 ? 'true' : 'false'}
@@ -25,7 +33,8 @@ const { tabs } = Astro.props;
         tabindex={i === 0 ? '0' : '-1'}
         data-tab={tab.id}
       >
-        {tab.label}
+        {tab.icon && icons[tab.icon] && <span class="install-tab-icon" set:html={icons[tab.icon]} />}
+        <span class="install-tab-label">{tab.label}</span>
       </button>
     ))}
   </div>
@@ -117,6 +126,57 @@ const { tabs } = Astro.props;
 </script>
 
 <style>
+  .install-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 var(--space-2);
+  }
+
+  .install-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    font-family: var(--font-sans);
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .install-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .install-tab[aria-selected="true"] {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+  }
+
+  .install-tab[aria-selected="true"] .install-tab-icon {
+    color: var(--accent);
+  }
+
+  .install-tab-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-tertiary);
+    transition: color 0.15s;
+  }
+
+  .install-tab:hover .install-tab-icon {
+    color: var(--text-secondary);
+  }
+
+  .install-tab-label {
+    line-height: 1;
+  }
+
   .code-block-wrapper {
     position: relative;
   }
