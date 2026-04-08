@@ -92,6 +92,10 @@ func setupDemo() (cleanup func(), err error) {
 	_ = os.Setenv("DISPATCH_DB", tmpDB)
 	_ = os.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
+	// Force workspace recovery on so interrupted session dots are visible
+	// regardless of the user's config setting.
+	_ = os.Setenv("DISPATCH_WORKSPACE_RECOVERY", "1")
+
 	ok = true
 	return func() { os.RemoveAll(tmpDir) }, nil
 }
@@ -193,9 +197,10 @@ func createDemoSessionState(stateDir string) error {
 	now := time.Now().UTC()
 	staleTime := now.Add(-10 * time.Minute) // old enough to exceed threshold
 
-	// deadPID is a PID that is almost certainly not running, used to
-	// simulate interrupted sessions (stale lock with dead process).
-	const deadPID = 99999
+	// deadPID is a PID near the maxPID ceiling (4194304) that is almost
+	// certainly not running. Using 99999 collided with live Windows
+	// processes (e.g. OpenConsole), so we match the test convention.
+	const deadPID = 4194000
 
 	for _, s := range demoAttentionSessions {
 		sessDir := filepath.Join(stateDir, s.sessionID)

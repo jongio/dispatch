@@ -294,6 +294,12 @@ func Load() (*Config, error) {
 		cfg.MaxSessions = 0
 	}
 	cfg.sanitize()
+
+	// Allow env var override for workspace recovery (used by --demo).
+	if os.Getenv("DISPATCH_WORKSPACE_RECOVERY") == "1" {
+		cfg.WorkspaceRecovery = true
+	}
+
 	return cfg, nil
 }
 

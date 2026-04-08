@@ -1808,13 +1808,21 @@ func TestCheckForUpdate_FetchError(t *testing.T) {
 // RunUpdate — configDir error path
 // ---------------------------------------------------------------------------
 
-func TestRunUpdate_MkdirAllError(t *testing.T) {
-	// Manually test with a path that won't exist.
+func TestRunUpdate_DevVersionProceeds(t *testing.T) {
+	tmpDir := t.TempDir()
+	setConfigDir(t, tmpDir)
+	setMockTransport(t, func(req *http.Request) (*http.Response, error) {
+		w := httptest.NewRecorder()
+		_ = json.NewEncoder(w).Encode(githubRelease{TagName: "v1.0.0"})
+		return w.Result(), nil
+	})
+
+	// Dev builds should proceed past the version check. "dev" compares as
+	// 0.0.0 < 1.0.0, so the update flow continues into download/checksum
+	// stages, which fail because the mock serves JSON for all requests.
+	// The key assertion: the error is NOT about "development build".
 	err := RunUpdate("dev")
-	if err == nil {
-		t.Fatal("expected error for dev version")
-	}
-	if !strings.Contains(err.Error(), "development build") {
-		t.Errorf("expected dev build error, got: %v", err)
+	if err != nil && strings.Contains(err.Error(), "development build") {
+		t.Fatal("RunUpdate should not reject dev builds")
 	}
 }

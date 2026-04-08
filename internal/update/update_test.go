@@ -528,11 +528,14 @@ func TestReplaceWindows_RollbackOnFailure(t *testing.T) {
 // RunUpdate edge cases
 // ---------------------------------------------------------------------------
 
-func TestRunUpdate_DevVersion(t *testing.T) {
+func TestRunUpdate_DevVersionNotBlocked(t *testing.T) {
 	t.Parallel()
 	err := RunUpdate("dev")
-	if err == nil {
-		t.Fatal("expected error for dev version")
+	// Dev builds should no longer be rejected. The call may fail for other
+	// reasons (network, lock contention, etc.) but never because of
+	// the version string.
+	if err != nil && strings.Contains(err.Error(), "development build") {
+		t.Fatal("RunUpdate should not reject dev builds")
 	}
 }
 

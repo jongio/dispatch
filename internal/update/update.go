@@ -74,10 +74,6 @@ func validateVersion(v string) error {
 // RunUpdate downloads and installs the latest version of dispatch. It
 // prints progress to stderr and returns an error on failure.
 func RunUpdate(currentVersion string) error {
-	if isDevVersion(currentVersion) {
-		return errors.New("cannot update a development build — install a release build first")
-	}
-
 	configDir, err := platform.ConfigDir()
 	if err != nil {
 		return fmt.Errorf("resolving config directory: %w", err)
