@@ -329,18 +329,36 @@ import Carousel from '../components/Carousel.astro';
           <h2>Work Status Detection</h2>
           <p>
             Dispatch analyzes <code>plan.md</code> files to identify sessions with
-            incomplete planned work. Sessions with unchecked tasks or pending items
-            display colored dot indicators in the session list, helping you quickly
-            find work that still needs attention.
+            incomplete planned work. A three-pass scan chain runs automatically:
+            quick plan parsing detects unchecked checkboxes, a full pass extracts
+            task counts, and an optional AI pass uses the Copilot SDK
+            <code>analyze_completion</code> tool for deeper analysis. Sessions display
+            colored dot indicators in the session list so you can spot unfinished
+            work at a glance.
           </p>
+          <h3>Status Indicators</h3>
           <ul>
-            <li>Automatic plan parsing detects incomplete tasks (unchecked checkboxes, pending items)</li>
-            <li>Copilot SDK <code>analyze_completion</code> tool for AI-powered completion analysis</li>
-            <li>Colored dot indicators in the session list showing work completion status</li>
-            <li>Work status display in the preview panel metadata</li>
-            <li>Filter by work completion via the <kbd>!</kbd> status picker (incomplete, complete)</li>
-            <li>Press <kbd>R</kbd> to scan work status across all sessions with plans</li>
+            <li><strong>Complete</strong> (green ✓) — all planned tasks are done</li>
+            <li><strong>Incomplete</strong> (yellow !) — unchecked tasks remain (shows task count, e.g. "2/5 done")</li>
+            <li><strong>Analyzing</strong> (magenta ~) — scan in progress</li>
           </ul>
+          <h3>Scan Chain</h3>
+          <ul>
+            <li><strong>Quick scan</strong> — parses plan.md for unchecked checkboxes and pending items</li>
+            <li><strong>Full scan</strong> — counts total/done tasks and extracts remaining items</li>
+            <li><strong>AI scan</strong> — Copilot SDK <code>analyze_completion</code> for nuanced completion analysis (requires API access)</li>
+          </ul>
+          <h3>Features</h3>
+          <ul>
+            <li>Work status displayed in preview panel metadata (Work: ✓ Complete / ! Incomplete)</li>
+            <li>Filter by work status via the <kbd>!</kbd> status picker (incomplete, complete)</li>
+            <li>Press <kbd>R</kbd> to scan work status across all sessions with plans</li>
+            <li>Scans also run automatically on reindex and periodic attention ticks</li>
+            <li><strong>Continuation plans</strong> — sessions with remaining items get a "Remaining Work" section auto-appended to their plan.md</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/attention-picker.png" alt="Status picker showing work status filter rows for incomplete and complete sessions" caption="Work status rows in the status picker" />
         </div>
       </div>
     </section>
