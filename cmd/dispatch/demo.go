@@ -15,10 +15,11 @@ import (
 
 // demoAttention describes a fake attention state for a demo session.
 type demoAttention struct {
-	sessionID string
-	eventType string // last event type (determines waiting/active/stale)
-	stale     bool   // if true, event timestamp is old (→ stale status)
-	idle      bool   // if true, no lock file created (→ idle status)
+	sessionID   string
+	eventType   string // last event type (determines waiting/active/stale)
+	stale       bool   // if true, event timestamp is old (→ stale status)
+	idle        bool   // if true, no lock file created (→ idle status)
+	interrupted bool   // if true, lock file uses a dead PID (→ interrupted status)
 }
 
 // demoAttentionSessions defines which sessions get attention status
@@ -34,7 +35,10 @@ var demoAttentionSessions = []demoAttention{
 
 	// Stale (yellow) — running but no recent activity.
 	{sessionID: "ses-003", eventType: "tool.execution", stale: true},
-	{sessionID: "ses-005", eventType: "tool.execution", stale: true},
+
+	// Interrupted (orange ⚡) — dead PID lock file, recent tool.execution event.
+	{sessionID: "ses-005", eventType: "tool.execution", interrupted: true},
+	{sessionID: "ses-007", eventType: "tool.execution", interrupted: true},
 
 	// Idle (gray) — session not running (no lock file).
 	{sessionID: "ses-006", idle: true},
@@ -189,6 +193,10 @@ func createDemoSessionState(stateDir string) error {
 	now := time.Now().UTC()
 	staleTime := now.Add(-10 * time.Minute) // old enough to exceed threshold
 
+	// deadPID is a PID that is almost certainly not running, used to
+	// simulate interrupted sessions (stale lock with dead process).
+	const deadPID = 99999
+
 	for _, s := range demoAttentionSessions {
 		sessDir := filepath.Join(stateDir, s.sessionID)
 		if err := os.MkdirAll(sessDir, 0o700); err != nil {
@@ -201,9 +209,14 @@ func createDemoSessionState(stateDir string) error {
 			continue
 		}
 
-		// Create lock file with our PID so IsProcessAlive returns true.
-		lockPath := filepath.Join(sessDir, "inuse."+strconv.Itoa(pid)+".lock")
-		if err := os.WriteFile(lockPath, []byte(strconv.Itoa(pid)), 0o600); err != nil {
+		lockPID := pid
+		if s.interrupted {
+			lockPID = deadPID
+		}
+
+		// Create lock file. Live PIDs → active/stale; dead PIDs → interrupted.
+		lockPath := filepath.Join(sessDir, "inuse."+strconv.Itoa(lockPID)+".lock")
+		if err := os.WriteFile(lockPath, []byte(strconv.Itoa(lockPID)), 0o600); err != nil {
 			return err
 		}
 
@@ -228,11 +241,12 @@ func createDemoSessionState(stateDir string) error {
 
 // demoPlanSessions lists session IDs that get a plan.md file in demo mode.
 // Chosen to overlap with interesting attention states (one waiting, one active,
-// one stale) so the dot indicator is clearly visible.
+// one stale, one interrupted) so the dot indicator is clearly visible.
 var demoPlanSessions = []string{
 	"fa800b7b-3a24-4e3b-9f2d-a414198b27ab", // Waiting (purple)
 	"ses-026",                              // Active (green)
 	"ses-003",                              // Stale (yellow)
+	"ses-005",                              // Interrupted (orange ⚡)
 }
 
 // createDemoPlanFiles writes minimal plan.md files into session-state

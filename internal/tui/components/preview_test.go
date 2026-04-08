@@ -460,16 +460,23 @@ func TestPreviewPanelHitConversationSort_WithTurns(t *testing.T) {
 	if p.convHeaderLine < 0 {
 		t.Fatalf("convHeaderLine = %d, want >= 0 when turns present", p.convHeaderLine)
 	}
-	// Exact line should hit.
+	// Exact header line should hit.
 	if !p.HitConversationSort(p.convHeaderLine) {
 		t.Error("HitConversationSort should return true on the conversation header line")
 	}
-	// One line above and below should miss.
-	if p.HitConversationSort(p.convHeaderLine - 1) {
-		t.Error("HitConversationSort should return false one line above")
+	// Lines within the expanded zone (separator above, blank below) should hit.
+	if !p.HitConversationSort(p.convHeaderLine - 1) {
+		t.Error("HitConversationSort should return true on separator line above")
 	}
-	if p.HitConversationSort(p.convHeaderLine + 1) {
-		t.Error("HitConversationSort should return false one line below")
+	if !p.HitConversationSort(p.convHeaderLine + 1) {
+		t.Error("HitConversationSort should return true on blank line below")
+	}
+	// Well outside the zone should miss.
+	if p.HitConversationSort(p.convHeaderLine - 4) {
+		t.Error("HitConversationSort should return false well above the zone")
+	}
+	if p.HitConversationSort(p.convHeaderLine + 3) {
+		t.Error("HitConversationSort should return false well below the zone")
 	}
 }
 

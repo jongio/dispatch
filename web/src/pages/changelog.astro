@@ -16,18 +16,52 @@ import Base from '../layouts/Base.astro';
 
       <h3>Added</h3>
       <ul class="changelog-list">
-        <li><strong>Multi-session open</strong> — select multiple sessions with <kbd>Space</kbd>, open all at once with <kbd>O</kbd>. <kbd>a</kbd>/<kbd>d</kbd> for select/deselect all. Ctrl+click and Shift+click for mouse selection. ✓ indicator on selected sessions.</li>
+        <li><strong>Work status detection</strong> — analyze <code>plan.md</code> files to identify sessions with incomplete planned work. Plan parsing, AI-powered completion analysis via Copilot SDK, colored dot indicators, and filter via <kbd>!</kbd> status picker.</li>
+        <li><strong>Shift+arrow range selection</strong> — <kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> extends selection in a contiguous range, matching standard OS file manager behavior. Correctly skips folder nodes in tree mode.</li>
+        <li><strong>Multi-session launch</strong> — select multiple sessions with <kbd>Space</kbd>, launch all at once with <kbd>L</kbd>. <kbd>a</kbd>/<kbd>d</kbd> for select/deselect all. Ctrl+click and Shift+click for mouse selection. ✓ indicator on selected sessions.</li>
         <li><strong>Attention indicators</strong> — colored dots showing real-time session AI activity: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). <kbd>n</kbd> to jump to next waiting session, <kbd>!</kbd> to filter by status.</li>
-        <li><strong>Workspace recovery</strong> — detect and resume sessions interrupted by crash/reboot. New <code>R</code> keybinding, <code>workspace_recovery</code> config toggle.</li>
+        <li><strong>Workspace recovery</strong> — detect and resume sessions interrupted by crash/reboot. <kbd>N</kbd> to resume all interrupted, <code>workspace_recovery</code> config toggle.</li>
+        <li><strong>Conversation sort default</strong> — preview pane now shows newest conversation turns first. Toggle with <kbd>o</kbd> or click the sort arrow.</li>
+        <li><strong>Interrupted sessions in demo mode</strong> — <code>dispatch --demo</code> now shows all five attention states including orange ⚡ interrupted.</li>
+        <li><strong>ANSI-clean preview selection</strong> — copying text from the preview pane strips ANSI escapes for clean clipboard content.</li>
         <li><strong>Self-update</strong> — <code>dispatch update</code> downloads the latest release and replaces in-place with SHA-256 verification. Background version check on every launch (24h cache).</li>
         <li>Demo mode enhancements — fake attention data, timestamps relative to launch time, sessions across all time windows</li>
         <li>WSL cross-testing for Unix code path coverage</li>
-        <li>Race detection and install verification as preflight steps (now 11 steps)</li>
+        <li>Race detection and install verification as preflight steps</li>
+      </ul>
+
+      <h3>Changed</h3>
+      <ul class="changelog-list">
+        <li><kbd>!</kbd> status picker now includes "Incomplete work", "Complete work", and "Favorites only" rows</li>
+        <li>Work status scan no longer runs on startup — press <kbd>R</kbd> to scan explicitly</li>
+        <li><code>conversation_newest_first</code> config defaults to <code>true</code></li>
+      </ul>
+
+      <h3>Breaking — Keybinding Overhaul</h3>
+      <ul class="changelog-list">
+        <li><strong><kbd>O</kbd> → <kbd>L</kbd></strong>: "Open selected" renamed to "Launch selected"</li>
+        <li><strong><kbd>F</kbd> removed</strong>: "Filter favorites" absorbed into <kbd>!</kbd> picker</li>
+        <li><strong><kbd>M</kbd> removed</strong>: "Filter plans" absorbed into <kbd>!</kbd> picker</li>
+        <li><strong><kbd>R</kbd> → <kbd>N</kbd></strong>: "Resume interrupted" moved to <kbd>N</kbd></li>
+        <li><strong><kbd>R</kbd> = Scan work status</strong> (new)</li>
+      </ul>
+
+      <h3>Security</h3>
+      <ul class="changelog-list">
+        <li>Eliminate TOCTOU race in file read/write paths — open-then-Fstat pattern</li>
+        <li>Harden prompt injection defense against spaced delimiter bypass</li>
+        <li>Cancellable AI work status scan with 10-minute timeout</li>
       </ul>
 
       <h3>Fixed</h3>
       <ul class="changelog-list">
-        <li>Demo mode 1-hour time range showing no sessions due to timestamp format mismatch (space vs RFC3339 <code>T</code> separator)</li>
+        <li><code>AttentionInterrupted</code> missing from sort priority</li>
+        <li>Deep search and AI session results now apply full filter chain</li>
+        <li>AI work status fallback for sessions without AI results</li>
+        <li>Demo mode 1-hour time range showing no sessions due to timestamp format mismatch</li>
+        <li>Symlink overwrite vulnerability in <code>WriteContinuationPlan</code></li>
+        <li>Plan parser auto-generated section feedback loop</li>
+        <li>Race detector guard in preflight — skips gracefully without CGO/gcc</li>
       </ul>
 
       <hr style="margin: var(--space-8) 0; border-color: var(--border);" />

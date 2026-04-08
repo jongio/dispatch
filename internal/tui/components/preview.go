@@ -185,10 +185,16 @@ func (p *PreviewPanel) ScrollOffset() int {
 }
 
 // HitConversationSort reports whether contentRow (a 0-indexed line in the
-// full rendered content) falls on the "Conversation" header label. This is
-// used by the mouse handler to detect clicks on the sort toggle.
+// full rendered content) falls within the clickable zone around the
+// "Conversation" header label. The zone spans from the separator line
+// above through the blank line below the label (4 lines total).
 func (p *PreviewPanel) HitConversationSort(contentRow int) bool {
-	return p.convHeaderLine >= 0 && contentRow == p.convHeaderLine
+	if p.convHeaderLine < 0 {
+		return false
+	}
+	// convHeaderLine points to "Conversation ▼".
+	// Layout: blank (H-2), separator (H-1), label (H), blank (H+1).
+	return contentRow >= p.convHeaderLine-2 && contentRow <= p.convHeaderLine+1
 }
 
 // HitSessionID reports whether contentRow (a 0-indexed line in the full
