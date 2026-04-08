@@ -22,10 +22,12 @@ const base = import.meta.env.BASE_URL;
         { label: 'From source', id: 'source', icon: 'source', code: 'go install github.com/jongio/dispatch/cmd/dispatch@latest' },
       ]} />
 
-      <p>Or clone and build locally:</p>
-      <pre><code>git clone https://github.com/jongio/dispatch.git
+      <div class="clone-block">
+        <p>Or clone and build locally:</p>
+        <pre><code>git clone https://github.com/jongio/dispatch.git
 cd dispatch
 go install ./cmd/dispatch/</code></pre>
+      </div>
     </div>
   </section>
 
@@ -118,5 +120,23 @@ Set-Alias -Name disp -Value dispatch</code></pre>
 
   .troubleshoot-item:last-child {
     margin-bottom: 0;
+  }
+
+  .clone-block {
+    max-width: 52rem;
+    margin: var(--space-6) auto 0;
+    text-align: center;
+  }
+
+  .clone-block p {
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-3);
+  }
+
+  .clone-block pre {
+    text-align: left;
+    margin-bottom: 0;
+  }
   }
 </style>
