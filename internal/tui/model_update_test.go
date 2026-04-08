@@ -2972,6 +2972,7 @@ func TestHandleMouse_LeftClick_PreviewConversationSort(t *testing.T) {
 		Turns:   []data.Turn{{UserMessage: "q", AssistantResponse: "a"}},
 	}
 	m.preview.SetDetail(m.detail)
+	m.preview.SetConversationSort(m.cfg.ConversationNewestFirst)
 	m.recalcLayout()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
 
@@ -3743,6 +3744,7 @@ func TestHandleKey_ConversationSort_NoOpWhenHidden(t *testing.T) {
 	}
 	m.preview.SetDetail(m.detail)
 	m.preview.SetConversationSort(false) // oldest first
+	m.cfg.ConversationNewestFirst = false
 
 	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	rm := result.(Model)
@@ -3757,6 +3759,7 @@ func TestHandleKey_ConversationSort_NoOpWhenDetailNil(t *testing.T) {
 	m.showPreview = true
 	m.recalcLayout()
 	m.detail = nil // no detail loaded
+	m.cfg.ConversationNewestFirst = false
 
 	result, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	rm := result.(Model)

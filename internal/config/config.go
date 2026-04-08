@@ -143,10 +143,10 @@ type Config struct {
 	DefaultCollapsed bool `json:"default_collapsed,omitempty"`
 
 	// ConversationNewestFirst controls the turn display order in the
-	// preview panel's Conversation section. When false (default), turns
-	// are shown oldest-first (ascending by TurnIndex). When true, turns
-	// are shown newest-first (descending).
-	ConversationNewestFirst bool `json:"conversation_newest_first,omitempty"`
+	// preview panel's Conversation section. When true (default), turns
+	// are shown newest-first (descending). When false, turns are shown
+	// oldest-first (ascending by TurnIndex).
+	ConversationNewestFirst bool `json:"conversation_newest_first"`
 
 	// WorkspaceRecovery enables detection of sessions interrupted by
 	// crash/reboot. When false, stale lock files are ignored. Default true.
@@ -245,14 +245,15 @@ func (c *Config) EffectiveLaunchMode() string {
 // Default returns a Config populated with sensible default values.
 func Default() *Config {
 	return &Config{
-		DefaultShell:      "",
-		DefaultTerminal:   "",
-		DefaultTimeRange:  "1d",
-		DefaultSort:       "updated",
-		DefaultPivot:      "folder",
-		ShowPreview:       true,
-		MaxSessions:       100,
-		WorkspaceRecovery: true,
+		DefaultShell:            "",
+		DefaultTerminal:         "",
+		DefaultTimeRange:        "1d",
+		DefaultSort:             "updated",
+		DefaultPivot:            "folder",
+		ShowPreview:             true,
+		MaxSessions:             100,
+		ConversationNewestFirst: true,
+		WorkspaceRecovery:       true,
 	}
 }
 
