@@ -20,9 +20,10 @@ type Session struct {
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
 
-	// LastActiveAt is computed at query time as the latest turn timestamp,
-	// falling back to updated_at then created_at. This avoids the problem
-	// where the Copilot CLI reindex resets updated_at on all sessions.
+	// LastActiveAt is computed at query time as the MAX of the latest
+	// turn timestamp, updated_at, and created_at — whichever is most
+	// recent.  Indexed turns may lag (stale reindex) while updated_at
+	// may be noisy, so taking the maximum gives the best estimate.
 	LastActiveAt string `json:"last_active_at"`
 
 	// Computed fields – populated by JOIN aggregates, not stored in the table.

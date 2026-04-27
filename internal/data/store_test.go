@@ -2370,3 +2370,102 @@ func TestDeepSearchWithGroupSessions(t *testing.T) {
 		t.Fatalf("expected 1 session matching file path in groups, got %d", totalSessions)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// lastActiveExpr regression tests — ensures the MAX-of-three logic picks
+// the most recent timestamp regardless of which source it comes from.
+// ---------------------------------------------------------------------------
+
+func TestLastActive_StaleTurnsUsesUpdatedAt(t *testing.T) {
+	// When turns are stale (not yet reindexed) but updated_at is recent,
+	// lastActiveAt should reflect updated_at.
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	seedSession(t, s.db, "s1", "/work", "r", "main", "Stale turns",
+		"2026-04-20T00:00:00Z", "2026-04-27T12:00:00Z")
+	seedTurn(t, s.db, "s1", 0, "hello", "hi", "2026-04-20T10:00:00Z")
+
+	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	if sessions[0].LastActiveAt != "2026-04-27T12:00:00Z" {
+		t.Errorf("LastActiveAt = %q, want updated_at %q", sessions[0].LastActiveAt, "2026-04-27T12:00:00Z")
+	}
+}
+
+func TestLastActive_FreshTurnsUsedOverUpdatedAt(t *testing.T) {
+	// When turns are more recent than updated_at, lastActiveAt should
+	// use the turn timestamp.
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	seedSession(t, s.db, "s1", "/work", "r", "main", "Fresh turns",
+		"2026-04-20T00:00:00Z", "2026-04-22T00:00:00Z")
+	seedTurn(t, s.db, "s1", 0, "hello", "hi", "2026-04-25T10:00:00Z")
+
+	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	if sessions[0].LastActiveAt != "2026-04-25T10:00:00Z" {
+		t.Errorf("LastActiveAt = %q, want turn timestamp %q", sessions[0].LastActiveAt, "2026-04-25T10:00:00Z")
+	}
+}
+
+func TestLastActive_NoTurnsFallsBackToUpdatedAt(t *testing.T) {
+	// Sessions with no turns should fall back to updated_at (or created_at).
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	// Insert a session with a turn so it passes the "EXISTS turns" filter,
+	// then test a second session that does have turns but where updated_at
+	// is the winner. For the no-turns case the session is excluded by the
+	// zero-turn filter, so we test indirectly via GetSession.
+	seedSession(t, s.db, "s1", "/work", "r", "main", "No turns",
+		"2026-04-10T00:00:00Z", "2026-04-15T00:00:00Z")
+
+	detail, err := s.GetSession("s1")
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if detail.Session.LastActiveAt != "2026-04-15T00:00:00Z" {
+		t.Errorf("LastActiveAt = %q, want updated_at %q", detail.Session.LastActiveAt, "2026-04-15T00:00:00Z")
+	}
+}
+
+func TestLastActive_StaleTurnsVisibleInDayFilter(t *testing.T) {
+	// Regression: a session with stale turn data but recent updated_at
+	// must appear under a "since 1 day ago" filter.
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	now := time.Now()
+	recent := now.Add(-6 * time.Hour).UTC().Format(time.RFC3339)
+	old := now.Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+
+	seedSession(t, s.db, "s1", "/msbench", "r", "main", "MSBench",
+		old, recent) // created 3d ago, updated 6h ago
+	seedTurn(t, s.db, "s1", 0, "build", "ok", old) // turn from 3d ago
+
+	since := now.Add(-24 * time.Hour)
+	sessions, err := s.ListSessions(
+		FilterOptions{Since: &since},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session within day filter, got %d", len(sessions))
+	}
+	if sessions[0].ID != "s1" {
+		t.Errorf("expected s1, got %s", sessions[0].ID)
+	}
+}

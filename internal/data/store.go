@@ -173,13 +173,18 @@ func escapeLIKE(s string) string {
 }
 
 // lastActiveExpr is the SQL expression that computes a session's true
-// "last active" time: the latest turn timestamp, falling back to
-// updated_at then created_at.  Use this in WHERE/GROUP BY clauses
-// where column aliases are not available.
-const lastActiveExpr = `COALESCE(
-	(SELECT MAX(t.timestamp) FROM turns t WHERE t.session_id = s.id),
-	s.updated_at,
-	s.created_at
+// "last active" time as the most recent signal across indexed turns,
+// updated_at, and created_at.  Indexed turns may lag behind actual
+// activity (reindex hasn't run), while updated_at may occasionally be
+// noisy (metadata-only updates).  Taking the MAX of all three gives
+// the best available estimate.
+//
+// Each value is COALESCE'd to empty-string so that SQLite's multi-arg MAX()
+// never sees NULL (which would poison the result to NULL).
+const lastActiveExpr = `MAX(
+	COALESCE((SELECT MAX(t.timestamp) FROM turns t WHERE t.session_id = s.id), ''),
+	COALESCE(s.updated_at, ''),
+	COALESCE(s.created_at, '')
 )`
 
 // filterBuilder accumulates JOIN and WHERE clauses with parameterised args.
@@ -296,9 +301,10 @@ func pivotExpr(p PivotField) string {
 }
 
 // sessionColumns is the shared SELECT list used by session queries.
-// last_active_at is computed as the most recent turn timestamp, falling
-// back to updated_at then created_at so that reindex-clobbered dates
-// don't make old sessions appear recent.
+// last_active_at is the MAX of the most recent turn timestamp,
+// updated_at, and created_at — whichever is newest wins.  This
+// handles both stale turn indexes (updated_at is more recent) and
+// noisy updated_at values (turns are more recent).
 var sessionColumns = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), COALESCE(s.branch,''),
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
 	` + lastActiveExpr + ` AS last_active_at,
