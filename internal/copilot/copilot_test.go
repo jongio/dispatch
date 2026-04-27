@@ -156,3 +156,80 @@ func TestParseSessionIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyError(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		err      error
+		contains string // substring that must appear in the message
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			contains: "",
+		},
+		{
+			name:     "executable not found",
+			err:      fmt.Errorf("exec: \"copilot\": executable file not found in %%PATH%%"),
+			contains: "install Copilot CLI",
+		},
+		{
+			name:     "401 auth error",
+			err:      fmt.Errorf("HTTP 401: bad credentials"),
+			contains: "not authenticated",
+		},
+		{
+			name:     "403 subscription",
+			err:      fmt.Errorf("HTTP 403: forbidden"),
+			contains: "Copilot subscription",
+		},
+		{
+			name:     "transport broken pipe",
+			err:      fmt.Errorf("broken pipe"),
+			contains: "reconnecting",
+		},
+		{
+			name:     "retries exhausted",
+			err:      fmt.Errorf("search unavailable after 3 retries"),
+			contains: "could not connect",
+		},
+		{
+			name:     "unknown error",
+			err:      fmt.Errorf("something unexpected"),
+			contains: "could not connect",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ClassifyError(tt.err)
+			if tt.err == nil {
+				if got != "" {
+					t.Errorf("expected empty string for nil error, got %q", got)
+				}
+				return
+			}
+			if got == "" {
+				t.Fatal("expected non-empty message for non-nil error")
+			}
+			// Every non-nil error message must start with "AI search:".
+			if !containsSubstr(got, "AI search:") {
+				t.Errorf("message should be prefixed with 'AI search:', got %q", got)
+			}
+			if !containsSubstr(got, tt.contains) {
+				t.Errorf("message should contain %q, got %q", tt.contains, got)
+			}
+		})
+	}
+}
+
+func containsSubstr(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

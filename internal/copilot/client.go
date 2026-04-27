@@ -86,6 +86,21 @@ func New(store *data.Store) *Client {
 	return &Client{store: store}
 }
 
+// NewForTest creates a Client with a mock search function for testing.
+// The returned client reports as available and uses searchFn instead of
+// the real Copilot SDK for Search calls.
+func NewForTest(store *data.Store, searchFn func(ctx context.Context, query string) ([]string, error)) *Client {
+	c := &Client{
+		store:     store,
+		available: true,
+		hooks: &testHooks{
+			doSearch: searchFn,
+			doInit:   func(ctx context.Context) error { return nil },
+		},
+	}
+	return c
+}
+
 // Init starts the Copilot SDK client. Sessions are created on-demand by
 // Search and SendMessage. This is safe to call from a goroutine;
 // subsequent calls are no-ops if already initialised.
@@ -169,17 +184,24 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 
 	// Create a dedicated streaming session for this message.
 	tools := defineTools(store)
+	systemMsg := "You are an AI assistant integrated into the Dispatch session browser. " +
+		"Your job is to help users find and explore their Copilot CLI sessions. " +
+		"Use the provided tools to search sessions, get details, and list repositories. " +
+		"When presenting session results, include the session ID, summary, repository, " +
+		"branch, and timestamps. Be concise and helpful."
+	slog.Debug("copilot send_message",
+		"system_prompt", systemMsg,
+		"user_prompt", prompt,
+		"model", "gpt-4.1",
+		"streaming", true,
+	)
 	session, err := sdkClient.CreateSession(ctx, &sdk.SessionConfig{
 		Model:               "gpt-4.1",
 		Streaming:           true,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
-			Content: "You are an AI assistant integrated into the Dispatch session browser. " +
-				"Your job is to help users find and explore their Copilot CLI sessions. " +
-				"Use the provided tools to search sessions, get details, and list repositories. " +
-				"When presenting session results, include the session ID, summary, repository, " +
-				"branch, and timestamps. Be concise and helpful.",
+			Content: systemMsg,
 		},
 	})
 	if err != nil {
@@ -428,17 +450,25 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 
 	// Create a dedicated session for search with a focused system message.
 	tools := defineTools(store)
+	systemMsg := "You are a session search assistant for a coding session browser. " +
+		"Given a search query, use the search_sessions and search_deep tools to find " +
+		"relevant coding sessions. Think about synonyms, related terms, and alternative " +
+		"phrasings of the query. Return ONLY a JSON array of session ID strings that match, " +
+		"nothing else. Example: [\"abc-123\", \"def-456\"]"
+	userPrompt := "Search for Copilot CLI coding sessions that include: " + QuoteUntrusted(query)
+	slog.Debug("copilot search prompt",
+		"system_prompt", systemMsg,
+		"user_prompt", userPrompt,
+		"model", "gpt-4.1",
+		"streaming", false,
+	)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
 		Model:               "gpt-4.1",
 		Streaming:           false,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
-			Content: "You are a session search assistant for a coding session browser. " +
-				"Given a search query, use the search_sessions and search_deep tools to find " +
-				"relevant coding sessions. Think about synonyms, related terms, and alternative " +
-				"phrasings of the query. Return ONLY a JSON array of session ID strings that match, " +
-				"nothing else. Example: [\"abc-123\", \"def-456\"]",
+			Content: systemMsg,
 		},
 	})
 	if err != nil {
@@ -454,7 +484,7 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 	}
 
 	resp, err := session.SendAndWait(sdkCtx, sdk.MessageOptions{
-		Prompt: "Search for Copilot CLI coding sessions that include: " + QuoteUntrusted(query),
+		Prompt: userPrompt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("search query failed: %w", err)
@@ -611,22 +641,28 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 
 	// Create a dedicated non-streaming session for analysis.
 	tools := defineTools(store)
+	systemMsg := "You are analyzing whether planned work in a Copilot CLI session was completed. " +
+		"You have access to tools that can retrieve session details including files changed, " +
+		"checkpoints, and conversation turns. Analyze the plan content against the session " +
+		"activity and return ONLY a JSON object with these fields:\n" +
+		"- complete: boolean (true if all planned work appears done)\n" +
+		"- total_tasks: number of distinct tasks identified in the plan\n" +
+		"- completed_tasks: number of tasks that appear completed based on evidence\n" +
+		"- remaining_items: array of strings describing tasks that appear incomplete\n" +
+		"- summary: brief one-sentence assessment\n\n" +
+		"Do not include any text outside the JSON object."
+	slog.Debug("copilot analyze_completion prompt",
+		"system_prompt", systemMsg,
+		"session_id", sessionID,
+		"model", "gpt-4.1",
+	)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
 		Model:               "gpt-4.1",
 		Streaming:           false,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
-			Content: "You are analyzing whether planned work in a Copilot CLI session was completed. " +
-				"You have access to tools that can retrieve session details including files changed, " +
-				"checkpoints, and conversation turns. Analyze the plan content against the session " +
-				"activity and return ONLY a JSON object with these fields:\n" +
-				"- complete: boolean (true if all planned work appears done)\n" +
-				"- total_tasks: number of distinct tasks identified in the plan\n" +
-				"- completed_tasks: number of tasks that appear completed based on evidence\n" +
-				"- remaining_items: array of strings describing tasks that appear incomplete\n" +
-				"- summary: brief one-sentence assessment\n\n" +
-				"Do not include any text outside the JSON object.",
+			Content: systemMsg,
 		},
 	})
 	if err != nil {
@@ -644,6 +680,10 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 		" and the following plan_content to retrieve session context, " +
 		"then return your completion analysis as a JSON object.\n\n" +
 		"Plan content:\n" + SanitizeExternalContent(planContent)
+	slog.Debug("copilot analyze_completion user_prompt",
+		"user_prompt", prompt,
+		"session_id", sessionID,
+	)
 
 	resp, err := session.SendAndWait(sdkCtx, sdk.MessageOptions{
 		Prompt: prompt,
@@ -713,6 +753,50 @@ func (c *Client) resetSDK() {
 	}
 	c.available = false
 	c.initErr = nil // clear so Init can retry
+}
+
+// ClassifyError returns an actionable user-facing message for a Copilot
+// SDK error. Every message is prefixed with "AI search:" so the user
+// knows which feature is affected, and includes guidance on how to fix it.
+func ClassifyError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+
+	// CLI binary not found.
+	if strings.Contains(msg, "executable file not found") ||
+		strings.Contains(msg, "exec:") && strings.Contains(msg, "copilot") {
+		return "AI search: install Copilot CLI \u2014 npm i -g @github/copilot"
+	}
+
+	// Auth failures.
+	if strings.Contains(msg, "401") ||
+		strings.Contains(msg, "not authenticated") ||
+		strings.Contains(msg, "no token") ||
+		strings.Contains(msg, "auth") && strings.Contains(msg, "fail") {
+		return "AI search: not authenticated \u2014 run 'copilot' to sign in"
+	}
+
+	// Subscription / permissions.
+	if strings.Contains(msg, "403") ||
+		strings.Contains(msg, "subscription") ||
+		strings.Contains(msg, "not entitled") {
+		return "AI search: requires a GitHub Copilot subscription"
+	}
+
+	// Transport / pipe errors (retrying).
+	if isTransportError(err) {
+		return "AI search: reconnecting\u2026"
+	}
+
+	// All retries exhausted.
+	if strings.Contains(msg, "retries") {
+		return "AI search: could not connect \u2014 try again later"
+	}
+
+	// Fallback — still actionable.
+	return "AI search: could not connect \u2014 try again later"
 }
 
 // maxParsedSessionIDs caps the number of session IDs extracted from a

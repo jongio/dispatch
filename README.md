@@ -19,6 +19,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 ## Features
 
 - **Full-text search** (`/`) — two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms
+- **AI search** — powered by the Copilot SDK, finds sessions by natural language (e.g. "the app about pets"). Enabled by default; requires the [Copilot CLI](https://docs.github.com/en/copilot/copilot-cli) installed and authenticated. Degrades gracefully with actionable error messages when unavailable
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
 - **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, created, turns) with toggleable direction
 - **Grouping (pivot) modes** (`Tab`) — flat, folder, repo, branch, date — displayed as collapsible trees with session counts

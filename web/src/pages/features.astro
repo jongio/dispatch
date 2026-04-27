@@ -40,6 +40,31 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- AI Search -->
+    <section class="section" id="ai-search">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>AI Search</h2>
+          <p>
+            Powered by the Copilot SDK, AI search lets you find sessions using
+            natural language. Type "the app about pets" or "auth refactoring last
+            week" and Dispatch asks Copilot to identify matching sessions.
+          </p>
+          <ul>
+            <li>Enabled by default — works alongside full-text search</li>
+            <li>AI-found sessions marked with ✦</li>
+            <li>Requires the <a href="https://docs.github.com/en/copilot/copilot-cli">Copilot CLI</a> installed and authenticated</li>
+            <li>Graceful degradation with actionable error messages</li>
+            <li>Disable with <code>ai_search: false</code> in config</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/search-ai-searching.png" alt="AI search in progress with connecting indicator" caption="AI search querying Copilot" />
+          <Screenshot src="one-half-light/search-ai-results.png" alt="AI search results with sparkle markers on matched sessions" caption="AI-found sessions marked with ✦" />
+        </div>
+      </div>
+    </section>
+
     <!-- Directory Filtering -->
     <section class="section" id="filter">
       <div class="feature-section reverse">

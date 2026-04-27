@@ -44,6 +44,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
         { key: 'theme', type: 'string', default: '"auto"', description: 'Color scheme: auto or a named scheme.' },
         { key: 'workspace_recovery', type: 'bool', default: 'true', description: 'Detect sessions interrupted by crash/reboot. Disable if you see false positives.' },
+        { key: 'ai_search', type: 'bool', default: 'true', description: 'Enable Copilot SDK AI search. Requires the Copilot CLI installed and authenticated. Set to false to use only local full-text search.' },
       ]} />
     </div>
   </section>

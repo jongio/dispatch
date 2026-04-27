@@ -844,12 +844,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.copilotSearching = false
 		m.searchBar.SetAISearching(false)
 		if msg.err != nil {
-			// AI search is best-effort — show a brief "(✦ unavailable)"
-			// indicator but never block or alarm the user.
-			m.searchBar.SetAIStatus("unavailable")
+			// AI search is best-effort — show an actionable error so
+			// the user knows what feature is affected and how to fix it.
+			errMsg := copilot.ClassifyError(msg.err)
+			m.searchBar.SetAIStatus("error")
+			m.searchBar.SetAIError(errMsg)
 			m.searchBar.SetAIResults(0)
-			m.searchBar.SetAIError("")
-			slog.Debug("copilot search failed", "error", msg.err)
+			slog.Debug("copilot search failed", "error", msg.err, "userMsg", errMsg)
 			return m, nil
 		}
 		m.searchBar.SetAIStatus("ready")

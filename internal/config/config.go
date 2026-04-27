@@ -111,9 +111,11 @@ type Config struct {
 	// as favorites. They can be filtered with the "filter favorites" toggle.
 	FavoriteSessions []string `json:"favoriteSessions,omitempty"`
 
-	// AISearch enables Copilot SDK-powered AI search. When false (the
-	// default), only the local FTS5 index is used.  Set to true to also
-	// query the Copilot backend for semantically relevant sessions.
+	// AISearch enables Copilot SDK-powered AI search. When true (the
+	// default), Dispatch queries the Copilot backend for semantically
+	// relevant sessions in addition to the local FTS5 index. Requires
+	// the Copilot CLI to be installed and authenticated; degrades
+	// gracefully with an actionable message when it is not available.
 	AISearch bool `json:"ai_search,omitempty"`
 
 	// AttentionThreshold is the duration string (e.g. "15m", "1h") after
@@ -254,6 +256,7 @@ func Default() *Config {
 		MaxSessions:             100,
 		ConversationNewestFirst: true,
 		WorkspaceRecovery:       true,
+		AISearch:                true,
 	}
 }
 

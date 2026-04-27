@@ -127,6 +127,35 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		add("search-deep", m, Highlight{Row: 0, Col: 0, Rows: 1, Cols: 120})
 	}
 
+	// ── AI Search ────────────────────────────────────────────────────
+	{
+		m := newBase()
+		m.searchBar.SetValue("pet adoption app")
+		m.searchBar.Focus()
+		m.searchBar.SetAISearching(true)
+		m.searchBar.SetAIStatus("connecting")
+		m.searchBar.SetResultCount(len(c.sessions))
+		add("search-ai-searching", m, Highlight{Row: 0, Col: 0, Rows: 1, Cols: 120})
+	}
+	{
+		m := newBase()
+		m.searchBar.SetValue("pet adoption app")
+		m.searchBar.Focus()
+		m.searchBar.SetAISearching(false)
+		m.searchBar.SetAIStatus("ready")
+		m.searchBar.SetAIResults(3)
+		m.searchBar.SetResultCount(8)
+		// Mark a few sessions as AI-found.
+		aiSet := make(map[string]struct{})
+		for i, s := range c.sessions {
+			if i < 3 {
+				aiSet[s.ID] = struct{}{}
+			}
+		}
+		m.sessionList.SetAISessions(aiSet)
+		add("search-ai-results", m, Highlight{Row: 0, Col: 0, Rows: 1, Cols: 120})
+	}
+
 	// ── Filter panel ──────────────────────────────────────────────────
 	{
 		m := newBase()

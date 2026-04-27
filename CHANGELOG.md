@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **AI search** — Copilot SDK-powered natural language search for sessions. Type a query like "the app about pets" and Dispatch asks Copilot to find matching sessions. Enabled by default (`ai_search: true`); requires the Copilot CLI installed and authenticated. Degrades gracefully with actionable error messages (install guidance, auth prompts) when the CLI is unavailable.
+- **Actionable AI search errors** — error messages in the search bar now explain exactly what's wrong and how to fix it (e.g. "AI search: install Copilot CLI — npm i -g @github/copilot").
+
 ## [v0.8.0] — 2026-04-08
 
 ### Added
