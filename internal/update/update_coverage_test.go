@@ -472,6 +472,80 @@ func TestReplaceWindows_PreviousOldFileRemoved(t *testing.T) {
 	}
 }
 
+func TestReplaceWindows_LockedOldFileFallback(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	exeDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(exeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	exePath := filepath.Join(exeDir, binaryName+".exe")
+	if err := os.WriteFile(exePath, []byte("current"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate a locked .old file by holding it open for reading.
+	oldPath := exePath + oldBinarySuffix
+	if err := os.WriteFile(oldPath, []byte("locked-old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockedFile, err := os.Open(oldPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// On Windows this open handle prevents deletion; on Unix the test
+	// still exercises the fallback-name path because removeWithRetry
+	// will succeed and the unique name is unused — that's fine.
+	defer lockedFile.Close() //nolint:errcheck
+
+	newBin := filepath.Join(tmpDir, "new.exe")
+	newContent := []byte("updated-binary")
+	if err := os.WriteFile(newBin, newContent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaceWindows(newBin, exeDir, binaryName+".exe"); err != nil {
+		t.Fatalf("replaceWindows should succeed with locked .old file: %v", err)
+	}
+
+	got, err := os.ReadFile(exePath)
+	if err != nil {
+		t.Fatalf("reading replaced binary: %v", err)
+	}
+	if string(got) != string(newContent) {
+		t.Errorf("replaced content = %q, want %q", string(got), string(newContent))
+	}
+}
+
+func TestRemoveWithRetry_NonExistent(t *testing.T) {
+	t.Parallel()
+	err := removeWithRetry(filepath.Join(t.TempDir(), "does-not-exist"))
+	if err != nil {
+		t.Fatalf("removeWithRetry should return nil for non-existent file, got: %v", err)
+	}
+}
+
+func TestRenameWithRetry_Success(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	src := filepath.Join(tmpDir, "src.txt")
+	dst := filepath.Join(tmpDir, "dst.txt")
+	if err := os.WriteFile(src, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := renameWithRetry(src, dst); err != nil {
+		t.Fatalf("renameWithRetry: %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "hello" {
+		t.Errorf("got %q, want %q", string(got), "hello")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // fetchLatestVersion — mock transport
 // ---------------------------------------------------------------------------

@@ -497,22 +497,67 @@ func replaceUnix(newBinaryPath, exePath string) error {
 	return nil
 }
 
+// windowsRetryDelay is the pause between retries when a Windows file
+// operation fails due to a transient lock (e.g. antivirus scanning).
+const windowsRetryDelay = 200 * time.Millisecond
+
+// windowsMaxRetries is the number of retry attempts for file operations
+// that may fail due to transient locks on Windows.
+const windowsMaxRetries = 5
+
+// removeWithRetry attempts to remove a file, retrying on failure to
+// handle transient locks from antivirus or other processes.
+func removeWithRetry(path string) error {
+	var err error
+	for i := 0; i <= windowsMaxRetries; i++ {
+		err = os.Remove(path)
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if i < windowsMaxRetries {
+			time.Sleep(windowsRetryDelay)
+		}
+	}
+	return err
+}
+
+// renameWithRetry attempts to rename a file, retrying on failure to
+// handle transient locks from antivirus or other processes.
+func renameWithRetry(oldpath, newpath string) error {
+	var err error
+	for i := 0; i <= windowsMaxRetries; i++ {
+		err = os.Rename(oldpath, newpath)
+		if err == nil {
+			return nil
+		}
+		if i < windowsMaxRetries {
+			time.Sleep(windowsRetryDelay)
+		}
+	}
+	return err
+}
+
 // replaceWindows renames the running exe to .old, then copies the new
 // binary and updates the companion (dispatch↔disp) if present.
 func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 	exePath := filepath.Join(exeDir, exeName)
 	oldPath := exePath + oldBinarySuffix
 
-	// Remove any previous .old file.
-	_ = os.Remove(oldPath)
+	// Remove any previous .old file, retrying for transient locks.
+	if err := removeWithRetry(oldPath); err != nil {
+		// .old file is stubbornly locked — use a unique fallback name
+		// so the rename below can still succeed.
+		oldPath = fmt.Sprintf("%s.old.%d", exePath, time.Now().UnixNano())
+	}
 
-	// Rename running exe so we can write the new one.
-	if err := os.Rename(exePath, oldPath); err != nil {
+	// Rename running exe so we can write the new one, retrying for
+	// transient locks (e.g. antivirus scanning the binary).
+	if err := renameWithRetry(exePath, oldPath); err != nil {
 		return fmt.Errorf("renaming current binary: %w", err)
 	}
 
 	if err := copyFile(newBinaryPath, exePath); err != nil {
-		rollbackErr := os.Rename(oldPath, exePath)
+		rollbackErr := renameWithRetry(oldPath, exePath)
 		if rollbackErr != nil {
 			return fmt.Errorf("installing new binary: %w", errors.Join(err, fmt.Errorf("restoring original binary: %w", rollbackErr)))
 		}
@@ -520,7 +565,7 @@ func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 	}
 
 	// Best-effort cleanup of old binary.
-	_ = os.Remove(oldPath)
+	_ = removeWithRetry(oldPath)
 
 	// Update companion binaries (dispatch.exe ↔ disp.exe). Skip the
 	// binary we just replaced to avoid a self-referencing rename that
@@ -537,15 +582,17 @@ func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 			continue
 		}
 		oldCompanion := companionPath + oldBinarySuffix
-		_ = os.Remove(oldCompanion)
-		if err := os.Rename(companionPath, oldCompanion); err != nil {
+		if removeWithRetry(oldCompanion) != nil {
+			oldCompanion = fmt.Sprintf("%s.old.%d", companionPath, time.Now().UnixNano())
+		}
+		if err := renameWithRetry(companionPath, oldCompanion); err != nil {
 			continue
 		}
 		if err := copyFile(newBinaryPath, companionPath); err != nil {
-			_ = os.Rename(oldCompanion, companionPath) // restore on failure
+			_ = renameWithRetry(oldCompanion, companionPath) // restore on failure
 			continue
 		}
-		_ = os.Remove(oldCompanion)
+		_ = removeWithRetry(oldCompanion)
 	}
 
 	return nil
