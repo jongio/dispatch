@@ -3125,11 +3125,13 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 				return dataErrorMsg{err: err}
 			}
 			// When sorting by updated time, reorder groups so the most
-			// recently active folder appears first.
+			// recently active group appears first; otherwise sort groups
+			// alphabetically by their pivot label.
 			if sortOpts.Field == data.SortByUpdated {
 				sortGroupsByLatest(groups, sortOpts.Order)
+			} else {
+				sortGroupsByLabel(groups, pivotOrd)
 			}
-			sortGroupsByLabel(groups, pivotOrd)
 			return groupsLoadedMsg{groups: groups}
 		}
 		sessions, err := store.ListSessions(filter, sortOpts, limit)
@@ -3547,8 +3549,9 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 			}
 			if sortOpts.Field == data.SortByUpdated {
 				sortGroupsByLatest(groups, sortOpts.Order)
+			} else {
+				sortGroupsByLabel(groups, pivotOrd)
 			}
-			sortGroupsByLabel(groups, pivotOrd)
 			return deepSearchResultMsg{version: version, groups: groups}
 		}
 		sessions, err := store.ListSessions(filter, sortOpts, limit)

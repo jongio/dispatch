@@ -242,6 +242,72 @@ func TestSortGroupsByLatest_SingleGroup(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Group sort ordering: sortGroupsByLatest must not be overridden by label sort
+// ---------------------------------------------------------------------------
+
+// TestSortGroupsByLatest_NotOverriddenByLabel is a regression test ensuring
+// that when sort field is SortByUpdated, groups are ordered by recency, NOT
+// alphabetically by label. Before the fix, sortGroupsByLabel always ran
+// after sortGroupsByLatest, overwriting the recency-based ordering.
+func TestSortGroupsByLatest_NotOverriddenByLabel(t *testing.T) {
+	// Groups whose labels are alphabetical (A < B < Z) but whose sessions
+	// have recency in the opposite order (Z=newest, A=oldest).
+	groups := []data.SessionGroup{
+		{Label: "A-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-01T00:00:00Z"}}},
+		{Label: "B-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-02T00:00:00Z"}}},
+		{Label: "Z-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-03T00:00:00Z"}}},
+	}
+
+	// Simulate the fixed loadSessionsCmd logic: SortByUpdated → sortGroupsByLatest only.
+	sortOpts := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+	pivotOrd := data.Ascending
+
+	if sortOpts.Field == data.SortByUpdated {
+		sortGroupsByLatest(groups, sortOpts.Order)
+	} else {
+		sortGroupsByLabel(groups, pivotOrd)
+	}
+
+	// Expect recency order: Z-folder (newest) first, A-folder (oldest) last.
+	if groups[0].Label != "Z-folder" {
+		t.Errorf("expected first group 'Z-folder' (newest), got %q", groups[0].Label)
+	}
+	if groups[2].Label != "A-folder" {
+		t.Errorf("expected last group 'A-folder' (oldest), got %q", groups[2].Label)
+	}
+}
+
+// TestSortGroupsByLabel_UsedWhenNotSortByUpdated verifies that when sorting
+// by a non-updated field, groups are sorted alphabetically by label.
+func TestSortGroupsByLabel_UsedWhenNotSortByUpdated(t *testing.T) {
+	groups := []data.SessionGroup{
+		{Label: "Z-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-03T00:00:00Z"}}},
+		{Label: "A-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-01T00:00:00Z"}}},
+		{Label: "M-folder", Sessions: []data.Session{{LastActiveAt: "2024-01-02T00:00:00Z"}}},
+	}
+
+	sortOpts := data.SortOptions{Field: data.SortByName, Order: data.Descending}
+	pivotOrd := data.Ascending
+
+	if sortOpts.Field == data.SortByUpdated {
+		sortGroupsByLatest(groups, sortOpts.Order)
+	} else {
+		sortGroupsByLabel(groups, pivotOrd)
+	}
+
+	// Expect alphabetical ascending: A, M, Z.
+	if groups[0].Label != "A-folder" {
+		t.Errorf("expected first group 'A-folder', got %q", groups[0].Label)
+	}
+	if groups[1].Label != "M-folder" {
+		t.Errorf("expected second group 'M-folder', got %q", groups[1].Label)
+	}
+	if groups[2].Label != "Z-folder" {
+		t.Errorf("expected third group 'Z-folder', got %q", groups[2].Label)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // resolveTheme
 // ---------------------------------------------------------------------------
 
