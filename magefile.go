@@ -20,6 +20,7 @@ const staleBinaryThreshold = 30 * time.Second
 // genuinely dead: build-tag stubs, interface implementations, and functions
 // called only from files with non-default build tags.
 var deadcodeAllowlist = []string{
+	"filterEnv",                    // Unix-only helper called from launchInPlaceUnix (launch_unix.go)
 	"launchInPlaceUnix",            // build-tag stub (launch_windows.go)
 	"colorSchemeRef.UnmarshalJSON", // Windows-only (wttheme.go)
 	"colorSchemeRef.resolve",       // Windows-only (wttheme.go)
@@ -281,6 +282,16 @@ func Clean() error {
 func Contributors() error {
 	fmt.Println("\n=== Generating CONTRIBUTORS.md ===")
 	return run("go", "run", "./cmd/contributors/", "--all")
+}
+
+// Deadcode runs dead code detection with allowlist filtering.
+// CI uses this target to avoid false positives from build-tag stubs.
+func Deadcode() error {
+	fmt.Println("\n=== Dead code detection ===")
+	if _, err := exec.LookPath("deadcode"); err != nil {
+		return fmt.Errorf("deadcode not installed: go install golang.org/x/tools/cmd/deadcode@latest")
+	}
+	return runDeadcode()
 }
 
 // --- helpers ---
