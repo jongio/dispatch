@@ -27,6 +27,7 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+      ignore-string-values: '(?i)^(#[0-9a-f]{6})$'
     exhaustive:
       default-signifies-exhaustive: true
     gocritic:
@@ -67,6 +68,31 @@ linters:
           - exhaustive
       # runtime.GOOS comparisons are idiomatic Go, not magic strings.
       - text: 'string `(windows|darwin|linux)` has'
+        linters:
+          - goconst
+      # Theme/color definitions intentionally repeat hex values across
+      # self-contained theme structs; extracting constants hurts readability.
+      - path: internal/tui/styles/
+        linters:
+          - goconst
+      # CLI flag strings in switch/case are idiomatic Go, not magic constants.
+      - path: cmd/
+        linters:
+          - goconst
+      # Shell definitions use inline names/args in struct literals by design.
+      - path: internal/platform/shell\.go
+        linters:
+          - goconst
+      # TUI labels and sort-field strings are intentionally inline.
+      - path: internal/tui/
+        linters:
+          - goconst
+      # Data layer uses inline SQL fragments and enum strings.
+      - path: internal/data/
+        linters:
+          - goconst
+      # Copilot client uses inline model names.
+      - path: internal/copilot/
         linters:
           - goconst
       # os.Exit in main() is acceptable; defer cleanup is best-effort.
