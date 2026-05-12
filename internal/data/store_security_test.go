@@ -209,7 +209,8 @@ func TestSQLInjection_GroupSessions(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	_, err := s.GroupSessions(PivotByRepo,
+	_, err := s.GroupSessions(
+		PivotByRepo,
 		FilterOptions{Query: "'; DROP TABLE sessions;--"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,

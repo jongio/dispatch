@@ -62,7 +62,8 @@ func findCopilotBinary() string {
 			"@github", "copilot", "node_modules", "@github", "copilot-win32-x64", "copilot.exe"),
 	}
 	if appdata := os.Getenv("APPDATA"); appdata != "" {
-		candidates = append(candidates,
+		candidates = append(
+			candidates,
 			filepath.Join(appdata, "npm", "node_modules",
 				"@github", "copilot", "node_modules", "@github", "copilot-win32-x64", "copilot.exe"),
 		)

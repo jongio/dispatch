@@ -599,12 +599,14 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 			count++
 			if count > maxPreviewItems {
 				b.WriteString(styles.DimmedStyle.Render(
-					fmt.Sprintf("  … and %d more", countUniqueRefs(p.detail.Refs)-maxPreviewItems)) + "\n")
+					fmt.Sprintf("  … and %d more", countUniqueRefs(p.detail.Refs)-maxPreviewItems),
+				) + "\n")
 				break
 			}
 			val := Truncate(ref.RefValue, max(1, contentW-len(ref.RefType)-6))
 			b.WriteString(styles.DimmedStyle.Render(
-				"  "+styles.IconBullet()+" "+ref.RefType+": "+val) + "\n")
+				"  "+styles.IconBullet()+" "+ref.RefType+": "+val,
+			) + "\n")
 		}
 	}
 
@@ -642,15 +644,18 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		sep := styles.SeparatorStyle.Render(strings.Repeat("─", max(1, contentW)))
 		b.WriteString(sep + "\n")
 		b.WriteString(styles.PreviewLabelStyle.Render(
-			fmt.Sprintf("Checkpoints (%d)", len(p.detail.Checkpoints))) + "\n")
+			fmt.Sprintf("Checkpoints (%d)", len(p.detail.Checkpoints)),
+		) + "\n")
 		for i, cp := range p.detail.Checkpoints {
 			if i >= maxPreviewItems {
 				b.WriteString(styles.DimmedStyle.Render(
-					fmt.Sprintf("  … and %d more", len(p.detail.Checkpoints)-maxPreviewItems)) + "\n")
+					fmt.Sprintf("  … and %d more", len(p.detail.Checkpoints)-maxPreviewItems),
+				) + "\n")
 				break
 			}
 			b.WriteString(styles.DimmedStyle.Render(
-				"  "+styles.IconBullet()+" "+Truncate(cp.Title, contentW-4)) + "\n")
+				"  "+styles.IconBullet()+" "+Truncate(cp.Title, contentW-4),
+			) + "\n")
 		}
 	}
 
@@ -661,15 +666,18 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		sep := styles.SeparatorStyle.Render(strings.Repeat("─", max(1, contentW)))
 		b.WriteString(sep + "\n")
 		b.WriteString(styles.PreviewLabelStyle.Render(
-			fmt.Sprintf("Files (%d)", len(unique))) + "\n")
+			fmt.Sprintf("Files (%d)", len(unique)),
+		) + "\n")
 		for i, fp := range unique {
 			if i >= maxPreviewItems {
 				b.WriteString(styles.DimmedStyle.Render(
-					fmt.Sprintf("  … and %d more", len(unique)-maxPreviewItems)) + "\n")
+					fmt.Sprintf("  … and %d more", len(unique)-maxPreviewItems),
+				) + "\n")
 				break
 			}
 			b.WriteString(styles.DimmedStyle.Render(
-				"  "+styles.IconBullet()+" "+Truncate(AbbrevPath(fp), contentW-4)) + "\n")
+				"  "+styles.IconBullet()+" "+Truncate(AbbrevPath(fp), contentW-4),
+			) + "\n")
 		}
 	}
 

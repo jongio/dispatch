@@ -109,21 +109,25 @@ func ansiToHTML(ansi, fg, bg string, palette [16]string, highlights []tui.Highli
 		// Top bar (full width, from top to cutout top).
 		if y1 > 0 {
 			hlHTML += fmt.Sprintf(
-				`<div class="spotlight" style="top:0;left:0;right:0;height:%.1fpx"></div>`+"\n", y1)
+				`<div class="spotlight" style="top:0;left:0;right:0;height:%.1fpx"></div>`+"\n", y1,
+			)
 		}
 		// Bottom bar (full width, from cutout bottom to container bottom).
 		hlHTML += fmt.Sprintf(
-			`<div class="spotlight" style="top:%.1fpx;left:0;right:0;bottom:0"></div>`+"\n", y2)
+			`<div class="spotlight" style="top:%.1fpx;left:0;right:0;bottom:0"></div>`+"\n", y2,
+		)
 		// Left bar (cutout row height, from left edge to cutout left).
 		if x1 > 0 {
 			hlHTML += fmt.Sprintf(
 				`<div class="spotlight" style="top:%.1fpx;left:0;width:%.1fpx;height:%.1fpx"></div>`+"\n",
-				y1, x1, y2-y1)
+				y1, x1, y2-y1,
+			)
 		}
 		// Right bar (cutout row height, from cutout right to container right).
 		hlHTML += fmt.Sprintf(
 			`<div class="spotlight" style="top:%.1fpx;left:%.1fpx;right:0;height:%.1fpx"></div>`+"\n",
-			y1, x2, y2-y1)
+			y1, x2, y2-y1,
+		)
 
 		// Accent-ring callout div around the cutout.
 		// Slight expansion (pad) so the border doesn't touch the text.
@@ -135,7 +139,8 @@ func ansiToHTML(ansi, fg, bg string, palette [16]string, highlights []tui.Highli
 		ch := (y2 - cy) + pad
 		hlHTML += fmt.Sprintf(
 			`<div class="callout" style="top:%.1fpx;left:%.1fpx;width:%.1fpx;height:%.1fpx"></div>`+"\n",
-			cy, cx, cw, ch)
+			cy, cx, cw, ch,
+		)
 	}
 
 	termClass := "terminal"

@@ -1472,7 +1472,8 @@ func TestSearch_retriesOnTransportError(t *testing.T) {
 	// Every search call returns a transport error — verify all retries
 	// are attempted (searchMaxRetries times) and final error is returned.
 	attempts := 0
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil }, // init always succeeds
 		func(ctx context.Context, query string) ([]string, error) {
 			attempts++
@@ -1501,7 +1502,8 @@ func TestSearch_retriesOnTransportError(t *testing.T) {
 func TestSearch_recoversOnRetry(t *testing.T) {
 	// First search returns transport error, second succeeds.
 	callCount := 0
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			callCount++
@@ -1527,7 +1529,8 @@ func TestSearch_clearsStateAfterExhaustedRetries(t *testing.T) {
 	// initErr must be cleared so the NEXT Search() call can attempt
 	// a fresh initialisation instead of returning the stale error.
 	failForever := true
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			if failForever {
@@ -1572,7 +1575,8 @@ func TestSearch_cachedInitErrorNotPermanent(t *testing.T) {
 	// the cached init error is a transport error — Search should
 	// clear it and retry init successfully.
 	initCallCount := 0
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error {
 			initCallCount++
 			if initCallCount == 1 {
@@ -1612,7 +1616,8 @@ func TestSearch_selfContainedInit(t *testing.T) {
 	t.Parallel()
 	// Search should call Init() internally — caller should NOT need to
 	// call Init() separately before Search().
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			return []string{"sess-a"}, nil
@@ -1636,7 +1641,8 @@ func TestSearch_nonTransportInitError_gracefulNoOp(t *testing.T) {
 	t.Parallel()
 	// If Init fails with a non-transport error, Search returns nil, nil
 	// (graceful no-op) rather than crashing or returning an error.
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error {
 			return fmt.Errorf("some config error")
 		},
@@ -1658,7 +1664,8 @@ func TestSearch_nonTransportInitError_gracefulNoOp(t *testing.T) {
 func TestSearch_emptyQuery_stillSearches(t *testing.T) {
 	t.Parallel()
 	called := false
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			called = true
@@ -1677,7 +1684,8 @@ func TestSearch_initRecoversFromTransportError(t *testing.T) {
 	// retry calls resetSDK+Init — Init should succeed again because
 	// resetSDK cleared initErr and available.
 	searchCallCount := 0
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			searchCallCount++
@@ -1728,7 +1736,8 @@ func TestSearch_concurrentCallsSerialised(t *testing.T) {
 	var active atomic.Int32
 	var maxActive atomic.Int32
 
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			cur := active.Add(1)
@@ -1769,7 +1778,8 @@ func TestSearch_cancelledContextReleasesLock(t *testing.T) {
 	// Verify that cancelling a search's context while it's queued behind
 	// another search causes the queued search to return quickly.
 	lockAcquired := make(chan struct{}, 1)
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			// Signal that we hold the lock (doSearch is called inside searchMu).
@@ -1825,7 +1835,8 @@ func TestSearch_cancelledDuringDoSearch_resetsSDK(t *testing.T) {
 	// return nil, nil — NOT an error that would be displayed in the UI.
 	// The pre-cancel check at the top of Search() fires before doSearch
 	// is even called. Verify we get a clean nil, nil with no error text.
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			return nil, fmt.Errorf("error reading header: file already closed")
@@ -1853,7 +1864,8 @@ func TestSearch_nonTransportError_retriesAndRecovers(t *testing.T) {
 	//             The retry loop should resetSDK + Init + doSearch again
 	//             and recover on the second attempt.
 	searchCall := atomic.Int32{}
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			n := searchCall.Add(1)
@@ -1901,7 +1913,8 @@ func TestSearch_transportErrorAfterCancel_noErrorLeaked(t *testing.T) {
 	// must suppress the error entirely (return nil, nil) so the TUI
 	// doesn't display "file already closed" in the footer.
 	callCount := atomic.Int32{}
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			callCount.Add(1)
@@ -2120,7 +2133,8 @@ func TestCoverage_Init_deadlineExceeded(t *testing.T) {
 
 func TestCoverage_Search_preCancelledContext(t *testing.T) {
 	t.Parallel()
-	c := newHookedClient(t,
+	c := newHookedClient(
+		t,
 		func(ctx context.Context) error { return nil },
 		func(ctx context.Context, query string) ([]string, error) {
 			return []string{"id1"}, nil

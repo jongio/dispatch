@@ -2130,25 +2130,29 @@ func (m Model) renderMainView() string {
 		gap := strings.Repeat(" ", gapWidth)
 		switch l.previewPosition {
 		case config.PreviewPositionLeft:
-			content = lipgloss.JoinHorizontal(lipgloss.Top,
+			content = lipgloss.JoinHorizontal(
+				lipgloss.Top,
 				m.preview.View(),
 				gap,
 				m.sessionList.View(),
 			)
 		case config.PreviewPositionTop:
-			content = lipgloss.JoinVertical(lipgloss.Left,
+			content = lipgloss.JoinVertical(
+				lipgloss.Left,
 				m.preview.View(),
 				"",
 				m.sessionList.View(),
 			)
 		case config.PreviewPositionBottom:
-			content = lipgloss.JoinVertical(lipgloss.Left,
+			content = lipgloss.JoinVertical(
+				lipgloss.Left,
 				m.sessionList.View(),
 				"",
 				m.preview.View(),
 			)
 		default: // right
-			content = lipgloss.JoinHorizontal(lipgloss.Top,
+			content = lipgloss.JoinHorizontal(
+				lipgloss.Top,
 				m.sessionList.View(),
 				gap,
 				m.preview.View(),

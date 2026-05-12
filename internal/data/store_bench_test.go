@@ -128,7 +128,8 @@ func populateBenchData(b *testing.B, s *Store, n int) {
 		created := baseTime.Add(time.Duration(i) * time.Hour).Format(time.RFC3339)
 		updated := baseTime.Add(time.Duration(i)*time.Hour + 2*time.Hour).Format(time.RFC3339)
 
-		benchSeedSession(b, db, sid,
+		benchSeedSession(
+			b, db, sid,
 			folders[i%len(folders)],
 			repos[i%len(repos)],
 			branches[i%len(branches)],
@@ -140,7 +141,8 @@ func populateBenchData(b *testing.B, s *Store, n int) {
 		turnCount := (i % 5) + 1
 		for t := range turnCount {
 			ts := baseTime.Add(time.Duration(i)*time.Hour + time.Duration(t)*10*time.Minute).Format(time.RFC3339)
-			benchSeedTurn(b, db, sid, t,
+			benchSeedTurn(
+				b, db, sid, t,
 				fmt.Sprintf("User message %d for session %d", t, i),
 				fmt.Sprintf("Assistant response %d for session %d", t, i),
 				ts,
@@ -160,7 +162,8 @@ func populateBenchData(b *testing.B, s *Store, n int) {
 
 		// Every fifth session gets a checkpoint.
 		if i%5 == 0 {
-			benchSeedCheckpoint(b, db, sid, 1,
+			benchSeedCheckpoint(
+				b, db, sid, 1,
 				fmt.Sprintf("Checkpoint for session %d", i),
 				fmt.Sprintf("Overview of work done in session %d", i),
 			)

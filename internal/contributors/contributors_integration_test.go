@@ -144,7 +144,8 @@ func TestExtract_RevRange(t *testing.T) {
 func TestExtract_WithCoAuthor(t *testing.T) {
 	t.Parallel()
 	dir := initTestRepo(t)
-	commitWithCoAuthor(t, dir,
+	commitWithCoAuthor(
+		t, dir,
 		"Alice", "alice@example.com",
 		"Bob", "bob@example.com",
 		"pair programming commit",

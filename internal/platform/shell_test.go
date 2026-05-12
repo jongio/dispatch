@@ -755,7 +755,8 @@ func TestHelperProcess(t *testing.T) {
 
 func helperCmd(mode string) *exec.Cmd {
 	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(
+		os.Environ(),
 		"GO_TEST_HELPER_PROCESS=1",
 		"GO_TEST_HELPER_MODE="+mode,
 	)

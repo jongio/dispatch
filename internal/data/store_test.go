@@ -607,7 +607,8 @@ func TestFilterByQuery(t *testing.T) {
 	// "auth" appears in sess-1's summary.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "auth"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with query filter: %v", err)
 	}
@@ -627,7 +628,8 @@ func TestFilterByQueryMatchesTurnContent(t *testing.T) {
 	// "fuzzy" appears in sess-2's turn user_message. Requires deep search.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with query matching turn: %v", err)
 	}
@@ -647,7 +649,8 @@ func TestFilterByQueryMatchesRepository(t *testing.T) {
 	// "repo-b" appears in sess-2's repository.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "repo-b"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -667,7 +670,8 @@ func TestFilterByQueryMatchesBranch(t *testing.T) {
 	// "feature/search" is sess-2's branch.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "feature/search"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -686,7 +690,8 @@ func TestFilterByFolder(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Folder: "/home/user/project-a"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with folder filter: %v", err)
 	}
@@ -703,7 +708,8 @@ func TestFilterByRepository(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Repository: "owner/repo-a"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with repository filter: %v", err)
 	}
@@ -720,7 +726,8 @@ func TestFilterByBranch(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Branch: "main"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with branch filter: %v", err)
 	}
@@ -741,7 +748,8 @@ func TestFilterBySince(t *testing.T) {
 	since := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
 	sessions, err := s.ListSessions(
 		FilterOptions{Since: &since},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with since filter: %v", err)
 	}
@@ -759,7 +767,8 @@ func TestFilterByUntil(t *testing.T) {
 	until := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	sessions, err := s.ListSessions(
 		FilterOptions{Until: &until},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with until filter: %v", err)
 	}
@@ -779,7 +788,8 @@ func TestFilterByHasRefs(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{HasRefs: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with HasRefs filter: %v", err)
 	}
@@ -796,7 +806,8 @@ func TestFilterByExcludedDirs(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{ExcludedDirs: []string{"/tmp"}},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with ExcludedDirs: %v", err)
 	}
@@ -818,7 +829,8 @@ func TestFilterCombinedRepositoryAndBranch(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Repository: "owner/repo-a", Branch: "feature/api"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with combined filter: %v", err)
 	}
@@ -837,7 +849,8 @@ func TestFilterNoResults(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Repository: "nonexistent/repo"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -857,7 +870,8 @@ func TestFilterQuerySpecialCharacters(t *testing.T) {
 	// Search with % and ' characters should not crash.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "O'Brien"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with special chars: %v", err)
 	}
@@ -875,7 +889,8 @@ func TestFilterQueryPercentCharacter(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "100%"},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with percent in query: %v", err)
 	}
@@ -1715,7 +1730,8 @@ func TestFilterCombinedSinceAndUntil(t *testing.T) {
 	until := time.Date(2024, 1, 11, 23, 59, 59, 0, time.UTC)
 	sessions, err := s.ListSessions(
 		FilterOptions{Since: &since, Until: &until},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with since+until: %v", err)
 	}
@@ -1732,7 +1748,8 @@ func TestFilterMultipleExcludedDirs(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{ExcludedDirs: []string{"/tmp", "/home/user/project-b"}},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -1758,7 +1775,8 @@ func TestFilterAllFieldsCombined(t *testing.T) {
 			HasRefs:      true,
 			ExcludedDirs: []string{"/tmp"},
 		},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions with all filters: %v", err)
 	}
@@ -1986,7 +2004,8 @@ func TestGetSessionWithNullFields(t *testing.T) {
 	// Insert a session with NULL fields (not empty strings).
 	_, err := s.db.Exec(
 		`INSERT INTO sessions (id, cwd, repository, branch, summary, created_at, updated_at)
-		 VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL)`, "null-sess")
+		 VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL)`, "null-sess",
+	)
 	if err != nil {
 		t.Fatalf("inserting null session: %v", err)
 	}
@@ -2018,7 +2037,8 @@ func TestListSessionsWithNullFields(t *testing.T) {
 
 	_, err := s.db.Exec(
 		`INSERT INTO sessions (id, cwd, repository, branch, summary, created_at, updated_at)
-		 VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL)`, "null-sess")
+		 VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL)`, "null-sess",
+	)
 	if err != nil {
 		t.Fatalf("inserting: %v", err)
 	}
@@ -2248,7 +2268,8 @@ func TestGetSession_TurnsScanError(t *testing.T) {
 	// Insert a real row into the backing table so the view returns data.
 	if _, err := s.db.Exec(
 		`INSERT INTO turns_real (session_id, turn_index, user_message, assistant_response, timestamp)
-		 VALUES (?, ?, ?, ?, ?)`, "tse-1", 0, "msg", "resp", "2024-01-01T00:00:00Z"); err != nil {
+		 VALUES (?, ?, ?, ?, ?)`, "tse-1", 0, "msg", "resp", "2024-01-01T00:00:00Z",
+	); err != nil {
 		t.Fatalf("inserting: %v", err)
 	}
 
@@ -2277,7 +2298,8 @@ func TestGetSession_CheckpointsScanError(t *testing.T) {
 	}
 	if _, err := s.db.Exec(
 		`INSERT INTO checkpoints_real (session_id, checkpoint_number, title, overview)
-		 VALUES (?, ?, ?, ?)`, "cse-1", 1, "CP", "Overview"); err != nil {
+		 VALUES (?, ?, ?, ?)`, "cse-1", 1, "CP", "Overview",
+	); err != nil {
 		t.Fatalf("inserting: %v", err)
 	}
 
@@ -2300,7 +2322,8 @@ func TestQuickSearchMatchesCwd(t *testing.T) {
 	// "scratch" appears only in sess-4's cwd (/tmp/scratch).
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "scratch", DeepSearch: false},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2320,7 +2343,8 @@ func TestQuickSearchDoesNotMatchTurns(t *testing.T) {
 	// "fuzzy" appears only in sess-2's turn content. Quick search should NOT find it.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "fuzzy", DeepSearch: false},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2337,7 +2361,8 @@ func TestDeepSearchMatchesTurns(t *testing.T) {
 	// "fuzzy" appears in sess-2's turn content. Deep search SHOULD find it.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2357,7 +2382,8 @@ func TestDeepSearchMatchesCheckpointTitle(t *testing.T) {
 	// "Auth module complete" is sess-1's checkpoint title. Only matches via deep.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "module complete", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2377,7 +2403,8 @@ func TestDeepSearchMatchesCheckpointOverview(t *testing.T) {
 	// "Login endpoint with tests added" is sess-1's checkpoint overview.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "endpoint with tests", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2397,7 +2424,8 @@ func TestDeepSearchMatchesFilePath(t *testing.T) {
 	// "auth_test.go" appears in sess-1's session_files.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "auth_test.go", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2417,7 +2445,8 @@ func TestDeepSearchMatchesRefValue(t *testing.T) {
 	// "abc123" is sess-3's commit ref.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "abc123", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2437,7 +2466,8 @@ func TestDeepSearchMatchesPRNumber(t *testing.T) {
 	// "42" is sess-1's PR ref value.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "42", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2460,7 +2490,8 @@ func TestDeepSearchNoMatchReturnsEmpty(t *testing.T) {
 
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "zzz_no_match_anywhere_zzz", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2477,7 +2508,8 @@ func TestQuickSearchDoesNotMatchCheckpoints(t *testing.T) {
 	// "module complete" only in checkpoint title — quick search should miss it.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "module complete", DeepSearch: false},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2494,7 +2526,8 @@ func TestQuickSearchDoesNotMatchFilePaths(t *testing.T) {
 	// "auth_test.go" only in session_files — quick search should miss it.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "auth_test.go", DeepSearch: false},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2511,7 +2544,8 @@ func TestDeepSearchAlsoMatchesSessionFields(t *testing.T) {
 	// "auth" matches sess-1's summary — deep search should still find it.
 	sessions, err := s.ListSessions(
 		FilterOptions{Query: "auth", DeepSearch: true},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2631,7 +2665,8 @@ func TestLastActive_StaleTurnsVisibleInDayFilter(t *testing.T) {
 	since := now.Add(-24 * time.Hour)
 	sessions, err := s.ListSessions(
 		FilterOptions{Since: &since},
-		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}

@@ -374,7 +374,8 @@ func scanSession(sc scanner) (Session, error) {
 // scanSession so new columns only need adding in one place.
 func scanGroupedSession(sc scanner, label *string) (Session, error) {
 	var sess Session
-	err := sc.Scan(label,
+	err := sc.Scan(
+		label,
 		&sess.ID, &sess.Cwd, &sess.Repository, &sess.Branch,
 		&sess.Summary, &sess.CreatedAt, &sess.UpdatedAt,
 		&sess.HostType,
@@ -505,7 +506,8 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 	// Turns
 	tRows, err := s.db.Query(
 		`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
-		 FROM turns WHERE session_id = ? ORDER BY turn_index`, id)
+		 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("loading turns for session %s: %w", id, err)
 	}
@@ -526,7 +528,8 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 		`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
 		        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
 		        COALESCE(important_files,''), COALESCE(next_steps,'')
-		 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id)
+		 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("loading checkpoints for session %s: %w", id, err)
 	}
@@ -546,7 +549,8 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 	// Files
 	fRows, err := s.db.Query(
 		`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
-		 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id)
+		 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("loading files for session %s: %w", id, err)
 	}
@@ -565,7 +569,8 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 	// Refs
 	rRows, err := s.db.Query(
 		`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
-		 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id)
+		 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("loading refs for session %s: %w", id, err)
 	}
@@ -671,7 +676,8 @@ func (s *Store) ListBranches(repository string) ([]string, error) {
 	if repository != "" {
 		return s.distinctStrings(
 			"SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' AND repository = ? ORDER BY branch",
-			repository)
+			repository,
+		)
 	}
 	return s.distinctStrings("SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' ORDER BY branch")
 }
