@@ -84,12 +84,12 @@ func newCopilotTestStore(t *testing.T) *data.Store {
 		t.Fatalf("creating schema: %v", err)
 	}
 
-	// Seed sessions
-	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-1','/tmp/project-a','owner/repo-a','main','Implement auth module','2024-01-10T10:00:00Z','2024-01-10T12:00:00Z')`)
-	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-2','/tmp/project-b','owner/repo-b','feature/search','Add search feature','2024-01-11T09:00:00Z','2024-01-11T14:00:00Z')`)
-	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-3','/tmp/project-a','owner/repo-a','feature/api','Build REST API','2024-01-12T08:00:00Z','2024-01-12T16:00:00Z')`)
+	// Seed sessions — use non-temp paths so auto-exclusion filters don't hide them.
+	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-1','/home/user/project-a','owner/repo-a','main','Implement auth module','2024-01-10T10:00:00Z','2024-01-10T12:00:00Z')`)
+	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-2','/home/user/project-b','owner/repo-b','feature/search','Add search feature','2024-01-11T09:00:00Z','2024-01-11T14:00:00Z')`)
+	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-3','/home/user/project-a','owner/repo-a','feature/api','Build REST API','2024-01-12T08:00:00Z','2024-01-12T16:00:00Z')`)
 	// sess-empty has no turns — should be excluded by queries that filter on turns
-	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-empty','/tmp/empty','owner/repo-c','main','Empty session','2024-01-08T06:00:00Z','2024-01-08T06:00:00Z')`)
+	mustExec(t, db, `INSERT INTO sessions VALUES ('sess-empty','/home/user/empty','owner/repo-c','main','Empty session','2024-01-08T06:00:00Z','2024-01-08T06:00:00Z')`)
 
 	// Seed turns
 	mustExec(t, db, `INSERT INTO turns VALUES ('sess-1',0,'Add login endpoint','Sure, adding it.','2024-01-10T10:00:00Z')`)
