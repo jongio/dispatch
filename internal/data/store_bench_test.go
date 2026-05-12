@@ -25,7 +25,7 @@ func newBenchStore(b *testing.B) *Store {
 		_ = db.Close()
 		b.Fatalf("creating schema: %v", err)
 	}
-	return &Store{db: db}
+	return &Store{db: db, hasHostType: true}
 }
 
 // benchSeedSession inserts a session row.

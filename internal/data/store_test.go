@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 	branch     TEXT,
 	summary    TEXT,
 	created_at TEXT,
-	updated_at TEXT
+	updated_at TEXT,
+	host_type  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS turns (
@@ -78,7 +79,7 @@ func newTestStore(t *testing.T) *Store {
 		_ = db.Close()
 		t.Fatalf("creating schema: %v", err)
 	}
-	return &Store{db: db}
+	return &Store{db: db, hasHostType: true}
 }
 
 // seedSession inserts a session row. Returns the ID for convenience.
@@ -258,7 +259,7 @@ func TestListSessionsEmptyDatabase(t *testing.T) {
 	}
 }
 
-func TestListSessionsExcludesZeroTurnSessions(t *testing.T) {
+func TestListSessionsExcludesEmptySessions(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
@@ -270,12 +271,184 @@ func TestListSessionsExcludesZeroTurnSessions(t *testing.T) {
 
 	for _, sess := range sessions {
 		if sess.ID == "sess-5" {
-			t.Error("ListSessions should exclude sessions with zero turns (sess-5)")
+			t.Error("ListSessions should exclude sessions with no turns, files, checkpoints, or refs (sess-5)")
 		}
 	}
 	// We seeded 5 sessions; 4 have turns.
 	if len(sessions) != 4 {
-		t.Errorf("expected 4 sessions (excluding zero-turn), got %d", len(sessions))
+		t.Errorf("expected 4 sessions (excluding empty), got %d", len(sessions))
+	}
+}
+
+func TestListSessionsKeepsZeroTurnWithActivity(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	// Zero-turn session with file activity — should be kept.
+	seedSession(t, s.db, "with-files", "/code/project", "owner/repo", "main",
+		"MCP sub-agent work", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedFile(t, s.db, "with-files", "src/main.go", "edit", 0, "2024-01-01T00:30:00Z")
+
+	// Zero-turn session with checkpoint — should be kept.
+	seedSession(t, s.db, "with-cp", "/code/review", "owner/repo", "main",
+		"PR Review", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedCheckpoint(t, s.db, "with-cp", 1, "Reviewed PR", "Looks good")
+
+	// Zero-turn session with ref — should be kept.
+	seedSession(t, s.db, "with-ref", "/code/watch", "owner/repo", "main",
+		"Watch PR", "2024-01-03T00:00:00Z", "2024-01-03T01:00:00Z")
+	seedRef(t, s.db, "with-ref", "pr", "99", 0, "2024-01-03T00:00:00Z")
+
+	// Zero-turn session with NO activity — should be excluded.
+	seedSession(t, s.db, "empty", "/tmp/ghost", "", "",
+		"Ghost session", "2024-01-04T00:00:00Z", "2024-01-04T00:00:00Z")
+
+	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+
+	ids := make(map[string]bool)
+	for _, sess := range sessions {
+		ids[sess.ID] = true
+	}
+
+	if !ids["with-files"] {
+		t.Error("zero-turn session with files should be included")
+	}
+	if !ids["with-cp"] {
+		t.Error("zero-turn session with checkpoints should be included")
+	}
+	if !ids["with-ref"] {
+		t.Error("zero-turn session with refs should be included")
+	}
+	if ids["empty"] {
+		t.Error("zero-turn session with no activity should be excluded")
+	}
+	if len(sessions) != 3 {
+		t.Errorf("expected 3 sessions, got %d", len(sessions))
+	}
+}
+
+func TestListSessionsExcludesTempDir(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	// Set a temp dir prefix for this test.
+	s.tempDir = "/tmp"
+
+	// Session in temp dir with turns — should be excluded.
+	seedSession(t, s.db, "temp-1", "/tmp/vally-eval-abc123", "", "",
+		"Please return the results", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "temp-1", 0, "Please return the results", "Here are the results.", "2024-01-01T00:00:00Z")
+
+	// Session NOT in temp dir with turns — should be kept.
+	seedSession(t, s.db, "real-1", "/home/user/project", "owner/repo", "main",
+		"Implement feature", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedTurn(t, s.db, "real-1", 0, "Add auth", "Done.", "2024-01-02T00:00:00Z")
+
+	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Errorf("expected 1 session (temp excluded), got %d", len(sessions))
+	}
+	if len(sessions) > 0 && sessions[0].ID != "real-1" {
+		t.Errorf("expected real-1, got %s", sessions[0].ID)
+	}
+}
+
+func TestGroupSessionsExcludesTempDir(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	s.tempDir = "/tmp"
+
+	seedSession(t, s.db, "temp-1", "/tmp/skill-test-xyz", "", "",
+		"Test session", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "temp-1", 0, "test", "ok", "2024-01-01T00:00:00Z")
+
+	seedSession(t, s.db, "real-1", "/home/user/project", "owner/repo", "main",
+		"Real work", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedTurn(t, s.db, "real-1", 0, "work", "done", "2024-01-02T00:00:00Z")
+
+	groups, err := s.GroupSessions(PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("GroupSessions: %v", err)
+	}
+
+	for _, g := range groups {
+		for _, sess := range g.Sessions {
+			if sess.ID == "temp-1" {
+				t.Error("GroupSessions should exclude temp dir sessions")
+			}
+		}
+	}
+}
+
+func TestListSessionsExcludesHomeDotfolders(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	home := filepath.Join(string(filepath.Separator)+"home", "user")
+	s.homeDir = home
+
+	// Session in a hidden dotfolder under home — should be excluded.
+	seedSession(t, s.db, "dot-1", filepath.Join(home, ".devx", "scout", "worktrees", "issue-42"), "", "",
+		"Read and execute the scout task", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "dot-1", 0, "scout", "done", "2024-01-01T00:00:00Z")
+
+	// Another hidden dotfolder — should be excluded.
+	seedSession(t, s.db, "dot-2", filepath.Join(home, ".config", "some-tool", "workspace"), "", "",
+		"Config workspace", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "dot-2", 0, "config", "ok", "2024-01-01T00:00:00Z")
+
+	// Session in a normal project dir — should be kept.
+	seedSession(t, s.db, "real-1", filepath.Join(home, "projects", "myapp"), "owner/repo", "main",
+		"Working on feature", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedTurn(t, s.db, "real-1", 0, "code", "done", "2024-01-02T00:00:00Z")
+
+	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Errorf("expected 1 session (dotfolders excluded), got %d", len(sessions))
+	}
+	if len(sessions) > 0 && sessions[0].ID != "real-1" {
+		t.Errorf("expected real-1, got %s", sessions[0].ID)
+	}
+}
+
+func TestGroupSessionsExcludesHomeDotfolders(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	home := filepath.Join(string(filepath.Separator)+"home", "user")
+	s.homeDir = home
+
+	seedSession(t, s.db, "dot-1", filepath.Join(home, ".devx", "scout", "repos", "Azure-dev"), "", "",
+		"Scout repo session", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "dot-1", 0, "scout", "ok", "2024-01-01T00:00:00Z")
+
+	seedSession(t, s.db, "real-1", filepath.Join(home, "code", "dispatch"), "owner/repo", "main",
+		"Real work", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedTurn(t, s.db, "real-1", 0, "work", "done", "2024-01-02T00:00:00Z")
+
+	groups, err := s.GroupSessions(PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("GroupSessions: %v", err)
+	}
+
+	for _, g := range groups {
+		for _, sess := range g.Sessions {
+			if sess.ID == "dot-1" {
+				t.Error("GroupSessions should exclude hidden dotfolder sessions")
+			}
+		}
 	}
 }
 
@@ -976,19 +1149,19 @@ func TestSearchSessionsZeroLimit(t *testing.T) {
 	}
 }
 
-func TestSearchSessionsExcludesZeroTurnSessions(t *testing.T) {
+func TestSearchSessionsExcludesEmptySessions(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	// "Empty" matches sess-5's summary, but it has zero turns.
+	// "Empty" matches sess-5's summary, but it has no turns, files, checkpoints, or refs.
 	results, err := s.SearchSessions("Empty session", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
 	for _, r := range results {
 		if r.SessionID == "sess-5" {
-			t.Error("SearchSessions should exclude sessions with zero turns")
+			t.Error("SearchSessions should exclude sessions with no activity")
 		}
 	}
 }
@@ -1354,11 +1527,11 @@ func TestPivotExpr(t *testing.T) {
 
 func TestFilterBuilderWhereSQL_Empty(t *testing.T) {
 	var fb filterBuilder
-	// apply with empty filter still adds the "has turns" clause.
+	// apply with empty filter still adds the "has activity" clause.
 	fb.apply(FilterOptions{})
 	w := fb.whereSQL()
 	if w == "" {
-		t.Error("expected non-empty WHERE clause (always excludes zero-turn sessions)")
+		t.Error("expected non-empty WHERE clause (always excludes empty sessions)")
 	}
 }
 

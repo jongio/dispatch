@@ -212,10 +212,17 @@ func classifyLiveSession(dir string, threshold time.Duration) AttentionStatus {
 		strings.HasPrefix(evt.Type, "tool.execution"),
 		strings.HasPrefix(evt.Type, "hook."),
 		strings.HasPrefix(evt.Type, "subagent."),
-		strings.HasPrefix(evt.Type, "session.plan_changed"):
+		strings.HasPrefix(evt.Type, "session.plan_changed"),
+		strings.HasPrefix(evt.Type, "skill.invoked"):
 		return AttentionActive
-	case evt.Type == "session.shutdown":
+	case evt.Type == "session.shutdown",
+		evt.Type == "abort":
 		return AttentionIdle
+	case evt.Type == "session.model_change",
+		evt.Type == "system.message":
+		// Neutral events — don't change the attention state.
+		// Treat as waiting since the AI isn't actively working.
+		return AttentionWaiting
 	default:
 		// user.message, session.start, or unknown — AI hasn't started
 		// responding yet, so treat as active.

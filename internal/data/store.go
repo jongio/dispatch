@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,7 +40,10 @@ const (
 
 // Store provides read-only access to the Copilot CLI session store.
 type Store struct {
-	db *sql.DB
+	db          *sql.DB
+	hasHostType bool   // true if sessions table has host_type column (schema v3+)
+	tempDir     string // OS temp directory prefix, used to filter automated sessions
+	homeDir     string // user home directory, used to filter hidden dotfolder sessions
 }
 
 // Open opens the session store at the default platform path.
@@ -65,7 +69,29 @@ func OpenPath(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("connecting to session store: %w", err)
 	}
-	return &Store{db: db}, nil
+
+	// Detect schema version: check if host_type column exists.
+	hasHostType := false
+	rows, err := db.Query("PRAGMA table_info(sessions)")
+	if err == nil {
+		defer rows.Close() //nolint:errcheck
+		for rows.Next() {
+			var cid int
+			var name, ctype string
+			var notnull int
+			var dflt sql.NullString
+			var pk int
+			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err == nil {
+				if name == "host_type" {
+					hasHostType = true
+					break
+				}
+			}
+		}
+	}
+
+	homeDir, _ := os.UserHomeDir()
+	return &Store{db: db, hasHostType: hasHostType, tempDir: os.TempDir(), homeDir: homeDir}, nil
 }
 
 // Close closes the underlying database connection.
@@ -195,8 +221,14 @@ type filterBuilder struct {
 }
 
 func (fb *filterBuilder) apply(f FilterOptions) {
-	// Always exclude sessions with zero turns.
-	fb.wheres = append(fb.wheres, "EXISTS (SELECT 1 FROM turns t WHERE t.session_id = s.id)")
+	// Exclude empty sessions: no turns AND no files, checkpoints, or refs.
+	// Sessions with activity in any of these tables are kept even if turns
+	// haven't been recorded (e.g. MCP / sub-agent work).
+	fb.wheres = append(fb.wheres,
+		`(EXISTS (SELECT 1 FROM turns t WHERE t.session_id = s.id)`+
+			` OR EXISTS (SELECT 1 FROM session_files sf3 WHERE sf3.session_id = s.id)`+
+			` OR EXISTS (SELECT 1 FROM checkpoints cp2 WHERE cp2.session_id = s.id)`+
+			` OR EXISTS (SELECT 1 FROM session_refs sr3 WHERE sr3.session_id = s.id))`)
 
 	if f.Query != "" {
 		pattern := "%" + escapeLIKE(f.Query) + "%"
@@ -300,16 +332,28 @@ func pivotExpr(p PivotField) string {
 	}
 }
 
-// sessionColumns is the shared SELECT list used by session queries.
-// last_active_at is the MAX of the most recent turn timestamp,
-// updated_at, and created_at — whichever is newest wins.  This
-// handles both stale turn indexes (updated_at is more recent) and
-// noisy updated_at values (turns are more recent).
-var sessionColumns = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), COALESCE(s.branch,''),
-	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,''),
-	` + lastActiveExpr + ` AS last_active_at,
+// sessionColumnsBase is the shared SELECT list used by session queries,
+// excluding the host_type column which may not exist in older schemas.
+var sessionColumnsBase = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), COALESCE(s.branch,''),
+	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,'')`
+
+// sessionColumnsSuffix is the computed columns appended after host_type.
+var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
 	(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turn_count,
 	(SELECT COUNT(DISTINCT sf.file_path) FROM session_files sf WHERE sf.session_id = s.id) AS file_count`
+
+// sessionColumns returns the full SELECT column list, including host_type
+// when the schema supports it.
+func (s *Store) sessionColumns() string {
+	if s.hasHostType {
+		return sessionColumnsBase + `,
+	COALESCE(s.host_type,''),
+	` + sessionColumnsSuffix
+	}
+	return sessionColumnsBase + `,
+	'' AS host_type,
+	` + sessionColumnsSuffix
+}
 
 // scanner is the subset of *sql.Row and *sql.Rows used to read columns.
 type scanner interface{ Scan(dest ...any) error }
@@ -319,6 +363,21 @@ func scanSession(sc scanner) (Session, error) {
 	err := sc.Scan(
 		&sess.ID, &sess.Cwd, &sess.Repository, &sess.Branch,
 		&sess.Summary, &sess.CreatedAt, &sess.UpdatedAt,
+		&sess.HostType,
+		&sess.LastActiveAt, &sess.TurnCount, &sess.FileCount,
+	)
+	return sess, err
+}
+
+// scanGroupedSession scans a row that has a leading pivot label followed
+// by the standard session columns. This keeps GroupSessions in sync with
+// scanSession so new columns only need adding in one place.
+func scanGroupedSession(sc scanner, label *string) (Session, error) {
+	var sess Session
+	err := sc.Scan(label,
+		&sess.ID, &sess.Cwd, &sess.Repository, &sess.Branch,
+		&sess.Summary, &sess.CreatedAt, &sess.UpdatedAt,
+		&sess.HostType,
 		&sess.LastActiveAt, &sess.TurnCount, &sess.FileCount,
 	)
 	return sess, err
@@ -328,13 +387,32 @@ func scanSession(sc scanner) (Session, error) {
 // Public query methods
 // ---------------------------------------------------------------------------
 
+// withAutoExclusions returns a copy of the filter with automatic exclusions
+// applied: OS temp directory and hidden dotfolders under the user's home
+// directory (e.g. ~/.devx/, ~/.config/). These are tool infrastructure
+// directories, not user project workspaces.
+func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
+	// Copy the slice to avoid mutating the caller's.
+	dirs := append([]string(nil), f.ExcludedDirs...)
+	if s.tempDir != "" {
+		dirs = append(dirs, s.tempDir)
+	}
+	if s.homeDir != "" {
+		// Exclude hidden dotfolders directly under home.
+		// filepath.Join would strip the trailing ".", so we build the prefix manually.
+		dirs = append(dirs, s.homeDir+string(filepath.Separator)+".")
+	}
+	f.ExcludedDirs = dirs
+	return f
+}
+
 // ListSessions returns sessions matching the filter, ordered and limited as
 // specified. TurnCount and FileCount are computed via subqueries.
 func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
 	var fb filterBuilder
-	fb.apply(filter)
+	fb.apply(s.withAutoExclusions(filter))
 
-	q := "SELECT " + sessionColumns + " FROM sessions s" + fb.joinSQL() + fb.whereSQL()
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + fb.joinSQL() + fb.whereSQL()
 	q += fmt.Sprintf(" ORDER BY %s %s", sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
@@ -381,7 +459,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	q := "SELECT " + sessionColumns + " FROM sessions s WHERE s.id IN (" +
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s WHERE s.id IN (" +
 		strings.Join(placeholders, ",") + ")"
 
 	rows, err := s.db.Query(q, args...)
@@ -416,7 +494,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
 func (s *Store) GetSession(id string) (*SessionDetail, error) {
-	row := s.db.QueryRow("SELECT "+sessionColumns+" FROM sessions s WHERE s.id = ?", id)
+	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s WHERE s.id = ?", id)
 	sess, err := scanSession(row)
 	if err != nil {
 		return nil, fmt.Errorf("loading session %s: %w", id, err)
@@ -511,20 +589,43 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 // zero turns are excluded.
 func (s *Store) SearchSessions(query string, limit int) ([]SearchResult, error) {
 	pattern := "%" + escapeLIKE(query) + "%"
+
+	// Build automatic exclusion clauses (temp dir + hidden dotfolders).
+	var autoClause string
+	var extraArgs []any
+	if s.tempDir != "" {
+		autoClause += ` AND s2.cwd NOT LIKE ? ESCAPE '\'`
+		extraArgs = append(extraArgs, escapeLIKE(s.tempDir)+"%")
+	}
+	if s.homeDir != "" {
+		autoClause += ` AND s2.cwd NOT LIKE ? ESCAPE '\'`
+		extraArgs = append(extraArgs, escapeLIKE(s.homeDir+string(filepath.Separator)+".")+"%")
+	}
+
 	q := `SELECT content, session_id, source_type, source_id, 0 AS rank FROM (
 		SELECT COALESCE(s2.summary,'') AS content, s2.id AS session_id,
 			'session' AS source_type, '' AS source_id
 		FROM sessions s2
 		WHERE (s2.summary LIKE ? ESCAPE '\' OR s2.branch LIKE ? ESCAPE '\' OR s2.repository LIKE ? ESCAPE '\')
-			AND EXISTS (SELECT 1 FROM turns t WHERE t.session_id = s2.id)
+			AND (EXISTS (SELECT 1 FROM turns t WHERE t.session_id = s2.id)
+				OR EXISTS (SELECT 1 FROM session_files sf WHERE sf.session_id = s2.id)
+				OR EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s2.id)
+				OR EXISTS (SELECT 1 FROM session_refs sr WHERE sr.session_id = s2.id))` + autoClause + `
 		UNION ALL
 		SELECT COALESCE(t.user_message,'') AS content, t.session_id,
 			'turn' AS source_type, CAST(t.turn_index AS TEXT) AS source_id
 		FROM turns t
+		JOIN sessions s2 ON s2.id = t.session_id
 		WHERE t.user_message LIKE ? ESCAPE '\'
-			AND EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = t.session_id)
+			AND (EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = t.session_id)
+				OR EXISTS (SELECT 1 FROM session_files sf WHERE sf.session_id = t.session_id)
+				OR EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = t.session_id)
+				OR EXISTS (SELECT 1 FROM session_refs sr WHERE sr.session_id = t.session_id))` + autoClause + `
 	) sub`
-	args := []any{pattern, pattern, pattern, pattern} //nolint:prealloc // literal init is clearer than make+append
+	args := []any{pattern, pattern, pattern} //nolint:prealloc // literal init is clearer than make+append
+	args = append(args, extraArgs...)
+	args = append(args, pattern)
+	args = append(args, extraArgs...)
 
 	if limit <= 0 {
 		limit = defaultQueryLimit
@@ -579,11 +680,11 @@ func (s *Store) ListBranches(repository string) ([]string, error) {
 // given filter and sort order within each group.
 func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
 	var fb filterBuilder
-	fb.apply(filter)
+	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
 	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
-		expr, sessionColumns, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit
@@ -602,11 +703,8 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 
 	for rows.Next() {
 		var label string
-		var sess Session
-		if err := rows.Scan(&label,
-			&sess.ID, &sess.Cwd, &sess.Repository, &sess.Branch,
-			&sess.Summary, &sess.CreatedAt, &sess.UpdatedAt,
-			&sess.LastActiveAt, &sess.TurnCount, &sess.FileCount); err != nil {
+		sess, err := scanGroupedSession(rows, &label)
+		if err != nil {
 			return nil, fmt.Errorf("scanning grouped session row: %w", err)
 		}
 		// For date pivots the SQL returns a full RFC 3339 timestamp

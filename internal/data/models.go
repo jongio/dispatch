@@ -20,6 +20,10 @@ type Session struct {
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
 
+	// HostType is the authentication provider that created the session
+	// (e.g. "github"). Added in schema version 3; empty for older sessions.
+	HostType string `json:"host_type"`
+
 	// LastActiveAt is computed at query time as the MAX of the latest
 	// turn timestamp, updated_at, and created_at — whichever is most
 	// recent.  Indexed turns may lag (stale reindex) while updated_at
