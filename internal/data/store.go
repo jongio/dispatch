@@ -262,11 +262,11 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 	}
 	if f.Since != nil {
 		fb.wheres = append(fb.wheres, lastActiveExpr+" >= ?")
-		fb.args = append(fb.args, f.Since.Format(time.RFC3339))
+		fb.args = append(fb.args, f.Since.UTC().Format(time.RFC3339))
 	}
 	if f.Until != nil {
 		fb.wheres = append(fb.wheres, lastActiveExpr+" <= ?")
-		fb.args = append(fb.args, f.Until.Format(time.RFC3339))
+		fb.args = append(fb.args, f.Until.UTC().Format(time.RFC3339))
 	}
 	if f.HasRefs {
 		fb.wheres = append(fb.wheres, "EXISTS (SELECT 1 FROM session_refs sr WHERE sr.session_id = s.id)")

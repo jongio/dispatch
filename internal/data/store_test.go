@@ -759,6 +759,50 @@ func TestFilterBySince(t *testing.T) {
 	}
 }
 
+// TestFilterBySinceNonUTC verifies that Since filters with non-UTC timezones
+// produce the same results as their UTC equivalent. Regression test for a bug
+// where local-time Since values were compared lexicographically against
+// UTC-stored timestamps in SQLite, causing incorrect filtering.
+func TestFilterBySinceNonUTC(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// Use a fixed offset timezone (UTC-7, like US Pacific).
+	pacific := time.FixedZone("UTC-7", -7*60*60)
+
+	// 2024-01-11T00:00:00Z expressed in UTC-7 is 2024-01-10T17:00:00-07:00.
+	// Both should produce the same filter result.
+	sinceUTC := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
+	sincePacific := sinceUTC.In(pacific)
+
+	sessUTC, err := s.ListSessions(
+		FilterOptions{Since: &sinceUTC},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with UTC since: %v", err)
+	}
+
+	sessPacific, err := s.ListSessions(
+		FilterOptions{Since: &sincePacific},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with Pacific since: %v", err)
+	}
+
+	if len(sessUTC) != len(sessPacific) {
+		t.Fatalf("timezone mismatch: UTC returned %d sessions, Pacific returned %d",
+			len(sessUTC), len(sessPacific))
+	}
+	for i := range sessUTC {
+		if sessUTC[i].ID != sessPacific[i].ID {
+			t.Errorf("session[%d]: UTC=%s, Pacific=%s", i, sessUTC[i].ID, sessPacific[i].ID)
+		}
+	}
+}
+
 func TestFilterByUntil(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()

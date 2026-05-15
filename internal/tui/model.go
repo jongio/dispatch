@@ -2033,12 +2033,13 @@ func (m Model) badgeClickAction(x int) string {
 	sortKeyW := lipgloss.Width(sortKeyRendered)
 	sortPrefix := styles.DimmedStyle.Render(": ")
 	sortPrefixW := lipgloss.Width(sortPrefix)
-	sortArrowRendered := styles.DimmedStyle.Render(arrow)
+	sortArrowRendered := styles.DimmedStyle.Render(arrow + " ")
 	sortArrowW := lipgloss.Width(sortArrowRendered)
 	sortFullRendered := sortKeyRendered + styles.DimmedStyle.Render(": "+sortLabel)
 	w := lipgloss.Width(sortFullRendered)
 	if x >= cursor && x < cursor+w {
-		// Click on the arrow portion toggles order; elsewhere cycles sort field.
+		// Click on the arrow portion (including trailing space) toggles order;
+		// elsewhere cycles sort field.
 		arrowStart := cursor + sortKeyW + sortPrefixW
 		if x >= arrowStart && x < arrowStart+sortArrowW {
 			return "sortorder"
@@ -2064,7 +2065,7 @@ func (m Model) badgeClickAction(x int) string {
 	pivotRendered := pivotKeyRendered + styles.DimmedStyle.Render(": "+pivotLabel)
 	pw := lipgloss.Width(pivotRendered)
 	if x >= cursor && x < cursor+pw {
-		pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown())
+		pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown() + " ")
 		pivotArrowW := lipgloss.Width(pivotArrowRendered)
 		arrowStart := cursor + pivotKeyW + pivotPrefixW
 		if x >= arrowStart && x < arrowStart+pivotArrowW {
@@ -2076,9 +2077,9 @@ func (m Model) badgeClickAction(x int) string {
 
 	// Expand/collapse all indicator — only in tree mode.
 	if m.pivot != pivotNone {
-		expandIcon := styles.IconSortUp() + styles.IconSortUp()
+		expandIcon := styles.IconExpandAll()
 		if m.sessionList.AllExpanded() {
-			expandIcon = styles.IconSortDown() + styles.IconSortDown()
+			expandIcon = styles.IconCollapseAll()
 		}
 		expandRendered := styles.KeyStyle.Render("x") + styles.DimmedStyle.Render(": "+expandIcon)
 		ew := lipgloss.Width(expandRendered)
@@ -2254,9 +2255,9 @@ func (m Model) renderBadges() string {
 
 	// Expand/collapse all indicator — only shown in tree mode.
 	if m.pivot != pivotNone {
-		expandIcon := styles.IconSortUp() + styles.IconSortUp()
+		expandIcon := styles.IconExpandAll()
 		if m.sessionList.AllExpanded() {
-			expandIcon = styles.IconSortDown() + styles.IconSortDown()
+			expandIcon = styles.IconCollapseAll()
 		}
 		parts = append(parts, styles.KeyStyle.Render("x")+styles.DimmedStyle.Render(": "+expandIcon))
 	}

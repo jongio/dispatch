@@ -185,6 +185,12 @@ func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }
 // IconAttentionInterrupted returns a lightning bolt for "crashed/interrupted" status.
 func IconAttentionInterrupted() string { return icon("\uf0e7", "⚡") }
 
+// IconExpandAll returns the "expand all groups" icon (⊞).
+func IconExpandAll() string { return "⊞" }
+
+// IconCollapseAll returns the "collapse all groups" icon (⊟).
+func IconCollapseAll() string { return "⊟" }
+
 // IconPlan returns a filled dot for sessions that have a plan.md file.
 func IconPlan() string { return icon(nfBullet, fbAttentionDot) }
 
