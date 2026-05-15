@@ -209,27 +209,23 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
 		switch event.Type {
 		case sdk.SessionEventTypeAssistantMessageDelta:
-			if event.Data.DeltaContent != nil {
-				trySend(StreamEvent{Type: EventTextDelta, Content: *event.Data.DeltaContent})
+			if d, ok := event.Data.(*sdk.AssistantMessageDeltaData); ok {
+				trySend(StreamEvent{Type: EventTextDelta, Content: d.DeltaContent})
 			}
 		case sdk.SessionEventTypeToolExecutionStart:
-			name := ""
-			if event.Data.ToolName != nil {
-				name = *event.Data.ToolName
+			if d, ok := event.Data.(*sdk.ToolExecutionStartData); ok {
+				trySend(StreamEvent{Type: EventToolStart, Content: d.ToolName})
 			}
-			trySend(StreamEvent{Type: EventToolStart, Content: name})
 		case sdk.SessionEventTypeToolExecutionComplete:
-			name := ""
-			if event.Data.ToolName != nil {
-				name = *event.Data.ToolName
+			if d, ok := event.Data.(*sdk.ToolExecutionCompleteData); ok {
+				trySend(StreamEvent{Type: EventToolDone, Content: d.ToolCallID})
 			}
-			trySend(StreamEvent{Type: EventToolDone, Content: name})
 		case sdk.SessionEventTypeSessionIdle:
 			trySend(StreamEvent{Type: EventDone})
 		case sdk.SessionEventTypeSessionError:
 			msg := "unknown error"
-			if event.Data.Content != nil {
-				msg = *event.Data.Content
+			if d, ok := event.Data.(*sdk.SessionErrorData); ok {
+				msg = d.Message
 			}
 			trySend(StreamEvent{Type: EventError, Content: msg})
 		default:
@@ -460,10 +456,14 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 		return nil, fmt.Errorf("search query failed: %w", err)
 	}
 
-	if resp == nil || resp.Data.Content == nil {
+	if resp == nil {
 		return nil, nil
 	}
-	return parseSessionIDs(*resp.Data.Content), nil
+	d, ok := resp.Data.(*sdk.AssistantMessageData)
+	if !ok || d.Content == "" {
+		return nil, nil
+	}
+	return parseSessionIDs(d.Content), nil
 }
 
 // AnalyzeCompletion uses the Copilot SDK to analyze whether a session's
@@ -652,10 +652,14 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 		return nil, fmt.Errorf("analysis query failed: %w", err)
 	}
 
-	if resp == nil || resp.Data.Content == nil {
+	if resp == nil {
 		return nil, nil
 	}
-	return parseCompletionAnalysis(*resp.Data.Content)
+	d, ok := resp.Data.(*sdk.AssistantMessageData)
+	if !ok || d.Content == "" {
+		return nil, nil
+	}
+	return parseCompletionAnalysis(d.Content)
 }
 
 // parseCompletionAnalysis extracts a CompletionAnalysis from the model's
