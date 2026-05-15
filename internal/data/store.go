@@ -815,7 +815,8 @@ func (s *Store) SearchSessionsFTS(query string, limit int) ([]SearchResult, erro
 		limit = defaultQueryLimit
 	}
 
-	args := []any{escaped}
+	args := make([]any, 0, 1+len(extraArgs)+1)
+	args = append(args, escaped)
 	args = append(args, extraArgs...)
 	args = append(args, limit)
 
