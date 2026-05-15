@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v0.9.0] — 2026-05-14
 
 ### Added
 - FTS5 full-text search with BM25 ranking (falls back to LIKE for older CLI versions)
@@ -16,6 +16,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 - Reindex renamed to "Rebuild Index" — now a manual repair action
 - Normal session refresh is automatic via DB change detection (no reindex needed)
+
+### Fixed
+- Time filter showing sessions from wrong hours due to timezone offset in SQLite comparison
+- Expand/collapse badge icons confused with sort direction controls (now uses distinct symbols)
+
+### Dependencies
+- Updated all Go dependencies to latest (38 packages)
+- github.com/github/copilot-sdk/go: v0.2.0 → v0.3.0 (breaking change handled)
+- charm.land/bubbletea/v2: v2.0.2 → v2.0.6
+- charm.land/bubbles/v2: v2.0.0 → v2.1.0
+- modernc.org/sqlite: v1.47.0 → v1.50.1
+- go.opentelemetry.io/otel: v1.35.0 → v1.43.0
 
 ## [v0.8.0] — 2026-04-08
 
