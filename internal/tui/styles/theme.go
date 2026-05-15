@@ -83,6 +83,9 @@ func SetTheme(t *Theme) {
 	AttentionStaleStyle = t.AttentionStaleStyle
 	AttentionIdleStyle = t.AttentionIdleStyle
 	AttentionInterruptedStyle = t.AttentionInterruptedStyle
+	AttentionWorkingStyle = t.AttentionWorkingStyle
+	AttentionThinkingStyle = t.AttentionThinkingStyle
+	AttentionCompactingStyle = t.AttentionCompactingStyle
 	PlanIndicatorStyle = t.PlanIndicatorStyle
 	WorkCompleteStyle = t.WorkCompleteStyle
 	WorkIncompleteStyle = t.WorkIncompleteStyle
@@ -228,6 +231,15 @@ var (
 	// AttentionInterruptedStyle renders the dot for sessions interrupted by crash.
 	AttentionInterruptedStyle lipgloss.Style
 
+	// AttentionWorkingStyle renders the dot for sessions actively executing tools.
+	AttentionWorkingStyle lipgloss.Style
+
+	// AttentionThinkingStyle renders the dot for sessions generating a response.
+	AttentionThinkingStyle lipgloss.Style
+
+	// AttentionCompactingStyle renders the dot for sessions undergoing context compaction.
+	AttentionCompactingStyle lipgloss.Style
+
 	// PlanIndicatorStyle renders the dot for sessions that have a plan.md file.
 	PlanIndicatorStyle lipgloss.Style
 
@@ -331,6 +343,9 @@ func applyLegacyDefaults(isDark bool) {
 	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00")))
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lightDark(c("#EA580C"), c("#F97316"))).Bold(true)
+	AttentionWorkingStyle = lipgloss.NewStyle().Foreground(lk)                                               // Green — same as Active
+	AttentionThinkingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE")))            // Cyan
+	AttentionCompactingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00"))).Faint(true) // Dim yellow
 	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE"))).Bold(true)
 	WorkCompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80"))).Bold(true)
 	WorkIncompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#CA8A04"), c("#FACC15"))).Bold(true)

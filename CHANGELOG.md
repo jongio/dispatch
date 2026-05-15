@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- FTS5 full-text search with BM25 ranking (falls back to LIKE for older CLI versions)
+- Session refs integration: searching numbers matches PR/issue/commit references
+- Incremental auto-refresh: session list updates within 2 seconds when Copilot CLI writes new data
+- Finer attention classification: Working, Thinking, and Compacting states
+- Host type icons: distinct icons for CLI, Cloud, and Actions sessions
+
+### Changed
+- Reindex renamed to "Rebuild Index" — now a manual repair action
+- Normal session refresh is automatic via DB change detection (no reindex needed)
+
 ## [v0.8.0] — 2026-04-08
 
 ### Added

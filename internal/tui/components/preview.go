@@ -859,6 +859,12 @@ func attentionStatusDisplay(status data.AttentionStatus) (icon, label string, st
 		return styles.IconAttentionActive(), "Active", styles.AttentionActiveStyle
 	case data.AttentionStale:
 		return styles.IconAttentionStale(), "Stale", styles.AttentionStaleStyle
+	case data.AttentionWorking:
+		return styles.IconAttentionWorking(), "Working", styles.AttentionWorkingStyle
+	case data.AttentionThinking:
+		return styles.IconAttentionThinking(), "Thinking", styles.AttentionThinkingStyle
+	case data.AttentionCompacting:
+		return styles.IconAttentionCompacting(), "Compacting", styles.AttentionCompactingStyle
 	default:
 		return styles.IconAttentionIdle(), "Idle", styles.PreviewValueStyle
 	}

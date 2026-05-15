@@ -203,21 +203,21 @@ func TestClassifySession(t *testing.T) {
 		}
 	})
 
-	t.Run("live PID + turn_start = active", func(t *testing.T) {
+	t.Run("live PID + turn_start = thinking", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "assistant.turn_start", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold, false); got != AttentionActive {
-			t.Errorf("got %v, want AttentionActive", got)
+		if got := classifySession(dir, threshold, false); got != AttentionThinking {
+			t.Errorf("got %v, want AttentionThinking", got)
 		}
 	})
 
-	t.Run("live PID + tool_execution_start = active", func(t *testing.T) {
+	t.Run("live PID + tool_execution_start = working", func(t *testing.T) {
 		dir := t.TempDir()
 		writeEvent(t, dir, "tool.execution_start", time.Now())
 		writeLockFile(t, dir, os.Getpid())
-		if got := classifySession(dir, threshold, false); got != AttentionActive {
-			t.Errorf("got %v, want AttentionActive", got)
+		if got := classifySession(dir, threshold, false); got != AttentionWorking {
+			t.Errorf("got %v, want AttentionWorking", got)
 		}
 	})
 
@@ -264,7 +264,7 @@ func TestScanAttention(t *testing.T) {
 	os.MkdirAll(s2, 0o755)
 	writeEvent(t, s2, "assistant.turn_end", time.Now())
 
-	// Session 3: active (live PID + turn_start).
+	// Session 3: active (live PID + turn_start → Thinking with finer classification).
 	s3 := filepath.Join(stateDir, "session-3")
 	os.MkdirAll(s3, 0o755)
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
@@ -278,8 +278,8 @@ func TestScanAttention(t *testing.T) {
 	if result["session-2"] != AttentionWaiting {
 		t.Errorf("session-2: got %v, want AttentionWaiting", result["session-2"])
 	}
-	if result["session-3"] != AttentionActive {
-		t.Errorf("session-3: got %v, want AttentionActive", result["session-3"])
+	if result["session-3"] != AttentionThinking {
+		t.Errorf("session-3: got %v, want AttentionThinking", result["session-3"])
 	}
 }
 
@@ -306,7 +306,7 @@ func TestScanAttentionQuick(t *testing.T) {
 	os.MkdirAll(s2, 0o755)
 	writeEvent(t, s2, "assistant.turn_end", time.Now())
 
-	// Session 3: live PID + turn_start → Active.
+	// Session 3: live PID + turn_start → Thinking.
 	s3 := filepath.Join(stateDir, "quick-3")
 	os.MkdirAll(s3, 0o755)
 	writeEvent(t, s3, "assistant.turn_start", time.Now())
@@ -320,8 +320,8 @@ func TestScanAttentionQuick(t *testing.T) {
 	if result["quick-2"] != AttentionIdle {
 		t.Errorf("quick-2: got %v, want AttentionIdle (quick scan skips dead)", result["quick-2"])
 	}
-	if result["quick-3"] != AttentionActive {
-		t.Errorf("quick-3: got %v, want AttentionActive", result["quick-3"])
+	if result["quick-3"] != AttentionThinking {
+		t.Errorf("quick-3: got %v, want AttentionThinking", result["quick-3"])
 	}
 }
 

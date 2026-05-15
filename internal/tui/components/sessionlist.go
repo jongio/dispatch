@@ -256,6 +256,19 @@ func (s *SessionList) VisibleSessionIDs() []string {
 	return out
 }
 
+// SelectByID moves the cursor to the visible session matching the given ID.
+// Returns true if the session was found and the cursor was moved.
+func (s *SessionList) SelectByID(id string) bool {
+	for i, idx := range s.visItems {
+		item := s.allItems[idx]
+		if !item.isFolder && item.session.ID == id {
+			s.MoveTo(i)
+			return true
+		}
+	}
+	return false
+}
+
 // FindNextWaiting searches forward from the current cursor position for
 // the next visible session item with AttentionWaiting status. Returns the
 // visItems index, or -1 if none found. Wraps around to the beginning.
@@ -699,6 +712,14 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	// Attention dot — 2 chars (dot + space).
 	attDot := s.attentionDot(sess.ID, selected)
 
+	// Host type icon — 2 chars (icon + space) if set, else empty.
+	hostIcon := styles.IconHostType(sess.HostType)
+	hostDotW := 0
+	if hostIcon != "" {
+		hostIcon += " "
+		hostDotW = 2
+	}
+
 	// Plan dot — 2 chars (dot + space) if plan exists, else 2 spaces.
 	plnDot := s.planDot(sess.ID, selected)
 
@@ -731,8 +752,8 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-planDotW-wrkDotW-2-timeW-spacing)
-		line := indent + checkMark + indicator + attDot + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-2-dotW-hostDotW-planDotW-wrkDotW-2-timeW-spacing)
+		line := indent + checkMark + indicator + attDot + hostIcon + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		if selected {
 			return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 		}
@@ -754,7 +775,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - 2 - dotW - planDotW - wrkDotW - 2 - timeW - turnsW - 2*spacing
+	summaryW := w - 2 - dotW - hostDotW - planDotW - wrkDotW - 2 - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -770,6 +791,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(checkMark)
 	b.WriteString(indicator)
 	b.WriteString(attDot)
+	b.WriteString(hostIcon)
 	b.WriteString(plnDot)
 	b.WriteString(wrkDot)
 	b.WriteString(PadRight(summary, summaryW))
@@ -834,6 +856,15 @@ func (s SessionList) attentionDot(sessionID string, selected bool) string {
 	case data.AttentionInterrupted:
 		dotStyle = styles.AttentionInterruptedStyle
 		icon = styles.IconAttentionInterrupted()
+	case data.AttentionWorking:
+		dotStyle = styles.AttentionWorkingStyle
+		icon = styles.IconAttentionWorking()
+	case data.AttentionThinking:
+		dotStyle = styles.AttentionThinkingStyle
+		icon = styles.IconAttentionThinking()
+	case data.AttentionCompacting:
+		dotStyle = styles.AttentionCompactingStyle
+		icon = styles.IconAttentionCompacting()
 	default:
 		dotStyle = styles.AttentionIdleStyle
 		icon = styles.IconAttentionIdle()

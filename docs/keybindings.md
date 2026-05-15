@@ -205,12 +205,12 @@
     - Condition: Only when preview panel is visible
 
 ### Session Management
-23. **r** → Reindex Sessions
+23. **r** → Rebuild Index
     - File: D:\code\dispatch\internal\tui\keys.go (line 73)
     - Code: key.NewBinding(key.WithKeys("r"))
     - Handler: D:\code\dispatch\internal\tui\model.go (lines 911-922)
-    - Behavior: Launches Copilot CLI in a pseudo-terminal and runs /chronicle reindex for a full ETL rebuild. Falls back to FTS5 maintenance if the binary is not found. Shows a streaming log overlay during the operation.
-    - Condition: In session list view; ignored if already reindexing
+    - Behavior: Manual repair action. Launches Copilot CLI in a pseudo-terminal and runs /chronicle reindex for a full ETL rebuild. Falls back to FTS5 maintenance if the binary is not found. Shows a streaming log overlay during the operation. Normal refresh is handled automatically by DB change detection.
+    - Condition: In session list view; ignored if already rebuilding
 
 24. **h** → Hide Current Session
     - File: D:\code\dispatch\internal\tui\keys.go (line 80)

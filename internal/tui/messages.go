@@ -156,3 +156,11 @@ type continuationPlanCreatedMsg struct {
 	updated int // number of plans successfully written
 	err     error
 }
+
+// ---------------------------------------------------------------------------
+// DB watcher messages
+// ---------------------------------------------------------------------------
+
+// sessionsChangedMsg indicates the session store database has been modified
+// externally and the session list should be refreshed.
+type sessionsChangedMsg struct{}

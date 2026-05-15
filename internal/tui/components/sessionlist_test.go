@@ -992,3 +992,89 @@ func TestMoveUpShift_AtTop(t *testing.T) {
 		t.Fatalf("SelectionCount = %d, want 1", sl.SelectionCount())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Host type icon rendering in session rows
+// ---------------------------------------------------------------------------
+
+func TestRenderSessionRow_HostTypeIcon(t *testing.T) {
+	t.Parallel()
+
+	sessWithHost := data.Session{
+		ID:           "test-host-1",
+		Summary:      "Test session with host",
+		HostType:     "cli",
+		TurnCount:    5,
+		LastActiveAt: "2025-01-01T00:00:00Z",
+	}
+	sessNoHost := data.Session{
+		ID:           "test-host-2",
+		Summary:      "Test session no host",
+		HostType:     "",
+		TurnCount:    3,
+		LastActiveAt: "2025-01-01T00:00:00Z",
+	}
+
+	sl := NewSessionList()
+	sl.SetSessions([]data.Session{sessWithHost, sessNoHost})
+	sl.SetSize(120, 20)
+
+	// Render and verify no panics, non-empty output.
+	view := sl.View()
+	if view == "" {
+		t.Fatal("expected non-empty view")
+	}
+
+	lines := strings.Split(view, "\n")
+	if len(lines) != 20 {
+		t.Fatalf("View() has %d lines, want 20", len(lines))
+	}
+
+	// Every line should be exactly 120 columns wide (line width consistency).
+	for i, line := range lines {
+		plain := stripAnsi(line)
+		pw := len([]rune(plain))
+		if pw != 120 {
+			t.Errorf("line %d: width=%d want 120, line=%q", i, pw, plain)
+		}
+	}
+}
+
+func TestRenderSessionRow_HostTypeWidthConsistency(t *testing.T) {
+	t.Parallel()
+	const width = 100
+	const height = 20
+
+	hostTypes := []string{"cli", "cloud", "actions", ""}
+	sessions := make([]data.Session, len(hostTypes))
+	for i, ht := range hostTypes {
+		sessions[i] = data.Session{
+			ID:           "ht-" + ht + "-" + string(rune('a'+i)),
+			Summary:      "Session with host type " + ht,
+			HostType:     ht,
+			TurnCount:    i + 1,
+			LastActiveAt: "2025-01-01T00:00:00Z",
+		}
+	}
+
+	sl := NewSessionList()
+	sl.SetSessions(sessions)
+	sl.SetSize(width, height)
+
+	for step := 0; step < len(sessions); step++ {
+		view := sl.View()
+		lines := strings.Split(view, "\n")
+		if len(lines) != height {
+			t.Fatalf("step %d: View() has %d lines, want %d", step, len(lines), height)
+		}
+		for i, line := range lines {
+			plain := stripAnsi(line)
+			pw := len([]rune(plain))
+			if pw != width {
+				t.Errorf("step %d line %d: width=%d want %d, line=%q",
+					step, i, pw, width, plain)
+			}
+		}
+		sl.MoveDown()
+	}
+}

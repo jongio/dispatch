@@ -48,9 +48,9 @@ const (
 	// Must be generous: Init ~1s + Search ~10s + retries (3 × [0.5s + 1s + 10s]) ≈ 45s.
 	copilotSearchTimeout = 45 * time.Second
 
-	// statusReindexDone is the status message shown when a reindex
+	// statusReindexDone is the status message shown when a repair reindex
 	// completes successfully.
-	statusReindexDone = "Reindexed ✓"
+	statusReindexDone = "Rebuild complete ✓"
 
 	// statusCopiedID is the status message shown when a session ID is
 	// copied to the clipboard.
@@ -65,8 +65,8 @@ const (
 	statusCopiedSelection = "Copied selection ✓"
 
 	// statusReindexCancelled is the status message shown when the user
-	// cancels an in-flight reindex operation.
-	statusReindexCancelled = "Reindex cancelled"
+	// cancels an in-flight rebuild operation.
+	statusReindexCancelled = "Rebuild cancelled"
 
 	// cancelBtnLabel is the button label shown in overlays that can be
 	// dismissed with Escape (reindex, etc.).
@@ -76,8 +76,8 @@ const (
 	// of the header row (accounts for a potential trailing space or cursor).
 	headerRightReserve = 4
 
-	// headerReindexReserve is the wider column reserve when the reindex
-	// spinner is active (" ⣾ Reindexing…" ≈ 15 chars + padding).
+	// headerReindexReserve is the wider column reserve when the rebuild
+	// spinner is active (" ⣾ Rebuilding…" ≈ 15 chars + padding).
 	headerReindexReserve = 16
 
 	// headerScanReserve is the column reserve when the work-status
@@ -237,6 +237,10 @@ type Model struct {
 	workStatusScanning bool                         // true while work status scan chain is in progress
 	workStatusAICancel context.CancelFunc           // cancels in-flight AI work status analysis
 	autoShowPlan       bool                         // when true, auto-switch to plan view on next planContentMsg
+
+	// DB watcher — monitors session-store.db for external modifications.
+	dbWatcher *data.DBWatcher
+	dbWatchCh chan struct{} // receives pings from the watcher callback
 }
 
 // NewModel creates the root Model with default configuration.
@@ -311,7 +315,17 @@ func NewModel() Model {
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
+		dbWatchCh:       make(chan struct{}, 1),
 	}
+
+	m.dbWatcher = data.NewDBWatcher(func() {
+		// Non-blocking send so the watcher goroutine never stalls.
+		select {
+		case m.dbWatchCh <- struct{}{}:
+		default:
+		}
+	})
+	m.dbWatcher.SetActive(true)
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
@@ -366,6 +380,7 @@ func (m Model) Init() tea.Cmd {
 		checkNerdFontCmd(),
 		m.spinner.Tick,
 		tea.RequestBackgroundColor,
+		m.waitForDBChangeCmd(),
 	)
 }
 
@@ -425,18 +440,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reindexCancel = nil
 		if msg.Err != nil {
 			if errors.Is(msg.Err, data.ErrIndexBusy) {
-				m.statusErr = "Index busy — Copilot is reindexing, try again shortly"
+				m.statusErr = "Index busy — Copilot is rebuilding, try again shortly"
 			} else if errors.Is(msg.Err, data.ErrReindexCancelled) {
 				m.statusInfo = statusReindexCancelled
 			} else {
-				m.statusErr = "Reindex: " + msg.Err.Error()
+				m.statusErr = "Rebuild index: " + msg.Err.Error()
 			}
 		} else {
 			m.statusInfo = statusReindexDone
 		}
 		m.reindexLog = nil
-		// Reload sessions to pick up changes from chronicle reindex.
+		// Reload sessions to pick up changes from chronicle reindex,
+		// and reset the DBWatcher baseline so it doesn't immediately
+		// trigger a duplicate refresh.
 		cmds := []tea.Cmd{clearStatusAfter(2 * time.Second)}
+		if m.store != nil {
+			cmds = append(cmds, m.loadSessionsCmd())
+		}
+		if m.dbWatcher != nil {
+			m.dbWatcher.ResetBaseline()
+		}
+		return m, tea.Batch(cmds...)
+
+	// ----- DB watcher (external session store changes) --------------------
+	case sessionsChangedMsg:
+		var cmds []tea.Cmd
+		cmds = append(cmds, m.waitForDBChangeCmd()) // re-arm the listener
 		if m.store != nil {
 			cmds = append(cmds, m.loadSessionsCmd())
 		}
@@ -473,6 +502,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ----- Data loading ----------------------------------------------------
 	case sessionsLoadedMsg:
+		prevID := m.selectedSessionID()
 		m.sessions = m.filterHiddenSessions(msg.sessions)
 		m.sessions = m.filterFavoritedSessions(m.sessions)
 		m.sessions = m.filterAttentionSessions(m.sessions)
@@ -486,6 +516,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionList.SetPlanStatuses(m.planMap)
 		m.sessionList.SetWorkStatuses(m.workStatusMap)
 		m.sessionList.SetSessions(m.sessions)
+		// Restore cursor to the previously selected session if possible.
+		if prevID != "" {
+			m.sessionList.SelectByID(prevID)
+		}
 		// Only transition from loading to session-list; never clobber an
 		// active modal/overlay state with an async data load.
 		if m.state == stateLoading {
@@ -499,6 +533,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
 
 	case groupsLoadedMsg:
+		prevID := m.selectedSessionID()
 		m.groups = m.filterHiddenGroups(msg.groups)
 		m.groups = m.filterFavoritedGroups(m.groups)
 		m.groups = m.filterAttentionGroups(m.groups)
@@ -515,6 +550,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionList.SetWorkStatuses(m.workStatusMap)
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
+		if prevID != "" {
+			m.sessionList.SelectByID(prevID)
+		}
 		if m.state == stateLoading {
 			if m.cfg.DefaultCollapsed {
 				m.sessionList.CollapseAll()
@@ -1393,7 +1431,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Reindex):
 		if !m.reindexing {
 			m.reindexing = true
-			m.reindexLog = []string{"Starting reindex…"}
+			m.reindexLog = []string{"Starting rebuild index…"}
 			m.reindexVP = viewport.New(viewport.WithHeight(reindexOverlayHeight))
 			// MouseWheelEnabled is default in v2
 			m.updateReindexViewport()
@@ -2194,7 +2232,7 @@ func (m Model) renderHeader() string {
 	// Right side: reindex or work-status scan status.
 	var right string
 	if m.reindexing {
-		right = m.spinner.View() + " Reindexing…"
+		right = m.spinner.View() + " Rebuilding index…"
 	} else if m.workStatusScanning {
 		right = m.spinner.View() + " Scanning work status…"
 	}
@@ -2332,9 +2370,9 @@ func (m Model) renderFooter() string {
 	} else if !m.reindexing {
 		// Show last reindex time as a subtle hint.
 		if t := data.LastReindexTime(); !t.IsZero() {
-			left += "  " + styles.DimStyle.Render("indexed "+components.RelativeTime(t.UTC().Format(time.RFC3339))+" · r reindex")
+			left += "  " + styles.DimStyle.Render("indexed "+components.RelativeTime(t.UTC().Format(time.RFC3339))+" · r rebuild index")
 		} else {
-			left += "  " + styles.DimStyle.Render("r reindex")
+			left += "  " + styles.DimStyle.Render("r rebuild index")
 		}
 	}
 
@@ -2455,7 +2493,7 @@ func (m Model) renderReindexOverlay() string {
 	maxW = min(maxW, m.width-4)
 	maxW = max(maxW, 44)
 
-	title := styles.OverlayTitleStyle.Render(m.spinner.View() + " Reindexing Sessions")
+	title := styles.OverlayTitleStyle.Render(m.spinner.View() + " Rebuild Index")
 
 	cancelBtn := lipgloss.NewStyle().
 		Foreground(styles.ColorPrimary).
@@ -3069,6 +3107,13 @@ func (m Model) selectedSessionCwd() string {
 // ---------------------------------------------------------------------------
 
 func (m *Model) closeStore() {
+	if m.dbWatcher != nil {
+		m.dbWatcher.Stop()
+	}
+	if m.dbWatchCh != nil {
+		close(m.dbWatchCh)
+		m.dbWatchCh = nil
+	}
 	if m.copilotClient != nil {
 		m.copilotClient.Close()
 		m.copilotClient = nil
@@ -3090,6 +3135,19 @@ func openStoreCmd() tea.Cmd {
 			return storeErrorMsg{err: err}
 		}
 		return storeOpenedMsg{store: store}
+	}
+}
+
+// waitForDBChangeCmd blocks on the dbWatchCh channel until the DB watcher
+// fires, then returns a sessionsChangedMsg to trigger a session list reload.
+func (m Model) waitForDBChangeCmd() tea.Cmd {
+	ch := m.dbWatchCh
+	return func() tea.Msg {
+		_, ok := <-ch
+		if !ok {
+			return nil // channel closed — watcher stopped
+		}
+		return sessionsChangedMsg{}
 	}
 }
 

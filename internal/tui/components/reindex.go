@@ -28,10 +28,12 @@ type ReindexHandle struct {
 	Cancel context.CancelFunc
 }
 
-// StartChronicleReindex launches a full chronicle reindex via the Copilot
-// CLI in a pseudo-terminal. It returns a ReindexHandle (for cancellation)
-// and two Cmds: one that runs the reindex (sending ReindexFinishedMsg on
-// completion), and one that pumps log lines into ReindexLogPump messages.
+// StartChronicleReindex launches a full chronicle rebuild via the Copilot
+// CLI in a pseudo-terminal. This is a manual repair action — normal session
+// refresh is handled by the DBWatcher. It returns a ReindexHandle (for
+// cancellation) and two Cmds: one that runs the reindex (sending
+// ReindexFinishedMsg on completion), and one that pumps log lines into
+// ReindexLogPump messages.
 //
 // Falls back to Maintain() if the copilot binary is not found.
 func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {

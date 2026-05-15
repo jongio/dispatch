@@ -89,7 +89,7 @@ var keys = keyMap{
 	Pivot:             key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "cycle pivot")),
 	PivotOrder:        key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "reverse pivot order")),
 	Preview:           key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "toggle preview")),
-	Reindex:           key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reindex")),
+	Reindex:           key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rebuild index")),
 	Help:              key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 	Config:            key.NewBinding(key.WithKeys(","), key.WithHelp(",", "settings")),
 	TimeRange1:        key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "1 hour")),

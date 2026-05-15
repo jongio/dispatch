@@ -47,6 +47,27 @@ const maxLockFileSize = 32
 // proliferation. Normal sessions have 0–1 lock files.
 const maxLockFilesPerSession = 10
 
+// ---------------------------------------------------------------------------
+// Event type prefixes — observable in ~/.copilot/session-state/{id}/events.jsonl.
+// Used by classifyLiveSession to determine session activity state.
+// ---------------------------------------------------------------------------
+
+const (
+	eventTurnEnd       = "assistant.turn_end"
+	eventMessage       = "assistant.message"
+	eventTurnStart     = "assistant.turn_start"
+	eventToolExecution = "tool.execution"
+	eventHook          = "hook."
+	eventSubagent      = "subagent."
+	eventPlanChanged   = "session.plan_changed"
+	eventSkillInvoked  = "skill.invoked"
+	eventShutdown      = "session.shutdown"
+	eventAbort         = "abort"
+	eventModelChange   = "session.model_change"
+	eventSystemMessage = "system.message"
+	eventCompaction    = "session.compaction_complete"
+)
+
 // deadSessionMaxAge is the maximum age of the last event for a dead session
 // to be classified as AttentionWaiting. Older dead sessions are always Idle
 // to avoid noise from long-abandoned sessions.
@@ -167,8 +188,8 @@ func classifySession(dir string, threshold time.Duration, workspaceRecovery bool
 			return AttentionIdle
 		}
 		switch {
-		case strings.HasPrefix(evt.Type, "assistant.turn_end"),
-			strings.HasPrefix(evt.Type, "assistant.message"):
+		case strings.HasPrefix(evt.Type, eventTurnEnd),
+			strings.HasPrefix(evt.Type, eventMessage):
 			return AttentionWaiting
 		default:
 			return AttentionInterrupted
@@ -180,8 +201,8 @@ func classifySession(dir string, threshold time.Duration, workspaceRecovery bool
 		return AttentionIdle
 	}
 	switch {
-	case strings.HasPrefix(evt.Type, "assistant.turn_end"),
-		strings.HasPrefix(evt.Type, "assistant.message"):
+	case strings.HasPrefix(evt.Type, eventTurnEnd),
+		strings.HasPrefix(evt.Type, eventMessage):
 		return AttentionWaiting
 	default:
 		return AttentionIdle
@@ -205,21 +226,25 @@ func classifyLiveSession(dir string, threshold time.Duration) AttentionStatus {
 
 	// Classify by event type.
 	switch {
-	case strings.HasPrefix(evt.Type, "assistant.turn_end"),
-		strings.HasPrefix(evt.Type, "assistant.message"):
+	case strings.HasPrefix(evt.Type, eventTurnEnd),
+		strings.HasPrefix(evt.Type, eventMessage):
 		return AttentionWaiting
-	case strings.HasPrefix(evt.Type, "assistant.turn_start"),
-		strings.HasPrefix(evt.Type, "tool.execution"),
-		strings.HasPrefix(evt.Type, "hook."),
-		strings.HasPrefix(evt.Type, "subagent."),
-		strings.HasPrefix(evt.Type, "session.plan_changed"),
-		strings.HasPrefix(evt.Type, "skill.invoked"):
+	case strings.HasPrefix(evt.Type, eventToolExecution):
+		return AttentionWorking
+	case strings.HasPrefix(evt.Type, eventTurnStart):
+		return AttentionThinking
+	case evt.Type == eventCompaction:
+		return AttentionCompacting
+	case strings.HasPrefix(evt.Type, eventHook),
+		strings.HasPrefix(evt.Type, eventSubagent),
+		strings.HasPrefix(evt.Type, eventPlanChanged),
+		strings.HasPrefix(evt.Type, eventSkillInvoked):
 		return AttentionActive
-	case evt.Type == "session.shutdown",
-		evt.Type == "abort":
+	case evt.Type == eventShutdown,
+		evt.Type == eventAbort:
 		return AttentionIdle
-	case evt.Type == "session.model_change",
-		evt.Type == "system.message":
+	case evt.Type == eventModelChange,
+		evt.Type == eventSystemMessage:
 		// Neutral events — don't change the attention state.
 		// Treat as waiting since the AI isn't actively working.
 		return AttentionWaiting

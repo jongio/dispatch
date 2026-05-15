@@ -2018,8 +2018,8 @@ func TestHandleKey_Reindex_EscapeCancels(t *testing.T) {
 	if rm.reindexLog != nil {
 		t.Error("reindexLog should be cleared after cancel")
 	}
-	if rm.statusInfo != "Reindex cancelled" {
-		t.Errorf("statusInfo should be 'Reindex cancelled', got %q", rm.statusInfo)
+	if rm.statusInfo != "Rebuild cancelled" {
+		t.Errorf("statusInfo should be 'Rebuild cancelled', got %q", rm.statusInfo)
 	}
 	if !called {
 		t.Error("cancel function should have been called")

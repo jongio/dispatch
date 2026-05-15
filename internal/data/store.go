@@ -42,6 +42,7 @@ const (
 type Store struct {
 	db          *sql.DB
 	hasHostType bool   // true if sessions table has host_type column (schema v3+)
+	hasFTS5     bool   // true if FTS5 search_index virtual table is present
 	tempDir     string // OS temp directory prefix, used to filter automated sessions
 	homeDir     string // user home directory, used to filter hidden dotfolder sessions
 }
@@ -90,8 +91,16 @@ func OpenPath(path string) (*Store, error) {
 		}
 	}
 
+	// Detect FTS5 search_index table availability.
+	hasFTS5 := false
+	ftsRow := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='search_index'")
+	var ftsName string
+	if ftsRow.Scan(&ftsName) == nil && ftsName == "search_index" {
+		hasFTS5 = true
+	}
+
 	homeDir, _ := os.UserHomeDir()
-	return &Store{db: db, hasHostType: hasHostType, tempDir: os.TempDir(), homeDir: homeDir}, nil
+	return &Store{db: db, hasHostType: hasHostType, hasFTS5: hasFTS5, tempDir: os.TempDir(), homeDir: homeDir}, nil
 }
 
 // Close closes the underlying database connection.
@@ -591,8 +600,30 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 
 // SearchSessions performs a fuzzy substring search across session metadata
 // and turn content, returning matches ranked by source type. Sessions with
-// zero turns are excluded.
+// zero turns are excluded. When FTS5 is available it is tried first for
+// faster BM25-ranked results; on failure it falls back to LIKE.
 func (s *Store) SearchSessions(query string, limit int) ([]SearchResult, error) {
+	// Try FTS5 path first (faster, BM25-ranked).
+	if s.hasFTS5 {
+		results, err := s.SearchSessionsFTS(query, limit)
+		if err == nil && results != nil {
+			// Merge in session_refs matches.
+			refResults := s.searchRefs(query, limit)
+			return mergeSearchResults(results, refResults, limit), nil
+		}
+		// FTS5 failed (syntax error, etc.) — fall through to LIKE.
+	}
+
+	results, err := s.searchSessionsLIKE(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	refResults := s.searchRefs(query, limit)
+	return mergeSearchResults(results, refResults, limit), nil
+}
+
+// searchSessionsLIKE is the LIKE-based fallback for SearchSessions.
+func (s *Store) searchSessionsLIKE(query string, limit int) ([]SearchResult, error) {
 	pattern := "%" + escapeLIKE(query) + "%"
 
 	// Build automatic exclusion clauses (temp dir + hidden dotfolders).
@@ -654,6 +685,160 @@ func (s *Store) SearchSessions(query string, limit int) ([]SearchResult, error) 
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating search results: %w", err)
+	}
+	return results, nil
+}
+
+// searchRefs returns SearchResult entries for sessions whose session_refs
+// match the query. This catches PR numbers, issue numbers, and commit refs
+// typed as bare numbers (e.g. "42" matches PR #42).
+func (s *Store) searchRefs(query string, limit int) []SearchResult {
+	// Extract numeric portion if present (strip leading # or "PR" prefix).
+	refQuery := strings.TrimPrefix(strings.TrimPrefix(query, "#"), "PR")
+	refQuery = strings.TrimPrefix(refQuery, "pr")
+	refQuery = strings.TrimSpace(refQuery)
+	if refQuery == "" {
+		return nil
+	}
+
+	pattern := "%" + escapeLIKE(refQuery) + "%"
+	q := `SELECT sr.ref_value, sr.session_id, sr.ref_type, CAST(sr.turn_index AS TEXT)
+		  FROM session_refs sr
+		  JOIN sessions s ON s.id = sr.session_id
+		  WHERE sr.ref_value LIKE ? ESCAPE '\'`
+
+	// Apply auto-exclusions.
+	var args []any
+	args = append(args, pattern)
+	if s.tempDir != "" {
+		q += ` AND s.cwd NOT LIKE ? ESCAPE '\'`
+		args = append(args, escapeLIKE(s.tempDir)+"%")
+	}
+	if s.homeDir != "" {
+		q += ` AND s.cwd NOT LIKE ? ESCAPE '\'`
+		args = append(args, escapeLIKE(s.homeDir+string(filepath.Separator)+".")+"%")
+	}
+	if limit <= 0 {
+		limit = defaultQueryLimit
+	}
+	q += " LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close() //nolint:errcheck // rows read-only
+
+	var results []SearchResult
+	for rows.Next() {
+		var r SearchResult
+		if err := rows.Scan(&r.Content, &r.SessionID, &r.SourceType, &r.SourceID); err != nil {
+			continue
+		}
+		r.Rank = -100 // boost ref matches to top
+		results = append(results, r)
+	}
+	return results
+}
+
+// mergeSearchResults combines FTS5 results with ref results, deduplicating
+// by session ID and respecting the limit.
+func mergeSearchResults(primary, secondary []SearchResult, limit int) []SearchResult {
+	if len(secondary) == 0 {
+		return primary
+	}
+	seen := make(map[string]struct{}, len(primary))
+	for _, r := range primary {
+		seen[r.SessionID] = struct{}{}
+	}
+	// Prepend ref matches (they're boosted).
+	merged := make([]SearchResult, 0, len(primary)+len(secondary))
+	for _, r := range secondary {
+		if _, ok := seen[r.SessionID]; !ok {
+			merged = append(merged, r)
+			seen[r.SessionID] = struct{}{}
+		}
+	}
+	merged = append(merged, primary...)
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged
+}
+
+// escapeFTS5 wraps each whitespace-separated term in double quotes so that
+// FTS5 special characters (-, *, OR, AND, NOT, NEAR, etc.) are treated as
+// literals. Returns the escaped query suitable for MATCH.
+func escapeFTS5(query string) string {
+	terms := strings.Fields(query)
+	if len(terms) == 0 {
+		return `""`
+	}
+	quoted := make([]string, len(terms))
+	for i, t := range terms {
+		// Escape any embedded double quotes by doubling them.
+		quoted[i] = `"` + strings.ReplaceAll(t, `"`, `""`) + `"`
+	}
+	return strings.Join(quoted, " ")
+}
+
+// SearchSessionsFTS performs a full-text search using the FTS5 search_index
+// virtual table maintained by the Copilot CLI. Results are ranked by BM25
+// relevance. Returns nil, nil if the FTS5 table is not available.
+func (s *Store) SearchSessionsFTS(query string, limit int) ([]SearchResult, error) {
+	if !s.hasFTS5 {
+		return nil, nil
+	}
+
+	escaped := escapeFTS5(query)
+
+	// Build automatic exclusion clauses (temp dir + hidden dotfolders).
+	var autoClause string
+	var extraArgs []any
+	if s.tempDir != "" {
+		autoClause += ` AND ` + coalesceCwd + ` NOT LIKE ? ESCAPE '\'`
+		extraArgs = append(extraArgs, escapeLIKE(s.tempDir)+"%")
+	}
+	if s.homeDir != "" {
+		autoClause += ` AND ` + coalesceCwd + ` NOT LIKE ? ESCAPE '\'`
+		extraArgs = append(extraArgs, escapeLIKE(s.homeDir+string(filepath.Separator)+".")+"%")
+	}
+
+	q := `SELECT si.content, si.session_id, si.source_type, si.source_id, si.rank
+		FROM search_index si
+		JOIN sessions s ON s.id = si.session_id
+		WHERE si.content MATCH ?` + autoClause + `
+		ORDER BY si.rank` + limitClause
+
+	if limit <= 0 {
+		limit = defaultQueryLimit
+	}
+
+	args := []any{escaped}
+	args = append(args, extraArgs...)
+	args = append(args, limit)
+
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		// FTS5 MATCH can fail on malformed queries — return empty, not error.
+		if strings.Contains(err.Error(), "fts5") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("FTS5 search: %w", err)
+	}
+	defer rows.Close() //nolint:errcheck // rows read-only
+
+	var results []SearchResult
+	for rows.Next() {
+		var r SearchResult
+		if err := rows.Scan(&r.Content, &r.SessionID, &r.SourceType, &r.SourceID, &r.Rank); err != nil {
+			return nil, fmt.Errorf("scanning FTS5 result: %w", err)
+		}
+		results = append(results, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating FTS5 results: %w", err)
 	}
 	return results, nil
 }

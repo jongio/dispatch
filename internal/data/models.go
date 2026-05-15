@@ -110,6 +110,12 @@ const (
 	// AttentionInterrupted means the session was interrupted by crash or reboot
 	// (stale lock file with dead PID, last event not a turn-end).
 	AttentionInterrupted
+	// AttentionWorking means the AI is actively executing tools (finer than Active).
+	AttentionWorking
+	// AttentionThinking means the AI is generating a response (no tool calls yet).
+	AttentionThinking
+	// AttentionCompacting means the session is undergoing context compaction.
+	AttentionCompacting
 )
 
 // String returns a human-readable label for the attention status.
@@ -123,6 +129,12 @@ func (a AttentionStatus) String() string {
 		return "stale"
 	case AttentionInterrupted:
 		return "interrupted"
+	case AttentionWorking:
+		return "working"
+	case AttentionThinking:
+		return "thinking"
+	case AttentionCompacting:
+		return "compacting"
 	default:
 		return "idle"
 	}

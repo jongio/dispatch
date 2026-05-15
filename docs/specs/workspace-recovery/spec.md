@@ -115,6 +115,9 @@ const (
     AttentionActive                         // 2 — AI working
     AttentionWaiting                        // 3 — needs user input
     AttentionInterrupted                    // 4 — crashed/killed mid-work
+    AttentionWorking                        // 5 — actively executing tools
+    AttentionThinking                       // 6 — generating a response
+    AttentionCompacting                     // 7 — context compaction in progress
 )
 ```
 

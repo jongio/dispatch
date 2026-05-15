@@ -44,6 +44,12 @@ func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
 		return styles.AttentionStaleStyle
 	case data.AttentionInterrupted:
 		return styles.AttentionInterruptedStyle
+	case data.AttentionWorking:
+		return styles.AttentionWorkingStyle
+	case data.AttentionThinking:
+		return styles.AttentionThinkingStyle
+	case data.AttentionCompacting:
+		return styles.AttentionCompactingStyle
 	default:
 		return styles.AttentionIdleStyle
 	}

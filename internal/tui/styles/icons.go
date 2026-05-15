@@ -58,6 +58,11 @@ const (
 	nfRepo       = "\uea62" //  nf-cod-repo
 	nfCalendar   = "\uf073" //  nf-fa-calendar
 	nfList       = "\uf03a" //  nf-fa-list
+
+	// Host type icons — distinguish session origin (CLI, cloud, Actions).
+	nfCloud   = "\uf0c2" //  nf-fa-cloud
+	nfActions = "\uf013" //  nf-fa-gear (reuse for actions/CI)
+	nfDesktop = "\uf108" //  nf-fa-desktop
 )
 
 // ---------------------------------------------------------------------------
@@ -85,6 +90,10 @@ const (
 	fbCalendar   = "◇"
 	fbList       = "≡"
 	fbBranch     = "⎇" // branch pivot fallback (distinct from fbGitBranch)
+
+	fbCloud   = "☁"
+	fbActions = "⚙"
+	fbDesktop = "◻"
 )
 
 // ---------------------------------------------------------------------------
@@ -185,6 +194,15 @@ func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }
 // IconAttentionInterrupted returns a lightning bolt for "crashed/interrupted" status.
 func IconAttentionInterrupted() string { return icon("\uf0e7", "⚡") }
 
+// IconAttentionWorking returns a filled dot for "actively executing tools" status.
+func IconAttentionWorking() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconAttentionThinking returns a filled dot for "generating response" status.
+func IconAttentionThinking() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconAttentionCompacting returns a filled dot for "context compaction" status.
+func IconAttentionCompacting() string { return icon(nfBullet, fbAttentionDot) }
+
 // IconExpandAll returns the "expand all groups" icon (⊞).
 func IconExpandAll() string { return "⊞" }
 
@@ -202,6 +220,21 @@ func IconWorkIncomplete() string { return icon("\uf071", "!") } // nf-fa-warning
 
 // IconWorkAnalyzing returns a spinner icon for sessions being analyzed.
 func IconWorkAnalyzing() string { return icon("\uf110", "~") } // nf-fa-spinner
+
+// IconHostType returns an icon representing the session's host type.
+// Returns empty string for unknown/empty host types (no icon shown).
+func IconHostType(hostType string) string {
+	switch hostType {
+	case "cli":
+		return icon(nfDesktop, fbDesktop)
+	case "cloud":
+		return icon(nfCloud, fbCloud)
+	case "actions":
+		return icon(nfActions, fbActions)
+	default:
+		return ""
+	}
+}
 
 // PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
 // The pivot string matches data.PivotField values ("cwd", "repository",

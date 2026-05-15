@@ -205,6 +205,45 @@ func TestIconFunctions_AllNonEmpty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// IconHostType
+// ---------------------------------------------------------------------------
+
+func TestIconHostType(t *testing.T) {
+	orig := NerdFontEnabled()
+	defer SetNerdFontEnabled(orig)
+
+	tests := []struct {
+		name      string
+		hostType  string
+		nerd      bool
+		wantEmpty bool
+	}{
+		{name: "cli with nerd font", hostType: "cli", nerd: true, wantEmpty: false},
+		{name: "cloud with nerd font", hostType: "cloud", nerd: true, wantEmpty: false},
+		{name: "actions with nerd font", hostType: "actions", nerd: true, wantEmpty: false},
+		{name: "cli without nerd font", hostType: "cli", nerd: false, wantEmpty: false},
+		{name: "cloud without nerd font", hostType: "cloud", nerd: false, wantEmpty: false},
+		{name: "actions without nerd font", hostType: "actions", nerd: false, wantEmpty: false},
+		{name: "empty host type", hostType: "", nerd: true, wantEmpty: true},
+		{name: "unknown host type", hostType: "unknown", nerd: true, wantEmpty: true},
+		{name: "github host type", hostType: "github", nerd: true, wantEmpty: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetNerdFontEnabled(tt.nerd)
+			got := IconHostType(tt.hostType)
+			if tt.wantEmpty && got != "" {
+				t.Errorf("IconHostType(%q) = %q, want empty", tt.hostType, got)
+			}
+			if !tt.wantEmpty && got == "" {
+				t.Errorf("IconHostType(%q) = empty, want non-empty", tt.hostType)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // PivotGroupIcons
 // ---------------------------------------------------------------------------
 
