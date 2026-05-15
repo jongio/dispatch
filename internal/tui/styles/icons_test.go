@@ -218,15 +218,13 @@ func TestIconHostType(t *testing.T) {
 		nerd      bool
 		wantEmpty bool
 	}{
-		{name: "cli with nerd font", hostType: "cli", nerd: true, wantEmpty: false},
-		{name: "cloud with nerd font", hostType: "cloud", nerd: true, wantEmpty: false},
-		{name: "actions with nerd font", hostType: "actions", nerd: true, wantEmpty: false},
-		{name: "cli without nerd font", hostType: "cli", nerd: false, wantEmpty: false},
-		{name: "cloud without nerd font", hostType: "cloud", nerd: false, wantEmpty: false},
-		{name: "actions without nerd font", hostType: "actions", nerd: false, wantEmpty: false},
+		{name: "github with nerd font", hostType: "github", nerd: true, wantEmpty: false},
+		{name: "ado with nerd font", hostType: "ado", nerd: true, wantEmpty: false},
+		{name: "github without nerd font", hostType: "github", nerd: false, wantEmpty: false},
+		{name: "ado without nerd font", hostType: "ado", nerd: false, wantEmpty: false},
 		{name: "empty host type", hostType: "", nerd: true, wantEmpty: true},
 		{name: "unknown host type", hostType: "unknown", nerd: true, wantEmpty: true},
-		{name: "github host type", hostType: "github", nerd: true, wantEmpty: true},
+		{name: "cli host type", hostType: "cli", nerd: true, wantEmpty: true},
 	}
 
 	for _, tt := range tests {

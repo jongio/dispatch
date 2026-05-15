@@ -59,10 +59,9 @@ const (
 	nfCalendar   = "\uf073" //  nf-fa-calendar
 	nfList       = "\uf03a" //  nf-fa-list
 
-	// Host type icons — distinguish session origin (CLI, cloud, Actions).
-	nfCloud   = "\uf0c2" //  nf-fa-cloud
-	nfActions = "\uf013" //  nf-fa-gear (reuse for actions/CI)
-	nfDesktop = "\uf108" //  nf-fa-desktop
+	// Host type icons — distinguish session origin (GitHub, Azure DevOps).
+	nfGitHub = "\uf09b" //  nf-fa-github
+	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
 )
 
 // ---------------------------------------------------------------------------
@@ -91,9 +90,8 @@ const (
 	fbList       = "≡"
 	fbBranch     = "⎇" // branch pivot fallback (distinct from fbGitBranch)
 
-	fbCloud   = "☁"
-	fbActions = "⚙"
-	fbDesktop = "◻"
+	fbGitHub = "⊙"
+	fbADO    = "☁"
 )
 
 // ---------------------------------------------------------------------------
@@ -225,12 +223,10 @@ func IconWorkAnalyzing() string { return icon("\uf110", "~") } // nf-fa-spinner
 // Returns empty string for unknown/empty host types (no icon shown).
 func IconHostType(hostType string) string {
 	switch hostType {
-	case "cli":
-		return icon(nfDesktop, fbDesktop)
-	case "cloud":
-		return icon(nfCloud, fbCloud)
-	case "actions":
-		return icon(nfActions, fbActions)
+	case "github":
+		return icon(nfGitHub, fbGitHub)
+	case "ado":
+		return icon(nfADO, fbADO)
 	default:
 		return ""
 	}
