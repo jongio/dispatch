@@ -227,10 +227,7 @@ func Preflight() error {
 	fmt.Println("\n=== 10/13 Vulnerability scan ===")
 	if _, err := exec.LookPath("govulncheck"); err == nil {
 		if err := run("govulncheck", "./..."); err != nil {
-			// govulncheck exit code 3 = vulns found in code. If only stdlib
-			// vulns requiring an unreleased Go patch, warn instead of fail.
-			fmt.Printf("   WARNING: govulncheck reported vulnerabilities: %v\n", err)
-			fmt.Println("   Review output above — stdlib vulns require Go toolchain upgrade.")
+			return fmt.Errorf("vulncheck: %w", err)
 		}
 	} else {
 		fmt.Println("   Skipped (install: go install golang.org/x/vuln/cmd/govulncheck@latest)")
