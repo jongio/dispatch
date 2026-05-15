@@ -343,8 +343,8 @@ func applyLegacyDefaults(isDark bool) {
 	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00")))
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	AttentionInterruptedStyle = lipgloss.NewStyle().Foreground(lightDark(c("#EA580C"), c("#F97316"))).Bold(true)
-	AttentionWorkingStyle = lipgloss.NewStyle().Foreground(lk)                                               // Green — same as Active
-	AttentionThinkingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE")))            // Cyan
+	AttentionWorkingStyle = lipgloss.NewStyle().Foreground(lk)                                                   // Green — same as Active
+	AttentionThinkingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE")))               // Cyan
 	AttentionCompactingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00"))).Faint(true) // Dim yellow
 	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE"))).Bold(true)
 	WorkCompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80"))).Bold(true)
