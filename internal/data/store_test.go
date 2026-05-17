@@ -75,6 +75,9 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("opening in-memory SQLite: %v", err)
 	}
+	// Limit to one connection so all goroutines share the same in-memory
+	// database (each :memory: connection creates a separate empty DB).
+	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(schemaSQL); err != nil {
 		_ = db.Close()
 		t.Fatalf("creating schema: %v", err)

@@ -21,6 +21,7 @@ func newBenchStore(b *testing.B) *Store {
 	if err != nil {
 		b.Fatalf("opening in-memory SQLite: %v", err)
 	}
+	db.SetMaxOpenConns(1) // share single in-memory DB across goroutines
 	if _, err := db.Exec(schemaSQL); err != nil {
 		_ = db.Close()
 		b.Fatalf("creating schema: %v", err)
