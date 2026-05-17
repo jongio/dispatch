@@ -79,7 +79,19 @@ jobs:
 
       - run: go vet ./...
 
-      - run: go test ./...
+      - name: Test with coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Coverage summary
+        run: |
+          echo "### Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -1 | awk '{print "Total: " $3}' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
 
       - name: Test (race detector)
         env:
