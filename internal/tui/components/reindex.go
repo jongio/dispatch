@@ -38,6 +38,9 @@ type ReindexHandle struct {
 // Falls back to Maintain() if the copilot binary is not found.
 func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 	logCh := make(chan string, reindexLogChanSize)
+	// Intentional context.Background(): Bubble Tea commands (tea.Cmd) are
+	// fire-and-forget with no parent context.  Cancellation is managed via
+	// ReindexHandle.Cancel which calls this cancel func.
 	ctx, cancel := context.WithCancel(context.Background())
 
 	handle := ReindexHandle{Cancel: cancel}

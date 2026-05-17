@@ -294,9 +294,10 @@ func (c *Client) Search(ctx context.Context, query string) ([]string, error) {
 		return nil, nil
 	}
 
-	// Ensure the SDK is initialised before searching.
-	// Use a non-cancellable context so that cancellation during Start()
-	// cannot leave the subprocess half-initialised.
+	// Intentional context.Background(): the SDK Init starts a subprocess
+	// and must not be interrupted by the caller's context cancellation -
+	// aborting Start() mid-handshake leaves the subprocess half-initialised
+	// and the JSON-RPC pipe in an unrecoverable state.
 	initCtx, initCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
 	defer initCancel()
 	if err := c.Init(initCtx); err != nil {
@@ -360,6 +361,8 @@ func (c *Client) Search(ctx context.Context, query string) ([]string, error) {
 		if ctx.Err() != nil {
 			return nil, nil
 		}
+		// Intentional context.Background(): same rationale as the initial
+		// Init call - protect the subprocess handshake from cancellation.
 		retryInitCtx, retryInitCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
 		if initErr := c.Init(retryInitCtx); initErr != nil {
 			retryInitCancel()
@@ -416,9 +419,11 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 	store := c.store
 	c.mu.Unlock()
 
-	// Use a non-cancellable context for SDK pipe operations.  Cancelling
-	// mid-SendAndWait corrupts the JSON-RPC pipe and causes "file already
-	// closed" errors on subsequent searches.
+	// Intentional context.Background(): SDK pipe operations (CreateSession,
+	// SendAndWait) must NOT inherit the caller's context.  Cancelling mid-
+	// SendAndWait corrupts the JSON-RPC pipe and causes "file already
+	// closed" errors on subsequent calls.  The caller's ctx is checked
+	// between operations (below) so we can bail early without pipe damage.
 	sdkCtx, sdkCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
 	defer sdkCancel()
 
@@ -495,7 +500,8 @@ func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planCo
 		return nil, nil
 	}
 
-	// Ensure the SDK is initialised before analysis.
+	// Intentional context.Background(): same rationale as Search() - protect
+	// the subprocess Init handshake from caller cancellation.
 	initCtx, initCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
 	defer initCancel()
 	if err := c.Init(initCtx); err != nil {
@@ -552,6 +558,8 @@ func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planCo
 		if ctx.Err() != nil {
 			return nil, nil
 		}
+		// Intentional context.Background(): same rationale as the initial
+		// Init call - protect the subprocess handshake from cancellation.
 		retryInitCtx, retryInitCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
 		if initErr := c.Init(retryInitCtx); initErr != nil {
 			retryInitCancel()
@@ -603,9 +611,11 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 	store := c.store
 	c.mu.Unlock()
 
-	// Use a non-cancellable context for SDK pipe operations.
-	// Analysis needs a longer timeout than search — the model creates a
-	// session, processes the plan, may call tools, and returns structured JSON.
+	// Intentional context.Background(): SDK pipe operations must NOT inherit
+	// the caller's context - cancelling mid-SendAndWait corrupts the JSON-RPC
+	// pipe (see doSearch for full rationale).  Analysis uses a longer timeout
+	// than search because the model creates a session, processes the plan,
+	// may call tools, and returns structured JSON.
 	sdkCtx, sdkCancel := context.WithTimeout(context.Background(), analysisOperationTimeout)
 	defer sdkCancel()
 
