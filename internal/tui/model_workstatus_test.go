@@ -12,7 +12,7 @@ import (
 func newWorkStatusTestModel(ids []string) Model {
 	m := newTestModel()
 	m.planMap = make(map[string]bool, len(ids))
-	m.workStatusMap = make(map[string]data.WorkStatusResult)
+	m.workStatus.workStatusMap = make(map[string]data.WorkStatusResult)
 
 	// Populate the session list so VisibleSessionIDs returns the IDs.
 	sessions := make([]data.Session, len(ids))
@@ -155,15 +155,15 @@ func TestScanWorkStatusCmd_ExcludesHiddenSessions(t *testing.T) {
 func TestCompleteWorkStatusScan_SetsScannedFlag(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel(nil)
-	m.workStatusScanning = true
-	m.workStatusScanned = false
+	m.workStatus.workStatusScanning = true
+	m.workStatus.workStatusScanned = false
 
 	m.completeWorkStatusScan()
 
-	if !m.workStatusScanned {
+	if !m.workStatus.workStatusScanned {
 		t.Error("workStatusScanned should be true after completeWorkStatusScan")
 	}
-	if m.workStatusScanning {
+	if m.workStatus.workStatusScanning {
 		t.Error("workStatusScanning should be false after completeWorkStatusScan")
 	}
 }
@@ -171,8 +171,8 @@ func TestCompleteWorkStatusScan_SetsScannedFlag(t *testing.T) {
 func TestCompleteWorkStatusScan_SummarizesStatusInfo(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel(nil)
-	m.workStatusScanning = true
-	m.workStatusMap = map[string]data.WorkStatusResult{
+	m.workStatus.workStatusScanning = true
+	m.workStatus.workStatusMap = map[string]data.WorkStatusResult{
 		"a": {Status: data.WorkStatusIncomplete},
 		"b": {Status: data.WorkStatusIncomplete},
 		"c": {Status: data.WorkStatusComplete},
@@ -190,7 +190,7 @@ func TestCompleteWorkStatusScan_SummarizesStatusInfo(t *testing.T) {
 func TestCompleteWorkStatusScan_NoSummaryWhenNotScanning(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel(nil)
-	m.workStatusScanning = false // was not scanning
+	m.workStatus.workStatusScanning = false // was not scanning
 	m.statusInfo = "previous info"
 
 	m.completeWorkStatusScan()
@@ -204,8 +204,8 @@ func TestCompleteWorkStatusScan_NoSummaryWhenNotScanning(t *testing.T) {
 func TestCompleteWorkStatusScan_ReturnsClearStatusCmd(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel(nil)
-	m.workStatusScanning = true
-	m.workStatusMap = map[string]data.WorkStatusResult{}
+	m.workStatus.workStatusScanning = true
+	m.workStatus.workStatusMap = map[string]data.WorkStatusResult{}
 
 	cmd := m.completeWorkStatusScan()
 
@@ -219,7 +219,7 @@ func TestCompleteWorkStatusScan_ReturnsClearStatusCmd(t *testing.T) {
 func TestCompleteWorkStatusScan_NilCmdWhenNotScanning(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel(nil)
-	m.workStatusScanning = false
+	m.workStatus.workStatusScanning = false
 
 	cmd := m.completeWorkStatusScan()
 
@@ -235,7 +235,7 @@ func TestCompleteWorkStatusScan_NilCmdWhenNotScanning(t *testing.T) {
 func TestScanWorkStatusAICmd_NilWithoutCopilotClient(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel([]string{"s1"})
-	m.workStatusMap["s1"] = data.WorkStatusResult{Status: data.WorkStatusIncomplete}
+	m.workStatus.workStatusMap["s1"] = data.WorkStatusResult{Status: data.WorkStatusIncomplete}
 	// copilotClient is nil and store is nil, so it should return nil.
 	cmd := m.scanWorkStatusAICmd()
 	if cmd != nil {
@@ -250,7 +250,7 @@ func TestScanWorkStatusAICmd_NilWithoutCopilotClient(t *testing.T) {
 func TestWriteContinuationPlansCmd_NilWhenNoRemainingItems(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel([]string{"s1"})
-	m.workStatusMap["s1"] = data.WorkStatusResult{
+	m.workStatus.workStatusMap["s1"] = data.WorkStatusResult{
 		Status: data.WorkStatusIncomplete,
 		// No RemainingItems set.
 	}
@@ -285,7 +285,7 @@ func TestWriteContinuationPlansCmd_NilForEmptySessionList(t *testing.T) {
 func TestWriteContinuationPlansCmd_ReturnsCmd(t *testing.T) {
 	t.Parallel()
 	m := newWorkStatusTestModel([]string{"s1"})
-	m.workStatusMap["s1"] = data.WorkStatusResult{
+	m.workStatus.workStatusMap["s1"] = data.WorkStatusResult{
 		Status:         data.WorkStatusIncomplete,
 		RemainingItems: []string{"fix bug", "add tests"},
 		Detail:         "1/3 tasks complete",

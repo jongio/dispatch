@@ -288,11 +288,11 @@ func TestUpdate_ClearStatusMsg(t *testing.T) {
 
 func TestUpdate_PendingClickFire_Stale(t *testing.T) {
 	m := newTestModel()
-	m.pendingClickVersion = 5
+	m.click.pendingClickVersion = 5
 	result, cmd := m.Update(pendingClickFireMsg{version: 3}) // stale
 	rm := result.(Model)
-	if rm.pendingClickVersion != 5 {
-		t.Errorf("version should be unchanged, got %d", rm.pendingClickVersion)
+	if rm.click.pendingClickVersion != 5 {
+		t.Errorf("version should be unchanged, got %d", rm.click.pendingClickVersion)
 	}
 	if cmd != nil {
 		t.Error("stale pendingClickFire should return nil cmd")
@@ -301,12 +301,12 @@ func TestUpdate_PendingClickFire_Stale(t *testing.T) {
 
 func TestUpdate_PendingClickFire_Current(t *testing.T) {
 	m := newTestModel()
-	m.pendingClickVersion = 7
-	m.pendingClickItemIdx = 0
+	m.click.pendingClickVersion = 7
+	m.click.pendingClickItemIdx = 0
 	result, _ := m.Update(pendingClickFireMsg{version: 7})
 	rm := result.(Model)
-	if rm.pendingClickVersion != 0 {
-		t.Errorf("pendingClickVersion should reset to 0, got %d", rm.pendingClickVersion)
+	if rm.click.pendingClickVersion != 0 {
+		t.Errorf("pendingClickVersion should reset to 0, got %d", rm.click.pendingClickVersion)
 	}
 }
 
@@ -441,7 +441,7 @@ func TestUpdate_DataErrorMsg(t *testing.T) {
 
 func TestUpdate_DeepSearchTickMsg_Stale(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 3
+	m.search.deepSearchVersion = 3
 	m.filter.Query = "hello"
 	result, cmd := m.Update(deepSearchTickMsg{version: 1})
 	_ = result.(Model)
@@ -452,7 +452,7 @@ func TestUpdate_DeepSearchTickMsg_Stale(t *testing.T) {
 
 func TestUpdate_DeepSearchTickMsg_EmptyQuery(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 3
+	m.search.deepSearchVersion = 3
 	m.filter.Query = ""
 	result, cmd := m.Update(deepSearchTickMsg{version: 3})
 	_ = result.(Model)
@@ -463,7 +463,7 @@ func TestUpdate_DeepSearchTickMsg_EmptyQuery(t *testing.T) {
 
 func TestUpdate_DeepSearchTickMsg_Current(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 3
+	m.search.deepSearchVersion = 3
 	m.filter.Query = "hello"
 	result, cmd := m.Update(deepSearchTickMsg{version: 3})
 	_ = result.(Model)
@@ -479,11 +479,11 @@ func TestUpdate_DeepSearchTickMsg_Current(t *testing.T) {
 
 func TestUpdate_DeepSearchResultMsg_Stale(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 5
-	m.deepSearchPending = true
+	m.search.deepSearchVersion = 5
+	m.search.deepSearchPending = true
 	result, cmd := m.Update(deepSearchResultMsg{version: 3})
 	rm := result.(Model)
-	if !rm.deepSearchPending {
+	if !rm.search.deepSearchPending {
 		t.Error("stale result should not clear deepSearchPending")
 	}
 	if cmd != nil {
@@ -493,12 +493,12 @@ func TestUpdate_DeepSearchResultMsg_Stale(t *testing.T) {
 
 func TestUpdate_DeepSearchResultMsg_Sessions(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 5
-	m.deepSearchPending = true
+	m.search.deepSearchVersion = 5
+	m.search.deepSearchPending = true
 	sessions := []data.Session{{ID: "s1"}, {ID: "s2"}}
 	result, _ := m.Update(deepSearchResultMsg{version: 5, sessions: sessions})
 	rm := result.(Model)
-	if rm.deepSearchPending {
+	if rm.search.deepSearchPending {
 		t.Error("deepSearchPending should be false")
 	}
 	if !rm.filter.DeepSearch {
@@ -514,8 +514,8 @@ func TestUpdate_DeepSearchResultMsg_Sessions(t *testing.T) {
 
 func TestUpdate_DeepSearchResultMsg_Groups(t *testing.T) {
 	m := newTestModel()
-	m.deepSearchVersion = 5
-	m.deepSearchPending = true
+	m.search.deepSearchVersion = 5
+	m.search.deepSearchPending = true
 	groups := []data.SessionGroup{
 		{Label: "g1", Sessions: []data.Session{{ID: "s1"}}, Count: 1},
 	}
@@ -557,7 +557,7 @@ func TestUpdate_CopilotErrorMsg(t *testing.T) {
 
 func TestUpdate_CopilotSearchTickMsg_Stale(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.filter.Query = "test"
 	result, cmd := m.Update(copilotSearchTickMsg{version: 3})
 	_ = result.(Model)
@@ -568,7 +568,7 @@ func TestUpdate_CopilotSearchTickMsg_Stale(t *testing.T) {
 
 func TestUpdate_CopilotSearchTickMsg_EmptyQuery(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.filter.Query = ""
 	result, cmd := m.Update(copilotSearchTickMsg{version: 5})
 	_ = result.(Model)
@@ -579,13 +579,13 @@ func TestUpdate_CopilotSearchTickMsg_EmptyQuery(t *testing.T) {
 
 func TestUpdate_CopilotSearchTickMsg_Current(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.filter.Query = "test"
 	m.copilotClient = nil
 	m.store = nil
 	result, cmd := m.Update(copilotSearchTickMsg{version: 5})
 	rm := result.(Model)
-	if !rm.copilotSearching {
+	if !rm.search.copilotSearching {
 		t.Error("copilotSearching should be true")
 	}
 	if cmd == nil {
@@ -599,11 +599,11 @@ func TestUpdate_CopilotSearchTickMsg_Current(t *testing.T) {
 
 func TestUpdate_CopilotSearchResultMsg_Stale(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
-	m.copilotSearching = true
+	m.search.copilotSearchVersion = 5
+	m.search.copilotSearching = true
 	result, cmd := m.Update(copilotSearchResultMsg{version: 3})
 	rm := result.(Model)
-	if !rm.copilotSearching {
+	if !rm.search.copilotSearching {
 		t.Error("stale result should not clear copilotSearching")
 	}
 	if cmd != nil {
@@ -613,11 +613,11 @@ func TestUpdate_CopilotSearchResultMsg_Stale(t *testing.T) {
 
 func TestUpdate_CopilotSearchResultMsg_Error(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
-	m.copilotSearching = true
+	m.search.copilotSearchVersion = 5
+	m.search.copilotSearching = true
 	result, cmd := m.Update(copilotSearchResultMsg{version: 5, err: errors.New("fail")})
 	rm := result.(Model)
-	if rm.copilotSearching {
+	if rm.search.copilotSearching {
 		t.Error("copilotSearching should be false")
 	}
 	if cmd != nil {
@@ -627,11 +627,11 @@ func TestUpdate_CopilotSearchResultMsg_Error(t *testing.T) {
 
 func TestUpdate_CopilotSearchResultMsg_Empty(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
-	m.copilotSearching = true
+	m.search.copilotSearchVersion = 5
+	m.search.copilotSearching = true
 	result, cmd := m.Update(copilotSearchResultMsg{version: 5, sessionIDs: nil})
 	rm := result.(Model)
-	if rm.copilotSearching {
+	if rm.search.copilotSearching {
 		t.Error("copilotSearching should be false")
 	}
 	if cmd != nil {
@@ -641,22 +641,22 @@ func TestUpdate_CopilotSearchResultMsg_Empty(t *testing.T) {
 
 func TestUpdate_CopilotSearchResultMsg_WithIDs(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
-	m.copilotSearching = true
+	m.search.copilotSearchVersion = 5
+	m.search.copilotSearching = true
 	m.sessions = []data.Session{{ID: "existing"}}
 	result, _ := m.Update(copilotSearchResultMsg{
 		version:    5,
 		sessionIDs: []string{"existing", "new1"},
 	})
 	rm := result.(Model)
-	if rm.copilotSearching {
+	if rm.search.copilotSearching {
 		t.Error("copilotSearching should be false")
 	}
-	if rm.aiSessionIDs == nil {
+	if rm.search.aiSessionIDs == nil {
 		t.Error("aiSessionIDs should be populated")
 	}
-	_, hasExisting := rm.aiSessionIDs["existing"]
-	_, hasNew1 := rm.aiSessionIDs["new1"]
+	_, hasExisting := rm.search.aiSessionIDs["existing"]
+	_, hasNew1 := rm.search.aiSessionIDs["new1"]
 	if !hasExisting || !hasNew1 {
 		t.Error("aiSessionIDs should contain all IDs")
 	}
@@ -664,15 +664,15 @@ func TestUpdate_CopilotSearchResultMsg_WithIDs(t *testing.T) {
 
 func TestUpdate_CopilotSearchResultMsg_AllExisting(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
-	m.copilotSearching = true
+	m.search.copilotSearchVersion = 5
+	m.search.copilotSearching = true
 	m.sessions = []data.Session{{ID: "a"}, {ID: "b"}}
 	result, cmd := m.Update(copilotSearchResultMsg{
 		version:    5,
 		sessionIDs: []string{"a", "b"},
 	})
 	rm := result.(Model)
-	if rm.aiSessionIDs == nil {
+	if rm.search.aiSessionIDs == nil {
 		t.Error("aiSessionIDs should be set")
 	}
 	// All IDs already exist, so no fetch cmd needed.
@@ -687,7 +687,7 @@ func TestUpdate_CopilotSearchResultMsg_AllExisting(t *testing.T) {
 
 func TestUpdate_AISessionsLoadedMsg_Stale(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.sessions = []data.Session{{ID: "a"}}
 	result, cmd := m.Update(aiSessionsLoadedMsg{version: 3, sessions: []data.Session{{ID: "x"}}})
 	rm := result.(Model)
@@ -701,7 +701,7 @@ func TestUpdate_AISessionsLoadedMsg_Stale(t *testing.T) {
 
 func TestUpdate_AISessionsLoadedMsg_Empty(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.sessions = []data.Session{{ID: "a"}}
 	result, cmd := m.Update(aiSessionsLoadedMsg{version: 5, sessions: nil})
 	rm := result.(Model)
@@ -715,7 +715,7 @@ func TestUpdate_AISessionsLoadedMsg_Empty(t *testing.T) {
 
 func TestUpdate_AISessionsLoadedMsg_AppendsSessions(t *testing.T) {
 	m := newTestModel()
-	m.copilotSearchVersion = 5
+	m.search.copilotSearchVersion = 5
 	m.sessions = []data.Session{{ID: "a"}}
 	result, cmd := m.Update(aiSessionsLoadedMsg{
 		version:  5,
@@ -2871,7 +2871,7 @@ func TestHandleMouse_LeftClick_ContentArea(t *testing.T) {
 	result, cmd := m.Update(msg)
 	rm := result.(Model)
 	// Should set pending click version
-	if rm.pendingClickVersion == 0 {
+	if rm.click.pendingClickVersion == 0 {
 		t.Error("single click should set pendingClickVersion > 0")
 	}
 	if cmd == nil {
@@ -2901,8 +2901,8 @@ func TestHandleMouse_DoubleClick_ContentArea(t *testing.T) {
 	result2, _ := rm1.Update(msg2)
 	rm2 := result2.(Model)
 	// Double-click should reset pending version
-	if rm2.pendingClickVersion != 0 {
-		t.Errorf("double-click should reset pendingClickVersion, got %d", rm2.pendingClickVersion)
+	if rm2.click.pendingClickVersion != 0 {
+		t.Errorf("double-click should reset pendingClickVersion, got %d", rm2.click.pendingClickVersion)
 	}
 }
 
@@ -3189,7 +3189,7 @@ func TestHandleKey_SearchFocused_Enter_WithQuery(t *testing.T) {
 	m.searchBar.Focus()
 	m.searchBar.SetValue("test query")
 	m.filter.Query = "test query"
-	m.deepSearchPending = true
+	m.search.deepSearchPending = true
 
 	result, _ := m.Update(enterKeyMsg())
 	rm := result.(Model)
@@ -3206,7 +3206,7 @@ func TestHandleKey_SearchFocused_Enter_DeepAlreadyRun(t *testing.T) {
 	m.searchBar.Focus()
 	m.searchBar.SetValue("test")
 	m.filter.Query = "test"
-	m.deepSearchPending = false
+	m.search.deepSearchPending = false
 
 	result, cmd := m.Update(enterKeyMsg())
 	rm := result.(Model)
