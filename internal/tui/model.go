@@ -2510,35 +2510,29 @@ func (m Model) renderReindexOverlay() string {
 }
 
 // ---------------------------------------------------------------------------
-// Hidden session filtering
+// Shared predicate-based filter helpers
 // ---------------------------------------------------------------------------
 
-// filterHiddenSessions removes hidden sessions from a flat list unless
-// showHidden mode is active.
-func (m *Model) filterHiddenSessions(sessions []data.Session) []data.Session {
-	if m.showHidden || len(m.hiddenSet) == 0 {
-		return sessions
-	}
+// filterSessionsWhere returns only the sessions for which pred returns true.
+func filterSessionsWhere(sessions []data.Session, pred func(data.Session) bool) []data.Session {
 	filtered := make([]data.Session, 0, len(sessions))
 	for _, s := range sessions {
-		if _, ok := m.hiddenSet[s.ID]; !ok {
+		if pred(s) {
 			filtered = append(filtered, s)
 		}
 	}
 	return filtered
 }
 
-// filterHiddenGroups removes hidden sessions from grouped results unless
-// showHidden mode is active. Empty groups are dropped.
-func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGroup {
-	if m.showHidden || len(m.hiddenSet) == 0 {
-		return groups
-	}
+// filterGroupsWhere applies pred to every session inside each group, keeping
+// only sessions that match. Groups left empty after filtering are dropped and
+// each retained group's Count is updated to reflect the new length.
+func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool) []data.SessionGroup {
 	filtered := make([]data.SessionGroup, 0, len(groups))
 	for _, g := range groups {
 		var sessions []data.Session
 		for _, s := range g.Sessions {
-			if _, ok := m.hiddenSet[s.ID]; !ok {
+			if pred(s) {
 				sessions = append(sessions, s)
 			}
 		}
@@ -2549,6 +2543,34 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 		}
 	}
 	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Hidden session filtering
+// ---------------------------------------------------------------------------
+
+// filterHiddenSessions removes hidden sessions from a flat list unless
+// showHidden mode is active.
+func (m *Model) filterHiddenSessions(sessions []data.Session) []data.Session {
+	if m.showHidden || len(m.hiddenSet) == 0 {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		_, ok := m.hiddenSet[s.ID]
+		return !ok
+	})
+}
+
+// filterHiddenGroups removes hidden sessions from grouped results unless
+// showHidden mode is active. Empty groups are dropped.
+func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if m.showHidden || len(m.hiddenSet) == 0 {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		_, ok := m.hiddenSet[s.ID]
+		return !ok
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2561,13 +2583,10 @@ func (m *Model) filterFavoritedSessions(sessions []data.Session) []data.Session 
 	if !m.showFavorited {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if _, ok := m.favoritedSet[s.ID]; ok {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		_, ok := m.favoritedSet[s.ID]
+		return ok
+	})
 }
 
 // filterFavoritedGroups returns only favorited sessions within each group
@@ -2576,22 +2595,15 @@ func (m *Model) filterFavoritedGroups(groups []data.SessionGroup) []data.Session
 	if !m.showFavorited {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if _, ok := m.favoritedSet[s.ID]; ok {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		_, ok := m.favoritedSet[s.ID]
+		return ok
+	})
 }
+
+// ---------------------------------------------------------------------------
+// Attention session filtering
+// ---------------------------------------------------------------------------
 
 // filterAttentionSessions removes sessions that don't match the attention
 // filter. When attentionFilter is empty, all sessions pass through.
@@ -2599,14 +2611,11 @@ func (m *Model) filterAttentionSessions(sessions []data.Session) []data.Session 
 	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
 		status := m.attentionMap[s.ID]
-		if _, ok := m.attentionFilter[status]; ok {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+		_, ok := m.attentionFilter[status]
+		return ok
+	})
 }
 
 // filterAttentionGroups removes sessions that don't match the attention
@@ -2615,22 +2624,11 @@ func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.Session
 	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			status := m.attentionMap[s.ID]
-			if _, ok := m.attentionFilter[status]; ok {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		status := m.attentionMap[s.ID]
+		_, ok := m.attentionFilter[status]
+		return ok
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2643,13 +2641,9 @@ func (m *Model) filterPlanSessions(sessions []data.Session) []data.Session {
 	if !m.filterPlans || len(m.planMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if m.planMap[s.ID] {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		return m.planMap[s.ID]
+	})
 }
 
 // filterPlanGroups removes sessions without a plan.md file from grouped
@@ -2658,21 +2652,9 @@ func (m *Model) filterPlanGroups(groups []data.SessionGroup) []data.SessionGroup
 	if !m.filterPlans || len(m.planMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if m.planMap[s.ID] {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		return m.planMap[s.ID]
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2686,15 +2668,14 @@ func (m *Model) filterWorkStatusSessions(sessions []data.Session) []data.Session
 	if len(m.filterWorkStatus) == 0 || len(m.workStatusMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if result, ok := m.workStatusMap[s.ID]; ok {
-			if _, match := m.filterWorkStatus[result.Status]; match {
-				filtered = append(filtered, s)
-			}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		result, ok := m.workStatusMap[s.ID]
+		if !ok {
+			return false
 		}
-	}
-	return filtered
+		_, match := m.filterWorkStatus[result.Status]
+		return match
+	})
 }
 
 // filterWorkStatusGroups removes sessions that don't match the active
@@ -2703,23 +2684,14 @@ func (m *Model) filterWorkStatusGroups(groups []data.SessionGroup) []data.Sessio
 	if len(m.filterWorkStatus) == 0 || len(m.workStatusMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if result, ok := m.workStatusMap[s.ID]; ok {
-				if _, match := m.filterWorkStatus[result.Status]; match {
-					sessions = append(sessions, s)
-				}
-			}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		result, ok := m.workStatusMap[s.ID]
+		if !ok {
+			return false
 		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+		_, match := m.filterWorkStatus[result.Status]
+		return match
+	})
 }
 
 // sortByAttention re-sorts the session slice by attention status when the
