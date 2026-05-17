@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -88,7 +89,7 @@ func TestSearchSessionsFTS_BasicMatch(t *testing.T) {
 	s := newFTSTestStore(t)
 	populateFTSData(t, s)
 
-	results, err := s.SearchSessionsFTS("login", 50)
+	results, err := s.SearchSessionsFTS(context.Background(), "login", 50)
 	if err != nil {
 		t.Fatalf("SearchSessionsFTS: %v", err)
 	}
@@ -104,7 +105,7 @@ func TestSearchSessionsFTS_BasicMatch(t *testing.T) {
 	}
 
 	// Multi-term search should match "REST API".
-	results2, err := s.SearchSessionsFTS("REST API", 50)
+	results2, err := s.SearchSessionsFTS(context.Background(), "REST API", 50)
 	if err != nil {
 		t.Fatalf("SearchSessionsFTS multi-term: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestSearchSessionsFTS_Ranking(t *testing.T) {
 	populateFTSData(t, s)
 
 	// "search" appears in fts-2 session summary and turn; FTS5 returns ranked.
-	results, err := s.SearchSessionsFTS("search", 50)
+	results, err := s.SearchSessionsFTS(context.Background(), "search", 50)
 	if err != nil {
 		t.Fatalf("SearchSessionsFTS: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestSearchSessionsFTS_NoFTS5Table(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	s.hasFTS5 = false
 
-	results, err := s.SearchSessionsFTS("anything", 50)
+	results, err := s.SearchSessionsFTS(context.Background(), "anything", 50)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -201,7 +202,7 @@ func TestSearchSessionsFTS_SpecialChars(t *testing.T) {
 	for _, q := range dangerousQueries {
 		t.Run(truncatePayload(q), func(t *testing.T) {
 			// Should not panic or return a hard error.
-			results, err := s.SearchSessionsFTS(q, 50)
+			results, err := s.SearchSessionsFTS(context.Background(), q, 50)
 			if err != nil {
 				t.Fatalf("SearchSessionsFTS(%q) returned error: %v", q, err)
 			}
@@ -242,7 +243,7 @@ func TestSearchSessionsFTS_AutoExclusions(t *testing.T) {
 	seedTurn(t, db, "ok-sess", 0, "normal experiment", "Done.", "2024-01-10T10:00:00Z")
 	seedSearchIndex(t, db, "normal experiment", "ok-sess", "session", "")
 
-	results, err := s.SearchSessionsFTS("experiment", 50)
+	results, err := s.SearchSessionsFTS(context.Background(), "experiment", 50)
 	if err != nil {
 		t.Fatalf("SearchSessionsFTS: %v", err)
 	}
@@ -275,7 +276,7 @@ func TestSearchRefs_NumericQuery(t *testing.T) {
 	s := newFTSTestStore(t)
 	populateFTSData(t, s)
 
-	results := s.searchRefs("42", 50)
+	results := s.searchRefs(context.Background(), "42", 50)
 	if len(results) == 0 {
 		t.Fatal("expected results for ref query '42'")
 	}
@@ -298,7 +299,7 @@ func TestSearchRefs_HashPrefix(t *testing.T) {
 	s := newFTSTestStore(t)
 	populateFTSData(t, s)
 
-	results := s.searchRefs("#123", 50)
+	results := s.searchRefs(context.Background(), "#123", 50)
 	if len(results) == 0 {
 		t.Fatal("expected results for ref query '#123'")
 	}
@@ -322,7 +323,7 @@ func TestSearchRefs_PRPrefix(t *testing.T) {
 	populateFTSData(t, s)
 
 	// "PR42" should strip PR prefix and find ref_value "42".
-	results := s.searchRefs("PR42", 50)
+	results := s.searchRefs(context.Background(), "PR42", 50)
 	if len(results) == 0 {
 		t.Fatal("expected results for ref query 'PR42'")
 	}
@@ -337,7 +338,7 @@ func TestSearchRefs_PRPrefix(t *testing.T) {
 	}
 
 	// Lowercase "pr42" should also work.
-	results2 := s.searchRefs("pr42", 50)
+	results2 := s.searchRefs(context.Background(), "pr42", 50)
 	if len(results2) == 0 {
 		t.Fatal("expected results for ref query 'pr42'")
 	}
@@ -353,18 +354,18 @@ func TestSearchRefs_NonNumeric(t *testing.T) {
 
 	// Purely alphabetic query with no ref-like content — searchRefs does a LIKE
 	// match on ref_value, so "hello" shouldn't match any ref_value.
-	results := s.searchRefs("hello", 50)
+	results := s.searchRefs(context.Background(), "hello", 50)
 	if len(results) != 0 {
 		t.Errorf("expected 0 results for non-ref query 'hello', got %d", len(results))
 	}
 
 	// Empty string after stripping prefix should return nil.
-	results2 := s.searchRefs("#", 50)
+	results2 := s.searchRefs(context.Background(), "#", 50)
 	if results2 != nil {
 		t.Errorf("expected nil for query '#', got %d results", len(results2))
 	}
 
-	results3 := s.searchRefs("PR", 50)
+	results3 := s.searchRefs(context.Background(), "PR", 50)
 	if results3 != nil {
 		t.Errorf("expected nil for query 'PR', got %d results", len(results3))
 	}
@@ -451,7 +452,7 @@ func TestSearchSessions_FTS5FallbackToLIKE(t *testing.T) {
 	}
 
 	// SearchSessions should still work via LIKE fallback.
-	results, err := s.SearchSessions("login", 50)
+	results, err := s.SearchSessions(context.Background(), "login", 50)
 	if err != nil {
 		t.Fatalf("SearchSessions fallback failed: %v", err)
 	}
@@ -478,7 +479,7 @@ func TestSearchSessions_IntegrationFTSPlusRefs(t *testing.T) {
 	populateFTSData(t, s)
 
 	// Search for "42" — should find fts-1 via session_refs (PR #42).
-	results, err := s.SearchSessions("42", 50)
+	results, err := s.SearchSessions(context.Background(), "42", 50)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -502,7 +503,7 @@ func TestSearchSessions_EmptyQuery(t *testing.T) {
 	s := newFTSTestStore(t)
 	populateFTSData(t, s)
 
-	results, err := s.SearchSessions("", 50)
+	results, err := s.SearchSessions(context.Background(), "", 50)
 	if err != nil {
 		t.Fatalf("SearchSessions empty query: %v", err)
 	}
@@ -563,7 +564,7 @@ func BenchmarkSearchSessionsFTS(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.SearchSessionsFTS("fuzzy search", 50); err != nil {
+		if _, err := s.SearchSessionsFTS(context.Background(), "fuzzy search", 50); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -617,7 +618,7 @@ func BenchmarkSearchSessionsLIKEvsNTS(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			if _, err := s.SearchSessions("search keywords", 50); err != nil {
+			if _, err := s.SearchSessions(context.Background(), "search keywords", 50); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -629,7 +630,7 @@ func BenchmarkSearchSessionsLIKEvsNTS(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			if _, err := s.SearchSessions("search keywords", 50); err != nil {
+			if _, err := s.SearchSessions(context.Background(), "search keywords", 50); err != nil {
 				b.Fatal(err)
 			}
 		}

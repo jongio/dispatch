@@ -101,13 +101,3 @@ linters:
         text: exitAfterDefer
         linters:
           - gocritic
-      # Database layer uses non-context sql methods by convention.
-      # Migrating to context-aware variants is a separate refactor.
-      - path: internal/data/
-        linters:
-          - noctx
-      # Platform helpers call exec.Command without context for
-      # OS-level operations (font installation, terminal detection).
-      - path: internal/platform/
-        linters:
-          - noctx

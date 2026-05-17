@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -239,7 +240,7 @@ func TestOpenPathInvalidSQLite(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// If Open succeeded, a query should fail.
-	_, queryErr := store.ListSessions(FilterOptions{}, SortOptions{}, 0)
+	_, queryErr := store.ListSessions(context.Background(), FilterOptions{}, SortOptions{}, 0)
 	if queryErr == nil {
 		t.Error("expected query to fail on invalid SQLite file")
 	}
@@ -253,7 +254,7 @@ func TestListSessionsEmptyDatabase(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions on empty DB: %v", err)
 	}
@@ -267,7 +268,7 @@ func TestListSessionsExcludesEmptySessions(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -306,7 +307,7 @@ func TestListSessionsKeepsZeroTurnWithActivity(t *testing.T) {
 	seedSession(t, s.db, "empty", "/tmp/ghost", "", "",
 		"Ghost session", "2024-01-04T00:00:00Z", "2024-01-04T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -350,7 +351,7 @@ func TestListSessionsExcludesTempDir(t *testing.T) {
 		"Implement feature", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
 	seedTurn(t, s.db, "real-1", 0, "Add auth", "Done.", "2024-01-02T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -377,7 +378,7 @@ func TestGroupSessionsExcludesTempDir(t *testing.T) {
 		"Real work", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
 	seedTurn(t, s.db, "real-1", 0, "work", "done", "2024-01-02T00:00:00Z")
 
-	groups, err := s.GroupSessions(PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -413,7 +414,7 @@ func TestListSessionsExcludesHomeDotfolders(t *testing.T) {
 		"Working on feature", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
 	seedTurn(t, s.db, "real-1", 0, "code", "done", "2024-01-02T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -441,7 +442,7 @@ func TestGroupSessionsExcludesHomeDotfolders(t *testing.T) {
 		"Real work", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
 	seedTurn(t, s.db, "real-1", 0, "work", "done", "2024-01-02T00:00:00Z")
 
-	groups, err := s.GroupSessions(PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -460,7 +461,7 @@ func TestListSessionsWithLimit(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 2)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 2)
 	if err != nil {
 		t.Fatalf("ListSessions with limit: %v", err)
 	}
@@ -474,7 +475,7 @@ func TestListSessionsSortByUpdatedDesc(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -492,7 +493,7 @@ func TestListSessionsSortByUpdatedAsc(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Ascending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Ascending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -509,7 +510,7 @@ func TestListSessionsSortByCreated(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByCreated, Order: Ascending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByCreated, Order: Ascending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -526,7 +527,7 @@ func TestListSessionsSortByTurns(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByTurns, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByTurns, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -544,7 +545,7 @@ func TestListSessionsSortByName(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByName, Order: Ascending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByName, Order: Ascending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -561,7 +562,7 @@ func TestListSessionsSortByFolder(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByFolder, Order: Ascending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByFolder, Order: Ascending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -578,7 +579,7 @@ func TestListSessionsTurnAndFileCountPopulated(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -608,7 +609,7 @@ func TestFilterByQuery(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth" appears in sess-1's summary.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "auth"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -629,7 +630,7 @@ func TestFilterByQueryMatchesTurnContent(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears in sess-2's turn user_message. Requires deep search.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -650,7 +651,7 @@ func TestFilterByQueryMatchesRepository(t *testing.T) {
 	populateTestData(t, s)
 
 	// "repo-b" appears in sess-2's repository.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "repo-b"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -671,7 +672,7 @@ func TestFilterByQueryMatchesBranch(t *testing.T) {
 	populateTestData(t, s)
 
 	// "feature/search" is sess-2's branch.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "feature/search"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -691,7 +692,7 @@ func TestFilterByFolder(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Folder: "/home/user/project-a"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -709,7 +710,7 @@ func TestFilterByRepository(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Repository: "owner/repo-a"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -727,7 +728,7 @@ func TestFilterByBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Branch: "main"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -749,7 +750,7 @@ func TestFilterBySince(t *testing.T) {
 	populateTestData(t, s)
 
 	since := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Since: &since},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -779,7 +780,7 @@ func TestFilterBySinceNonUTC(t *testing.T) {
 	sinceUTC := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
 	sincePacific := sinceUTC.In(pacific)
 
-	sessUTC, err := s.ListSessions(
+	sessUTC, err := s.ListSessions(context.Background(), 
 		FilterOptions{Since: &sinceUTC},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -787,7 +788,7 @@ func TestFilterBySinceNonUTC(t *testing.T) {
 		t.Fatalf("ListSessions with UTC since: %v", err)
 	}
 
-	sessPacific, err := s.ListSessions(
+	sessPacific, err := s.ListSessions(context.Background(), 
 		FilterOptions{Since: &sincePacific},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -812,7 +813,7 @@ func TestFilterByUntil(t *testing.T) {
 	populateTestData(t, s)
 
 	until := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Until: &until},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -833,7 +834,7 @@ func TestFilterByHasRefs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{HasRefs: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -851,7 +852,7 @@ func TestFilterByExcludedDirs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{ExcludedDirs: []string{"/tmp"}},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -874,7 +875,7 @@ func TestFilterCombinedRepositoryAndBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Repository: "owner/repo-a", Branch: "feature/api"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -894,7 +895,7 @@ func TestFilterNoResults(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Repository: "nonexistent/repo"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -915,7 +916,7 @@ func TestFilterQuerySpecialCharacters(t *testing.T) {
 	seedTurn(t, s.db, "special-1", 0, "Debug it", "Done.", "2024-01-01T00:00:00Z")
 
 	// Search with % and ' characters should not crash.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "O'Brien"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -934,7 +935,7 @@ func TestFilterQueryPercentCharacter(t *testing.T) {
 	seedSession(t, s.db, "pct-1", "/path", "", "", "Fix bug: 100% CPU", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "pct-1", 0, "Fix it", "Fixed.", "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "100%"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -955,7 +956,7 @@ func TestGetSessionBasic(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	detail, err := s.GetSession("sess-1")
+	detail, err := s.GetSession(context.Background(), "sess-1")
 	if err != nil {
 		t.Fatalf("GetSession(sess-1): %v", err)
 	}
@@ -982,7 +983,7 @@ func TestGetSessionTurns(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	detail, err := s.GetSession("sess-1")
+	detail, err := s.GetSession(context.Background(), "sess-1")
 	if err != nil {
 		t.Fatalf("GetSession(sess-1): %v", err)
 	}
@@ -1006,7 +1007,7 @@ func TestGetSessionFiles(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	detail, err := s.GetSession("sess-1")
+	detail, err := s.GetSession(context.Background(), "sess-1")
 	if err != nil {
 		t.Fatalf("GetSession(sess-1): %v", err)
 	}
@@ -1028,7 +1029,7 @@ func TestGetSessionRefs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	detail, err := s.GetSession("sess-1")
+	detail, err := s.GetSession(context.Background(), "sess-1")
 	if err != nil {
 		t.Fatalf("GetSession(sess-1): %v", err)
 	}
@@ -1049,7 +1050,7 @@ func TestGetSessionCheckpoints(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	detail, err := s.GetSession("sess-1")
+	detail, err := s.GetSession(context.Background(), "sess-1")
 	if err != nil {
 		t.Fatalf("GetSession(sess-1): %v", err)
 	}
@@ -1069,7 +1070,7 @@ func TestGetSessionNotFound(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	_, err := s.GetSession("nonexistent")
+	_, err := s.GetSession(context.Background(), "nonexistent")
 	if err == nil {
 		t.Fatal("GetSession should fail for nonexistent ID")
 	}
@@ -1082,7 +1083,7 @@ func TestGetSessionNoTurnsOrFiles(t *testing.T) {
 	seedSession(t, s.db, "bare", "/tmp", "", "", "Bare session", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	// Note: no turns, files, refs, or checkpoints.
 
-	detail, err := s.GetSession("bare")
+	detail, err := s.GetSession(context.Background(), "bare")
 	if err != nil {
 		t.Fatalf("GetSession(bare): %v", err)
 	}
@@ -1108,7 +1109,7 @@ func TestSearchSessionsEmptyDB(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	results, err := s.SearchSessions("anything", 10)
+	results, err := s.SearchSessions(context.Background(), "anything", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions on empty DB: %v", err)
 	}
@@ -1122,7 +1123,7 @@ func TestSearchSessionsMatchesSummary(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("auth", 10)
+	results, err := s.SearchSessions(context.Background(), "auth", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1147,7 +1148,7 @@ func TestSearchSessionsMatchesTurnContent(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("fuzzy", 10)
+	results, err := s.SearchSessions(context.Background(), "fuzzy", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1172,7 +1173,7 @@ func TestSearchSessionsNoMatch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("xyznonexistent", 10)
+	results, err := s.SearchSessions(context.Background(), "xyznonexistent", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1186,7 +1187,7 @@ func TestSearchSessionsWithLimit(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("e", 2) // broad query
+	results, err := s.SearchSessions(context.Background(), "e", 2) // broad query
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1201,7 +1202,7 @@ func TestSearchSessionsZeroLimit(t *testing.T) {
 	populateTestData(t, s)
 
 	// Limit 0 means no limit.
-	results, err := s.SearchSessions("e", 0)
+	results, err := s.SearchSessions(context.Background(), "e", 0)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1217,7 +1218,7 @@ func TestSearchSessionsExcludesEmptySessions(t *testing.T) {
 	populateTestData(t, s)
 
 	// "Empty" matches sess-5's summary, but it has no turns, files, checkpoints, or refs.
-	results, err := s.SearchSessions("Empty session", 10)
+	results, err := s.SearchSessions(context.Background(), "Empty session", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1235,7 +1236,7 @@ func TestSearchSessionsSpecialCharacters(t *testing.T) {
 	seedSession(t, s.db, "sp-1", "/path", "", "", "Fix O'Brien's bug", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "sp-1", 0, "debug", "ok", "2024-01-01T00:00:00Z")
 
-	results, err := s.SearchSessions("O'Brien", 10)
+	results, err := s.SearchSessions(context.Background(), "O'Brien", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions with special chars: %v", err)
 	}
@@ -1253,7 +1254,7 @@ func TestListFolders(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	folders, err := s.ListFolders()
+	folders, err := s.ListFolders(context.Background())
 	if err != nil {
 		t.Fatalf("ListFolders: %v", err)
 	}
@@ -1282,7 +1283,7 @@ func TestListFoldersEmptyDB(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	folders, err := s.ListFolders()
+	folders, err := s.ListFolders(context.Background())
 	if err != nil {
 		t.Fatalf("ListFolders on empty DB: %v", err)
 	}
@@ -1296,7 +1297,7 @@ func TestListRepositories(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	repos, err := s.ListRepositories()
+	repos, err := s.ListRepositories(context.Background())
 	if err != nil {
 		t.Fatalf("ListRepositories: %v", err)
 	}
@@ -1316,7 +1317,7 @@ func TestListRepositoriesEmptyDB(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	repos, err := s.ListRepositories()
+	repos, err := s.ListRepositories(context.Background())
 	if err != nil {
 		t.Fatalf("ListRepositories on empty DB: %v", err)
 	}
@@ -1330,7 +1331,7 @@ func TestListBranchesAll(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("")
+	branches, err := s.ListBranches(context.Background(), "")
 	if err != nil {
 		t.Fatalf("ListBranches(''): %v", err)
 	}
@@ -1350,7 +1351,7 @@ func TestListBranchesByRepository(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("owner/repo-a")
+	branches, err := s.ListBranches(context.Background(), "owner/repo-a")
 	if err != nil {
 		t.Fatalf("ListBranches('owner/repo-a'): %v", err)
 	}
@@ -1365,7 +1366,7 @@ func TestListBranchesUnknownRepo(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("unknown/repo")
+	branches, err := s.ListBranches(context.Background(), "unknown/repo")
 	if err != nil {
 		t.Fatalf("ListBranches('unknown/repo'): %v", err)
 	}
@@ -1383,7 +1384,7 @@ func TestGroupSessionsByRepo(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -1411,7 +1412,7 @@ func TestGroupSessionsByFolder(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByFolder, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions by folder: %v", err)
 	}
@@ -1425,7 +1426,7 @@ func TestGroupSessionsByBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByBranch, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByBranch, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions by branch: %v", err)
 	}
@@ -1439,7 +1440,7 @@ func TestGroupSessionsByDate(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByDate, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByDate, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions by date: %v", err)
 	}
@@ -1477,7 +1478,7 @@ func TestGroupSessionsByDateRespectsLocalTimezone(t *testing.T) {
 		"Timezone test session", "2024-03-15T01:00:00Z", "2024-03-15T02:00:00Z")
 	seedTurn(t, db, "tz-1", 0, "hello", "hi", "2024-03-15T02:00:00Z")
 
-	groups, err := st.GroupSessions(PivotByDate, FilterOptions{},
+	groups, err := st.GroupSessions(context.Background(), PivotByDate, FilterOptions{},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
@@ -1497,7 +1498,7 @@ func TestGroupSessionsWithFilter(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByRepo,
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo,
 		FilterOptions{Repository: "owner/repo-a"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
@@ -1515,7 +1516,7 @@ func TestGroupSessionsEmptyDB(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	groups, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions on empty DB: %v", err)
 	}
@@ -1638,7 +1639,7 @@ func TestListSessionsLargeDataset(t *testing.T) {
 		seedTurn(t, s.db, id, 0, "msg", "resp", fmt.Sprintf("2024-01-%02dT10:00:00Z", (i%28)+1))
 	}
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 50)
 	if err != nil {
 		t.Fatalf("ListSessions large dataset: %v", err)
 	}
@@ -1681,7 +1682,7 @@ func TestListSessions_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	_, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err == nil {
 		t.Fatal("ListSessions on closed DB should return error")
 	}
@@ -1692,7 +1693,7 @@ func TestGetSession_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.GetSession("sess-1")
+	_, err := s.GetSession(context.Background(), "sess-1")
 	if err == nil {
 		t.Fatal("GetSession on closed DB should return error")
 	}
@@ -1703,7 +1704,7 @@ func TestSearchSessions_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.SearchSessions("auth", 10)
+	_, err := s.SearchSessions(context.Background(), "auth", 10)
 	if err == nil {
 		t.Fatal("SearchSessions on closed DB should return error")
 	}
@@ -1714,7 +1715,7 @@ func TestGroupSessions_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	_, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err == nil {
 		t.Fatal("GroupSessions on closed DB should return error")
 	}
@@ -1725,7 +1726,7 @@ func TestListFolders_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.ListFolders()
+	_, err := s.ListFolders(context.Background())
 	if err == nil {
 		t.Fatal("ListFolders on closed DB should return error")
 	}
@@ -1736,7 +1737,7 @@ func TestListRepositories_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.ListRepositories()
+	_, err := s.ListRepositories(context.Background())
 	if err == nil {
 		t.Fatal("ListRepositories on closed DB should return error")
 	}
@@ -1747,7 +1748,7 @@ func TestListBranches_ClosedDB(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.ListBranches("")
+	_, err := s.ListBranches(context.Background(), "")
 	if err == nil {
 		t.Fatal("ListBranches on closed DB should return error")
 	}
@@ -1758,7 +1759,7 @@ func TestListBranches_ClosedDB_WithRepo(t *testing.T) {
 	populateTestData(t, s)
 	_ = s.Close()
 
-	_, err := s.ListBranches("owner/repo-a")
+	_, err := s.ListBranches(context.Background(), "owner/repo-a")
 	if err == nil {
 		t.Fatal("ListBranches with repo on closed DB should return error")
 	}
@@ -1775,7 +1776,7 @@ func TestFilterCombinedSinceAndUntil(t *testing.T) {
 
 	since := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2024, 1, 11, 23, 59, 59, 0, time.UTC)
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Since: &since, Until: &until},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -1793,7 +1794,7 @@ func TestFilterMultipleExcludedDirs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{ExcludedDirs: []string{"/tmp", "/home/user/project-b"}},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -1813,7 +1814,7 @@ func TestFilterAllFieldsCombined(t *testing.T) {
 	populateTestData(t, s)
 
 	since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{
 			Repository:   "owner/repo-a",
 			Branch:       "main",
@@ -1850,7 +1851,7 @@ func TestGetSessionMultipleCheckpoints(t *testing.T) {
 	seedCheckpoint(t, s.db, "mc-1", 2, "Second CP", "Second overview")
 	seedCheckpoint(t, s.db, "mc-1", 3, "Third CP", "Third overview")
 
-	detail, err := s.GetSession("mc-1")
+	detail, err := s.GetSession(context.Background(), "mc-1")
 	if err != nil {
 		t.Fatalf("GetSession: %v", err)
 	}
@@ -1876,7 +1877,7 @@ func TestGetSessionMultipleRefs(t *testing.T) {
 	seedRef(t, s.db, "mr-1", "pr", "99", 1, "2024-01-01T01:30:00Z")
 	seedRef(t, s.db, "mr-1", "issue", "42", 1, "2024-01-01T01:45:00Z")
 
-	detail, err := s.GetSession("mr-1")
+	detail, err := s.GetSession(context.Background(), "mr-1")
 	if err != nil {
 		t.Fatalf("GetSession: %v", err)
 	}
@@ -1897,7 +1898,7 @@ func TestGetSessionComputedCounts(t *testing.T) {
 	seedFile(t, s.db, "cc-1", "b.go", "create", 1, "2024-01-01T00:00:00Z")
 	seedFile(t, s.db, "cc-1", "c.go", "edit", 2, "2024-01-01T00:00:00Z")
 
-	detail, err := s.GetSession("cc-1")
+	detail, err := s.GetSession(context.Background(), "cc-1")
 	if err != nil {
 		t.Fatalf("GetSession: %v", err)
 	}
@@ -1918,7 +1919,7 @@ func TestSearchSessionsMatchesRepository(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("repo-a", 10)
+	results, err := s.SearchSessions(context.Background(), "repo-a", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1938,7 +1939,7 @@ func TestSearchSessionsMatchesBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("feature/api", 10)
+	results, err := s.SearchSessions(context.Background(), "feature/api", 10)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -1962,7 +1963,7 @@ func TestGroupSessionsSortWithinGroups(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByCreated, Order: Ascending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByCreated, Order: Ascending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -1988,7 +1989,7 @@ func TestListSessionsSortByUnknownField(t *testing.T) {
 	populateTestData(t, s)
 
 	// Unknown sort field defaults to updated_at.
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortField("bogus"), Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortField("bogus"), Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions with unknown sort field: %v", err)
 	}
@@ -2012,7 +2013,7 @@ func TestListSessionsSingleSession(t *testing.T) {
 	seedSession(t, s.db, "only-1", "/path", "org/repo", "main", "Only session", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "only-1", 0, "msg", "resp", "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2028,7 +2029,7 @@ func TestGroupSessionsSingleSession(t *testing.T) {
 	seedSession(t, s.db, "only-1", "/path", "org/repo", "main", "Only session", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "only-1", 0, "msg", "resp", "2024-01-01T00:00:00Z")
 
-	groups, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -2059,7 +2060,7 @@ func TestGetSessionWithNullFields(t *testing.T) {
 	// Add a turn so it isn't excluded
 	seedTurn(t, s.db, "null-sess", 0, "msg", "resp", "2024-01-01T00:00:00Z")
 
-	detail, err := s.GetSession("null-sess")
+	detail, err := s.GetSession(context.Background(), "null-sess")
 	if err != nil {
 		t.Fatalf("GetSession with nulls: %v", err)
 	}
@@ -2091,7 +2092,7 @@ func TestListSessionsWithNullFields(t *testing.T) {
 	}
 	seedTurn(t, s.db, "null-sess", 0, "msg", "resp", "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions with null fields: %v", err)
 	}
@@ -2118,7 +2119,7 @@ func TestGetSession_TurnsQueryError(t *testing.T) {
 		t.Fatalf("dropping turns table: %v", err)
 	}
 
-	_, err := s.GetSession("tqe-1")
+	_, err := s.GetSession(context.Background(), "tqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when turns table is missing")
 	}
@@ -2136,7 +2137,7 @@ func TestGetSession_CheckpointsQueryError(t *testing.T) {
 		t.Fatalf("dropping checkpoints table: %v", err)
 	}
 
-	_, err := s.GetSession("cqe-1")
+	_, err := s.GetSession(context.Background(), "cqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when checkpoints table is missing")
 	}
@@ -2154,7 +2155,7 @@ func TestGetSession_FilesQueryError(t *testing.T) {
 		t.Fatalf("dropping session_files table: %v", err)
 	}
 
-	_, err := s.GetSession("fqe-1")
+	_, err := s.GetSession(context.Background(), "fqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when session_files table is missing")
 	}
@@ -2172,7 +2173,7 @@ func TestGetSession_RefsQueryError(t *testing.T) {
 		t.Fatalf("dropping session_refs table: %v", err)
 	}
 
-	_, err := s.GetSession("rqe-1")
+	_, err := s.GetSession(context.Background(), "rqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when session_refs table is missing")
 	}
@@ -2186,7 +2187,7 @@ func TestGetSession_NotFound(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	_, err := s.GetSession("nonexistent-id")
+	_, err := s.GetSession(context.Background(), "nonexistent-id")
 	if err == nil {
 		t.Fatal("GetSession should return error for nonexistent session")
 	}
@@ -2202,7 +2203,7 @@ func TestSearchSessionsNoLimit(t *testing.T) {
 	populateTestData(t, s)
 
 	// limit=0 should not add a LIMIT clause and return all matches.
-	results, err := s.SearchSessions("auth", 0)
+	results, err := s.SearchSessions(context.Background(), "auth", 0)
 	if err != nil {
 		t.Fatalf("SearchSessions with limit=0: %v", err)
 	}
@@ -2259,7 +2260,7 @@ func TestGetSession_TurnsSubQueryError(t *testing.T) {
 		t.Fatalf("inserting into stub turns: %v", err)
 	}
 
-	_, err := s.GetSession("tsqe-1")
+	_, err := s.GetSession(context.Background(), "tsqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when turns table has missing columns")
 	}
@@ -2286,7 +2287,7 @@ func TestGetSession_FilesSubQueryError(t *testing.T) {
 		t.Fatalf("inserting into stub session_files: %v", err)
 	}
 
-	_, err := s.GetSession("fsqe-1")
+	_, err := s.GetSession(context.Background(), "fsqe-1")
 	if err == nil {
 		t.Fatal("GetSession should fail when session_files table has missing columns")
 	}
@@ -2320,7 +2321,7 @@ func TestGetSession_TurnsScanError(t *testing.T) {
 		t.Fatalf("inserting: %v", err)
 	}
 
-	_, err := s.GetSession("tse-1")
+	_, err := s.GetSession(context.Background(), "tse-1")
 	if err == nil {
 		t.Fatal("GetSession should fail on scan error from corrupt turn_index")
 	}
@@ -2350,7 +2351,7 @@ func TestGetSession_CheckpointsScanError(t *testing.T) {
 		t.Fatalf("inserting: %v", err)
 	}
 
-	_, err := s.GetSession("cse-1")
+	_, err := s.GetSession(context.Background(), "cse-1")
 	if err == nil {
 		t.Fatal("GetSession should fail on scan error from corrupt checkpoint_number")
 	}
@@ -2367,7 +2368,7 @@ func TestQuickSearchMatchesCwd(t *testing.T) {
 
 	// Quick search (DeepSearch=false) should match cwd field.
 	// "scratch" appears only in sess-4's cwd (/tmp/scratch).
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "scratch", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2388,7 +2389,7 @@ func TestQuickSearchDoesNotMatchTurns(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears only in sess-2's turn content. Quick search should NOT find it.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "fuzzy", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2406,7 +2407,7 @@ func TestDeepSearchMatchesTurns(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears in sess-2's turn content. Deep search SHOULD find it.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2427,7 +2428,7 @@ func TestDeepSearchMatchesCheckpointTitle(t *testing.T) {
 	populateTestData(t, s)
 
 	// "Auth module complete" is sess-1's checkpoint title. Only matches via deep.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "module complete", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2448,7 +2449,7 @@ func TestDeepSearchMatchesCheckpointOverview(t *testing.T) {
 	populateTestData(t, s)
 
 	// "Login endpoint with tests added" is sess-1's checkpoint overview.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "endpoint with tests", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2469,7 +2470,7 @@ func TestDeepSearchMatchesFilePath(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth_test.go" appears in sess-1's session_files.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "auth_test.go", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2490,7 +2491,7 @@ func TestDeepSearchMatchesRefValue(t *testing.T) {
 	populateTestData(t, s)
 
 	// "abc123" is sess-3's commit ref.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "abc123", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2511,7 +2512,7 @@ func TestDeepSearchMatchesPRNumber(t *testing.T) {
 	populateTestData(t, s)
 
 	// "42" is sess-1's PR ref value.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "42", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2535,7 +2536,7 @@ func TestDeepSearchNoMatchReturnsEmpty(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "zzz_no_match_anywhere_zzz", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2553,7 +2554,7 @@ func TestQuickSearchDoesNotMatchCheckpoints(t *testing.T) {
 	populateTestData(t, s)
 
 	// "module complete" only in checkpoint title — quick search should miss it.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "module complete", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2571,7 +2572,7 @@ func TestQuickSearchDoesNotMatchFilePaths(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth_test.go" only in session_files — quick search should miss it.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "auth_test.go", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2589,7 +2590,7 @@ func TestDeepSearchAlsoMatchesSessionFields(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth" matches sess-1's summary — deep search should still find it.
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Query: "auth", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2610,7 +2611,7 @@ func TestDeepSearchWithGroupSessions(t *testing.T) {
 	populateTestData(t, s)
 
 	// Deep search through GroupSessions should also search related tables.
-	groups, err := s.GroupSessions(PivotByRepo,
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo,
 		FilterOptions{Query: "auth_test.go", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
@@ -2640,7 +2641,7 @@ func TestLastActive_StaleTurnsUsesUpdatedAt(t *testing.T) {
 		"2026-04-20T00:00:00Z", "2026-04-27T12:00:00Z")
 	seedTurn(t, s.db, "s1", 0, "hello", "hi", "2026-04-20T10:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2662,7 +2663,7 @@ func TestLastActive_FreshTurnsUsedOverUpdatedAt(t *testing.T) {
 		"2026-04-20T00:00:00Z", "2026-04-22T00:00:00Z")
 	seedTurn(t, s.db, "s1", 0, "hello", "hi", "2026-04-25T10:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -2686,7 +2687,7 @@ func TestLastActive_NoTurnsFallsBackToUpdatedAt(t *testing.T) {
 	seedSession(t, s.db, "s1", "/work", "r", "main", "No turns",
 		"2026-04-10T00:00:00Z", "2026-04-15T00:00:00Z")
 
-	detail, err := s.GetSession("s1")
+	detail, err := s.GetSession(context.Background(), "s1")
 	if err != nil {
 		t.Fatalf("GetSession: %v", err)
 	}
@@ -2710,7 +2711,7 @@ func TestLastActive_StaleTurnsVisibleInDayFilter(t *testing.T) {
 	seedTurn(t, s.db, "s1", 0, "build", "ok", old) // turn from 3d ago
 
 	since := now.Add(-24 * time.Hour)
-	sessions, err := s.ListSessions(
+	sessions, err := s.ListSessions(context.Background(), 
 		FilterOptions{Since: &since},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)

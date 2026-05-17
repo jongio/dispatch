@@ -3183,7 +3183,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
@@ -3197,7 +3197,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 			}
 			return groupsLoadedMsg{groups: groups}
 		}
-		sessions, err := store.ListSessions(filter, sortOpts, limit)
+		sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3606,7 +3606,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
@@ -3617,7 +3617,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 			}
 			return deepSearchResultMsg{version: version, groups: groups}
 		}
-		sessions, err := store.ListSessions(filter, sortOpts, limit)
+		sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3640,7 +3640,7 @@ func (m Model) loadSelectedDetailCmd() tea.Cmd {
 		if store == nil {
 			return nil
 		}
-		detail, err := store.GetSession(id)
+		detail, err := store.GetSession(context.Background(), id)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3653,7 +3653,7 @@ func loadFilterDataCmd(store *data.Store) tea.Cmd {
 		if store == nil {
 			return filterDataMsg{}
 		}
-		folders, err := store.ListFolders()
+		folders, err := store.ListFolders(context.Background())
 		if err != nil {
 			return dataErrorMsg{err: fmt.Errorf("listing folders: %w", err)}
 		}
@@ -3729,7 +3729,7 @@ func (m Model) fetchAISessionsCmd(ids []string, version int) tea.Cmd {
 		if store == nil || len(ids) == 0 {
 			return aiSessionsLoadedMsg{version: version}
 		}
-		sessions, err := store.ListSessionsByIDs(ids)
+		sessions, err := store.ListSessionsByIDs(context.Background(), ids)
 		if err != nil {
 			// Silently degrade — don't break the UI for fetch errors.
 			return aiSessionsLoadedMsg{version: version}

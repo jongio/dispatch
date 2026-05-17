@@ -89,7 +89,7 @@ func TestIntegration_RealSearch(t *testing.T) {
 	// Step 4: Verify results exist in actual store
 	if len(ids) > 0 {
 		for _, id := range ids[:minInt(3, len(ids))] {
-			detail, lookupErr := store.GetSession(id)
+			detail, lookupErr := store.GetSession(context.Background(), id)
 			if lookupErr != nil {
 				t.Logf("  Session %s: lookup error: %v", id, lookupErr)
 			} else if detail == nil {

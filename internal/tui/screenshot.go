@@ -146,7 +146,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m := newBase()
 		m.sort.Field = data.SortByFolder
 		m.sort.Order = data.Ascending
-		if sorted, err := c.store.GroupSessions(data.PivotByFolder, c.flatFilter, m.sort, 0); err == nil {
+		if sorted, err := c.store.GroupSessions(context.Background(), data.PivotByFolder, c.flatFilter, m.sort, 0); err == nil {
 			sortGroupsByLatest(sorted, data.Ascending)
 			m.groups = sorted
 			m.sessionList.SetPivotField(m.pivot)
@@ -197,7 +197,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m := newBase()
 		m.timeRange = tc.tr
 		trFilter := data.FilterOptions{Since: timeRangeToSince(tc.tr)}
-		if trGroups, err := c.store.GroupSessions(data.PivotByFolder, trFilter, c.flatSort, 0); err == nil {
+		if trGroups, err := c.store.GroupSessions(context.Background(), data.PivotByFolder, trFilter, c.flatSort, 0); err == nil {
 			sortGroupsByLatest(trGroups, data.Descending)
 			m.groups = trGroups
 			m.sessionList.SetPivotField(m.pivot)
@@ -541,15 +541,15 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	flatSort := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
 	flatFilter := data.FilterOptions{Since: timeRangeToSince("7d")}
 
-	sessions, err := store.ListSessions(flatFilter, flatSort, 100)
+	sessions, err := store.ListSessions(context.Background(), flatFilter, flatSort, 100)
 	if err != nil {
 		return nil, err
 	}
 
-	folders, _ := store.ListFolders()
+	folders, _ := store.ListFolders(context.Background())
 
 	loadGroups := func(pf data.PivotField) []data.SessionGroup {
-		groups, err := store.GroupSessions(pf, flatFilter, flatSort, 0)
+		groups, err := store.GroupSessions(context.Background(), pf, flatFilter, flatSort, 0)
 		if err != nil {
 			return nil
 		}
@@ -565,7 +565,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	var detail *data.SessionDetail
 	for _, g := range folderGroups {
 		if len(g.Sessions) > 0 {
-			if d, err := store.GetSession(g.Sessions[0].ID); err == nil {
+			if d, err := store.GetSession(context.Background(), g.Sessions[0].ID); err == nil {
 				detail = d
 			}
 			break

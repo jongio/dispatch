@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,7 +65,7 @@ func isNerdFontInstalledLinux() bool {
 		}
 	}
 	// Try fc-list as a fallback.
-	out, err := exec.Command("fc-list").Output()
+	out, err := exec.CommandContext(context.Background(), "fc-list").Output()
 	if err == nil && strings.Contains(string(out), "Nerd") {
 		return true
 	}

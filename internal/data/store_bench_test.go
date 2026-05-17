@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"testing"
@@ -187,7 +188,7 @@ func BenchmarkListSessions(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.ListSessions(filter, sort, 100); err != nil {
+		if _, err := s.ListSessions(context.Background(), filter, sort, 100); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -204,7 +205,7 @@ func BenchmarkListSessionsWithSearch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.ListSessions(filter, sort, 100); err != nil {
+		if _, err := s.ListSessions(context.Background(), filter, sort, 100); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -223,7 +224,7 @@ func BenchmarkListSessionsWithDateRange(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.ListSessions(filter, sort, 100); err != nil {
+		if _, err := s.ListSessions(context.Background(), filter, sort, 100); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -245,7 +246,7 @@ func BenchmarkListSessionsCombinedFilters(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.ListSessions(filter, sort, 50); err != nil {
+		if _, err := s.ListSessions(context.Background(), filter, sort, 50); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -267,7 +268,7 @@ func BenchmarkGetSession(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.GetSession(targetID); err != nil {
+		if _, err := s.GetSession(context.Background(), targetID); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -285,7 +286,7 @@ func BenchmarkSearchSessions(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.SearchSessions("fuzzy matching", 50); err != nil {
+		if _, err := s.SearchSessions(context.Background(), "fuzzy matching", 50); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -306,7 +307,7 @@ func BenchmarkGroupSessionsByFolder(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.GroupSessions(PivotByFolder, filter, sort, 0); err != nil {
+		if _, err := s.GroupSessions(context.Background(), PivotByFolder, filter, sort, 0); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -323,7 +324,7 @@ func BenchmarkGroupSessionsByRepo(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.GroupSessions(PivotByRepo, filter, sort, 0); err != nil {
+		if _, err := s.GroupSessions(context.Background(), PivotByRepo, filter, sort, 0); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -346,7 +347,7 @@ func BenchmarkListSessionsScaling(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				if _, err := s.ListSessions(filter, sort, 100); err != nil {
+				if _, err := s.ListSessions(context.Background(), filter, sort, 100); err != nil {
 					b.Fatal(err)
 				}
 			}
