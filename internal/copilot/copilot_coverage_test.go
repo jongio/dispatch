@@ -5,10 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1461,6 +1465,32 @@ func TestIsTransportError(t *testing.T) {
 	// nil error is not a transport error.
 	if isTransportError(nil) {
 		t.Error("isTransportError(nil) should be false")
+	}
+}
+
+// TestIsTransportError_TypedSentinels verifies the errors.Is path for typed
+// sentinel/syscall errors that don't rely on string matching.
+func TestIsTransportError_TypedSentinels(t *testing.T) {
+	t.Parallel()
+	sentinels := []struct {
+		name string
+		err  error
+	}{
+		{"io.EOF", io.EOF},
+		{"io.ErrUnexpectedEOF", io.ErrUnexpectedEOF},
+		{"os.ErrClosed", os.ErrClosed},
+		{"net.ErrClosed", net.ErrClosed},
+		{"syscall.EPIPE", syscall.EPIPE},
+		{"syscall.ECONNRESET", syscall.ECONNRESET},
+	}
+	for _, tt := range sentinels {
+		if !isTransportError(tt.err) {
+			t.Errorf("isTransportError(%s) = false, want true", tt.name)
+		}
+		wrapped := fmt.Errorf("sdk call failed: %w", tt.err)
+		if !isTransportError(wrapped) {
+			t.Errorf("isTransportError(wrapped %s) = false, want true", tt.name)
+		}
 	}
 }
 
