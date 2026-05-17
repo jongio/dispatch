@@ -42,6 +42,10 @@ const searchOperationTimeout = 30 * time.Second
 // JSON.  120 s gives sufficient headroom.
 const analysisOperationTimeout = 120 * time.Second
 
+// defaultModel is the Copilot SDK model used for all sessions (chat, search,
+// and analysis). Extracted as a constant to provide a single source of truth.
+const defaultModel = "gpt-4.1"
+
 // testHooks allows tests to override internal behaviour without a real
 // Copilot SDK process. Only tests in this package set these fields;
 // production code leaves hooks nil.
@@ -170,7 +174,7 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	// Create a dedicated streaming session for this message.
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(ctx, &sdk.SessionConfig{
-		Model:               "gpt-4.1",
+		Model:               defaultModel,
 		Streaming:           true,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
@@ -425,7 +429,7 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 	// Create a dedicated session for search with a focused system message.
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
-		Model:               "gpt-4.1",
+		Model:               defaultModel,
 		Streaming:           false,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
@@ -612,7 +616,7 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 	// Create a dedicated non-streaming session for analysis.
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
-		Model:               "gpt-4.1",
+		Model:               defaultModel,
 		Streaming:           false,
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
