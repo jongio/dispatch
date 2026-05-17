@@ -3142,6 +3142,9 @@ func openStoreCmd() tea.Cmd {
 // fires, then returns a sessionsChangedMsg to trigger a session list reload.
 func (m Model) waitForDBChangeCmd() tea.Cmd {
 	ch := m.dbWatchCh
+	if ch == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		_, ok := <-ch
 		if !ok {
