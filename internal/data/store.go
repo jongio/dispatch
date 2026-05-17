@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
-	_ "modernc.org/sqlite"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // ErrIndexBusy is returned when the session store database is locked
@@ -181,12 +182,32 @@ func LastReindexTime() time.Time {
 	return time.Time{}
 }
 
-// isDBBusy returns true if the error indicates the database is locked
-// or busy — typically because the Copilot CLI is actively reindexing.
+// isDBBusy returns true if err indicates the SQLite database is busy or
+// locked. It first tries errors.As to extract the typed *sqlite.Error and
+// check the numeric error code (SQLITE_BUSY=5, SQLITE_LOCKED=6). This
+// catches errors produced by the modernc.org/sqlite driver directly.
+//
+// A string-based fallback is retained because database/sql may rewrap driver
+// errors in ways that strip the typed *sqlite.Error (e.g. via fmt.Errorf
+// without %w in older call sites). The fallback ensures busy detection still
+// works in those edge cases.
 func isDBBusy(err error) bool {
 	if err == nil {
 		return false
 	}
+
+	// Prefer typed error code check via errors.As.
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		code := sqliteErr.Code()
+		// Mask off extended error code bits to get the primary result code.
+		primary := code & 0xFF
+		if primary == sqlite3.SQLITE_BUSY || primary == sqlite3.SQLITE_LOCKED {
+			return true
+		}
+	}
+
+	// Fallback: string matching for errors that lost the typed wrapper.
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "database is locked") ||
 		strings.Contains(msg, "database table is locked") ||
