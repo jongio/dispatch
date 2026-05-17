@@ -837,6 +837,16 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 }
 
+// renderDot returns a styled 2-character string (icon + space). When selected
+// is true the icon is returned unstyled so the outer SelectedStyle highlight
+// spans the row without ANSI-reset gaps.
+func renderDot(icon string, style lipgloss.Style, selected bool) string {
+	if selected {
+		return icon + " "
+	}
+	return style.Render(icon + " ")
+}
+
 // attentionDot returns a styled 2-character string (dot + space) representing
 // the attention status of the given session. If no attention data is available
 // the dot is omitted but the space is preserved for alignment.
@@ -881,15 +891,7 @@ func (s SessionList) attentionDot(sessionID string, selected bool) string {
 		icon = styles.IconAttentionIdle()
 	}
 
-	// When the row is selected, return the plain icon without lipgloss
-	// styling. lipgloss.Render appends an ANSI reset (\033[0m) that would
-	// kill the outer SelectedStyle background mid-line. Returning raw text
-	// lets the outer Render call apply a uniform highlight across the row.
-	if selected {
-		return icon + " "
-	}
-
-	return dotStyle.Render(icon + " ")
+	return renderDot(icon, dotStyle, selected)
 }
 
 // planDot returns a styled 2-character string (dot + space) for sessions
@@ -902,10 +904,7 @@ func (s SessionList) planDot(sessionID string, selected bool) string {
 
 	icon := styles.IconPlan()
 
-	if selected {
-		return icon + " "
-	}
-	return styles.PlanIndicatorStyle.Render(icon + " ")
+	return renderDot(icon, styles.PlanIndicatorStyle, selected)
 }
 
 // workStatusDot returns a styled 2-character string (icon + space) representing
@@ -936,8 +935,5 @@ func (s SessionList) workStatusDot(sessionID string, selected bool) string {
 		return "  "
 	}
 
-	if selected {
-		return icon + " "
-	}
-	return dotStyle.Render(icon + " ")
+	return renderDot(icon, dotStyle, selected)
 }
