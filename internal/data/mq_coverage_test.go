@@ -3,6 +3,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -386,7 +387,7 @@ func TestListSessionsByIDs_CapLargeSlice(t *testing.T) {
 	// Should not panic or error — just returns empty because the IDs don't
 	// exist in the test DB, but we verify it runs without hitting SQLite
 	// variable limits.
-	result, err := s.ListSessionsByIDs(ids)
+	result, err := s.ListSessionsByIDs(context.Background(), ids)
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs with %d IDs: unexpected error: %v", len(ids), err)
 	}
@@ -400,7 +401,7 @@ func TestListSessionsByIDs_Empty(t *testing.T) {
 	s := newTestStore(t)
 	defer s.Close()
 
-	result, err := s.ListSessionsByIDs(nil)
+	result, err := s.ListSessionsByIDs(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs(nil): unexpected error: %v", err)
 	}

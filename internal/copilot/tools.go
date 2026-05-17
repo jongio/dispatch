@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -131,7 +132,7 @@ func defineSearchSessionsTool(store *data.Store) sdk.Tool {
 				filter.Until = t
 			}
 			sort := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
-			sessions, err := store.ListSessions(filter, sort, toolResultLimit)
+			sessions, err := store.ListSessions(context.Background(), filter, sort, toolResultLimit)
 			if err != nil {
 				return "", fmt.Errorf("searching sessions: %w", err)
 			}
@@ -155,7 +156,7 @@ func defineGetSessionDetailTool(store *data.Store) sdk.Tool {
 			if params.ID == "" {
 				return "", errors.New("session ID is required")
 			}
-			detail, err := store.GetSession(params.ID)
+			detail, err := store.GetSession(context.Background(), params.ID)
 			if err != nil {
 				return "", fmt.Errorf("loading session %s: %w", params.ID, err)
 			}
@@ -173,7 +174,7 @@ func defineListRepositoriesTool(store *data.Store) sdk.Tool {
 		"list_repositories",
 		"List all distinct repository names across all sessions.",
 		func(params ListReposParams, _ sdk.ToolInvocation) (string, error) {
-			repos, err := store.ListRepositories()
+			repos, err := store.ListRepositories(context.Background())
 			if err != nil {
 				return "", fmt.Errorf("listing repositories: %w", err)
 			}
@@ -208,7 +209,7 @@ func defineSearchDeepTool(store *data.Store) sdk.Tool {
 			if params.Query == "" {
 				return "", errors.New("query is required")
 			}
-			results, err := store.SearchSessions(params.Query, toolResultLimit)
+			results, err := store.SearchSessions(context.Background(), params.Query, toolResultLimit)
 			if err != nil {
 				return "", fmt.Errorf("deep search: %w", err)
 			}
@@ -234,7 +235,7 @@ func defineAnalyzeCompletionTool(store *data.Store) sdk.Tool {
 			if params.SessionID == "" {
 				return "", errors.New("session_id is required")
 			}
-			detail, err := store.GetSession(params.SessionID)
+			detail, err := store.GetSession(context.Background(), params.SessionID)
 			if err != nil {
 				return "", fmt.Errorf("loading session %s: %w", params.SessionID, err)
 			}
