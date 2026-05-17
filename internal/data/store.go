@@ -347,9 +347,16 @@ var sessionColumnsBase = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), 
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,'')`
 
 // sessionColumnsSuffix is the computed columns appended after host_type.
+// Turn and file counts come from pre-aggregated LEFT JOINs (see countJoins)
+// rather than correlated subqueries, which avoids per-row rescans.
 var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
-	(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turn_count,
-	(SELECT COUNT(DISTINCT sf.file_path) FROM session_files sf WHERE sf.session_id = s.id) AS file_count`
+	COALESCE(tc.turn_count, 0) AS turn_count,
+	COALESCE(fc.file_count, 0) AS file_count`
+
+// countJoins provides the LEFT JOINs for pre-aggregated turn and file counts.
+// Every query that uses sessionColumnsSuffix must include these joins.
+const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
+	` LEFT JOIN (SELECT session_id, COUNT(DISTINCT file_path) AS file_count FROM session_files GROUP BY session_id) fc ON fc.session_id = s.id`
 
 // sessionColumns returns the full SELECT column list, including host_type
 // when the schema supports it.
@@ -422,7 +429,7 @@ func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) 
 	var fb filterBuilder
 	fb.apply(s.withAutoExclusions(filter))
 
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + fb.joinSQL() + fb.whereSQL()
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + fb.joinSQL() + fb.whereSQL()
 	q += fmt.Sprintf(" ORDER BY %s %s", sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
@@ -469,7 +476,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s WHERE s.id IN (" +
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
 		strings.Join(placeholders, ",") + ")"
 
 	rows, err := s.db.Query(q, args...)
@@ -504,7 +511,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
 func (s *Store) GetSession(id string) (*SessionDetail, error) {
-	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s WHERE s.id = ?", id)
+	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s"+countJoins+" WHERE s.id = ?", id)
 	sess, err := scanSession(row)
 	if err != nil {
 		return nil, fmt.Errorf("loading session %s: %w", id, err)
@@ -875,8 +882,8 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
-	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
-		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s%s ORDER BY pivot_label, %s %s",
+		expr, s.sessionColumns(), countJoins, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit
