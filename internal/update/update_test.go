@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -454,7 +455,7 @@ func TestDownloadAsset_RejectsNonHTTPSRedirect(t *testing.T) {
 	}))
 	defer httpsRedirect.Close()
 
-	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), httpsRedirect.URL)
+	err := downloadAsset(context.Background(), filepath.Join(t.TempDir(), "asset.bin"), httpsRedirect.URL)
 	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
 		t.Fatalf("expected non-HTTPS redirect rejection, got %v", err)
 	}
@@ -468,7 +469,7 @@ func TestDownloadAsset_EnforcesMaxSize(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), srv.URL)
+	err := downloadAsset(context.Background(), filepath.Join(t.TempDir(), "asset.bin"), srv.URL)
 	if err == nil || !strings.Contains(err.Error(), "download exceeds") {
 		t.Fatalf("expected size limit error, got %v", err)
 	}
@@ -487,7 +488,7 @@ func TestVerifyChecksum_Mismatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
+	err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz")
 	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected checksum mismatch error, got %v", err)
 	}
@@ -530,7 +531,7 @@ func TestReplaceWindows_RollbackOnFailure(t *testing.T) {
 
 func TestRunUpdate_DevVersionNotBlocked(t *testing.T) {
 	t.Parallel()
-	err := RunUpdate("dev")
+	err := RunUpdate(context.Background(), "dev")
 	// Dev builds should no longer be rejected. The call may fail for other
 	// reasons (network, lock contention, etc.) but never because of
 	// the version string.
@@ -585,8 +586,10 @@ func setTestHTTPTransport(t *testing.T) {
 
 	original := updateHTTPTransport
 	updateHTTPTransport = transport
+	sharedClient.Transport = transport
 	t.Cleanup(func() {
 		updateHTTPTransport = original
+		sharedClient.Transport = original
 		transport.CloseIdleConnections()
 	})
 }
