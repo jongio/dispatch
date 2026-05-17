@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -436,7 +437,7 @@ func TestBuildWSLWTArgs_TabMode(t *testing.T) {
 
 	shell := ShellInfo{Name: "bash", Path: "/bin/bash"}
 	err := launchLinuxSession(shell, "echo test", termWindowsTerminal, "", "", "")
-	if err != nil && strings.Contains(err.Error(), "no supported terminal emulator found") {
+	if err != nil && errors.Is(err, ErrNoTerminalEmulator) {
 		t.Error("launchLinuxSession with Windows Terminal in WSL fell through to 'no terminal' error")
 	}
 }

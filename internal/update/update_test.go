@@ -2,6 +2,7 @@ package update
 
 import (
 	"archive/tar"
+	"errors"
 	"archive/zip"
 	"compress/gzip"
 	"crypto/sha256"
@@ -387,7 +388,7 @@ func TestExtractFromTarGz_PathTraversalRejected(t *testing.T) {
 	}
 
 	_, err := extractFromTarGz(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsafe archive entry path") {
+	if err == nil || !errors.Is(err, ErrUnsafeArchivePath) {
 		t.Fatalf("expected unsafe path error, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(extractDir, binaryName)); !os.IsNotExist(err) {
@@ -409,7 +410,7 @@ func TestExtractFromZip_PathTraversalRejected(t *testing.T) {
 	}
 
 	_, err := extractFromZip(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsafe archive entry path") {
+	if err == nil || !errors.Is(err, ErrUnsafeArchivePath) {
 		t.Fatalf("expected unsafe path error, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(extractDir, binaryName+".exe")); !os.IsNotExist(err) {
@@ -436,7 +437,7 @@ func TestExtractFromTarGz_SymlinkRejected(t *testing.T) {
 	}
 
 	_, err := extractFromTarGz(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsupported tar entry type") {
+	if err == nil || !errors.Is(err, ErrUnsupportedTarEntry) {
 		t.Fatalf("expected symlink rejection error, got %v", err)
 	}
 }
@@ -455,7 +456,7 @@ func TestDownloadAsset_RejectsNonHTTPSRedirect(t *testing.T) {
 	defer httpsRedirect.Close()
 
 	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), httpsRedirect.URL)
-	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+	if err == nil || !errors.Is(err, ErrNonHTTPS) {
 		t.Fatalf("expected non-HTTPS redirect rejection, got %v", err)
 	}
 }
@@ -469,7 +470,7 @@ func TestDownloadAsset_EnforcesMaxSize(t *testing.T) {
 	defer srv.Close()
 
 	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), srv.URL)
-	if err == nil || !strings.Contains(err.Error(), "download exceeds") {
+	if err == nil || !errors.Is(err, ErrDownloadExceeded) {
 		t.Fatalf("expected size limit error, got %v", err)
 	}
 }
@@ -488,7 +489,7 @@ func TestVerifyChecksum_Mismatch(t *testing.T) {
 	defer srv.Close()
 
 	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
-	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+	if err == nil || !errors.Is(err, ErrChecksumMismatch) {
 		t.Fatalf("expected checksum mismatch error, got %v", err)
 	}
 }

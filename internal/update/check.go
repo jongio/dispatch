@@ -180,7 +180,7 @@ func fetchLatestVersion() (string, error) {
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("%w: GitHub API returned HTTP %d", ErrHTTPStatus, resp.StatusCode)
 	}
 
 	var release githubRelease

@@ -132,7 +132,7 @@ func NewResumeCmd(sessionID string, cfg ResumeConfig) (*exec.Cmd, error) {
 	} else {
 		binary := FindCLIBinary()
 		if binary == "" {
-			return nil, errors.New("ghcs/copilot CLI not found in PATH")
+			return nil, ErrCLINotFound
 		}
 		args := BuildResumeArgs(sessionID, cfg)
 		cmd = exec.Command(binary, args...)
@@ -168,7 +168,7 @@ func buildCustomCmd(sessionID, template string) (*exec.Cmd, error) {
 	expanded := strings.ReplaceAll(template, "{sessionId}", sessionID)
 	parts := strings.Fields(expanded)
 	if len(parts) == 0 {
-		return nil, errors.New("custom command is empty after expansion")
+		return nil, ErrEmptyAfterExpansion
 	}
 	return exec.Command(parts[0], parts[1:]...), nil
 }
@@ -196,14 +196,14 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 		}
 		expanded := strings.ReplaceAll(cfg.CustomCommand, "{sessionId}", sessionID)
 		if strings.TrimSpace(expanded) == "" {
-			return "", errors.New("custom command is empty after expansion")
+			return "", ErrEmptyAfterExpansion
 		}
 		return expanded, nil
 	}
 
 	binary := FindCLIBinary()
 	if binary == "" {
-		return "", errors.New("ghcs/copilot CLI not found in PATH")
+		return "", ErrCLINotFound
 	}
 
 	// Choose quoting style: Windows uses double quotes (understood by
@@ -877,7 +877,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 		}
 	}
 
-	return errors.New("no supported terminal emulator found; tried alacritty, kitty, wezterm, gnome-terminal, konsole, xfce4-terminal, xterm")
+	return fmt.Errorf("%w; tried alacritty, kitty, wezterm, gnome-terminal, konsole, xfce4-terminal, xterm", ErrNoTerminalEmulator)
 }
 
 // launchWSLWindowsTerminal launches a session via wt.exe from within WSL.

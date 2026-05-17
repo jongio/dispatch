@@ -2,6 +2,7 @@ package copilot
 
 import (
 	"context"
+	"errors"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -425,8 +426,8 @@ func TestCoverage_searchSessionsTool_sinceInvalid(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid since date")
 	}
-	if !strings.Contains(err.Error(), "invalid since date") {
-		t.Errorf("expected 'invalid since date' error, got: %v", err)
+	if !errors.Is(err, ErrInvalidDate) {
+		t.Errorf("expected ErrInvalidDate, got: %v", err)
 	}
 }
 
@@ -477,8 +478,8 @@ func TestCoverage_searchSessionsTool_untilInvalid(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid until date")
 	}
-	if !strings.Contains(err.Error(), "invalid until date") {
-		t.Errorf("expected 'invalid until date' error, got: %v", err)
+	if !errors.Is(err, ErrInvalidDate) {
+		t.Errorf("expected ErrInvalidDate, got: %v", err)
 	}
 }
 
@@ -548,8 +549,8 @@ func TestCoverage_getSessionDetailTool_emptyID(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty ID")
 	}
-	if !strings.Contains(err.Error(), "session ID is required") {
-		t.Errorf("unexpected error: %v", err)
+	if !errors.Is(err, ErrSessionIDRequired) {
+		t.Errorf("expected ErrSessionIDRequired, got: %v", err)
 	}
 }
 
@@ -667,8 +668,8 @@ func TestCoverage_searchDeepTool_emptyQuery(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty query")
 	}
-	if !strings.Contains(err.Error(), "query is required") {
-		t.Errorf("unexpected error: %v", err)
+	if !errors.Is(err, ErrQueryRequired) {
+		t.Errorf("expected ErrQueryRequired, got: %v", err)
 	}
 }
 
@@ -746,8 +747,8 @@ func TestCoverage_SendMessage_unavailable(t *testing.T) {
 	if ch != nil {
 		t.Error("expected nil channel from SendMessage on unavailable client")
 	}
-	if !strings.Contains(err.Error(), "not available") {
-		t.Errorf("expected 'not available' error, got: %v", err)
+	if !errors.Is(err, ErrSessionNotAvailable) {
+		t.Errorf("expected ErrSessionNotAvailable, got: %v", err)
 	}
 }
 
@@ -921,8 +922,8 @@ func TestCoverage_Init_failsWithoutSDK(t *testing.T) {
 		t.Fatal("Init should fail with injected hook error")
 	}
 	// The hook error is wrapped: "starting Copilot SDK: Copilot binary not found"
-	if !strings.Contains(err.Error(), "Copilot") {
-		t.Errorf("expected error about Copilot, got: %v", err)
+	if !errors.Is(err, ErrStartingSDK) {
+		t.Errorf("expected ErrStartingSDK, got: %v", err)
 	}
 	if c.Available() {
 		t.Error("should not be available after failed Init")
@@ -1087,8 +1088,8 @@ func TestCoverage_searchSessionsTool_storeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from closed store")
 	}
-	if !strings.Contains(err.Error(), "searching sessions") {
-		t.Errorf("expected 'searching sessions' error, got: %v", err)
+	if !errors.Is(err, ErrSearchingSessions) {
+		t.Errorf("expected ErrSearchingSessions, got: %v", err)
 	}
 }
 
@@ -1101,8 +1102,8 @@ func TestCoverage_getSessionDetailTool_storeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from closed store")
 	}
-	if !strings.Contains(err.Error(), "loading session") {
-		t.Errorf("expected 'loading session' error, got: %v", err)
+	if !errors.Is(err, ErrLoadingSession) {
+		t.Errorf("expected ErrLoadingSession, got: %v", err)
 	}
 }
 
@@ -1115,8 +1116,8 @@ func TestCoverage_listRepositoriesTool_storeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from closed store")
 	}
-	if !strings.Contains(err.Error(), "listing repositories") {
-		t.Errorf("expected 'listing repositories' error, got: %v", err)
+	if !errors.Is(err, ErrListingRepos) {
+		t.Errorf("expected ErrListingRepos, got: %v", err)
 	}
 }
 
@@ -1129,8 +1130,8 @@ func TestCoverage_searchDeepTool_storeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from closed store")
 	}
-	if !strings.Contains(err.Error(), "deep search") {
-		t.Errorf("expected 'deep search' error, got: %v", err)
+	if !errors.Is(err, ErrDeepSearch) {
+		t.Errorf("expected ErrDeepSearch, got: %v", err)
 	}
 }
 
@@ -1494,8 +1495,8 @@ func TestSearch_retriesOnTransportError(t *testing.T) {
 	if attempts != expectedAttempts {
 		t.Errorf("expected %d search attempts, got %d", expectedAttempts, attempts)
 	}
-	if !strings.Contains(err.Error(), "search unavailable after") {
-		t.Errorf("unexpected error message: %v", err)
+	if !errors.Is(err, ErrSearchUnavailable) {
+		t.Errorf("expected ErrSearchUnavailable, got: %v", err)
 	}
 }
 
@@ -1966,8 +1967,8 @@ func TestCoverage_SendMessage_createSessionFails(t *testing.T) {
 		}
 		t.Log("SendMessage succeeded unexpectedly with unstarted SDK")
 	} else {
-		if !strings.Contains(err.Error(), "session") {
-			t.Errorf("expected session-related error, got: %v", err)
+		if !errors.Is(err, ErrSessionNotAvailable) {
+			t.Errorf("expected ErrSessionNotAvailable, got: %v", err)
 		}
 		if ch != nil {
 			t.Error("channel should be nil on error")
@@ -2052,8 +2053,8 @@ func TestCoverage_Init_realSDKPath(t *testing.T) {
 	err := c.Init(context.Background())
 	if err != nil {
 		// SDK not available — that's fine, we've exercised the error path.
-		if !strings.Contains(err.Error(), "Copilot") {
-			t.Errorf("expected Copilot-related error, got: %v", err)
+		if !errors.Is(err, ErrStartingSDK) {
+			t.Errorf("expected ErrStartingSDK, got: %v", err)
 		}
 		if c.Available() {
 			t.Error("should not be available after failed Init")
@@ -2265,8 +2266,8 @@ func TestCoverage_AnalyzeCompletion_analyzeError_retriesExhausted(t *testing.T) 
 	if err == nil {
 		t.Fatal("expected error after retries exhausted")
 	}
-	if !strings.Contains(err.Error(), "unavailable after") {
-		t.Errorf("expected 'unavailable after' error, got: %v", err)
+	if !errors.Is(err, ErrAnalyzeUnavailable) {
+		t.Errorf("expected ErrAnalyzeUnavailable, got: %v", err)
 	}
 	if result != nil {
 		t.Error("expected nil result after retries exhausted")

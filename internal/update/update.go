@@ -66,7 +66,7 @@ var (
 
 func validateVersion(v string) error {
 	if !versionPattern.MatchString(v) {
-		return fmt.Errorf("invalid version %q: expected semantic version in major.minor.patch format", v)
+		return fmt.Errorf("%w: %q: expected semantic version in major.minor.patch format", ErrInvalidVersion, v)
 	}
 	return nil
 }
@@ -91,10 +91,10 @@ func RunUpdate(currentVersion string) error {
 
 	latest, err := fetchLatestVersion()
 	if err != nil {
-		return fmt.Errorf("checking latest version: %w", err)
+		return fmt.Errorf("%w: %w", ErrCheckingVersion, err)
 	}
 	if err := validateVersion(latest); err != nil {
-		return fmt.Errorf("invalid latest version: %w", err)
+		return fmt.Errorf("%w: %w", ErrInvalidVersion, err)
 	}
 
 	if CompareVersions(latest, currentVersion) <= 0 {
@@ -116,7 +116,7 @@ func RunUpdate(currentVersion string) error {
 	assetURL := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, latest, asset)
 	archivePath := filepath.Join(tmpDir, asset)
 	if err := downloadAsset(archivePath, assetURL); err != nil {
-		return fmt.Errorf("downloading %s: %w", asset, err)
+		return fmt.Errorf("%w: %s: %w", ErrDownloading, asset, err)
 	}
 
 	// Download and verify checksum.
@@ -128,7 +128,7 @@ func RunUpdate(currentVersion string) error {
 	// Extract the binary from the archive.
 	binPath, err := extractBinary(archivePath, tmpDir)
 	if err != nil {
-		return fmt.Errorf("extracting binary: %w", err)
+		return fmt.Errorf("%w: %w", ErrExtractingBinary, err)
 	}
 
 	// Replace the running binary.
@@ -164,10 +164,10 @@ func assetNameForPlatform(version, goos, goarch string) string {
 
 func httpsOnlyCheckRedirect(req *http.Request, via []*http.Request) error {
 	if req.URL.Scheme != "https" {
-		return fmt.Errorf("refusing redirect to non-HTTPS URL: %s", req.URL)
+		return fmt.Errorf("%w: %s", ErrNonHTTPS, req.URL)
 	}
 	if len(via) >= maxRedirects {
-		return errors.New("too many redirects")
+		return ErrTooManyRedirects
 	}
 	return nil
 }
@@ -197,10 +197,10 @@ func downloadAsset(dst, url string) error {
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+		return fmt.Errorf("%w: HTTP %d from %s", ErrHTTPStatus, resp.StatusCode, url)
 	}
 	if resp.ContentLength > maxDownloadSize {
-		return fmt.Errorf("download exceeds %d bytes", maxDownloadSize)
+		return fmt.Errorf("%w: download exceeds %d bytes", ErrDownloadExceeded, maxDownloadSize)
 	}
 
 	out, err := os.Create(dst)
@@ -229,15 +229,15 @@ func verifyChecksum(archivePath, checksumURL, archiveName string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("downloading checksums: %w", err)
+		return fmt.Errorf("%w: %w", ErrDownloadingChecksums, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d fetching checksums", resp.StatusCode)
+		return fmt.Errorf("%w: HTTP %d fetching checksums", ErrHTTPStatus, resp.StatusCode)
 	}
 	if resp.ContentLength > maxChecksumSize {
-		return fmt.Errorf("checksums file exceeds %d bytes", maxChecksumSize)
+		return fmt.Errorf("%w: checksums file exceeds %d bytes", ErrPayloadExceeded, maxChecksumSize)
 	}
 
 	checksumData, err := io.ReadAll(io.LimitReader(resp.Body, maxChecksumSize+1))
@@ -245,7 +245,7 @@ func verifyChecksum(archivePath, checksumURL, archiveName string) error {
 		return fmt.Errorf("reading checksums: %w", err)
 	}
 	if int64(len(checksumData)) > maxChecksumSize {
-		return fmt.Errorf("checksums file exceeds %d bytes", maxChecksumSize)
+		return fmt.Errorf("%w: checksums file exceeds %d bytes", ErrPayloadExceeded, maxChecksumSize)
 	}
 
 	// Find the expected hash for our archive.
@@ -257,11 +257,11 @@ func verifyChecksum(archivePath, checksumURL, archiveName string) error {
 	// Compute the actual hash of the downloaded file.
 	actualHash, err := SHA256File(archivePath)
 	if err != nil {
-		return fmt.Errorf("computing checksum: %w", err)
+		return fmt.Errorf("%w: %w", ErrComputingChecksum, err)
 	}
 
 	if actualHash != expectedHash {
-		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHash, actualHash)
+		return fmt.Errorf("%w: expected %s, got %s", ErrChecksumMismatch, expectedHash, actualHash)
 	}
 
 	return nil
@@ -307,7 +307,7 @@ func copyWithLimit(dst io.Writer, src io.Reader, maxBytes int64) error {
 		return err
 	}
 	if written > maxBytes {
-		return fmt.Errorf("payload exceeds %d bytes", maxBytes)
+		return fmt.Errorf("%w: payload exceeds %d bytes", ErrPayloadExceeded, maxBytes)
 	}
 	return nil
 }
@@ -324,7 +324,7 @@ func matchArchiveTarget(name, target string) (bool, error) {
 		return true, nil
 	}
 	if path.Base(normalized) == target {
-		return false, fmt.Errorf("unsafe archive entry path %q", name)
+		return false, fmt.Errorf("%w: %q", ErrUnsafeArchivePath, name)
 	}
 	return false, nil
 }
@@ -342,7 +342,7 @@ func extractBinary(archivePath, destDir string) (string, error) {
 func extractFromTarGz(archivePath, destDir string) (string, error) {
 	f, err := os.Open(archivePath)
 	if err != nil {
-		return "", fmt.Errorf("opening archive: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrOpeningArchive, err)
 	}
 	defer f.Close() //nolint:errcheck // read-only
 
@@ -370,7 +370,7 @@ func extractFromTarGz(archivePath, destDir string) (string, error) {
 			continue
 		}
 		if header.Typeflag != tar.TypeReg {
-			return "", fmt.Errorf("unsupported tar entry type for %s", header.Name)
+			return "", fmt.Errorf("%w: %s", ErrUnsupportedTarEntry, header.Name)
 		}
 
 		dst := filepath.Join(destDir, binaryName)
@@ -396,7 +396,7 @@ func extractFromTarGz(archivePath, destDir string) (string, error) {
 func extractFromZip(archivePath, destDir string) (string, error) {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return "", fmt.Errorf("opening zip: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrOpeningZip, err)
 	}
 	defer r.Close() //nolint:errcheck // read-only
 
@@ -469,7 +469,7 @@ func replaceUnix(newBinaryPath, exePath string) error {
 
 	src, err := os.Open(newBinaryPath)
 	if err != nil {
-		return fmt.Errorf("opening new binary: %w", err)
+		return fmt.Errorf("%w: %w", ErrOpeningBinary, err)
 	}
 	defer src.Close() //nolint:errcheck // read-only
 
