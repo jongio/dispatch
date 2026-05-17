@@ -42,8 +42,10 @@ type SessionList struct {
 	anchor        int                              // anchor for Shift+click range selection
 	shifting      bool                             // true while shift+arrow range selection is active
 	scrollOffset  int                              // first visible position within visItems
-	width         int
-	height        int
+	width          int
+	height         int
+	cachedPad      string // cached padding string (spaces x width)
+	cachedPadWidth int    // width used to generate cachedPad
 }
 
 // NewSessionList returns an empty SessionList.
@@ -52,6 +54,15 @@ func NewSessionList() SessionList {
 		expanded: make(map[string]struct{}),
 		selected: make(map[string]struct{}),
 	}
+}
+
+// pad returns a width-sized padding string, regenerating only when width changes.
+func (s *SessionList) pad() string {
+	if s.cachedPadWidth != s.width {
+		s.cachedPad = strings.Repeat(" ", s.width)
+		s.cachedPadWidth = s.width
+	}
+	return s.cachedPad
 }
 
 // SetSessions replaces the list content with a flat slice of sessions.
@@ -612,7 +623,7 @@ func (s SessionList) View() string {
 	}
 	// Pad to full height.
 	for len(lines) < s.height {
-		lines = append(lines, strings.Repeat(" ", s.width))
+		lines = append(lines, s.pad())
 	}
 	// Safety net: ensure exactly s.height newline-delimited lines.
 	// A wrapped row from lipgloss could produce embedded newlines.
@@ -622,7 +633,7 @@ func (s SessionList) View() string {
 		all = all[:s.height]
 	} else {
 		for len(all) < s.height {
-			all = append(all, strings.Repeat(" ", s.width))
+			all = append(all, s.pad())
 		}
 	}
 	return strings.Join(all, "\n")
