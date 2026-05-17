@@ -129,6 +129,58 @@ func TestPoll_EmptyPath(t *testing.T) {
 	}
 }
 
+func TestResetBaseline(t *testing.T) {
+dir := t.TempDir()
+dbPath := filepath.Join(dir, "session-store.db")
+walPath := dbPath + "-wal"
+
+// Set the WAL mtime to the past so that time.Now() in ResetBaseline
+// is guaranteed to be after it.
+past := time.Now().Add(-10 * time.Second)
+if err := os.WriteFile(walPath, []byte("initial"), 0o644); err != nil {
+t.Fatalf("creating temp wal: %v", err)
+}
+if err := os.Chtimes(walPath, past, past); err != nil {
+t.Fatalf("setting initial mtime: %v", err)
+}
+
+w := &DBWatcher{
+path:     dbPath,
+interval: time.Hour,
+stop:     make(chan struct{}),
+}
+defer w.Stop()
+
+// First poll establishes baseline - should return false.
+if w.Poll() {
+t.Fatal("expected first Poll to return false (baseline)")
+}
+
+// Advance the WAL mtime (still in the past, but later than baseline).
+past2 := past.Add(5 * time.Second)
+if err := os.Chtimes(walPath, past2, past2); err != nil {
+t.Fatalf("touching wal file: %v", err)
+}
+
+// Poll should detect the modification.
+if !w.Poll() {
+t.Fatal("expected Poll to return true after WAL modification")
+}
+
+// Advance the WAL mtime once more - this change is pending.
+past3 := past2.Add(2 * time.Second)
+if err := os.Chtimes(walPath, past3, past3); err != nil {
+t.Fatalf("touching wal file again: %v", err)
+}
+
+// ResetBaseline sets lastMod to time.Now(), which is after all the
+// past mtimes, so the next poll should NOT report a change.
+w.ResetBaseline()
+
+if w.Poll() {
+t.Fatal("expected Poll to return false after ResetBaseline")
+}
+}
 func TestStop_TerminatesLoop(t *testing.T) {
 	w := &DBWatcher{
 		path:     "nonexistent",
