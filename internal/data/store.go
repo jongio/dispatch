@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
+	"golang.org/x/sync/errgroup"
 	_ "modernc.org/sqlite"
 )
 
@@ -99,7 +101,10 @@ func OpenPath(path string) (*Store, error) {
 		hasFTS5 = true
 	}
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		slog.Warn("could not resolve home directory", "error", err)
+	}
 	return &Store{db: db, hasHostType: hasHostType, hasFTS5: hasFTS5, tempDir: os.TempDir(), homeDir: homeDir}, nil
 }
 
@@ -347,9 +352,16 @@ var sessionColumnsBase = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), 
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,'')`
 
 // sessionColumnsSuffix is the computed columns appended after host_type.
+// Turn and file counts come from pre-aggregated LEFT JOINs (see countJoins)
+// rather than correlated subqueries, which avoids per-row rescans.
 var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
-	(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turn_count,
-	(SELECT COUNT(DISTINCT sf.file_path) FROM session_files sf WHERE sf.session_id = s.id) AS file_count`
+	COALESCE(tc.turn_count, 0) AS turn_count,
+	COALESCE(fc.file_count, 0) AS file_count`
+
+// countJoins provides the LEFT JOINs for pre-aggregated turn and file counts.
+// Every query that uses sessionColumnsSuffix must include these joins.
+const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
+	` LEFT JOIN (SELECT session_id, COUNT(DISTINCT file_path) AS file_count FROM session_files GROUP BY session_id) fc ON fc.session_id = s.id`
 
 // sessionColumns returns the full SELECT column list, including host_type
 // when the schema supports it.
@@ -422,7 +434,7 @@ func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) 
 	var fb filterBuilder
 	fb.apply(s.withAutoExclusions(filter))
 
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + fb.joinSQL() + fb.whereSQL()
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + fb.joinSQL() + fb.whereSQL()
 	q += fmt.Sprintf(" ORDER BY %s %s", sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
@@ -469,7 +481,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s WHERE s.id IN (" +
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
 		strings.Join(placeholders, ",") + ")"
 
 	rows, err := s.db.Query(q, args...)
@@ -504,7 +516,7 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
 func (s *Store) GetSession(id string) (*SessionDetail, error) {
-	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s WHERE s.id = ?", id)
+	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s"+countJoins+" WHERE s.id = ?", id)
 	sess, err := scanSession(row)
 	if err != nil {
 		return nil, fmt.Errorf("loading session %s: %w", id, err)
@@ -512,88 +524,108 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 
 	detail := &SessionDetail{Session: sess}
 
-	// Turns
-	tRows, err := s.db.Query(
-		`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
-		 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
+	// The four child queries are independent of each other; run them in
+	// parallel to reduce wall-clock latency.
+	var (
+		turns       []Turn
+		checkpoints []Checkpoint
+		files       []SessionFile
+		refs        []SessionRef
 	)
-	if err != nil {
-		return nil, fmt.Errorf("loading turns for session %s: %w", id, err)
-	}
-	defer tRows.Close() //nolint:errcheck // rows read-only
-	for tRows.Next() {
-		var t Turn
-		if err := tRows.Scan(&t.SessionID, &t.TurnIndex, &t.UserMessage, &t.AssistantResponse, &t.Timestamp); err != nil {
-			return nil, fmt.Errorf("scanning turn row: %w", err)
+
+	var eg errgroup.Group
+
+	// Turns
+	eg.Go(func() error {
+		tRows, err := s.db.Query(
+			`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
+			 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading turns for session %s: %w", id, err)
 		}
-		detail.Turns = append(detail.Turns, t)
-	}
-	if err := tRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating turn rows: %w", err)
-	}
+		defer tRows.Close() //nolint:errcheck // rows read-only
+		for tRows.Next() {
+			var t Turn
+			if err := tRows.Scan(&t.SessionID, &t.TurnIndex, &t.UserMessage, &t.AssistantResponse, &t.Timestamp); err != nil {
+				return fmt.Errorf("scanning turn row: %w", err)
+			}
+			turns = append(turns, t)
+		}
+		return tRows.Err()
+	})
 
 	// Checkpoints
-	cRows, err := s.db.Query(
-		`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
-		        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
-		        COALESCE(important_files,''), COALESCE(next_steps,'')
-		 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading checkpoints for session %s: %w", id, err)
-	}
-	defer cRows.Close() //nolint:errcheck // rows read-only
-	for cRows.Next() {
-		var c Checkpoint
-		if err := cRows.Scan(&c.SessionID, &c.CheckpointNumber, &c.Title, &c.Overview,
-			&c.History, &c.WorkDone, &c.TechnicalDetails, &c.ImportantFiles, &c.NextSteps); err != nil {
-			return nil, fmt.Errorf("scanning checkpoint row: %w", err)
+	eg.Go(func() error {
+		cRows, err := s.db.Query(
+			`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
+			        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
+			        COALESCE(important_files,''), COALESCE(next_steps,'')
+			 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading checkpoints for session %s: %w", id, err)
 		}
-		detail.Checkpoints = append(detail.Checkpoints, c)
-	}
-	if err := cRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating checkpoint rows: %w", err)
-	}
+		defer cRows.Close() //nolint:errcheck // rows read-only
+		for cRows.Next() {
+			var c Checkpoint
+			if err := cRows.Scan(&c.SessionID, &c.CheckpointNumber, &c.Title, &c.Overview,
+				&c.History, &c.WorkDone, &c.TechnicalDetails, &c.ImportantFiles, &c.NextSteps); err != nil {
+				return fmt.Errorf("scanning checkpoint row: %w", err)
+			}
+			checkpoints = append(checkpoints, c)
+		}
+		return cRows.Err()
+	})
 
 	// Files
-	fRows, err := s.db.Query(
-		`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
-		 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading files for session %s: %w", id, err)
-	}
-	defer fRows.Close() //nolint:errcheck // rows read-only
-	for fRows.Next() {
-		var f SessionFile
-		if err := fRows.Scan(&f.SessionID, &f.FilePath, &f.ToolName, &f.TurnIndex, &f.FirstSeenAt); err != nil {
-			return nil, fmt.Errorf("scanning file row: %w", err)
+	eg.Go(func() error {
+		fRows, err := s.db.Query(
+			`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
+			 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading files for session %s: %w", id, err)
 		}
-		detail.Files = append(detail.Files, f)
-	}
-	if err := fRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating file rows: %w", err)
-	}
+		defer fRows.Close() //nolint:errcheck // rows read-only
+		for fRows.Next() {
+			var f SessionFile
+			if err := fRows.Scan(&f.SessionID, &f.FilePath, &f.ToolName, &f.TurnIndex, &f.FirstSeenAt); err != nil {
+				return fmt.Errorf("scanning file row: %w", err)
+			}
+			files = append(files, f)
+		}
+		return fRows.Err()
+	})
 
 	// Refs
-	rRows, err := s.db.Query(
-		`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
-		 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading refs for session %s: %w", id, err)
-	}
-	defer rRows.Close() //nolint:errcheck // rows read-only
-	for rRows.Next() {
-		var r SessionRef
-		if err := rRows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scanning ref row: %w", err)
+	eg.Go(func() error {
+		rRows, err := s.db.Query(
+			`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
+			 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading refs for session %s: %w", id, err)
 		}
-		detail.Refs = append(detail.Refs, r)
+		defer rRows.Close() //nolint:errcheck // rows read-only
+		for rRows.Next() {
+			var r SessionRef
+			if err := rRows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
+				return fmt.Errorf("scanning ref row: %w", err)
+			}
+			refs = append(refs, r)
+		}
+		return rRows.Err()
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
-	if err := rRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating ref rows: %w", err)
-	}
+
+	detail.Turns = turns
+	detail.Checkpoints = checkpoints
+	detail.Files = files
+	detail.Refs = refs
 
 	return detail, nil
 }
@@ -875,8 +907,8 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
-	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
-		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s%s ORDER BY pivot_label, %s %s",
+		expr, s.sessionColumns(), countJoins, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit

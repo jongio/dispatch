@@ -61,7 +61,18 @@ const (
 
 var (
 	updateHTTPTransport = http.DefaultTransport
-	versionPattern      = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+
+	// sharedClient is reused across sequential update requests. The
+	// transport is already shared; this avoids re-creating the wrapper
+	// struct on every call. Per-request timeouts are enforced via
+	// context.WithTimeout instead of http.Client.Timeout so that a
+	// single client can serve requests with different deadlines.
+	sharedClient = &http.Client{
+		Transport:     updateHTTPTransport,
+		CheckRedirect: httpsOnlyCheckRedirect,
+	}
+
+	versionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 func validateVersion(v string) error {
@@ -73,7 +84,7 @@ func validateVersion(v string) error {
 
 // RunUpdate downloads and installs the latest version of dispatch. It
 // prints progress to stderr and returns an error on failure.
-func RunUpdate(currentVersion string) error {
+func RunUpdate(ctx context.Context, currentVersion string) error {
 	configDir, err := platform.ConfigDir()
 	if err != nil {
 		return fmt.Errorf("resolving config directory: %w", err)
@@ -89,7 +100,7 @@ func RunUpdate(currentVersion string) error {
 	}
 	defer releaseUpdateLock(lock)
 
-	latest, err := fetchLatestVersion()
+	latest, err := fetchLatestVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("checking latest version: %w", err)
 	}
@@ -115,13 +126,13 @@ func RunUpdate(currentVersion string) error {
 	asset := AssetName(latest)
 	assetURL := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, latest, asset)
 	archivePath := filepath.Join(tmpDir, asset)
-	if err := downloadAsset(archivePath, assetURL); err != nil {
+	if err := downloadAsset(ctx, archivePath, assetURL); err != nil {
 		return fmt.Errorf("downloading %s: %w", asset, err)
 	}
 
 	// Download and verify checksum.
 	checksumURL := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, latest, checksumFileName)
-	if err := verifyChecksum(archivePath, checksumURL, asset); err != nil {
+	if err := verifyChecksum(ctx, archivePath, checksumURL, asset); err != nil {
 		return fmt.Errorf("checksum verification: %w", err)
 	}
 
@@ -172,25 +183,18 @@ func httpsOnlyCheckRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-func newSecureClient(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout:       timeout,
-		Transport:     updateHTTPTransport,
-		CheckRedirect: httpsOnlyCheckRedirect,
-	}
-}
-
 // downloadAsset downloads a URL to a local file path with HTTPS-only
 // redirect enforcement and size limits.
-func downloadAsset(dst, url string) error {
-	client := newSecureClient(downloadTimeout)
+func downloadAsset(ctx context.Context, dst, url string) error {
+	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request for %s: %w", url, err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := sharedClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", url, err)
 	}
@@ -219,15 +223,16 @@ func downloadAsset(dst, url string) error {
 
 // verifyChecksum downloads the checksum file and verifies the SHA-256
 // hash of the downloaded archive.
-func verifyChecksum(archivePath, checksumURL, archiveName string) error {
-	client := newSecureClient(apiTimeout)
+func verifyChecksum(ctx context.Context, archivePath, checksumURL, archiveName string) error {
+	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, checksumURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checksumURL, nil)
 	if err != nil {
 		return fmt.Errorf("creating checksum request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := sharedClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading checksums: %w", err)
 	}

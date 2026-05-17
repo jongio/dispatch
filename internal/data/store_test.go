@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS session_refs (
 	turn_index INTEGER,
 	created_at TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_session_files_session ON session_files(session_id);
 `
 
 // newTestStore creates an in-memory SQLite store with the session-store

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,7 +21,7 @@ func main() {
 	// with argument parsing and TUI startup.
 	updateCh := make(chan *update.UpdateInfo, 1)
 	go func() {
-		updateCh <- update.CheckForUpdate(tui.Version)
+		updateCh <- update.CheckForUpdate(context.Background(), tui.Version)
 	}()
 
 	origStderr := captureOriginalStderr()
