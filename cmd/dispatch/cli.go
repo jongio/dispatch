@@ -44,7 +44,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, nil
 
 		case "update":
-			if uErr := runUpdateFn(tui.Version); uErr != nil {
+			if uErr := runUpdateFn(context.Background(), tui.Version); uErr != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", uErr)
 				return true, cleanup, uErr
 			}
