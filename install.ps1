@@ -164,6 +164,37 @@ function Install-Dispatch {
         Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
         Write-Success 'Downloaded archive'
 
+        # ---- Verify cosign signature on checksums file -----------------------
+        $cosignCmd = Get-Command cosign -ErrorAction SilentlyContinue
+        if ($cosignCmd) {
+            Write-Status 'Verifying cosign signature on checksums file...'
+            $sigUrl  = "$Script:GitHubDownload/$tag/$($Script:ChecksumsFile).sig"
+            $pemUrl  = "$Script:GitHubDownload/$tag/$($Script:ChecksumsFile).pem"
+            $sigPath = Join-Path $tempDir "$($Script:ChecksumsFile).sig"
+            $pemPath = Join-Path $tempDir "$($Script:ChecksumsFile).pem"
+
+            Invoke-WebRequest -Uri $sigUrl -OutFile $sigPath -UseBasicParsing
+            Invoke-WebRequest -Uri $pemUrl -OutFile $pemPath -UseBasicParsing
+
+            $cosignArgs = @(
+                'verify-blob'
+                '--signature', $sigPath
+                '--certificate', $pemPath
+                '--certificate-identity-regexp', "^https://github\.com/$Script:Repo/"
+                '--certificate-oidc-issuer', 'https://token.actions.githubusercontent.com'
+                $checksumsPath
+            )
+
+            $cosignResult = & cosign @cosignArgs 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Fail "Cosign signature verification failed. The checksums file may have been tampered with.`n$cosignResult"
+            }
+            Write-Success 'Cosign signature verified'
+        }
+        else {
+            Write-Warn 'cosign not found - skipping signature verification. Install cosign for supply-chain security.'
+        }
+
         # ---- Verify checksum -------------------------------------------------
         Write-Status 'Verifying SHA-256 checksum...'
 

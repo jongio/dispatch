@@ -184,9 +184,31 @@ main() {
     http_download "${archive_url}"  "${tmp}/${archive_name}"
     pass "Downloaded archive"
 
+    # ---- Download checksums and verify cosign signature ------------------
+    info "Downloading checksums…"
+    http_download "${checksums_url}" "${tmp}/${checksums_name}"
+
+    if command -v cosign >/dev/null 2>&1; then
+        info "Verifying cosign signature on checksums file…"
+        sig_url="${GITHUB_DOWNLOAD}/${tag}/${checksums_name}.sig"
+        pem_url="${GITHUB_DOWNLOAD}/${tag}/${checksums_name}.pem"
+        http_download "${sig_url}" "${tmp}/${checksums_name}.sig"
+        http_download "${pem_url}" "${tmp}/${checksums_name}.pem"
+
+        cosign verify-blob \
+            --signature "${tmp}/${checksums_name}.sig" \
+            --certificate "${tmp}/${checksums_name}.pem" \
+            --certificate-identity-regexp "^https://github\\.com/${REPO}/" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${tmp}/${checksums_name}" \
+            || fail "Cosign signature verification failed. The checksums file may have been tampered with."
+        pass "Cosign signature verified"
+    else
+        warn "cosign not found — skipping signature verification. Install cosign for supply-chain security."
+    fi
+
     # ---- Verify checksum -------------------------------------------------
     info "Verifying SHA-256 checksum…"
-    http_download "${checksums_url}" "${tmp}/${checksums_name}"
 
     expected_sha=$(grep " ${archive_name}\$" "${tmp}/${checksums_name}" | awk '{print $1}')
     if [ -z "${expected_sha}" ]; then
