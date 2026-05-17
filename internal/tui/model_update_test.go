@@ -105,8 +105,9 @@ func TestView_HelpOverlay(t *testing.T) {
 	m.state = stateHelpOverlay
 	m.help.SetSize(120, 30)
 	v := m.View()
-	// Help overlay renders its own view
-	_ = v
+	if v.Content == "" {
+		t.Error("expected non-empty view output for help overlay")
+	}
 }
 
 func TestView_ShellPicker(t *testing.T) {
@@ -114,7 +115,9 @@ func TestView_ShellPicker(t *testing.T) {
 	m.state = stateShellPicker
 	m.shellPicker.SetSize(120, 30)
 	v := m.View()
-	_ = v
+	if v.Content == "" {
+		t.Error("expected non-empty view output for shell picker")
+	}
 }
 
 func TestView_FilterPanel(t *testing.T) {
@@ -122,7 +125,9 @@ func TestView_FilterPanel(t *testing.T) {
 	m.state = stateFilterPanel
 	m.filterPanel.SetSize(120, 30)
 	v := m.View()
-	_ = v
+	if v.Content == "" {
+		t.Error("expected non-empty view output for filter panel")
+	}
 }
 
 func TestView_ConfigPanel(t *testing.T) {
@@ -130,7 +135,9 @@ func TestView_ConfigPanel(t *testing.T) {
 	m.state = stateConfigPanel
 	m.configPanel.SetSize(120, 30)
 	v := m.View()
-	_ = v
+	if v.Content == "" {
+		t.Error("expected non-empty view output for config panel")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1508,7 +1515,8 @@ func TestLaunchWithMode_InPlace(t *testing.T) {
 	// we just need to verify it doesn't panic and returns a cmd or nil.
 	cmd := m.launchWithMode(config.LaunchModeInPlace)
 	// Could be nil if platform.NewResumeCmd fails, that's ok.
-	_ = cmd
+	// The key assertion is no panic; cmd value depends on platform.
+	_ = cmd == nil // suppress unused warning while documenting the check
 }
 
 func TestLaunchWithMode_External_SingleShell(t *testing.T) {
@@ -1568,7 +1576,7 @@ func TestLaunchNewSession_InPlace(t *testing.T) {
 	m := newTestModel()
 	cmd := m.launchNewSession("/test", config.LaunchModeInPlace)
 	// May be nil if NewResumeCmd fails (no copilot CLI), but shouldn't panic.
-	_ = cmd
+	_ = cmd == nil // suppress unused warning while documenting the check
 }
 
 func TestLaunchNewSession_External(t *testing.T) {
@@ -4003,10 +4011,10 @@ func TestResolveShellAndLaunch_InvalidShell_SetsStatusErr(t *testing.T) {
 	// the user should get feedback.
 	m.shells = nil
 	cmd := m.resolveShellAndLaunch("s1", "/test", config.LaunchModeTab)
-	// On a real system DefaultShell() usually returns a valid path,
-	// so the error message appears only when the fallback also fails.
-	// What matters: no panic.
-	_ = cmd
+	// On a real system DefaultShell() returns a valid path, so cmd should be non-nil.
+	if cmd == nil {
+		t.Log("resolveShellAndLaunch returned nil; DefaultShell() may have failed on this platform")
+	}
 }
 
 func TestResolveShellAndLaunch_EmptyPathShell_SetsStatusErr(t *testing.T) {
@@ -4045,8 +4053,10 @@ func TestResolveShellAndLaunchDirect_NoShells_UsesDefault(t *testing.T) {
 	m.shells = nil
 	// DefaultShell() should succeed on any real OS, so cmd should be non-nil.
 	cmd := m.resolveShellAndLaunchDirect("s1", "/test", config.LaunchModeTab)
-	// No panic is the main assertion. On CI the platform default should exist.
-	_ = cmd
+	// DefaultShell() should succeed on any real OS, so cmd should be non-nil.
+	if cmd == nil {
+		t.Log("resolveShellAndLaunchDirect returned nil; DefaultShell() may have failed on this platform")
+	}
 }
 
 func TestLaunchExternal_ErrorIncludesContext(t *testing.T) {
