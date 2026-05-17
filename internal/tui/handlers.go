@@ -23,7 +23,7 @@ import (
 
 // ----- Background color detection ------------------------------------------
 
-func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (Model, tea.Cmd) {
+func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.hasDarkBackground = msg.IsDark()
 	// Re-apply the auto theme with the correct light/dark variant.
 	themeName := m.cfg.Theme
@@ -35,7 +35,7 @@ func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (Model, tea.Cmd
 
 // ----- Window resize -------------------------------------------------------
 
-func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
+func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.width = msg.Width
 	m.height = msg.Height
 	m.recalcLayout()
@@ -59,7 +59,7 @@ func (m Model) handleStoreOpened(msg storeOpenedMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionQuickCmd())
 }
 
-func (m Model) handleStoreError(msg storeErrorMsg) (Model, tea.Cmd) {
+func (m Model) handleStoreError(msg storeErrorMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.statusErr = "Store: " + msg.err.Error()
 	m.state = stateSessionList
 	return m, nil
@@ -121,7 +121,7 @@ func (m Model) handleSessionsChanged() (Model, tea.Cmd) {
 
 // ----- Transient status clear ----------------------------------------------
 
-func (m Model) handleClearStatus() (Model, tea.Cmd) {
+func (m Model) handleClearStatus() (Model, tea.Cmd) { //nolint:unparam
 	m.statusInfo = ""
 	m.statusErr = ""
 	return m, nil
@@ -249,7 +249,7 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleDataError(msg dataErrorMsg) (Model, tea.Cmd) {
+func (m Model) handleDataError(msg dataErrorMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.statusErr = "Data: " + msg.err.Error()
 	if m.state == stateLoading {
 		m.state = stateSessionList
@@ -315,7 +315,7 @@ func (m Model) handlePlansScanned(msg plansScannedMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) handlePlanContent(msg planContentMsg) (Model, tea.Cmd) {
+func (m Model) handlePlanContent(msg planContentMsg) (Model, tea.Cmd) { //nolint:unparam
 	if msg.err != nil || msg.content == "" {
 		m.preview.SetPlanContent("")
 		m.workStatus.autoShowPlan = false
@@ -585,7 +585,7 @@ func (m Model) handleCopilotSearchResult(msg copilotSearchResultMsg) (Model, tea
 	return m, nil
 }
 
-func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) {
+func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) { //nolint:unparam
 	if msg.version != m.search.copilotSearchVersion {
 		return m, nil // stale
 	}
@@ -623,14 +623,14 @@ func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) 
 
 // ----- Filter picker data --------------------------------------------------
 
-func (m Model) handleFilterData(msg filterDataMsg) (Model, tea.Cmd) {
+func (m Model) handleFilterData(msg filterDataMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.filterPanel.SetFolders(msg.folders, m.cfg.ExcludedDirs)
 	return m, nil
 }
 
 // ----- Shell detection -----------------------------------------------------
 
-func (m Model) handleShellsDetected(msg shellsDetectedMsg) (Model, tea.Cmd) {
+func (m Model) handleShellsDetected(msg shellsDetectedMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.shells = msg.shells
 	m.configPanel.SetShellOptions(m.shells)
 	return m, nil
@@ -638,9 +638,9 @@ func (m Model) handleShellsDetected(msg shellsDetectedMsg) (Model, tea.Cmd) {
 
 // ----- Terminal detection --------------------------------------------------
 
-func (m Model) handleTerminalsDetected(msg terminalsDetectedMsg) (Model, tea.Cmd) {
+func (m Model) handleTerminalsDetected(msg terminalsDetectedMsg) (Model, tea.Cmd) { //nolint:unparam
 	m.terminals = msg.terminals
-	var names []string
+	names := make([]string, 0, len(m.terminals))
 	for _, t := range m.terminals {
 		names = append(names, t.Name)
 	}
@@ -650,7 +650,7 @@ func (m Model) handleTerminalsDetected(msg terminalsDetectedMsg) (Model, tea.Cmd
 
 // ----- Font check ----------------------------------------------------------
 
-func (m Model) handleFontCheck(msg fontCheckMsg) (Model, tea.Cmd) {
+func (m Model) handleFontCheck(msg fontCheckMsg) (Model, tea.Cmd) { //nolint:unparam
 	styles.SetNerdFontEnabled(msg.installed)
 	return m, nil
 }

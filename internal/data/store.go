@@ -70,7 +70,7 @@ func OpenPath(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening session store: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("connecting to session store: %w", err)
 	}
