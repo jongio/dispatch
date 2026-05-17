@@ -55,7 +55,7 @@ jobs:
 
       - name: Check strict formatting (gofumpt)
         run: |
-          go install mvdan.cc/gofumpt@latest || { echo "gofumpt install failed, skipping"; exit 0; }
+          go install mvdan.cc/gofumpt@v0.10.0 || { echo "gofumpt install failed, skipping"; exit 0; }
           unformatted=$(gofumpt -l .)
           if [ -n "$unformatted" ]; then
             echo "::error::Files need strict formatting (gofumpt):"
@@ -65,8 +65,8 @@ jobs:
 
       - name: Check dead code
         run: |
-          go install golang.org/x/tools/cmd/deadcode@latest || { echo "deadcode install failed, skipping"; exit 0; }
-          go install github.com/magefile/mage@latest || { echo "mage install failed, skipping"; exit 0; }
+          go install golang.org/x/tools/cmd/deadcode@v0.45.0 || { echo "deadcode install failed, skipping"; exit 0; }
+          go install github.com/magefile/mage@v1.17.2 || { echo "mage install failed, skipping"; exit 0; }
           mage deadcode
 
       - run: go build ./cmd/dispatch/
@@ -88,7 +88,7 @@ jobs:
 
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
           govulncheck ./...
 
   # Verify the binary compiles for all release platforms.
