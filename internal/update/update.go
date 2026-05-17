@@ -286,7 +286,7 @@ func ParseChecksum(content, filename string) (string, error) {
 			return strings.ToLower(parts[0]), nil
 		}
 	}
-	return "", fmt.Errorf("no checksum found for %s", filename)
+	return "", fmt.Errorf("%w: no checksum found for %s", ErrChecksumMismatch, filename)
 }
 
 // SHA256File computes the SHA-256 hash of a file and returns it as a
