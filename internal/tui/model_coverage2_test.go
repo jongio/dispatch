@@ -508,13 +508,13 @@ func TestHandleKey_R_ScanWorkStatus(t *testing.T) {
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
 	m.planMap = map[string]bool{"s1": true}
-	m.workStatusScanning = false
+	m.workStatus.workStatusScanning = false
 
 	// 'R' should trigger work status scan.
 	msg := tea.KeyPressMsg{Code: 'R', Text: "R"}
 	result, cmd := m.Update(msg)
 	rm := result.(Model)
-	if !rm.workStatusScanning {
+	if !rm.workStatus.workStatusScanning {
 		t.Error("pressing 'R' should set workStatusScanning to true")
 	}
 	if rm.statusInfo != "Scanning work status..." {
@@ -529,7 +529,7 @@ func TestHandleKey_R_ScanWorkStatus_AlreadyScanning(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp"}}
 	m.sessionList.SetSessions(m.sessions)
-	m.workStatusScanning = true // already scanning
+	m.workStatus.workStatusScanning = true // already scanning
 
 	// 'R' while already scanning should be a no-op.
 	msg := tea.KeyPressMsg{Code: 'R', Text: "R"}

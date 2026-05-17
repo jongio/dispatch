@@ -89,7 +89,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.pivot = pivotFolder
 		m.groups = c.folderGroups
 		m.planMap = c.planMap
-		m.workStatusMap = c.workStatusMap
+		m.workStatus.workStatusMap = c.workStatusMap
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(c.folderGroups)
 		m.sessionList.SetAttentionStatuses(c.attentionMap)

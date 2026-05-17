@@ -185,7 +185,7 @@ func TestEnterFromSearchPreservesQuery(t *testing.T) {
 	m.searchBar.Focus()
 	m.searchBar.SetValue("seattle")
 	m.filter.Query = "seattle"
-	m.deepSearchPending = true
+	m.search.deepSearchPending = true
 
 	result, _ := m.Update(enterKeyMsg())
 	rm := result.(Model)
