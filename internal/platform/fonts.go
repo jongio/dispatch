@@ -25,19 +25,31 @@ func IsNerdFontInstalled() bool {
 // Detection helpers
 // ---------------------------------------------------------------------------
 
-func isNerdFontInstalledWindows() bool {
-	localAppData := os.Getenv("LOCALAPPDATA")
-	if localAppData != "" {
-		userFonts := filepath.Join(localAppData, "Microsoft", "Windows", "Fonts")
-		if hasNerdFontFiles(userFonts) {
+// checkNerdFontDirs returns true if any directory in dirs contains a Nerd Font
+// file. Empty strings are silently skipped.
+func checkNerdFontDirs(dirs []string) bool {
+	for _, d := range dirs {
+		if d != "" && hasNerdFontFiles(d) {
 			return true
 		}
 	}
+	return false
+}
+
+func isNerdFontInstalledWindows() bool {
+	var dirs []string
+
+	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+		dirs = append(dirs, filepath.Join(localAppData, "Microsoft", "Windows", "Fonts"))
+	}
+
 	winDir := os.Getenv("WINDIR")
 	if winDir == "" {
 		winDir = `C:\Windows`
 	}
-	return hasNerdFontFiles(filepath.Join(winDir, "Fonts"))
+	dirs = append(dirs, filepath.Join(winDir, "Fonts"))
+
+	return checkNerdFontDirs(dirs)
 }
 
 func isNerdFontInstalledDarwin() bool {
@@ -45,24 +57,24 @@ func isNerdFontInstalledDarwin() bool {
 	if err != nil {
 		return false
 	}
-	if hasNerdFontFiles(filepath.Join(home, "Library", "Fonts")) {
-		return true
-	}
-	return hasNerdFontFiles("/Library/Fonts")
+	return checkNerdFontDirs([]string{
+		filepath.Join(home, "Library", "Fonts"),
+		"/Library/Fonts",
+	})
 }
 
 func isNerdFontInstalledLinux() bool {
-	home, err := os.UserHomeDir()
-	if err == nil {
-		if hasNerdFontFiles(filepath.Join(home, ".local", "share", "fonts")) {
-			return true
-		}
+	home, _ := os.UserHomeDir()
+
+	dirs := []string{
+		filepath.Join(home, ".local", "share", "fonts"),
+		"/usr/share/fonts",
+		"/usr/local/share/fonts",
 	}
-	for _, dir := range []string{"/usr/share/fonts", "/usr/local/share/fonts"} {
-		if hasNerdFontFiles(dir) {
-			return true
-		}
+	if checkNerdFontDirs(dirs) {
+		return true
 	}
+
 	// Try fc-list as a fallback.
 	out, err := exec.Command("fc-list").Output()
 	if err == nil && strings.Contains(string(out), "Nerd") {

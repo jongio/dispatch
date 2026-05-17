@@ -92,7 +92,7 @@ jobs:
           # Update CONTRIBUTORS.md with all-time contributors
           go run ./cmd/contributors/ --all
 
-          # Commit updated CONTRIBUTORS.md if changed - open a PR instead of pushing directly to main
+          # Commit updated CONTRIBUTORS.md if changed — open a PR instead of pushing directly to main
           if ! git diff --quiet CONTRIBUTORS.md; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
