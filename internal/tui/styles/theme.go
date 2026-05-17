@@ -11,9 +11,16 @@ package styles
 
 import (
 	"image/color"
+	"sync"
 
 	"charm.land/lipgloss/v2"
 )
+
+// styleMu protects all mutable package-level style variables and
+// currentTheme from concurrent read/write access.  Writers (SetTheme,
+// ApplyAutoTheme) take a write lock; readers (CurrentTheme) take a read
+// lock.
+var styleMu sync.RWMutex
 
 // currentTheme holds the active theme.  Access via CurrentTheme().
 var currentTheme *Theme
@@ -30,6 +37,8 @@ func SetTheme(t *Theme) {
 	if t == nil {
 		return
 	}
+	styleMu.Lock()
+	defer styleMu.Unlock()
 	currentTheme = t
 
 	// Semantic colour aliases (kept for helpers / overlay code that
@@ -94,6 +103,8 @@ func SetTheme(t *Theme) {
 
 // CurrentTheme returns the active Theme (never nil after init).
 func CurrentTheme() *Theme {
+	styleMu.RLock()
+	defer styleMu.RUnlock()
 	return currentTheme
 }
 
@@ -262,6 +273,8 @@ var (
 // colour is detected (via tea.BackgroundColorMsg) and the user has not
 // selected an explicit theme.
 func ApplyAutoTheme(isDark bool) {
+	styleMu.Lock()
+	defer styleMu.Unlock()
 	applyLegacyDefaults(isDark)
 }
 
