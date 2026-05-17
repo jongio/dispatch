@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -362,12 +363,12 @@ func TestWriteCache_ConcurrentWritesRemainReadable(t *testing.T) {
 
 func TestCheckForUpdate_DevVersion(t *testing.T) {
 	t.Parallel()
-	info := CheckForUpdate("dev")
+	info := CheckForUpdate(context.Background(), "dev")
 	if info != nil {
 		t.Error("CheckForUpdate(\"dev\") should return nil")
 	}
 
-	info = CheckForUpdate("dev-abc123-20240101")
+	info = CheckForUpdate(context.Background(), "dev-abc123-20240101")
 	if info != nil {
 		t.Error("CheckForUpdate(\"dev-...\") should return nil")
 	}
@@ -395,7 +396,7 @@ func TestCheckForUpdate_CachedUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info != nil {
 		t.Error("CheckForUpdate should return nil when cache says up to date")
 	}
@@ -423,7 +424,7 @@ func TestCheckForUpdate_CachedUpdateAvailable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info == nil {
 		t.Fatal("CheckForUpdate should return UpdateInfo when update available")
 	}
@@ -463,7 +464,7 @@ func TestCheckForUpdate_StaleCache(t *testing.T) {
 
 	// With stale cache and no network, CheckForUpdate returns nil
 	// (network error is silently swallowed).
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info != nil {
 		t.Error("CheckForUpdate with stale cache and no network should return nil")
 	}
@@ -493,7 +494,7 @@ func TestCheckForUpdate_VersionChanged(t *testing.T) {
 	}
 
 	// Cache version doesn't match current → triggers network call → fails → nil.
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info != nil {
 		t.Error("CheckForUpdate with version mismatch and no network should return nil")
 	}
