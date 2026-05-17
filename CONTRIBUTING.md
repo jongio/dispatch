@@ -4,7 +4,7 @@ Thank you for your interest in contributing! Here's how to get started.
 
 ## Prerequisites
 
-- **Go 1.26.1+**
+- **Go 1.26.3+** (see `go.mod` for the authoritative version)
 - **Git**
 - **[Mage](https://magefile.org/)** — Go-based build tool (install: `go install github.com/magefile/mage@latest`)
 
