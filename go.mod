@@ -13,6 +13,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/github/copilot-sdk/go v0.3.0
 	github.com/lucasb-eyer/go-colorful v1.4.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.44.0
 	modernc.org/sqlite v1.50.1
 )
@@ -59,7 +60,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/net v0.54.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	modernc.org/libc v1.72.3 // indirect
