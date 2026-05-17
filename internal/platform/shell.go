@@ -2,9 +2,9 @@
 package platform
 
 import (
-	"context"
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"

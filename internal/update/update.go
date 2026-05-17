@@ -72,7 +72,7 @@ var (
 		CheckRedirect: httpsOnlyCheckRedirect,
 	}
 
-	versionPattern      = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+	versionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 func validateVersion(v string) error {

@@ -559,7 +559,8 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 
 	// Turns
 	eg.Go(func() error {
-		tRows, err := s.db.QueryContext(ctx,
+		tRows, err := s.db.QueryContext(
+			ctx,
 			`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
 			 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
 		)
@@ -579,7 +580,8 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 
 	// Checkpoints
 	eg.Go(func() error {
-		cRows, err := s.db.QueryContext(ctx,
+		cRows, err := s.db.QueryContext(
+			ctx,
 			`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
 			        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
 			        COALESCE(important_files,''), COALESCE(next_steps,'')
@@ -602,7 +604,8 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 
 	// Files
 	eg.Go(func() error {
-		fRows, err := s.db.QueryContext(ctx,
+		fRows, err := s.db.QueryContext(
+			ctx,
 			`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
 			 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
 		)
@@ -622,7 +625,8 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 
 	// Refs
 	eg.Go(func() error {
-		rRows, err := s.db.QueryContext(ctx,
+		rRows, err := s.db.QueryContext(
+			ctx,
 			`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
 			 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
 		)
@@ -914,7 +918,8 @@ func (s *Store) ListRepositories(ctx context.Context) ([]string, error) {
 // results are filtered to that repository.
 func (s *Store) ListBranches(ctx context.Context, repository string) ([]string, error) {
 	if repository != "" {
-		return s.distinctStrings(ctx,
+		return s.distinctStrings(
+			ctx,
 			"SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' AND repository = ? ORDER BY branch",
 			repository,
 		)

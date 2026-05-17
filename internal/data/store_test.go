@@ -611,7 +611,8 @@ func TestFilterByQuery(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth" appears in sess-1's summary.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "auth"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -632,7 +633,8 @@ func TestFilterByQueryMatchesTurnContent(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears in sess-2's turn user_message. Requires deep search.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -653,7 +655,8 @@ func TestFilterByQueryMatchesRepository(t *testing.T) {
 	populateTestData(t, s)
 
 	// "repo-b" appears in sess-2's repository.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "repo-b"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -674,7 +677,8 @@ func TestFilterByQueryMatchesBranch(t *testing.T) {
 	populateTestData(t, s)
 
 	// "feature/search" is sess-2's branch.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "feature/search"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -694,7 +698,8 @@ func TestFilterByFolder(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Folder: "/home/user/project-a"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -712,7 +717,8 @@ func TestFilterByRepository(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Repository: "owner/repo-a"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -730,7 +736,8 @@ func TestFilterByBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Branch: "main"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -752,7 +759,8 @@ func TestFilterBySince(t *testing.T) {
 	populateTestData(t, s)
 
 	since := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Since: &since},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -782,7 +790,8 @@ func TestFilterBySinceNonUTC(t *testing.T) {
 	sinceUTC := time.Date(2024, 1, 11, 0, 0, 0, 0, time.UTC)
 	sincePacific := sinceUTC.In(pacific)
 
-	sessUTC, err := s.ListSessions(context.Background(), 
+	sessUTC, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Since: &sinceUTC},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -790,7 +799,8 @@ func TestFilterBySinceNonUTC(t *testing.T) {
 		t.Fatalf("ListSessions with UTC since: %v", err)
 	}
 
-	sessPacific, err := s.ListSessions(context.Background(), 
+	sessPacific, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Since: &sincePacific},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -815,7 +825,8 @@ func TestFilterByUntil(t *testing.T) {
 	populateTestData(t, s)
 
 	until := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Until: &until},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -836,7 +847,8 @@ func TestFilterByHasRefs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{HasRefs: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -854,7 +866,8 @@ func TestFilterByExcludedDirs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{ExcludedDirs: []string{"/tmp"}},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -877,7 +890,8 @@ func TestFilterCombinedRepositoryAndBranch(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Repository: "owner/repo-a", Branch: "feature/api"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -897,7 +911,8 @@ func TestFilterNoResults(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Repository: "nonexistent/repo"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -918,7 +933,8 @@ func TestFilterQuerySpecialCharacters(t *testing.T) {
 	seedTurn(t, s.db, "special-1", 0, "Debug it", "Done.", "2024-01-01T00:00:00Z")
 
 	// Search with % and ' characters should not crash.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "O'Brien"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -937,7 +953,8 @@ func TestFilterQueryPercentCharacter(t *testing.T) {
 	seedSession(t, s.db, "pct-1", "/path", "", "", "Fix bug: 100% CPU", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "pct-1", 0, "Fix it", "Fixed.", "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "100%"},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -1778,7 +1795,8 @@ func TestFilterCombinedSinceAndUntil(t *testing.T) {
 
 	since := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2024, 1, 11, 23, 59, 59, 0, time.UTC)
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Since: &since, Until: &until},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -1796,7 +1814,8 @@ func TestFilterMultipleExcludedDirs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{ExcludedDirs: []string{"/tmp", "/home/user/project-b"}},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -1816,7 +1835,8 @@ func TestFilterAllFieldsCombined(t *testing.T) {
 	populateTestData(t, s)
 
 	since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{
 			Repository:   "owner/repo-a",
 			Branch:       "main",
@@ -2370,7 +2390,8 @@ func TestQuickSearchMatchesCwd(t *testing.T) {
 
 	// Quick search (DeepSearch=false) should match cwd field.
 	// "scratch" appears only in sess-4's cwd (/tmp/scratch).
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "scratch", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2391,7 +2412,8 @@ func TestQuickSearchDoesNotMatchTurns(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears only in sess-2's turn content. Quick search should NOT find it.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "fuzzy", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2409,7 +2431,8 @@ func TestDeepSearchMatchesTurns(t *testing.T) {
 	populateTestData(t, s)
 
 	// "fuzzy" appears in sess-2's turn content. Deep search SHOULD find it.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "fuzzy", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2430,7 +2453,8 @@ func TestDeepSearchMatchesCheckpointTitle(t *testing.T) {
 	populateTestData(t, s)
 
 	// "Auth module complete" is sess-1's checkpoint title. Only matches via deep.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "module complete", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2451,7 +2475,8 @@ func TestDeepSearchMatchesCheckpointOverview(t *testing.T) {
 	populateTestData(t, s)
 
 	// "Login endpoint with tests added" is sess-1's checkpoint overview.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "endpoint with tests", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2472,7 +2497,8 @@ func TestDeepSearchMatchesFilePath(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth_test.go" appears in sess-1's session_files.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "auth_test.go", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2493,7 +2519,8 @@ func TestDeepSearchMatchesRefValue(t *testing.T) {
 	populateTestData(t, s)
 
 	// "abc123" is sess-3's commit ref.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "abc123", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2514,7 +2541,8 @@ func TestDeepSearchMatchesPRNumber(t *testing.T) {
 	populateTestData(t, s)
 
 	// "42" is sess-1's PR ref value.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "42", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2538,7 +2566,8 @@ func TestDeepSearchNoMatchReturnsEmpty(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "zzz_no_match_anywhere_zzz", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2556,7 +2585,8 @@ func TestQuickSearchDoesNotMatchCheckpoints(t *testing.T) {
 	populateTestData(t, s)
 
 	// "module complete" only in checkpoint title — quick search should miss it.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "module complete", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2574,7 +2604,8 @@ func TestQuickSearchDoesNotMatchFilePaths(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth_test.go" only in session_files — quick search should miss it.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "auth_test.go", DeepSearch: false},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2592,7 +2623,8 @@ func TestDeepSearchAlsoMatchesSessionFields(t *testing.T) {
 	populateTestData(t, s)
 
 	// "auth" matches sess-1's summary — deep search should still find it.
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Query: "auth", DeepSearch: true},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)
@@ -2713,7 +2745,8 @@ func TestLastActive_StaleTurnsVisibleInDayFilter(t *testing.T) {
 	seedTurn(t, s.db, "s1", 0, "build", "ok", old) // turn from 3d ago
 
 	since := now.Add(-24 * time.Hour)
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Since: &since},
 		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
 	)

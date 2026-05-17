@@ -2,9 +2,9 @@ package copilot
 
 import (
 	"context"
-	"errors"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"

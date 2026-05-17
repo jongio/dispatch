@@ -41,7 +41,8 @@ func TestSQLInjection_QueryFilter(t *testing.T) {
 			// The query filter wraps the value in LIKE %...% — if it
 			// breaks out of the parameter the DB driver will error or
 			// the results will be wrong. Neither should happen.
-			sessions, err := s.ListSessions(context.Background(), 
+			sessions, err := s.ListSessions(
+				context.Background(),
 				FilterOptions{Query: payload},
 				SortOptions{Field: SortByUpdated, Order: Descending},
 				0,
@@ -75,7 +76,8 @@ func TestSQLInjection_FolderFilter(t *testing.T) {
 			defer func() { _ = s.Close() }()
 			populateTestData(t, s)
 
-			sessions, err := s.ListSessions(context.Background(), 
+			sessions, err := s.ListSessions(
+				context.Background(),
 				FilterOptions{Folder: payload},
 				SortOptions{Field: SortByUpdated, Order: Descending},
 				0,
@@ -96,7 +98,8 @@ func TestSQLInjection_RepositoryFilter(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Repository: "owner/repo-a' OR '1'='1"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -115,7 +118,8 @@ func TestSQLInjection_BranchFilter(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Branch: "main' OR '1'='1"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -133,7 +137,8 @@ func TestSQLInjection_ExcludedDirs(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(context.Background(), 
+	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{ExcludedDirs: []string{"'; DROP TABLE sessions;--"}},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -210,7 +215,8 @@ func TestSQLInjection_GroupSessions(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	_, err := s.GroupSessions(context.Background(), 
+	_, err := s.GroupSessions(
+		context.Background(),
 		PivotByRepo,
 		FilterOptions{Query: "'; DROP TABLE sessions;--"},
 		SortOptions{Field: SortByUpdated, Order: Descending},

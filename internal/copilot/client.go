@@ -10,8 +10,8 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"sync"
+	"syscall"
 	"time"
 
 	sdk "github.com/github/copilot-sdk/go"

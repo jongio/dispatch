@@ -26,22 +26,22 @@ type displayItem struct {
 // SessionList renders a vertical list of sessions with optional collapsible
 // folder tree grouping when pivoting is active.
 type SessionList struct {
-	allItems      []displayItem                    // every item (folders + sessions)
-	visItems      []int                            // indices into allItems that are currently visible
-	expanded      map[string]struct{}              // folder path → expanded state (tree mode)
-	hiddenSet     map[string]struct{}              // session ID → hidden sessions
-	favoritedSet  map[string]struct{}              // session ID → favorited sessions
-	aiSet         map[string]struct{}              // session ID → AI-found sessions
-	attentionMap  map[string]data.AttentionStatus  // session ID → attention status
-	planMap       map[string]bool                  // session ID → has plan.md
-	workStatusMap map[string]data.WorkStatusResult // session ID → work status
-	selected      map[string]struct{}              // session ID → selected for multi-open
-	treeMode      bool                             // true when showing grouped/tree view
-	pivotField    string                           // current pivot mode (e.g. "folder", "repo")
-	cursor        int                              // position within visItems
-	anchor        int                              // anchor for Shift+click range selection
-	shifting      bool                             // true while shift+arrow range selection is active
-	scrollOffset  int                              // first visible position within visItems
+	allItems       []displayItem                    // every item (folders + sessions)
+	visItems       []int                            // indices into allItems that are currently visible
+	expanded       map[string]struct{}              // folder path → expanded state (tree mode)
+	hiddenSet      map[string]struct{}              // session ID → hidden sessions
+	favoritedSet   map[string]struct{}              // session ID → favorited sessions
+	aiSet          map[string]struct{}              // session ID → AI-found sessions
+	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
+	planMap        map[string]bool                  // session ID → has plan.md
+	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
+	selected       map[string]struct{}              // session ID → selected for multi-open
+	treeMode       bool                             // true when showing grouped/tree view
+	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
+	cursor         int                              // position within visItems
+	anchor         int                              // anchor for Shift+click range selection
+	shifting       bool                             // true while shift+arrow range selection is active
+	scrollOffset   int                              // first visible position within visItems
 	width          int
 	height         int
 	cachedPad      string // cached padding string (spaces x width)

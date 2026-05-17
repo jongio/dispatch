@@ -399,143 +399,144 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-switch msg := msg.(type) {
+	switch msg := msg.(type) {
 
-// ----- Background color detection --------------------------------------
-case tea.BackgroundColorMsg:
-return m.handleBackgroundColor(msg)
+	// ----- Background color detection --------------------------------------
+	case tea.BackgroundColorMsg:
+		return m.handleBackgroundColor(msg)
 
-// ----- Window resize ---------------------------------------------------
-case tea.WindowSizeMsg:
-return m.handleResize(msg)
+	// ----- Window resize ---------------------------------------------------
+	case tea.WindowSizeMsg:
+		return m.handleResize(msg)
 
-// ----- Spinner tick ----------------------------------------------------
-case spinner.TickMsg:
-return m.handleSpinnerTick(msg)
+	// ----- Spinner tick ----------------------------------------------------
+	case spinner.TickMsg:
+		return m.handleSpinnerTick(msg)
 
-// ----- Store lifecycle -------------------------------------------------
-case storeOpenedMsg:
-return m.handleStoreOpened(msg)
+	// ----- Store lifecycle -------------------------------------------------
+	case storeOpenedMsg:
+		return m.handleStoreOpened(msg)
 
-case storeErrorMsg:
-return m.handleStoreError(msg)
+	case storeErrorMsg:
+		return m.handleStoreError(msg)
 
-// ----- Reindex ---------------------------------------------------------
-case components.ReindexLogPump:
-return m.handleReindexLogPump(msg)
+	// ----- Reindex ---------------------------------------------------------
+	case components.ReindexLogPump:
+		return m.handleReindexLogPump(msg)
 
-case components.ReindexFinishedMsg:
-return m.handleReindexFinished(msg)
+	case components.ReindexFinishedMsg:
+		return m.handleReindexFinished(msg)
 
-// ----- DB watcher (external session store changes) --------------------
-case sessionsChangedMsg:
-return m.handleSessionsChanged()
+	// ----- DB watcher (external session store changes) --------------------
+	case sessionsChangedMsg:
+		return m.handleSessionsChanged()
 
-// ----- Transient status clear -----------------------------------------
-case clearStatusMsg:
-return m.handleClearStatus()
+	// ----- Transient status clear -----------------------------------------
+	case clearStatusMsg:
+		return m.handleClearStatus()
 
-// ----- Pending click fire (single-click debounce) ---------------------
-case pendingClickFireMsg:
-return m.handlePendingClickFire(msg)
+	// ----- Pending click fire (single-click debounce) ---------------------
+	case pendingClickFireMsg:
+		return m.handlePendingClickFire(msg)
 
-// ----- Data loading ----------------------------------------------------
-case sessionsLoadedMsg:
-return m.handleSessionsLoaded(msg)
+	// ----- Data loading ----------------------------------------------------
+	case sessionsLoadedMsg:
+		return m.handleSessionsLoaded(msg)
 
-case groupsLoadedMsg:
-return m.handleGroupsLoaded(msg)
+	case groupsLoadedMsg:
+		return m.handleGroupsLoaded(msg)
 
-case sessionDetailMsg:
-return m.handleSessionDetail(msg)
+	case sessionDetailMsg:
+		return m.handleSessionDetail(msg)
 
-case dataErrorMsg:
-return m.handleDataError(msg)
+	case dataErrorMsg:
+		return m.handleDataError(msg)
 
-// ----- Attention scanning ---------------------------------------------
-case attentionQuickScannedMsg:
-return m.handleAttentionQuickScanned(msg)
+	// ----- Attention scanning ---------------------------------------------
+	case attentionQuickScannedMsg:
+		return m.handleAttentionQuickScanned(msg)
 
-case attentionScannedMsg:
-return m.handleAttentionScanned(msg)
+	case attentionScannedMsg:
+		return m.handleAttentionScanned(msg)
 
-case attentionTickMsg:
-return m.handleAttentionTick()
+	case attentionTickMsg:
+		return m.handleAttentionTick()
 
-// ----- Plan scanning --------------------------------------------------
-case plansScannedMsg:
-return m.handlePlansScanned(msg)
+	// ----- Plan scanning --------------------------------------------------
+	case plansScannedMsg:
+		return m.handlePlansScanned(msg)
 
-case planContentMsg:
-return m.handlePlanContent(msg)
+	case planContentMsg:
+		return m.handlePlanContent(msg)
 
-// ----- Work status scanning -------------------------------------------
-case workStatusQuickScannedMsg:
-return m.handleWorkStatusQuickScanned(msg)
+	// ----- Work status scanning -------------------------------------------
+	case workStatusQuickScannedMsg:
+		return m.handleWorkStatusQuickScanned(msg)
 
-case workStatusScannedMsg:
-return m.handleWorkStatusScanned(msg)
+	case workStatusScannedMsg:
+		return m.handleWorkStatusScanned(msg)
 
-case workStatusAIScannedMsg:
-return m.handleWorkStatusAIScanned(msg)
+	case workStatusAIScannedMsg:
+		return m.handleWorkStatusAIScanned(msg)
 
-case continuationPlanCreatedMsg:
-return m.handleContinuationPlanCreated(msg)
+	case continuationPlanCreatedMsg:
+		return m.handleContinuationPlanCreated(msg)
 
-// ----- Deep search debounce -------------------------------------------
-case deepSearchTickMsg:
-return m.handleDeepSearchTick(msg)
+	// ----- Deep search debounce -------------------------------------------
+	case deepSearchTickMsg:
+		return m.handleDeepSearchTick(msg)
 
-case deepSearchResultMsg:
-return m.handleDeepSearchResult(msg)
+	case deepSearchResultMsg:
+		return m.handleDeepSearchResult(msg)
 
-// ----- Copilot SDK search ------------------------------------------------
-case copilotReadyMsg:
-return m.handleCopilotReady()
+	// ----- Copilot SDK search ------------------------------------------------
+	case copilotReadyMsg:
+		return m.handleCopilotReady()
 
-case copilotErrorMsg:
-return m.handleCopilotError()
+	case copilotErrorMsg:
+		return m.handleCopilotError()
 
-case copilotSearchTickMsg:
-return m.handleCopilotSearchTick(msg)
+	case copilotSearchTickMsg:
+		return m.handleCopilotSearchTick(msg)
 
-case copilotSearchResultMsg:
-return m.handleCopilotSearchResult(msg)
+	case copilotSearchResultMsg:
+		return m.handleCopilotSearchResult(msg)
 
-case aiSessionsLoadedMsg:
-return m.handleAISessionsLoaded(msg)
+	case aiSessionsLoadedMsg:
+		return m.handleAISessionsLoaded(msg)
 
-// ----- Filter picker data ---------------------------------------------
-case filterDataMsg:
-return m.handleFilterData(msg)
+	// ----- Filter picker data ---------------------------------------------
+	case filterDataMsg:
+		return m.handleFilterData(msg)
 
-// ----- Shell detection -------------------------------------------------
-case shellsDetectedMsg:
-return m.handleShellsDetected(msg)
+	// ----- Shell detection -------------------------------------------------
+	case shellsDetectedMsg:
+		return m.handleShellsDetected(msg)
 
-// ----- Terminal detection ----------------------------------------------
-case terminalsDetectedMsg:
-return m.handleTerminalsDetected(msg)
+	// ----- Terminal detection ----------------------------------------------
+	case terminalsDetectedMsg:
+		return m.handleTerminalsDetected(msg)
 
-// ----- Font check -------------------------------------------------------
-case fontCheckMsg:
-return m.handleFontCheck(msg)
+	// ----- Font check -------------------------------------------------------
+	case fontCheckMsg:
+		return m.handleFontCheck(msg)
 
-// ----- Session exit (in-place resume finished) -------------------------
-case sessionExitMsg:
-return m.handleSessionExit(msg)
+	// ----- Session exit (in-place resume finished) -------------------------
+	case sessionExitMsg:
+		return m.handleSessionExit(msg)
 
-// ----- Keyboard --------------------------------------------------------
-case tea.KeyPressMsg:
-return m.handleKey(msg)
+	// ----- Keyboard --------------------------------------------------------
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 
-// ----- Mouse -----------------------------------------------------------
-case tea.MouseMsg:
-return m.handleMouse(msg)
+	// ----- Mouse -----------------------------------------------------------
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+	}
+
+	return m, nil
 }
 
-return m, nil
-}
 func (m Model) View() tea.View {
 	var content string
 	if m.width == 0 || m.height == 0 {
