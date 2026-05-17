@@ -385,611 +385,143 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+switch msg := msg.(type) {
 
-	// ----- Background color detection --------------------------------------
-	case tea.BackgroundColorMsg:
-		m.hasDarkBackground = msg.IsDark()
-		// Re-apply the auto theme with the correct light/dark variant.
-		themeName := m.cfg.Theme
-		if themeName == "" || themeName == themeAuto {
-			styles.ApplyAutoTheme(msg.IsDark())
-		}
-		return m, nil
+// ----- Background color detection --------------------------------------
+case tea.BackgroundColorMsg:
+return m.handleBackgroundColor(msg)
 
-	// ----- Window resize ---------------------------------------------------
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.recalcLayout()
-		return m, nil
+// ----- Window resize ---------------------------------------------------
+case tea.WindowSizeMsg:
+return m.handleResize(msg)
 
-	// ----- Spinner tick ----------------------------------------------------
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+// ----- Spinner tick ----------------------------------------------------
+case spinner.TickMsg:
+return m.handleSpinnerTick(msg)
 
-	// ----- Store lifecycle -------------------------------------------------
-	case storeOpenedMsg:
-		m.store = msg.store
-		m.state = stateSessionList
-		// Quick scan first (lock files only), then full scan follows.
-		return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionQuickCmd())
+// ----- Store lifecycle -------------------------------------------------
+case storeOpenedMsg:
+return m.handleStoreOpened(msg)
 
-	case storeErrorMsg:
-		m.statusErr = "Store: " + msg.err.Error()
-		m.state = stateSessionList
-		return m, nil
+case storeErrorMsg:
+return m.handleStoreError(msg)
 
-	// ----- Reindex ---------------------------------------------------------
-	case components.ReindexLogPump:
-		if !m.reindexing {
-			return m, nil // Discard stale log pump after cancel.
-		}
-		m.reindexLog = append(m.reindexLog, msg.Lines...)
-		// Cap log to prevent unbounded growth.
-		if len(m.reindexLog) > maxReindexLogLines {
-			m.reindexLog = m.reindexLog[len(m.reindexLog)-maxReindexLogLines:]
-		}
-		m.updateReindexViewport()
-		return m, msg.NextLogCmd()
+// ----- Reindex ---------------------------------------------------------
+case components.ReindexLogPump:
+return m.handleReindexLogPump(msg)
 
-	case components.ReindexFinishedMsg:
-		m.reindexing = false
-		m.reindexCancel = nil
-		if msg.Err != nil {
-			if errors.Is(msg.Err, data.ErrIndexBusy) {
-				m.statusErr = "Index busy — Copilot is rebuilding, try again shortly"
-			} else if errors.Is(msg.Err, data.ErrReindexCancelled) {
-				m.statusInfo = statusReindexCancelled
-			} else {
-				m.statusErr = "Rebuild index: " + msg.Err.Error()
-			}
-		} else {
-			m.statusInfo = statusReindexDone
-		}
-		m.reindexLog = nil
-		// Reload sessions to pick up changes from chronicle reindex,
-		// and reset the DBWatcher baseline so it doesn't immediately
-		// trigger a duplicate refresh.
-		cmds := []tea.Cmd{clearStatusAfter(2 * time.Second)}
-		if m.store != nil {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		if m.dbWatcher != nil {
-			m.dbWatcher.ResetBaseline()
-		}
-		return m, tea.Batch(cmds...)
+case components.ReindexFinishedMsg:
+return m.handleReindexFinished(msg)
 
-	// ----- DB watcher (external session store changes) --------------------
-	case sessionsChangedMsg:
-		var cmds []tea.Cmd
-		cmds = append(cmds, m.waitForDBChangeCmd()) // re-arm the listener
-		if m.store != nil {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		return m, tea.Batch(cmds...)
+// ----- DB watcher (external session store changes) --------------------
+case sessionsChangedMsg:
+return m.handleSessionsChanged()
 
-	// ----- Transient status clear -----------------------------------------
-	case clearStatusMsg:
-		m.statusInfo = ""
-		m.statusErr = ""
-		return m, nil
+// ----- Transient status clear -----------------------------------------
+case clearStatusMsg:
+return m.handleClearStatus()
 
-	// ----- Pending click fire (single-click debounce) ---------------------
-	case pendingClickFireMsg:
-		if msg.version != m.pendingClickVersion {
-			return m, nil // stale — a double-click already consumed this
-		}
-		// Timer fired — no second click arrived, so this is a single click.
-		// Reset pending state so the next click isn't mistaken for a double.
-		m.pendingClickVersion = 0
-		// Normal click clears multi-selection (Windows Explorer behavior).
-		if m.sessionList.SelectionCount() > 0 {
-			m.sessionList.DeselectAll()
-			m.statusInfo = ""
-		}
-		// Execute deferred single-click action.
-		m.sessionList.MoveTo(m.pendingClickItemIdx)
-		m.sessionList.SetAnchor()
-		if m.sessionList.IsFolderSelected() {
-			m.sessionList.ToggleFolder()
-			return m, nil
-		}
-		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+// ----- Pending click fire (single-click debounce) ---------------------
+case pendingClickFireMsg:
+return m.handlePendingClickFire(msg)
 
-	// ----- Data loading ----------------------------------------------------
-	case sessionsLoadedMsg:
-		prevID := m.selectedSessionID()
-		m.sessions = m.filterHiddenSessions(msg.sessions)
-		m.sessions = m.filterFavoritedSessions(m.sessions)
-		m.sessions = m.filterAttentionSessions(m.sessions)
-		m.sessions = m.filterPlanSessions(m.sessions)
-		m.sessions = m.filterWorkStatusSessions(m.sessions)
-		m.sortByAttention(m.sessions)
-		m.groups = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		m.sessionList.SetPlanStatuses(m.planMap)
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		m.sessionList.SetSessions(m.sessions)
-		// Restore cursor to the previously selected session if possible.
-		if prevID != "" {
-			m.sessionList.SelectByID(prevID)
-		}
-		// Only transition from loading to session-list; never clobber an
-		// active modal/overlay state with an async data load.
-		if m.state == stateLoading {
-			if m.cfg.DefaultCollapsed {
-				m.sessionList.CollapseAll()
-			}
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+// ----- Data loading ----------------------------------------------------
+case sessionsLoadedMsg:
+return m.handleSessionsLoaded(msg)
 
-	case groupsLoadedMsg:
-		prevID := m.selectedSessionID()
-		m.groups = m.filterHiddenGroups(msg.groups)
-		m.groups = m.filterFavoritedGroups(m.groups)
-		m.groups = m.filterAttentionGroups(m.groups)
-		m.groups = m.filterPlanGroups(m.groups)
-		m.groups = m.filterWorkStatusGroups(m.groups)
-		for i := range m.groups {
-			m.sortByAttention(m.groups[i].Sessions)
-		}
-		m.sessions = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		m.sessionList.SetPlanStatuses(m.planMap)
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		m.sessionList.SetPivotField(m.pivot)
-		m.sessionList.SetGroups(m.groups)
-		if prevID != "" {
-			m.sessionList.SelectByID(prevID)
-		}
-		if m.state == stateLoading {
-			if m.cfg.DefaultCollapsed {
-				m.sessionList.CollapseAll()
-			}
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+case groupsLoadedMsg:
+return m.handleGroupsLoaded(msg)
 
-	case sessionDetailMsg:
-		if msg.version != m.detailVersion {
-			return m, nil // stale result — selection changed since request
-		}
-		// Detect whether this is a reload of the same session or a new session.
-		previousID := ""
-		if m.detail != nil {
-			previousID = m.detail.Session.ID
-		}
-		m.detail = msg.detail
-		m.preview.SetDetail(m.detail)
-		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
-		m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
-		if result, ok := m.workStatusMap[m.detail.Session.ID]; ok {
-			m.preview.SetWorkStatus(result)
-		} else {
-			m.preview.SetWorkStatus(data.WorkStatusResult{})
-		}
-		// Only exit plan view when switching to a different session.
-		// If the user pressed 'v' to view the plan, preserve that state
-		// across detail reloads for the same session.
-		if m.detail.Session.ID != previousID {
-			m.preview.ExitPlanView()
-		}
-		if m.planMap[m.detail.Session.ID] {
-			return m, m.loadPlanContentCmd(m.detail.Session.ID)
-		}
-		m.preview.SetPlanContent("")
-		return m, nil
+case sessionDetailMsg:
+return m.handleSessionDetail(msg)
 
-	case dataErrorMsg:
-		m.statusErr = "Data: " + msg.err.Error()
-		if m.state == stateLoading {
-			m.state = stateSessionList
-		}
-		return m, nil
+case dataErrorMsg:
+return m.handleDataError(msg)
 
-	// ----- Attention scanning ---------------------------------------------
-	case attentionQuickScannedMsg:
-		m.attentionMap = msg.statuses
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		// Quick scan done — immediately fire full (deep) scan.
-		return m, m.scanAttentionCmd()
+// ----- Attention scanning ---------------------------------------------
+case attentionQuickScannedMsg:
+return m.handleAttentionQuickScanned(msg)
 
-	case attentionScannedMsg:
-		m.attentionMap = msg.statuses
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		// Update preview panel status if a session is selected.
-		if m.detail != nil {
-			m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
-		}
-		// Always schedule the next periodic scan. When the attention filter
-		// is active, also reload sessions so the list reflects updated
-		// statuses. The reload no longer fires another scan (that was an
-		// infinite loop), so the tick is the sole driver of periodic scans.
-		cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd()}
-		if len(m.attentionFilter) > 0 {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		return m, tea.Batch(cmds...)
+case attentionScannedMsg:
+return m.handleAttentionScanned(msg)
 
-	case attentionTickMsg:
-		return m, m.scanAttentionCmd()
+case attentionTickMsg:
+return m.handleAttentionTick()
 
-	// ----- Plan scanning --------------------------------------------------
-	case plansScannedMsg:
-		m.planMap = msg.plans
-		m.sessionList.SetPlanStatuses(m.planMap)
-		// When the plan filter is active, reload sessions so the list
-		// reflects any newly discovered (or removed) plan.md files.
-		var cmds []tea.Cmd
-		if m.filterPlans {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		// Update preview plan indicator and content if a session is selected.
-		if m.detail != nil {
-			m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
-			if m.planMap[m.detail.Session.ID] {
-				cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
-			}
-		}
-		// Chain: after plans are known, do a quick work status classification
-		// — but only when a work-status scan has been explicitly requested
-		// (W key or reindex completion).
-		if m.workStatusScanning {
-			cmds = append(cmds, m.scanWorkStatusQuickCmd())
-		}
-		return m, tea.Batch(cmds...)
+// ----- Plan scanning --------------------------------------------------
+case plansScannedMsg:
+return m.handlePlansScanned(msg)
 
-	case planContentMsg:
-		if msg.err != nil || msg.content == "" {
-			m.preview.SetPlanContent("")
-			m.autoShowPlan = false
-			return m, nil
-		}
-		// Only apply if the content matches the currently selected session.
-		if m.detail != nil && m.detail.Session.ID == msg.sessionID {
-			m.preview.SetPlanContent(msg.content)
-			// After a work status scan with continuation plans, auto-switch
-			// to plan view so the user sees the freshly written plan.
-			if m.autoShowPlan {
-				m.autoShowPlan = false
-				m.preview.ShowPlanView()
-			}
-		}
-		return m, nil
+case planContentMsg:
+return m.handlePlanContent(msg)
 
-	// ----- Work status scanning -------------------------------------------
-	case workStatusQuickScannedMsg:
-		m.workStatusMap = msg.statuses
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain the full work status scan to parse plan.md content.
-		return m, m.scanWorkStatusCmd()
+// ----- Work status scanning -------------------------------------------
+case workStatusQuickScannedMsg:
+return m.handleWorkStatusQuickScanned(msg)
 
-	case workStatusScannedMsg:
-		// Merge full-scan results into the existing map so that NoPlan
-		// entries from the quick scan are preserved (the full scan only
-		// covers sessions with plans).
-		if m.workStatusMap == nil {
-			m.workStatusMap = msg.statuses
-		} else {
-			maps.Copy(m.workStatusMap, msg.statuses)
-		}
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain to optional AI-enhanced analysis for sessions with
-		// incomplete work. If the Copilot SDK is unavailable the command
-		// returns nil and the chain stops here.
-		aiCmd := m.scanWorkStatusAICmd()
-		if aiCmd != nil {
-			return m, aiCmd
-		}
-		// AI unavailable — write continuation plans from non-AI remaining
-		// items (parsed from unchecked plan.md checkboxes).
-		var sessionsWithRemaining []string
-		for id, result := range m.workStatusMap {
-			if len(result.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		if len(sessionsWithRemaining) > 0 {
-			if contCmd := m.writeContinuationPlansCmd(sessionsWithRemaining); contCmd != nil {
-				return m, contCmd
-			}
-		}
-		return m, m.completeWorkStatusScan()
+case workStatusScannedMsg:
+return m.handleWorkStatusScanned(msg)
 
-	case workStatusAIScannedMsg:
-		// Merge AI analysis results into the work status map. The AI may
-		// provide richer detail, updated task counts, and remaining items.
-		var sessionsWithRemaining []string
-		for id, analysis := range msg.analyses {
-			if analysis == nil {
-				continue
-			}
-			existing, ok := m.workStatusMap[id]
-			if !ok {
-				continue
-			}
-			// Update detail with AI summary if provided.
-			if analysis.Summary != "" {
-				existing.Detail = analysis.Summary
-			}
-			// Trust AI task counts when they differ from local parse.
-			if analysis.TotalTasks > 0 {
-				existing.TotalTasks = analysis.TotalTasks
-				existing.DoneTasks = analysis.CompletedTasks
-			}
-			// Overwrite status if the AI determined completion.
-			if analysis.Complete && existing.Status == data.WorkStatusIncomplete {
-				existing.Status = data.WorkStatusComplete
-			}
-			existing.RemainingItems = analysis.RemainingItems
-			m.workStatusMap[id] = existing
+case workStatusAIScannedMsg:
+return m.handleWorkStatusAIScanned(msg)
 
-			// Only queue continuation plan writes for sessions that remain
-			// incomplete after AI analysis — don't write "remaining work"
-			// into plans the AI classified as complete.
-			if existing.Status == data.WorkStatusIncomplete && len(analysis.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		// Also include sessions that were incomplete with local remaining
-		// items but weren't in the AI results (AI failure/timeout/skipped).
-		// This ensures continuation plans are written even when AI is partial.
-		for id, result := range m.workStatusMap {
-			if _, hadAI := msg.analyses[id]; hadAI {
-				continue // already handled above
-			}
-			if result.Status == data.WorkStatusIncomplete && len(result.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain: write continuation plans for sessions with remaining items.
-		if len(sessionsWithRemaining) > 0 {
-			contCmd := m.writeContinuationPlansCmd(sessionsWithRemaining)
-			if contCmd != nil {
-				return m, contCmd
-			}
-		}
-		// Chain ends here — no continuation plans to write.
-		return m, m.completeWorkStatusScan()
+case continuationPlanCreatedMsg:
+return m.handleContinuationPlanCreated(msg)
 
-	case continuationPlanCreatedMsg:
-		if msg.err != nil {
-			slog.Debug("continuation plan write error", "error", msg.err)
-		} else if msg.updated > 0 {
-			// Check whether the currently selected session has remaining work
-			// and reload its plan content so the preview shows the fresh plan.
-			if m.detail != nil {
-				if result, ok := m.workStatusMap[m.detail.Session.ID]; ok && len(result.RemainingItems) > 0 {
-					m.autoShowPlan = true
-					m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — showing plan for current session", msg.updated)
-					scanCmd := m.completeWorkStatusScan()
-					reloadCmd := m.loadPlanContentCmd(m.detail.Session.ID)
-					return m, tea.Batch(scanCmd, reloadCmd)
-				}
-			}
-			m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — press v on a session to view", msg.updated)
-		}
-		return m, m.completeWorkStatusScan()
+// ----- Deep search debounce -------------------------------------------
+case deepSearchTickMsg:
+return m.handleDeepSearchTick(msg)
 
-	// ----- Deep search debounce -------------------------------------------
-	case deepSearchTickMsg:
-		if msg.version != m.deepSearchVersion || m.filter.Query == "" {
-			return m, nil // stale tick — query changed since scheduling
-		}
-		return m, m.deepSearchCmd(msg.version)
+case deepSearchResultMsg:
+return m.handleDeepSearchResult(msg)
 
-	case deepSearchResultMsg:
-		if msg.version != m.deepSearchVersion {
-			return m, nil // stale result — query changed since search started
-		}
-		m.deepSearchPending = false
-		m.filter.DeepSearch = true // keep deep mode for subsequent reloads (time range, sort, etc.)
-		m.searchBar.SetSearching(false)
-		if msg.sessions != nil {
-			m.sessions = m.filterHiddenSessions(msg.sessions)
-			m.sessions = m.filterFavoritedSessions(m.sessions)
-			m.sessions = m.filterAttentionSessions(m.sessions)
-			m.sessions = m.filterPlanSessions(m.sessions)
-			m.sessions = m.filterWorkStatusSessions(m.sessions)
-			m.groups = nil
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetSessions(m.sessions)
-		} else if msg.groups != nil {
-			m.groups = m.filterHiddenGroups(msg.groups)
-			m.groups = m.filterFavoritedGroups(m.groups)
-			m.sessions = nil
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetPivotField(m.pivot)
-			m.sessionList.SetGroups(m.groups)
-		}
-		if m.state == stateLoading {
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+// ----- Copilot SDK search ------------------------------------------------
+case copilotReadyMsg:
+return m.handleCopilotReady()
 
-	// ----- Copilot SDK search ------------------------------------------------
-	case copilotReadyMsg:
-		// Client is ready — no UI action needed; search will use it.
-		return m, nil
+case copilotErrorMsg:
+return m.handleCopilotError()
 
-	case copilotErrorMsg:
-		// SDK init/search error — silently ignore, search degrades gracefully.
-		return m, nil
+case copilotSearchTickMsg:
+return m.handleCopilotSearchTick(msg)
 
-	case copilotSearchTickMsg:
-		if msg.version != m.copilotSearchVersion || m.filter.Query == "" {
-			return m, nil // stale tick — query changed since scheduling
-		}
-		// If copilot client needs lazy init, do it here on the main goroutine
-		// then kick off search.
-		if m.copilotClient == nil && m.store != nil {
-			m.copilotClient = copilot.New(m.store)
-		}
-		// Cancel any in-flight search so it releases the searchMu quickly
-		// and doesn't block this new search for up to 45 seconds.
-		if m.copilotSearchCancel != nil {
-			m.copilotSearchCancel()
-			m.copilotSearchCancel = nil
-		}
-		m.copilotSearching = true
-		m.searchBar.SetAISearching(true)
-		// Show "connecting" if SDK hasn't been initialised yet.
-		if m.copilotClient != nil && !m.copilotClient.Available() {
-			m.searchBar.SetAIStatus("connecting")
-		}
-		cmd := m.copilotSearchCmd(msg.version)
-		return m, cmd
+case copilotSearchResultMsg:
+return m.handleCopilotSearchResult(msg)
 
-	case copilotSearchResultMsg:
-		if msg.version != m.copilotSearchVersion {
-			// Stale result — a newer search is in flight. Don't update
-			// status here; the newer search will set it when it completes.
-			return m, nil
-		}
-		m.copilotSearching = false
-		m.searchBar.SetAISearching(false)
-		if msg.err != nil {
-			// AI search is best-effort — show a brief "(✦ unavailable)"
-			// indicator but never block or alarm the user.
-			m.searchBar.SetAIStatus("unavailable")
-			m.searchBar.SetAIResults(0)
-			m.searchBar.SetAIError("")
-			slog.Debug("copilot search failed", "error", msg.err)
-			return m, nil
-		}
-		m.searchBar.SetAIStatus("ready")
-		m.searchBar.SetAIResults(len(msg.sessionIDs))
-		if len(msg.sessionIDs) == 0 {
-			return m, nil
-		}
-		// Store AI session IDs.
-		m.aiSessionIDs = make(map[string]struct{}, len(msg.sessionIDs))
-		for _, id := range msg.sessionIDs {
-			m.aiSessionIDs[id] = struct{}{}
-		}
-		m.sessionList.SetAISessions(m.aiSessionIDs)
-		// Find IDs not already in the current session list and fetch them.
-		missingIDs := m.findMissingAISessionIDs(msg.sessionIDs)
-		if len(missingIDs) > 0 {
-			return m, m.fetchAISessionsCmd(missingIDs, msg.version)
-		}
-		return m, nil
+case aiSessionsLoadedMsg:
+return m.handleAISessionsLoaded(msg)
 
-	case aiSessionsLoadedMsg:
-		if msg.version != m.copilotSearchVersion {
-			return m, nil // stale
-		}
-		if len(msg.sessions) == 0 {
-			return m, nil
-		}
-		// Apply full filter chain before merging (matches sessionsLoadedMsg).
-		incoming := m.filterHiddenSessions(msg.sessions)
-		incoming = m.filterFavoritedSessions(incoming)
-		incoming = m.filterAttentionSessions(incoming)
-		incoming = m.filterPlanSessions(incoming)
-		incoming = m.filterWorkStatusSessions(incoming)
-		if len(incoming) == 0 {
-			return m, nil
-		}
-		// Only merge into flat session mode — skip if in groups/pivot mode.
-		if m.sessions != nil {
-			existing := make(map[string]struct{}, len(m.sessions))
-			for _, s := range m.sessions {
-				existing[s.ID] = struct{}{}
-			}
-			for _, s := range incoming {
-				if _, ok := existing[s.ID]; !ok {
-					m.sessions = append(m.sessions, s)
-				}
-			}
-			m.sortByAttention(m.sessions)
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetSessions(m.sessions)
-			m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		}
-		return m, nil
+// ----- Filter picker data ---------------------------------------------
+case filterDataMsg:
+return m.handleFilterData(msg)
 
-	// ----- Filter picker data ---------------------------------------------
-	case filterDataMsg:
-		m.filterPanel.SetFolders(msg.folders, m.cfg.ExcludedDirs)
-		return m, nil
+// ----- Shell detection -------------------------------------------------
+case shellsDetectedMsg:
+return m.handleShellsDetected(msg)
 
-	// ----- Shell detection -------------------------------------------------
-	case shellsDetectedMsg:
-		m.shells = msg.shells
-		m.configPanel.SetShellOptions(m.shells)
-		return m, nil
+// ----- Terminal detection ----------------------------------------------
+case terminalsDetectedMsg:
+return m.handleTerminalsDetected(msg)
 
-	// ----- Terminal detection ----------------------------------------------
-	case terminalsDetectedMsg:
-		m.terminals = msg.terminals
-		var names []string
-		for _, t := range m.terminals {
-			names = append(names, t.Name)
-		}
-		m.configPanel.SetTerminals(names)
-		return m, nil
+// ----- Font check -------------------------------------------------------
+case fontCheckMsg:
+return m.handleFontCheck(msg)
 
-	// ----- Font check -------------------------------------------------------
-	case fontCheckMsg:
-		styles.SetNerdFontEnabled(msg.installed)
-		return m, nil
+// ----- Session exit (in-place resume finished) -------------------------
+case sessionExitMsg:
+return m.handleSessionExit(msg)
 
-	// ----- Session exit (in-place resume finished) -------------------------
-	case sessionExitMsg:
-		if msg.err != nil {
-			m.statusErr = fmt.Sprintf("Session failed: %v", msg.err)
-			return m, nil
-		}
-		m.closeStore()
-		return m, tea.Quit
+// ----- Keyboard --------------------------------------------------------
+case tea.KeyPressMsg:
+return m.handleKey(msg)
 
-	// ----- Keyboard --------------------------------------------------------
-	case tea.KeyPressMsg:
-		return m.handleKey(msg)
-
-	// ----- Mouse -----------------------------------------------------------
-	case tea.MouseMsg:
-		return m.handleMouse(msg)
-	}
-
-	return m, nil
+// ----- Mouse -----------------------------------------------------------
+case tea.MouseMsg:
+return m.handleMouse(msg)
 }
 
+return m, nil
+}
 func (m Model) View() tea.View {
 	var content string
 	if m.width == 0 || m.height == 0 {
