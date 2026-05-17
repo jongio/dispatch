@@ -168,9 +168,14 @@ func TestResetBaseline(t *testing.T) {
 		t.Fatalf("touching wal file again: %v", err)
 	}
 
-	// ResetBaseline should set lastMod to now(), which is after future2,
-	// so the next poll should NOT report a change.
+	// ResetBaseline should set lastMod to now().
 	w.ResetBaseline()
+
+	// Set the WAL mtime to a time before now so Poll sees no new change.
+	past := time.Now().Add(-10 * time.Second)
+	if err := os.Chtimes(walPath, past, past); err != nil {
+		t.Fatalf("setting wal mtime to past: %v", err)
+	}
 
 	if w.Poll() {
 		t.Fatal("expected Poll to return false after ResetBaseline")
