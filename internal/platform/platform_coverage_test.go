@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -114,8 +115,8 @@ func TestCovBuildCustomCmd_EmptyAfterExpansion(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when command is empty after expansion")
 	}
-	if err != nil && !strings.Contains(err.Error(), "empty after expansion") {
-		t.Errorf("unexpected error message: %v", err)
+	if err != nil && !errors.Is(err, ErrEmptyAfterExpansion) {
+		t.Errorf("expected ErrEmptyAfterExpansion, got: %v", err)
 	}
 }
 

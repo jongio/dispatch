@@ -3,7 +3,6 @@ package copilot
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -99,7 +98,7 @@ func parseFlexibleDate(s, fieldName string) (*time.Time, error) {
 	if err != nil {
 		t, err = time.Parse("2006-01-02", s)
 		if err != nil {
-			return nil, fmt.Errorf("invalid %s date %q: %w", fieldName, s, err)
+			return nil, fmt.Errorf("%w: %s date %q: %w", ErrInvalidDate, fieldName, s, err)
 		}
 	}
 	return &t, nil
@@ -134,7 +133,7 @@ func defineSearchSessionsTool(store *data.Store) sdk.Tool {
 			sort := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
 			sessions, err := store.ListSessions(context.Background(), filter, sort, toolResultLimit)
 			if err != nil {
-				return "", fmt.Errorf("searching sessions: %w", err)
+				return "", fmt.Errorf("%w: %w", ErrSearchingSessions, err)
 			}
 			if len(sessions) == 0 {
 				return "No sessions found matching the criteria.", nil
@@ -154,11 +153,11 @@ func defineGetSessionDetailTool(store *data.Store) sdk.Tool {
 		"Get full details for a specific session including all turns, checkpoints, files, and refs.",
 		func(params GetSessionDetailParams, _ sdk.ToolInvocation) (string, error) {
 			if params.ID == "" {
-				return "", errors.New("session ID is required")
+				return "", ErrSessionIDRequired
 			}
 			detail, err := store.GetSession(context.Background(), params.ID)
 			if err != nil {
-				return "", fmt.Errorf("loading session %s: %w", params.ID, err)
+				return "", fmt.Errorf("%w %s: %w", ErrLoadingSession, params.ID, err)
 			}
 			raw, err := marshalJSON(detail)
 			if err != nil {
@@ -176,7 +175,7 @@ func defineListRepositoriesTool(store *data.Store) sdk.Tool {
 		func(params ListReposParams, _ sdk.ToolInvocation) (string, error) {
 			repos, err := store.ListRepositories(context.Background())
 			if err != nil {
-				return "", fmt.Errorf("listing repositories: %w", err)
+				return "", fmt.Errorf("%w: %w", ErrListingRepos, err)
 			}
 			if len(repos) == 0 {
 				return "No repositories found.", nil
@@ -207,11 +206,11 @@ func defineSearchDeepTool(store *data.Store) sdk.Tool {
 			"checkpoints, files, and refs. Returns matching content snippets with session IDs.",
 		func(params SearchDeepParams, _ sdk.ToolInvocation) (string, error) {
 			if params.Query == "" {
-				return "", errors.New("query is required")
+				return "", ErrQueryRequired
 			}
 			results, err := store.SearchSessions(context.Background(), params.Query, toolResultLimit)
 			if err != nil {
-				return "", fmt.Errorf("deep search: %w", err)
+				return "", fmt.Errorf("%w: %w", ErrDeepSearch, err)
 			}
 			if len(results) == 0 {
 				return "No results found.", nil
@@ -233,11 +232,11 @@ func defineAnalyzeCompletionTool(store *data.Store) sdk.Tool {
 			"Returns a JSON assessment with completion status, task counts, and remaining items.",
 		func(params AnalyzeCompletionParams, _ sdk.ToolInvocation) (string, error) {
 			if params.SessionID == "" {
-				return "", errors.New("session_id is required")
+				return "", ErrSessionIDRequired
 			}
 			detail, err := store.GetSession(context.Background(), params.SessionID)
 			if err != nil {
-				return "", fmt.Errorf("loading session %s: %w", params.SessionID, err)
+				return "", fmt.Errorf("%w %s: %w", ErrLoadingSession, params.SessionID, err)
 			}
 
 			// Collect unique file paths, capped to keep context manageable.

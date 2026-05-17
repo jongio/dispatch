@@ -114,9 +114,9 @@ func (c *Client) Init(ctx context.Context) error {
 			// permanent failure.  The next caller with a live context
 			// should be allowed to retry.
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				c.initErr = fmt.Errorf("starting Copilot SDK: %w", err)
+				c.initErr = fmt.Errorf("%w: %w", ErrStartingSDK, err)
 			}
-			return fmt.Errorf("starting Copilot SDK: %w", err)
+			return fmt.Errorf("%w: %w", ErrStartingSDK, err)
 		}
 		c.available = true
 		return nil
@@ -131,9 +131,9 @@ func (c *Client) Init(ctx context.Context) error {
 	client := sdk.NewClient(opts)
 	if err := client.Start(ctx); err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			c.initErr = fmt.Errorf("starting Copilot SDK: %w", err)
+			c.initErr = fmt.Errorf("%w: %w", ErrStartingSDK, err)
 		}
-		return fmt.Errorf("starting Copilot SDK: %w", err)
+		return fmt.Errorf("%w: %w", ErrStartingSDK, err)
 	}
 	c.sdk = client
 	c.available = true
@@ -168,7 +168,7 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	c.mu.Lock()
 	if !c.available || c.sdk == nil {
 		c.mu.Unlock()
-		return nil, errors.New("copilot session not available")
+		return nil, ErrSessionNotAvailable
 	}
 	sdkClient := c.sdk
 	store := c.store
@@ -401,7 +401,7 @@ func (c *Client) Search(ctx context.Context, query string) ([]string, error) {
 	c.resetSDK()
 	slog.Debug("copilot search: all retries exhausted",
 		"duration", time.Since(searchStart), "error", err)
-	return nil, fmt.Errorf("search unavailable after %d retries: %w", searchMaxRetries, err)
+	return nil, fmt.Errorf("%w after %d retries: %w", ErrSearchUnavailable, searchMaxRetries, err)
 }
 
 // doSearch performs a single search attempt against the SDK.
@@ -596,7 +596,7 @@ func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planCo
 	c.resetSDK()
 	slog.Debug("copilot analyze_completion: all retries exhausted",
 		"duration", time.Since(analysisStart), "error", err)
-	return nil, fmt.Errorf("analyze_completion unavailable after %d retries: %w", searchMaxRetries, err)
+	return nil, fmt.Errorf("%w after %d retries: %w", ErrAnalyzeUnavailable, searchMaxRetries, err)
 }
 
 // doAnalyze performs a single analysis attempt against the SDK.

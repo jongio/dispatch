@@ -2,6 +2,7 @@ package platform
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -701,7 +702,7 @@ func TestLaunchSession_EmptyShellPath_AfterDefault(t *testing.T) {
 	if err != nil {
 		// If the error is about CLI not found, the test still proves no
 		// zombie was created (the stub was never reached).
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, ErrCLINotFound) {
 			return
 		}
 		t.Fatalf("unexpected error: %v", err)
