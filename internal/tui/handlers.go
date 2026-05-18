@@ -498,6 +498,9 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 	} else if msg.groups != nil {
 		m.groups = m.filterHiddenGroups(msg.groups)
 		m.groups = m.filterFavoritedGroups(m.groups)
+		m.groups = m.filterAttentionGroups(m.groups)
+		m.groups = m.filterPlanGroups(m.groups)
+		m.groups = m.filterWorkStatusGroups(m.groups)
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)

@@ -2626,6 +2626,17 @@ func (m Model) selectedSessionCwd() string {
 // ---------------------------------------------------------------------------
 
 func (m *Model) closeStore() {
+	// Cancel any in-flight copilot search context so the goroutine
+	// holding searchMu can unblock and exit.
+	if m.search.copilotSearchCancel != nil {
+		m.search.copilotSearchCancel()
+		m.search.copilotSearchCancel = nil
+	}
+	// Cancel any in-flight AI work-status analysis.
+	if m.workStatus.workStatusAICancel != nil {
+		m.workStatus.workStatusAICancel()
+		m.workStatus.workStatusAICancel = nil
+	}
 	if m.dbWatcher != nil {
 		m.dbWatcher.Stop()
 	}
