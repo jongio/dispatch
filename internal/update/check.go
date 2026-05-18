@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -173,6 +174,9 @@ func fetchLatestVersion(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	if token := resolveGitHubToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := sharedClient.Do(req)
 	if err != nil {
@@ -190,6 +194,19 @@ func fetchLatestVersion(ctx context.Context) (string, error) {
 	}
 
 	return strings.TrimPrefix(release.TagName, "v"), nil
+}
+
+// resolveGitHubToken returns a GitHub token from the environment or from
+// the gh CLI auth store. Returns empty string if no token is available.
+func resolveGitHubToken() string {
+	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
+		return tok
+	}
+	out, err := exec.Command("gh", "auth", "token").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // cachePath returns the path to the update check cache file.
