@@ -3,6 +3,7 @@
 package data
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -41,7 +42,7 @@ func (p *ptyHandle) Close() error {
 // startPTY launches the Copilot CLI binary inside a Unix PTY so it
 // believes it has an interactive terminal.
 func startPTY(binary string) (io.ReadWriteCloser, error) {
-	cmd := exec.Command(binary, "--no-auto-update", "--no-color", "--no-custom-instructions")
+	cmd := exec.CommandContext(context.Background(), binary, "--no-auto-update", "--no-color", "--no-custom-instructions")
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: ptyDimRows, Cols: ptyDimCols})
 	if err != nil {
 		return nil, err

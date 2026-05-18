@@ -67,7 +67,7 @@ type githubRelease struct {
 // on GitHub. It returns nil if the current version is up to date, is a
 // dev build, or any error occurs. This function is safe to call from a
 // goroutine — it never panics and silently returns nil on all errors.
-func CheckForUpdate(currentVersion string) *UpdateInfo {
+func CheckForUpdate(ctx context.Context, currentVersion string) *UpdateInfo {
 	if isDevVersion(currentVersion) {
 		return nil
 	}
@@ -87,7 +87,7 @@ func CheckForUpdate(currentVersion string) *UpdateInfo {
 		return nil
 	}
 
-	latest, err := fetchLatestVersion()
+	latest, err := fetchLatestVersion(ctx)
 	if err != nil {
 		return nil
 	}
@@ -164,23 +164,24 @@ func splitVersion(v string) []int {
 
 // fetchLatestVersion queries the GitHub Releases API and returns the
 // latest release version (without leading "v").
-func fetchLatestVersion() (string, error) {
-	client := newSecureClient(apiTimeout)
+func fetchLatestVersion(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, latestReleaseURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestReleaseURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := client.Do(req)
+	resp, err := sharedClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("querying GitHub API: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("%w: GitHub API returned HTTP %d", ErrHTTPStatus, resp.StatusCode)
 	}
 
 	var release githubRelease

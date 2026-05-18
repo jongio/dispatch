@@ -57,14 +57,14 @@ func acquireUpdateLock(path string) (*updateLock, error) {
 			return nil, staleErr
 		}
 		if !stale {
-			return nil, fmt.Errorf("lock file exists at %s", path)
+			return nil, fmt.Errorf("%w: %s", ErrLockExists, path)
 		}
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("removing stale lock file: %w", err)
 		}
 	}
 
-	return nil, fmt.Errorf("lock file exists at %s", path)
+	return nil, fmt.Errorf("%w: %s", ErrLockExists, path)
 }
 
 func releaseUpdateLock(lock *updateLock) {

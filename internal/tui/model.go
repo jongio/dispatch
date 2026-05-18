@@ -136,6 +136,37 @@ const (
 )
 
 // ---------------------------------------------------------------------------
+// Focused sub-models
+// ---------------------------------------------------------------------------
+
+// searchState groups fields related to search tracking.
+type searchState struct {
+	deepSearchVersion    int
+	deepSearchPending    bool
+	copilotSearchVersion int                 // version counter for SDK search debounce
+	copilotSearching     bool                // true when SDK search is in progress
+	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
+	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
+}
+
+// workStatusState groups fields related to work status scanning.
+type workStatusState struct {
+	workStatusMap      map[string]data.WorkStatusResult
+	filterWorkStatus   map[data.WorkStatus]struct{} // when non-empty, only show sessions with matching work status
+	workStatusScanned  bool                         // true after first successful work status scan
+	workStatusScanning bool                         // true while work status scan chain is in progress
+	workStatusAICancel context.CancelFunc           // cancels in-flight AI work status analysis
+	autoShowPlan       bool                         // when true, auto-switch to plan view on next planContentMsg
+}
+
+// clickState groups fields related to click debounce.
+type clickState struct {
+	pendingClickVersion int
+	pendingClickY       int
+	pendingClickItemIdx int
+}
+
+// ---------------------------------------------------------------------------
 // Root model
 // ---------------------------------------------------------------------------
 
@@ -194,18 +225,13 @@ type Model struct {
 	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
 	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
 
-	// Click debounce: delays single-click action so double-click can be
-	// detected without the first click firing prematurely.
-	pendingClickVersion int
-	pendingClickY       int
-	pendingClickItemIdx int
+	// Focused sub-models.
+	click      clickState
+	search     searchState
+	workStatus workStatusState
 
 	// Launch mode requested when showing the shell picker.
 	pendingLaunchMode string
-
-	// Deep search debounce tracking.
-	deepSearchVersion int
-	deepSearchPending bool
 
 	// Detail loading version — incremented on each loadSelectedDetailCmd
 	// call to discard stale results from slower prior queries.
@@ -216,11 +242,7 @@ type Model struct {
 	statusInfo string
 
 	// Copilot SDK search.
-	copilotClient        *copilot.Client
-	copilotSearchVersion int                 // version counter for SDK search debounce
-	copilotSearching     bool                // true when SDK search is in progress
-	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
-	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
+	copilotClient *copilot.Client
 
 	// Attention status tracking — scanned from session-state directories.
 	attentionMap    map[string]data.AttentionStatus
@@ -229,14 +251,6 @@ type Model struct {
 	// Plan status tracking — scanned from session-state directories.
 	planMap     map[string]bool
 	filterPlans bool // when true, only show sessions with a plan.md file
-
-	// Work status tracking — computed from plan.md analysis.
-	workStatusMap      map[string]data.WorkStatusResult
-	filterWorkStatus   map[data.WorkStatus]struct{} // when non-empty, only show sessions with matching work status
-	workStatusScanned  bool                         // true after first successful work status scan
-	workStatusScanning bool                         // true while work status scan chain is in progress
-	workStatusAICancel context.CancelFunc           // cancels in-flight AI work status analysis
-	autoShowPlan       bool                         // when true, auto-switch to plan view on next planContentMsg
 
 	// DB watcher — monitors session-store.db for external modifications.
 	dbWatcher *data.DBWatcher
@@ -389,594 +403,127 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ----- Background color detection --------------------------------------
 	case tea.BackgroundColorMsg:
-		m.hasDarkBackground = msg.IsDark()
-		// Re-apply the auto theme with the correct light/dark variant.
-		themeName := m.cfg.Theme
-		if themeName == "" || themeName == themeAuto {
-			styles.ApplyAutoTheme(msg.IsDark())
-		}
-		return m, nil
+		return m.handleBackgroundColor(msg)
 
 	// ----- Window resize ---------------------------------------------------
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.recalcLayout()
-		return m, nil
+		return m.handleResize(msg)
 
 	// ----- Spinner tick ----------------------------------------------------
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		return m.handleSpinnerTick(msg)
 
 	// ----- Store lifecycle -------------------------------------------------
 	case storeOpenedMsg:
-		m.store = msg.store
-		m.state = stateSessionList
-		// Quick scan first (lock files only), then full scan follows.
-		return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionQuickCmd())
+		return m.handleStoreOpened(msg)
 
 	case storeErrorMsg:
-		m.statusErr = "Store: " + msg.err.Error()
-		m.state = stateSessionList
-		return m, nil
+		return m.handleStoreError(msg)
 
 	// ----- Reindex ---------------------------------------------------------
 	case components.ReindexLogPump:
-		if !m.reindexing {
-			return m, nil // Discard stale log pump after cancel.
-		}
-		m.reindexLog = append(m.reindexLog, msg.Lines...)
-		// Cap log to prevent unbounded growth.
-		if len(m.reindexLog) > maxReindexLogLines {
-			m.reindexLog = m.reindexLog[len(m.reindexLog)-maxReindexLogLines:]
-		}
-		m.updateReindexViewport()
-		return m, msg.NextLogCmd()
+		return m.handleReindexLogPump(msg)
 
 	case components.ReindexFinishedMsg:
-		m.reindexing = false
-		m.reindexCancel = nil
-		if msg.Err != nil {
-			if errors.Is(msg.Err, data.ErrIndexBusy) {
-				m.statusErr = "Index busy — Copilot is rebuilding, try again shortly"
-			} else if errors.Is(msg.Err, data.ErrReindexCancelled) {
-				m.statusInfo = statusReindexCancelled
-			} else {
-				m.statusErr = "Rebuild index: " + msg.Err.Error()
-			}
-		} else {
-			m.statusInfo = statusReindexDone
-		}
-		m.reindexLog = nil
-		// Reload sessions to pick up changes from chronicle reindex,
-		// and reset the DBWatcher baseline so it doesn't immediately
-		// trigger a duplicate refresh.
-		cmds := []tea.Cmd{clearStatusAfter(2 * time.Second)}
-		if m.store != nil {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		if m.dbWatcher != nil {
-			m.dbWatcher.ResetBaseline()
-		}
-		return m, tea.Batch(cmds...)
+		return m.handleReindexFinished(msg)
 
 	// ----- DB watcher (external session store changes) --------------------
 	case sessionsChangedMsg:
-		var cmds []tea.Cmd
-		cmds = append(cmds, m.waitForDBChangeCmd()) // re-arm the listener
-		if m.store != nil {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		return m, tea.Batch(cmds...)
+		return m.handleSessionsChanged()
 
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
-		m.statusInfo = ""
-		m.statusErr = ""
-		return m, nil
+		return m.handleClearStatus()
 
 	// ----- Pending click fire (single-click debounce) ---------------------
 	case pendingClickFireMsg:
-		if msg.version != m.pendingClickVersion {
-			return m, nil // stale — a double-click already consumed this
-		}
-		// Timer fired — no second click arrived, so this is a single click.
-		// Reset pending state so the next click isn't mistaken for a double.
-		m.pendingClickVersion = 0
-		// Normal click clears multi-selection (Windows Explorer behavior).
-		if m.sessionList.SelectionCount() > 0 {
-			m.sessionList.DeselectAll()
-			m.statusInfo = ""
-		}
-		// Execute deferred single-click action.
-		m.sessionList.MoveTo(m.pendingClickItemIdx)
-		m.sessionList.SetAnchor()
-		if m.sessionList.IsFolderSelected() {
-			m.sessionList.ToggleFolder()
-			return m, nil
-		}
-		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m.handlePendingClickFire(msg)
 
 	// ----- Data loading ----------------------------------------------------
 	case sessionsLoadedMsg:
-		prevID := m.selectedSessionID()
-		m.sessions = m.filterHiddenSessions(msg.sessions)
-		m.sessions = m.filterFavoritedSessions(m.sessions)
-		m.sessions = m.filterAttentionSessions(m.sessions)
-		m.sessions = m.filterPlanSessions(m.sessions)
-		m.sessions = m.filterWorkStatusSessions(m.sessions)
-		m.sortByAttention(m.sessions)
-		m.groups = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		m.sessionList.SetPlanStatuses(m.planMap)
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		m.sessionList.SetSessions(m.sessions)
-		// Restore cursor to the previously selected session if possible.
-		if prevID != "" {
-			m.sessionList.SelectByID(prevID)
-		}
-		// Only transition from loading to session-list; never clobber an
-		// active modal/overlay state with an async data load.
-		if m.state == stateLoading {
-			if m.cfg.DefaultCollapsed {
-				m.sessionList.CollapseAll()
-			}
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+		return m.handleSessionsLoaded(msg)
 
 	case groupsLoadedMsg:
-		prevID := m.selectedSessionID()
-		m.groups = m.filterHiddenGroups(msg.groups)
-		m.groups = m.filterFavoritedGroups(m.groups)
-		m.groups = m.filterAttentionGroups(m.groups)
-		m.groups = m.filterPlanGroups(m.groups)
-		m.groups = m.filterWorkStatusGroups(m.groups)
-		for i := range m.groups {
-			m.sortByAttention(m.groups[i].Sessions)
-		}
-		m.sessions = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		m.sessionList.SetPlanStatuses(m.planMap)
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		m.sessionList.SetPivotField(m.pivot)
-		m.sessionList.SetGroups(m.groups)
-		if prevID != "" {
-			m.sessionList.SelectByID(prevID)
-		}
-		if m.state == stateLoading {
-			if m.cfg.DefaultCollapsed {
-				m.sessionList.CollapseAll()
-			}
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+		return m.handleGroupsLoaded(msg)
 
 	case sessionDetailMsg:
-		if msg.version != m.detailVersion {
-			return m, nil // stale result — selection changed since request
-		}
-		// Detect whether this is a reload of the same session or a new session.
-		previousID := ""
-		if m.detail != nil {
-			previousID = m.detail.Session.ID
-		}
-		m.detail = msg.detail
-		m.preview.SetDetail(m.detail)
-		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
-		m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
-		if result, ok := m.workStatusMap[m.detail.Session.ID]; ok {
-			m.preview.SetWorkStatus(result)
-		} else {
-			m.preview.SetWorkStatus(data.WorkStatusResult{})
-		}
-		// Only exit plan view when switching to a different session.
-		// If the user pressed 'v' to view the plan, preserve that state
-		// across detail reloads for the same session.
-		if m.detail.Session.ID != previousID {
-			m.preview.ExitPlanView()
-		}
-		if m.planMap[m.detail.Session.ID] {
-			return m, m.loadPlanContentCmd(m.detail.Session.ID)
-		}
-		m.preview.SetPlanContent("")
-		return m, nil
+		return m.handleSessionDetail(msg)
 
 	case dataErrorMsg:
-		m.statusErr = "Data: " + msg.err.Error()
-		if m.state == stateLoading {
-			m.state = stateSessionList
-		}
-		return m, nil
+		return m.handleDataError(msg)
 
 	// ----- Attention scanning ---------------------------------------------
 	case attentionQuickScannedMsg:
-		m.attentionMap = msg.statuses
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		// Quick scan done — immediately fire full (deep) scan.
-		return m, m.scanAttentionCmd()
+		return m.handleAttentionQuickScanned(msg)
 
 	case attentionScannedMsg:
-		m.attentionMap = msg.statuses
-		m.sessionList.SetAttentionStatuses(m.attentionMap)
-		// Update preview panel status if a session is selected.
-		if m.detail != nil {
-			m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
-		}
-		// Always schedule the next periodic scan. When the attention filter
-		// is active, also reload sessions so the list reflects updated
-		// statuses. The reload no longer fires another scan (that was an
-		// infinite loop), so the tick is the sole driver of periodic scans.
-		cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd()}
-		if len(m.attentionFilter) > 0 {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		return m, tea.Batch(cmds...)
+		return m.handleAttentionScanned(msg)
 
 	case attentionTickMsg:
-		return m, m.scanAttentionCmd()
+		return m.handleAttentionTick()
 
 	// ----- Plan scanning --------------------------------------------------
 	case plansScannedMsg:
-		m.planMap = msg.plans
-		m.sessionList.SetPlanStatuses(m.planMap)
-		// When the plan filter is active, reload sessions so the list
-		// reflects any newly discovered (or removed) plan.md files.
-		var cmds []tea.Cmd
-		if m.filterPlans {
-			cmds = append(cmds, m.loadSessionsCmd())
-		}
-		// Update preview plan indicator and content if a session is selected.
-		if m.detail != nil {
-			m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
-			if m.planMap[m.detail.Session.ID] {
-				cmds = append(cmds, m.loadPlanContentCmd(m.detail.Session.ID))
-			}
-		}
-		// Chain: after plans are known, do a quick work status classification
-		// — but only when a work-status scan has been explicitly requested
-		// (W key or reindex completion).
-		if m.workStatusScanning {
-			cmds = append(cmds, m.scanWorkStatusQuickCmd())
-		}
-		return m, tea.Batch(cmds...)
+		return m.handlePlansScanned(msg)
 
 	case planContentMsg:
-		if msg.err != nil || msg.content == "" {
-			m.preview.SetPlanContent("")
-			m.autoShowPlan = false
-			return m, nil
-		}
-		// Only apply if the content matches the currently selected session.
-		if m.detail != nil && m.detail.Session.ID == msg.sessionID {
-			m.preview.SetPlanContent(msg.content)
-			// After a work status scan with continuation plans, auto-switch
-			// to plan view so the user sees the freshly written plan.
-			if m.autoShowPlan {
-				m.autoShowPlan = false
-				m.preview.ShowPlanView()
-			}
-		}
-		return m, nil
+		return m.handlePlanContent(msg)
 
 	// ----- Work status scanning -------------------------------------------
 	case workStatusQuickScannedMsg:
-		m.workStatusMap = msg.statuses
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain the full work status scan to parse plan.md content.
-		return m, m.scanWorkStatusCmd()
+		return m.handleWorkStatusQuickScanned(msg)
 
 	case workStatusScannedMsg:
-		// Merge full-scan results into the existing map so that NoPlan
-		// entries from the quick scan are preserved (the full scan only
-		// covers sessions with plans).
-		if m.workStatusMap == nil {
-			m.workStatusMap = msg.statuses
-		} else {
-			maps.Copy(m.workStatusMap, msg.statuses)
-		}
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain to optional AI-enhanced analysis for sessions with
-		// incomplete work. If the Copilot SDK is unavailable the command
-		// returns nil and the chain stops here.
-		aiCmd := m.scanWorkStatusAICmd()
-		if aiCmd != nil {
-			return m, aiCmd
-		}
-		// AI unavailable — write continuation plans from non-AI remaining
-		// items (parsed from unchecked plan.md checkboxes).
-		var sessionsWithRemaining []string
-		for id, result := range m.workStatusMap {
-			if len(result.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		if len(sessionsWithRemaining) > 0 {
-			if contCmd := m.writeContinuationPlansCmd(sessionsWithRemaining); contCmd != nil {
-				return m, contCmd
-			}
-		}
-		return m, m.completeWorkStatusScan()
+		return m.handleWorkStatusScanned(msg)
 
 	case workStatusAIScannedMsg:
-		// Merge AI analysis results into the work status map. The AI may
-		// provide richer detail, updated task counts, and remaining items.
-		var sessionsWithRemaining []string
-		for id, analysis := range msg.analyses {
-			if analysis == nil {
-				continue
-			}
-			existing, ok := m.workStatusMap[id]
-			if !ok {
-				continue
-			}
-			// Update detail with AI summary if provided.
-			if analysis.Summary != "" {
-				existing.Detail = analysis.Summary
-			}
-			// Trust AI task counts when they differ from local parse.
-			if analysis.TotalTasks > 0 {
-				existing.TotalTasks = analysis.TotalTasks
-				existing.DoneTasks = analysis.CompletedTasks
-			}
-			// Overwrite status if the AI determined completion.
-			if analysis.Complete && existing.Status == data.WorkStatusIncomplete {
-				existing.Status = data.WorkStatusComplete
-			}
-			existing.RemainingItems = analysis.RemainingItems
-			m.workStatusMap[id] = existing
-
-			// Only queue continuation plan writes for sessions that remain
-			// incomplete after AI analysis — don't write "remaining work"
-			// into plans the AI classified as complete.
-			if existing.Status == data.WorkStatusIncomplete && len(analysis.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		// Also include sessions that were incomplete with local remaining
-		// items but weren't in the AI results (AI failure/timeout/skipped).
-		// This ensures continuation plans are written even when AI is partial.
-		for id, result := range m.workStatusMap {
-			if _, hadAI := msg.analyses[id]; hadAI {
-				continue // already handled above
-			}
-			if result.Status == data.WorkStatusIncomplete && len(result.RemainingItems) > 0 {
-				sessionsWithRemaining = append(sessionsWithRemaining, id)
-			}
-		}
-		m.sessionList.SetWorkStatuses(m.workStatusMap)
-		if sel, ok := m.sessionList.Selected(); ok {
-			if result, exists := m.workStatusMap[sel.ID]; exists {
-				m.preview.SetWorkStatus(result)
-			}
-		}
-		// Chain: write continuation plans for sessions with remaining items.
-		if len(sessionsWithRemaining) > 0 {
-			contCmd := m.writeContinuationPlansCmd(sessionsWithRemaining)
-			if contCmd != nil {
-				return m, contCmd
-			}
-		}
-		// Chain ends here — no continuation plans to write.
-		return m, m.completeWorkStatusScan()
+		return m.handleWorkStatusAIScanned(msg)
 
 	case continuationPlanCreatedMsg:
-		if msg.err != nil {
-			slog.Debug("continuation plan write error", "error", msg.err)
-		} else if msg.updated > 0 {
-			// Check whether the currently selected session has remaining work
-			// and reload its plan content so the preview shows the fresh plan.
-			if m.detail != nil {
-				if result, ok := m.workStatusMap[m.detail.Session.ID]; ok && len(result.RemainingItems) > 0 {
-					m.autoShowPlan = true
-					m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — showing plan for current session", msg.updated)
-					scanCmd := m.completeWorkStatusScan()
-					reloadCmd := m.loadPlanContentCmd(m.detail.Session.ID)
-					return m, tea.Batch(scanCmd, reloadCmd)
-				}
-			}
-			m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — press v on a session to view", msg.updated)
-		}
-		return m, m.completeWorkStatusScan()
+		return m.handleContinuationPlanCreated(msg)
 
 	// ----- Deep search debounce -------------------------------------------
 	case deepSearchTickMsg:
-		if msg.version != m.deepSearchVersion || m.filter.Query == "" {
-			return m, nil // stale tick — query changed since scheduling
-		}
-		return m, m.deepSearchCmd(msg.version)
+		return m.handleDeepSearchTick(msg)
 
 	case deepSearchResultMsg:
-		if msg.version != m.deepSearchVersion {
-			return m, nil // stale result — query changed since search started
-		}
-		m.deepSearchPending = false
-		m.filter.DeepSearch = true // keep deep mode for subsequent reloads (time range, sort, etc.)
-		m.searchBar.SetSearching(false)
-		if msg.sessions != nil {
-			m.sessions = m.filterHiddenSessions(msg.sessions)
-			m.sessions = m.filterFavoritedSessions(m.sessions)
-			m.sessions = m.filterAttentionSessions(m.sessions)
-			m.sessions = m.filterPlanSessions(m.sessions)
-			m.sessions = m.filterWorkStatusSessions(m.sessions)
-			m.groups = nil
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetSessions(m.sessions)
-		} else if msg.groups != nil {
-			m.groups = m.filterHiddenGroups(msg.groups)
-			m.groups = m.filterFavoritedGroups(m.groups)
-			m.sessions = nil
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetPivotField(m.pivot)
-			m.sessionList.SetGroups(m.groups)
-		}
-		if m.state == stateLoading {
-			m.state = stateSessionList
-		}
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		m.detailVersion++
-		return m, m.loadSelectedDetailCmd()
+		return m.handleDeepSearchResult(msg)
 
 	// ----- Copilot SDK search ------------------------------------------------
 	case copilotReadyMsg:
-		// Client is ready — no UI action needed; search will use it.
-		return m, nil
+		return m.handleCopilotReady()
 
 	case copilotErrorMsg:
-		// SDK init/search error — silently ignore, search degrades gracefully.
-		return m, nil
+		return m.handleCopilotError()
 
 	case copilotSearchTickMsg:
-		if msg.version != m.copilotSearchVersion || m.filter.Query == "" {
-			return m, nil // stale tick — query changed since scheduling
-		}
-		// If copilot client needs lazy init, do it here on the main goroutine
-		// then kick off search.
-		if m.copilotClient == nil && m.store != nil {
-			m.copilotClient = copilot.New(m.store)
-		}
-		// Cancel any in-flight search so it releases the searchMu quickly
-		// and doesn't block this new search for up to 45 seconds.
-		if m.copilotSearchCancel != nil {
-			m.copilotSearchCancel()
-			m.copilotSearchCancel = nil
-		}
-		m.copilotSearching = true
-		m.searchBar.SetAISearching(true)
-		// Show "connecting" if SDK hasn't been initialised yet.
-		if m.copilotClient != nil && !m.copilotClient.Available() {
-			m.searchBar.SetAIStatus("connecting")
-		}
-		cmd := m.copilotSearchCmd(msg.version)
-		return m, cmd
+		return m.handleCopilotSearchTick(msg)
 
 	case copilotSearchResultMsg:
-		if msg.version != m.copilotSearchVersion {
-			// Stale result — a newer search is in flight. Don't update
-			// status here; the newer search will set it when it completes.
-			return m, nil
-		}
-		m.copilotSearching = false
-		m.searchBar.SetAISearching(false)
-		if msg.err != nil {
-			// AI search is best-effort — show a brief "(✦ unavailable)"
-			// indicator but never block or alarm the user.
-			m.searchBar.SetAIStatus("unavailable")
-			m.searchBar.SetAIResults(0)
-			m.searchBar.SetAIError("")
-			slog.Debug("copilot search failed", "error", msg.err)
-			return m, nil
-		}
-		m.searchBar.SetAIStatus("ready")
-		m.searchBar.SetAIResults(len(msg.sessionIDs))
-		if len(msg.sessionIDs) == 0 {
-			return m, nil
-		}
-		// Store AI session IDs.
-		m.aiSessionIDs = make(map[string]struct{}, len(msg.sessionIDs))
-		for _, id := range msg.sessionIDs {
-			m.aiSessionIDs[id] = struct{}{}
-		}
-		m.sessionList.SetAISessions(m.aiSessionIDs)
-		// Find IDs not already in the current session list and fetch them.
-		missingIDs := m.findMissingAISessionIDs(msg.sessionIDs)
-		if len(missingIDs) > 0 {
-			return m, m.fetchAISessionsCmd(missingIDs, msg.version)
-		}
-		return m, nil
+		return m.handleCopilotSearchResult(msg)
 
 	case aiSessionsLoadedMsg:
-		if msg.version != m.copilotSearchVersion {
-			return m, nil // stale
-		}
-		if len(msg.sessions) == 0 {
-			return m, nil
-		}
-		// Apply full filter chain before merging (matches sessionsLoadedMsg).
-		incoming := m.filterHiddenSessions(msg.sessions)
-		incoming = m.filterFavoritedSessions(incoming)
-		incoming = m.filterAttentionSessions(incoming)
-		incoming = m.filterPlanSessions(incoming)
-		incoming = m.filterWorkStatusSessions(incoming)
-		if len(incoming) == 0 {
-			return m, nil
-		}
-		// Only merge into flat session mode — skip if in groups/pivot mode.
-		if m.sessions != nil {
-			existing := make(map[string]struct{}, len(m.sessions))
-			for _, s := range m.sessions {
-				existing[s.ID] = struct{}{}
-			}
-			for _, s := range incoming {
-				if _, ok := existing[s.ID]; !ok {
-					m.sessions = append(m.sessions, s)
-				}
-			}
-			m.sortByAttention(m.sessions)
-			m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.sessionList.SetSessions(m.sessions)
-			m.searchBar.SetResultCount(m.sessionList.SessionCount())
-		}
-		return m, nil
+		return m.handleAISessionsLoaded(msg)
 
 	// ----- Filter picker data ---------------------------------------------
 	case filterDataMsg:
-		m.filterPanel.SetFolders(msg.folders, m.cfg.ExcludedDirs)
-		return m, nil
+		return m.handleFilterData(msg)
 
 	// ----- Shell detection -------------------------------------------------
 	case shellsDetectedMsg:
-		m.shells = msg.shells
-		m.configPanel.SetShellOptions(m.shells)
-		return m, nil
+		return m.handleShellsDetected(msg)
 
 	// ----- Terminal detection ----------------------------------------------
 	case terminalsDetectedMsg:
-		m.terminals = msg.terminals
-		var names []string
-		for _, t := range m.terminals {
-			names = append(names, t.Name)
-		}
-		m.configPanel.SetTerminals(names)
-		return m, nil
+		return m.handleTerminalsDetected(msg)
 
 	// ----- Font check -------------------------------------------------------
 	case fontCheckMsg:
-		styles.SetNerdFontEnabled(msg.installed)
-		return m, nil
+		return m.handleFontCheck(msg)
 
 	// ----- Session exit (in-place resume finished) -------------------------
 	case sessionExitMsg:
-		if msg.err != nil {
-			m.statusErr = fmt.Sprintf("Session failed: %v", msg.err)
-			return m, nil
-		}
-		m.closeStore()
-		return m, tea.Quit
+		return m.handleSessionExit(msg)
 
 	// ----- Keyboard --------------------------------------------------------
 	case tea.KeyPressMsg:
@@ -1122,7 +669,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.filterPlans = m.attentionPicker.FilterPlans()
 			m.showFavorited = m.attentionPicker.FilterFavorites()
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
-			m.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
+			m.workStatus.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
 		}
@@ -1138,14 +685,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, keys.Escape):
 			m.searchBar.Blur()
-			m.deepSearchPending = false
+			m.search.deepSearchPending = false
 			m.searchBar.SetSearching(false)
 			m.searchBar.SetAISearching(false)
-			m.copilotSearching = false
+			m.search.copilotSearching = false
 			// Cancel any in-flight SDK search.
-			if m.copilotSearchCancel != nil {
-				m.copilotSearchCancel()
-				m.copilotSearchCancel = nil
+			if m.search.copilotSearchCancel != nil {
+				m.search.copilotSearchCancel()
+				m.search.copilotSearchCancel = nil
 			}
 			// Keep the query active — Escape only dismisses the input focus.
 			// The filter stays applied so subsequent operations (time range,
@@ -1159,8 +706,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.searchBar.Blur()
 			// If deep search hasn't run yet, trigger it now.
-			if m.deepSearchPending && m.filter.Query != "" {
-				m.deepSearchPending = false
+			if m.search.deepSearchPending && m.filter.Query != "" {
+				m.search.deepSearchPending = false
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
@@ -1183,20 +730,20 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.filter.Query = newQuery
 				m.filter.DeepSearch = false
 				// Quick search fires immediately; schedule deep search.
-				m.deepSearchVersion++
-				m.deepSearchPending = true
+				m.search.deepSearchVersion++
+				m.search.deepSearchPending = true
 				m.searchBar.SetSearching(true)
 
-				cmds := []tea.Cmd{cmd, m.loadSessionsCmd(), m.scheduleDeepSearch(m.deepSearchVersion)}
+				cmds := []tea.Cmd{cmd, m.loadSessionsCmd(), m.scheduleDeepSearch(m.search.deepSearchVersion)}
 
 				// Copilot SDK search is gated by config flag.
 				if m.cfg.AISearch {
-					m.copilotSearchVersion++
+					m.search.copilotSearchVersion++
 					m.searchBar.SetAISearching(false) // reset until tick fires
 					m.searchBar.SetAIResults(0)       // clear stale count
-					m.aiSessionIDs = nil
+					m.search.aiSessionIDs = nil
 					m.sessionList.SetAISessions(nil)
-					cmds = append(cmds, m.scheduleCopilotSearch(m.copilotSearchVersion))
+					cmds = append(cmds, m.scheduleCopilotSearch(m.search.copilotSearchVersion))
 				}
 
 				return m, tea.Batch(cmds...)
@@ -1230,8 +777,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.searchBar.SetSearching(false)
 			m.searchBar.SetAISearching(false)
 			m.searchBar.SetAIResults(0)
-			m.copilotSearching = false
-			m.aiSessionIDs = nil
+			m.search.copilotSearching = false
+			m.search.aiSessionIDs = nil
 			m.sessionList.SetAISessions(nil)
 			return m, m.loadSessionsCmd()
 		}
@@ -1483,9 +1030,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetPlanCount(m.planSessionCount())
 		m.attentionPicker.SetFilterFavorites(m.showFavorited)
 		m.attentionPicker.SetFavoriteCount(len(m.favoritedSet))
-		m.attentionPicker.SetWorkStatusFilter(m.filterWorkStatus)
+		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
-		m.attentionPicker.SetWorkStatusScanned(m.workStatusScanned)
+		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -1503,8 +1050,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleResumeInterrupted()
 
 	case key.Matches(msg, keys.ScanWorkStatus):
-		if !m.workStatusScanning {
-			m.workStatusScanning = true
+		if !m.workStatus.workStatusScanning {
+			m.workStatus.workStatusScanning = true
 			m.statusInfo = "Scanning work status..."
 			// Trigger a fresh plan scan first — the plansScannedMsg
 			// handler chains into scanWorkStatusQuickCmd when
@@ -1863,12 +1410,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		// Detect double-click: second click on the same row while a
 		// pending single-click timer is still running.
-		isDoubleClick := m.pendingClickVersion > 0 &&
-			mouse.Y == m.pendingClickY
+		isDoubleClick := m.click.pendingClickVersion > 0 &&
+			mouse.Y == m.click.pendingClickY
 
 		if isDoubleClick {
 			// Invalidate the pending single-click so it won't fire.
-			m.pendingClickVersion = 0
+			m.click.pendingClickVersion = 0
 
 			m.sessionList.MoveTo(itemIdx)
 
@@ -1933,15 +1480,15 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		// First click — defer the single-click action behind a timer so
 		// a potential second click (double-click) can cancel it.
-		m.pendingClickVersion++
-		m.pendingClickY = mouse.Y
-		m.pendingClickItemIdx = itemIdx
+		m.click.pendingClickVersion++
+		m.click.pendingClickY = mouse.Y
+		m.click.pendingClickItemIdx = itemIdx
 
 		// Immediately move selection so the highlight follows the cursor,
 		// but do NOT toggle folders or load details yet.
 		m.sessionList.MoveTo(itemIdx)
 
-		ver := m.pendingClickVersion
+		ver := m.click.pendingClickVersion
 		return m, tea.Tick(doubleClickTimeout, func(time.Time) tea.Msg {
 			return pendingClickFireMsg{version: ver}
 		})
@@ -1974,9 +1521,9 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetPlanCount(m.planSessionCount())
 		m.attentionPicker.SetFilterFavorites(m.showFavorited)
 		m.attentionPicker.SetFavoriteCount(len(m.favoritedSet))
-		m.attentionPicker.SetWorkStatusFilter(m.filterWorkStatus)
+		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
-		m.attentionPicker.SetWorkStatusScanned(m.workStatusScanned)
+		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -2212,7 +1759,7 @@ func (m Model) renderHeader() string {
 	rightReserve := headerRightReserve
 	if m.reindexing {
 		rightReserve = headerReindexReserve
-	} else if m.workStatusScanning {
+	} else if m.workStatus.workStatusScanning {
 		rightReserve = headerScanReserve
 	}
 	searchW := m.width - lipgloss.Width(title) - rightReserve
@@ -2233,7 +1780,7 @@ func (m Model) renderHeader() string {
 	var right string
 	if m.reindexing {
 		right = m.spinner.View() + " Rebuilding index…"
-	} else if m.workStatusScanning {
+	} else if m.workStatus.workStatusScanning {
 		right = m.spinner.View() + " Scanning work status…"
 	}
 
@@ -2353,12 +1900,12 @@ func (m Model) renderFooter() string {
 	if m.filterPlans {
 		left += "  " + styles.ActiveBadgeStyle.Render("! plans")
 	}
-	if len(m.filterWorkStatus) > 0 {
+	if len(m.workStatus.filterWorkStatus) > 0 {
 		var wsNames []string
-		if _, ok := m.filterWorkStatus[data.WorkStatusIncomplete]; ok {
+		if _, ok := m.workStatus.filterWorkStatus[data.WorkStatusIncomplete]; ok {
 			wsNames = append(wsNames, "incomplete")
 		}
-		if _, ok := m.filterWorkStatus[data.WorkStatusComplete]; ok {
+		if _, ok := m.workStatus.filterWorkStatus[data.WorkStatusComplete]; ok {
 			wsNames = append(wsNames, "complete")
 		}
 		left += "  " + styles.ActiveBadgeStyle.Render("! "+strings.Join(wsNames, ", "))
@@ -2510,35 +2057,29 @@ func (m Model) renderReindexOverlay() string {
 }
 
 // ---------------------------------------------------------------------------
-// Hidden session filtering
+// Shared predicate-based filter helpers
 // ---------------------------------------------------------------------------
 
-// filterHiddenSessions removes hidden sessions from a flat list unless
-// showHidden mode is active.
-func (m *Model) filterHiddenSessions(sessions []data.Session) []data.Session {
-	if m.showHidden || len(m.hiddenSet) == 0 {
-		return sessions
-	}
+// filterSessionsWhere returns only the sessions for which pred returns true.
+func filterSessionsWhere(sessions []data.Session, pred func(data.Session) bool) []data.Session {
 	filtered := make([]data.Session, 0, len(sessions))
 	for _, s := range sessions {
-		if _, ok := m.hiddenSet[s.ID]; !ok {
+		if pred(s) {
 			filtered = append(filtered, s)
 		}
 	}
 	return filtered
 }
 
-// filterHiddenGroups removes hidden sessions from grouped results unless
-// showHidden mode is active. Empty groups are dropped.
-func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGroup {
-	if m.showHidden || len(m.hiddenSet) == 0 {
-		return groups
-	}
+// filterGroupsWhere applies pred to every session inside each group, keeping
+// only sessions that match. Groups left empty after filtering are dropped and
+// each retained group's Count is updated to reflect the new length.
+func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool) []data.SessionGroup {
 	filtered := make([]data.SessionGroup, 0, len(groups))
 	for _, g := range groups {
 		var sessions []data.Session
 		for _, s := range g.Sessions {
-			if _, ok := m.hiddenSet[s.ID]; !ok {
+			if pred(s) {
 				sessions = append(sessions, s)
 			}
 		}
@@ -2549,6 +2090,34 @@ func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGro
 		}
 	}
 	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Hidden session filtering
+// ---------------------------------------------------------------------------
+
+// filterHiddenSessions removes hidden sessions from a flat list unless
+// showHidden mode is active.
+func (m *Model) filterHiddenSessions(sessions []data.Session) []data.Session {
+	if m.showHidden || len(m.hiddenSet) == 0 {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		_, ok := m.hiddenSet[s.ID]
+		return !ok
+	})
+}
+
+// filterHiddenGroups removes hidden sessions from grouped results unless
+// showHidden mode is active. Empty groups are dropped.
+func (m *Model) filterHiddenGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if m.showHidden || len(m.hiddenSet) == 0 {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		_, ok := m.hiddenSet[s.ID]
+		return !ok
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2561,13 +2130,10 @@ func (m *Model) filterFavoritedSessions(sessions []data.Session) []data.Session 
 	if !m.showFavorited {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if _, ok := m.favoritedSet[s.ID]; ok {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		_, ok := m.favoritedSet[s.ID]
+		return ok
+	})
 }
 
 // filterFavoritedGroups returns only favorited sessions within each group
@@ -2576,22 +2142,15 @@ func (m *Model) filterFavoritedGroups(groups []data.SessionGroup) []data.Session
 	if !m.showFavorited {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if _, ok := m.favoritedSet[s.ID]; ok {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		_, ok := m.favoritedSet[s.ID]
+		return ok
+	})
 }
+
+// ---------------------------------------------------------------------------
+// Attention session filtering
+// ---------------------------------------------------------------------------
 
 // filterAttentionSessions removes sessions that don't match the attention
 // filter. When attentionFilter is empty, all sessions pass through.
@@ -2599,14 +2158,11 @@ func (m *Model) filterAttentionSessions(sessions []data.Session) []data.Session 
 	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
 		status := m.attentionMap[s.ID]
-		if _, ok := m.attentionFilter[status]; ok {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+		_, ok := m.attentionFilter[status]
+		return ok
+	})
 }
 
 // filterAttentionGroups removes sessions that don't match the attention
@@ -2615,22 +2171,11 @@ func (m *Model) filterAttentionGroups(groups []data.SessionGroup) []data.Session
 	if len(m.attentionFilter) == 0 || len(m.attentionMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			status := m.attentionMap[s.ID]
-			if _, ok := m.attentionFilter[status]; ok {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		status := m.attentionMap[s.ID]
+		_, ok := m.attentionFilter[status]
+		return ok
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2643,13 +2188,9 @@ func (m *Model) filterPlanSessions(sessions []data.Session) []data.Session {
 	if !m.filterPlans || len(m.planMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if m.planMap[s.ID] {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		return m.planMap[s.ID]
+	})
 }
 
 // filterPlanGroups removes sessions without a plan.md file from grouped
@@ -2658,21 +2199,9 @@ func (m *Model) filterPlanGroups(groups []data.SessionGroup) []data.SessionGroup
 	if !m.filterPlans || len(m.planMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if m.planMap[s.ID] {
-				sessions = append(sessions, s)
-			}
-		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		return m.planMap[s.ID]
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -2683,43 +2212,33 @@ func (m *Model) filterPlanGroups(groups []data.SessionGroup) []data.SessionGroup
 // work status filter set. When filterWorkStatus is empty, all sessions
 // pass through.
 func (m *Model) filterWorkStatusSessions(sessions []data.Session) []data.Session {
-	if len(m.filterWorkStatus) == 0 || len(m.workStatusMap) == 0 {
+	if len(m.workStatus.filterWorkStatus) == 0 || len(m.workStatus.workStatusMap) == 0 {
 		return sessions
 	}
-	filtered := make([]data.Session, 0, len(sessions))
-	for _, s := range sessions {
-		if result, ok := m.workStatusMap[s.ID]; ok {
-			if _, match := m.filterWorkStatus[result.Status]; match {
-				filtered = append(filtered, s)
-			}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		result, ok := m.workStatus.workStatusMap[s.ID]
+		if !ok {
+			return false
 		}
-	}
-	return filtered
+		_, match := m.workStatus.filterWorkStatus[result.Status]
+		return match
+	})
 }
 
 // filterWorkStatusGroups removes sessions that don't match the active
 // work status filter set from grouped results. Empty groups are dropped.
 func (m *Model) filterWorkStatusGroups(groups []data.SessionGroup) []data.SessionGroup {
-	if len(m.filterWorkStatus) == 0 || len(m.workStatusMap) == 0 {
+	if len(m.workStatus.filterWorkStatus) == 0 || len(m.workStatus.workStatusMap) == 0 {
 		return groups
 	}
-	filtered := make([]data.SessionGroup, 0, len(groups))
-	for _, g := range groups {
-		var sessions []data.Session
-		for _, s := range g.Sessions {
-			if result, ok := m.workStatusMap[s.ID]; ok {
-				if _, match := m.filterWorkStatus[result.Status]; match {
-					sessions = append(sessions, s)
-				}
-			}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		result, ok := m.workStatus.workStatusMap[s.ID]
+		if !ok {
+			return false
 		}
-		if len(sessions) > 0 {
-			g.Sessions = sessions
-			g.Count = len(sessions)
-			filtered = append(filtered, g)
-		}
-	}
-	return filtered
+		_, match := m.workStatus.filterWorkStatus[result.Status]
+		return match
+	})
 }
 
 // sortByAttention re-sorts the session slice by attention status when the
@@ -3107,6 +2626,17 @@ func (m Model) selectedSessionCwd() string {
 // ---------------------------------------------------------------------------
 
 func (m *Model) closeStore() {
+	// Cancel any in-flight copilot search context so the goroutine
+	// holding searchMu can unblock and exit.
+	if m.search.copilotSearchCancel != nil {
+		m.search.copilotSearchCancel()
+		m.search.copilotSearchCancel = nil
+	}
+	// Cancel any in-flight AI work-status analysis.
+	if m.workStatus.workStatusAICancel != nil {
+		m.workStatus.workStatusAICancel()
+		m.workStatus.workStatusAICancel = nil
+	}
 	if m.dbWatcher != nil {
 		m.dbWatcher.Stop()
 	}
@@ -3142,6 +2672,9 @@ func openStoreCmd() tea.Cmd {
 // fires, then returns a sessionsChangedMsg to trigger a session list reload.
 func (m Model) waitForDBChangeCmd() tea.Cmd {
 	ch := m.dbWatchCh
+	if ch == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		_, ok := <-ch
 		if !ok {
@@ -3183,7 +2716,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
@@ -3197,7 +2730,7 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 			}
 			return groupsLoadedMsg{groups: groups}
 		}
-		sessions, err := store.ListSessions(filter, sortOpts, limit)
+		sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3336,7 +2869,7 @@ func (m *Model) scanWorkStatusAICmd() tea.Cmd {
 	// Only capture session IDs here — file I/O (ReadPlanContent) is
 	// deferred to the background closure to avoid blocking the UI thread.
 	var candidateIDs []string
-	for id, result := range m.workStatusMap {
+	for id, result := range m.workStatus.workStatusMap {
 		if result.Status != data.WorkStatusIncomplete {
 			continue
 		}
@@ -3354,11 +2887,11 @@ func (m *Model) scanWorkStatusAICmd() tea.Cmd {
 	}
 
 	// Cancel any previous AI analysis and create a fresh cancellable context.
-	if m.workStatusAICancel != nil {
-		m.workStatusAICancel()
+	if m.workStatus.workStatusAICancel != nil {
+		m.workStatus.workStatusAICancel()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	m.workStatusAICancel = cancel
+	m.workStatus.workStatusAICancel = cancel
 
 	return func() tea.Msg {
 		results := make(map[string]*copilot.CompletionAnalysis, len(candidateIDs))
@@ -3402,7 +2935,7 @@ func (m *Model) writeContinuationPlansCmd(sessionIDs []string) tea.Cmd {
 	}
 	var plans []planData
 	for _, id := range sessionIDs {
-		result, ok := m.workStatusMap[id]
+		result, ok := m.workStatus.workStatusMap[id]
 		if !ok || len(result.RemainingItems) == 0 {
 			continue
 		}
@@ -3434,14 +2967,14 @@ func (m *Model) writeContinuationPlansCmd(sessionIDs []string) tea.Cmd {
 // shows a summary in the status bar, and reloads sessions when a
 // work-status filter is active.
 func (m *Model) completeWorkStatusScan() tea.Cmd {
-	m.workStatusScanned = true
-	wasScanning := m.workStatusScanning
-	m.workStatusScanning = false
+	m.workStatus.workStatusScanned = true
+	wasScanning := m.workStatus.workStatusScanning
+	m.workStatus.workStatusScanning = false
 
 	if wasScanning {
 		// Count incomplete/complete from the work status map.
 		var incomplete, complete int
-		for _, r := range m.workStatusMap {
+		for _, r := range m.workStatus.workStatusMap {
 			switch r.Status {
 			case data.WorkStatusIncomplete:
 				incomplete++
@@ -3460,7 +2993,7 @@ func (m *Model) completeWorkStatusScan() tea.Cmd {
 	}
 	// When a work-status filter is active, reload sessions so the list
 	// reflects the new scan results.
-	if wasScanning && len(m.filterWorkStatus) > 0 {
+	if wasScanning && len(m.workStatus.filterWorkStatus) > 0 {
 		cmds = append(cmds, m.loadSessionsCmd())
 	}
 	if len(cmds) > 0 {
@@ -3573,7 +3106,7 @@ func (m Model) planSessionCount() int {
 // workStatusCounts returns the number of sessions in each work status category.
 func (m Model) workStatusCounts() map[data.WorkStatus]int {
 	counts := make(map[data.WorkStatus]int)
-	for _, r := range m.workStatusMap {
+	for _, r := range m.workStatus.workStatusMap {
 		counts[r.Status]++
 	}
 	return counts
@@ -3606,7 +3139,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(pf, filter, sortOpts, limit)
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
@@ -3617,7 +3150,7 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 			}
 			return deepSearchResultMsg{version: version, groups: groups}
 		}
-		sessions, err := store.ListSessions(filter, sortOpts, limit)
+		sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3640,7 +3173,7 @@ func (m Model) loadSelectedDetailCmd() tea.Cmd {
 		if store == nil {
 			return nil
 		}
-		detail, err := store.GetSession(id)
+		detail, err := store.GetSession(context.Background(), id)
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
@@ -3653,7 +3186,7 @@ func loadFilterDataCmd(store *data.Store) tea.Cmd {
 		if store == nil {
 			return filterDataMsg{}
 		}
-		folders, err := store.ListFolders()
+		folders, err := store.ListFolders(context.Background())
 		if err != nil {
 			return dataErrorMsg{err: fmt.Errorf("listing folders: %w", err)}
 		}
@@ -3685,14 +3218,14 @@ func (m Model) scheduleCopilotSearch(version int) tea.Cmd {
 
 // copilotSearchCmd runs the Copilot SDK search in a background goroutine.
 // Search() handles lazy initialisation and retries internally.
-// The search context is stored in m.copilotSearchCancel so that a newer
+// The search context is stored in m.search.copilotSearchCancel so that a newer
 // search (or Escape) can cancel this one, unblocking the searchMu.
 func (m *Model) copilotSearchCmd(version int) tea.Cmd {
 	client := m.copilotClient
 	query := m.filter.Query
 
 	ctx, cancel := context.WithTimeout(context.Background(), copilotSearchTimeout)
-	m.copilotSearchCancel = cancel
+	m.search.copilotSearchCancel = cancel
 
 	return func() tea.Msg {
 		defer cancel()
@@ -3729,7 +3262,7 @@ func (m Model) fetchAISessionsCmd(ids []string, version int) tea.Cmd {
 		if store == nil || len(ids) == 0 {
 			return aiSessionsLoadedMsg{version: version}
 		}
-		sessions, err := store.ListSessionsByIDs(ids)
+		sessions, err := store.ListSessionsByIDs(context.Background(), ids)
 		if err != nil {
 			// Silently degrade — don't break the UI for fetch errors.
 			return aiSessionsLoadedMsg{version: version}

@@ -29,9 +29,27 @@ or email the maintainer directly through their GitHub profile.
 
 ## Security Model
 
-Copilot Dispatch is a **local-only** tool that reads from your Copilot CLI
-session store (`~/.copilot/session-store.db`) in **read-only mode**. It does
-not make network requests, except when optionally downloading Nerd Fonts.
+Copilot Dispatch is a **local-first** tool that reads from your Copilot CLI
+session store (`~/.copilot/session-store.db`) in **read-only mode**. It makes
+network requests in the following scenarios:
+
+- **Self-update**: `dispatch update` contacts the GitHub Releases API
+  (`api.github.com`) to check for and download new versions.
+- **Copilot SDK**: AI-powered features (work status analysis, semantic search)
+  communicate with the GitHub Copilot API. Requires an authenticated Copilot
+  session.
+- **Nerd Font downloads**: Optional font installation downloads from GitHub
+  Releases.
+
+### Network endpoints
+
+The application may contact the following domains:
+
+| Domain | Purpose |
+|--------|---------|
+| `api.github.com` | Release version checks, asset downloads |
+| `github.com` | Release archive downloads |
+| `*.githubusercontent.com` | Copilot API communication |
 
 ### Trust boundaries
 

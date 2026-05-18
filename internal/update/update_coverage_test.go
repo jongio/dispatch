@@ -4,9 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,9 +36,12 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 func setMockTransport(t *testing.T, fn func(req *http.Request) (*http.Response, error)) {
 	t.Helper()
 	original := updateHTTPTransport
-	updateHTTPTransport = &mockRoundTripper{fn: fn}
+	mock := &mockRoundTripper{fn: fn}
+	updateHTTPTransport = mock
+	sharedClient.Transport = mock
 	t.Cleanup(func() {
 		updateHTTPTransport = original
+		sharedClient.Transport = original
 	})
 }
 
@@ -76,8 +81,8 @@ func TestCopyWithLimit_OverLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when exceeding limit")
 	}
-	if !strings.Contains(err.Error(), "exceeds") {
-		t.Errorf("error should mention exceeds, got: %v", err)
+	if !errors.Is(err, ErrPayloadExceeded) {
+		t.Errorf("expected ErrPayloadExceeded, got: %v", err)
 	}
 }
 
@@ -170,8 +175,8 @@ func TestMatchArchiveTarget(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error for unsafe path")
 				}
-				if !strings.Contains(err.Error(), "unsafe archive entry path") {
-					t.Errorf("error should mention unsafe path, got: %v", err)
+				if !errors.Is(err, ErrUnsafeArchivePath) {
+					t.Errorf("expected ErrUnsafeArchivePath, got: %v", err)
 				}
 				return
 			}
@@ -206,8 +211,8 @@ func TestHttpsOnlyCheckRedirect_HTTP(t *testing.T) {
 	if err == nil {
 		t.Fatal("HTTP redirect should be rejected")
 	}
-	if !strings.Contains(err.Error(), "non-HTTPS") {
-		t.Errorf("error should mention non-HTTPS, got: %v", err)
+	if !errors.Is(err, ErrNonHTTPS) {
+		t.Errorf("expected ErrNonHTTPS, got: %v", err)
 	}
 }
 
@@ -219,8 +224,8 @@ func TestHttpsOnlyCheckRedirect_TooManyRedirects(t *testing.T) {
 	if err == nil {
 		t.Fatal("too many redirects should be rejected")
 	}
-	if !strings.Contains(err.Error(), "too many redirects") {
-		t.Errorf("error should mention too many redirects, got: %v", err)
+	if !errors.Is(err, ErrTooManyRedirects) {
+		t.Errorf("expected ErrTooManyRedirects, got: %v", err)
 	}
 }
 
@@ -234,23 +239,18 @@ func TestHttpsOnlyCheckRedirect_ExactlyAtLimit(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// newSecureClient
+// sharedClient
 // ---------------------------------------------------------------------------
 
-func TestNewSecureClient_NonNil(t *testing.T) {
+func TestSharedClient_NonNil(t *testing.T) {
 	t.Parallel()
-	client := newSecureClient(10)
-	if client == nil {
-		t.Fatal("newSecureClient returned nil")
+	if sharedClient == nil {
+		t.Fatal("sharedClient should not be nil")
 	}
-	if client.CheckRedirect == nil {
-		t.Error("secure client should have CheckRedirect set")
+	if sharedClient.CheckRedirect == nil {
+		t.Error("shared client should have CheckRedirect set")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// replaceUnix — file operations (works on all platforms)
-// ---------------------------------------------------------------------------
 
 func TestReplaceUnix_Success(t *testing.T) {
 	t.Parallel()
@@ -300,8 +300,8 @@ func TestReplaceUnix_MissingSource(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing source binary")
 	}
-	if !strings.Contains(err.Error(), "opening new binary") {
-		t.Errorf("error should mention opening, got: %v", err)
+	if !errors.Is(err, ErrOpeningBinary) {
+		t.Errorf("expected ErrOpeningBinary, got: %v", err)
 	}
 }
 
@@ -559,7 +559,7 @@ func TestFetchLatestVersion_Success(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	version, err := fetchLatestVersion()
+	version, err := fetchLatestVersion(context.Background())
 	if err != nil {
 		t.Fatalf("fetchLatestVersion: %v", err)
 	}
@@ -575,12 +575,12 @@ func TestFetchLatestVersion_NonOKStatus(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	_, err := fetchLatestVersion()
+	_, err := fetchLatestVersion(context.Background())
 	if err == nil {
 		t.Fatal("expected error for non-200 response")
 	}
-	if !strings.Contains(err.Error(), "503") {
-		t.Errorf("error should mention 503, got: %v", err)
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Errorf("expected ErrHTTPStatus, got: %v", err)
 	}
 }
 
@@ -591,7 +591,7 @@ func TestFetchLatestVersion_InvalidJSON(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	_, err := fetchLatestVersion()
+	_, err := fetchLatestVersion(context.Background())
 	if err == nil {
 		t.Fatal("expected error for invalid JSON response")
 	}
@@ -602,7 +602,7 @@ func TestFetchLatestVersion_NetworkError(t *testing.T) {
 		return nil, fmt.Errorf("network unreachable")
 	})
 
-	_, err := fetchLatestVersion()
+	_, err := fetchLatestVersion(context.Background())
 	if err == nil {
 		t.Fatal("expected error for network failure")
 	}
@@ -615,7 +615,7 @@ func TestFetchLatestVersion_StripVPrefix(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	version, err := fetchLatestVersion()
+	version, err := fetchLatestVersion(context.Background())
 	if err != nil {
 		t.Fatalf("fetchLatestVersion: %v", err)
 	}
@@ -637,7 +637,7 @@ func TestRunUpdate_AlreadyUpToDate(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err != nil {
 		t.Fatalf("RunUpdate should succeed when already up to date: %v", err)
 	}
@@ -652,12 +652,12 @@ func TestRunUpdate_InvalidLatestVersion(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error for invalid latest version")
 	}
-	if !strings.Contains(err.Error(), "invalid latest version") {
-		t.Errorf("error should mention invalid latest version, got: %v", err)
+	if !errors.Is(err, ErrInvalidVersion) {
+		t.Errorf("expected ErrInvalidVersion, got: %v", err)
 	}
 }
 
@@ -668,12 +668,12 @@ func TestRunUpdate_FetchVersionError(t *testing.T) {
 		return nil, fmt.Errorf("DNS resolution failed")
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error when fetch fails")
 	}
-	if !strings.Contains(err.Error(), "checking latest version") {
-		t.Errorf("error should mention checking, got: %v", err)
+	if !errors.Is(err, ErrCheckingVersion) {
+		t.Errorf("expected ErrCheckingVersion, got: %v", err)
 	}
 }
 
@@ -695,12 +695,12 @@ func TestRunUpdate_DownloadFailure(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error when download fails")
 	}
-	if !strings.Contains(err.Error(), "downloading") {
-		t.Errorf("error should mention downloading, got: %v", err)
+	if !errors.Is(err, ErrDownloading) {
+		t.Errorf("expected ErrDownloading, got: %v", err)
 	}
 }
 
@@ -729,7 +729,7 @@ func TestVerifyChecksum_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz"); err != nil {
+	if err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz"); err != nil {
 		t.Fatalf("verifyChecksum should succeed: %v", err)
 	}
 }
@@ -747,7 +747,7 @@ func TestVerifyChecksum_DownloadError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
+	err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz")
 	if err == nil {
 		t.Fatal("expected error when checksum download fails")
 	}
@@ -766,7 +766,7 @@ func TestVerifyChecksum_MissingArchiveName(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
+	err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz")
 	if err == nil {
 		t.Fatal("expected error when archive name not in checksums")
 	}
@@ -786,7 +786,7 @@ func TestDownloadAsset_Success(t *testing.T) {
 	defer srv.Close()
 
 	dst := filepath.Join(t.TempDir(), "downloaded.bin")
-	if err := downloadAsset(dst, srv.URL); err != nil {
+	if err := downloadAsset(context.Background(), dst, srv.URL); err != nil {
 		t.Fatalf("downloadAsset: %v", err)
 	}
 
@@ -807,12 +807,12 @@ func TestDownloadAsset_HTTPError(t *testing.T) {
 	defer srv.Close()
 
 	dst := filepath.Join(t.TempDir(), "downloaded.bin")
-	err := downloadAsset(dst, srv.URL)
+	err := downloadAsset(context.Background(), dst, srv.URL)
 	if err == nil {
 		t.Fatal("expected error for 403 response")
 	}
-	if !strings.Contains(err.Error(), "403") {
-		t.Errorf("error should mention 403, got: %v", err)
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Errorf("expected ErrHTTPStatus, got: %v", err)
 	}
 }
 
@@ -892,12 +892,12 @@ func TestRunUpdate_ChecksumVerificationFails(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error when checksum verification fails")
 	}
-	if !strings.Contains(err.Error(), "checksum") {
-		t.Errorf("error should mention checksum, got: %v", err)
+	if !errors.Is(err, ErrChecksumMismatch) {
+		t.Errorf("expected ErrChecksumMismatch, got: %v", err)
 	}
 }
 
@@ -980,8 +980,8 @@ func TestAcquireUpdateLock_FailsWhenHeld(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when lock is held by active process")
 	}
-	if !strings.Contains(err.Error(), "lock file exists") {
-		t.Errorf("error should mention lock file exists, got: %v", err)
+	if !errors.Is(err, ErrLockExists) {
+		t.Errorf("expected ErrLockExists, got: %v", err)
 	}
 }
 
@@ -1147,7 +1147,7 @@ func TestCheckForUpdate_NetworkReturnsUpdate(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info == nil {
 		t.Fatal("expected update info when newer version available")
 	}
@@ -1169,7 +1169,7 @@ func TestCheckForUpdate_NetworkReturnsUpToDate(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info != nil {
 		t.Error("expected nil when already up to date via network")
 	}
@@ -1185,7 +1185,7 @@ func TestCheckForUpdate_NetworkReturnsInvalidVersion(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	info := CheckForUpdate("1.0.0")
+	info := CheckForUpdate(context.Background(), "1.0.0")
 	if info != nil {
 		t.Error("expected nil for invalid version from network")
 	}
@@ -1223,12 +1223,12 @@ func TestRunUpdate_ExtractBinaryFailure(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := RunUpdate("1.0.0")
+	err := RunUpdate(context.Background(), "1.0.0")
 	if err == nil {
 		t.Fatal("expected error when binary not found in archive")
 	}
-	if !strings.Contains(err.Error(), "extracting binary") {
-		t.Errorf("error should mention extracting binary, got: %v", err)
+	if !errors.Is(err, ErrExtractingBinary) {
+		t.Errorf("expected ErrExtractingBinary, got: %v", err)
 	}
 }
 
@@ -1274,7 +1274,7 @@ func TestVerifyChecksum_OversizedResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
+	err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz")
 	if err == nil {
 		t.Fatal("expected error for oversized checksum response")
 	}
@@ -1288,7 +1288,7 @@ func TestDownloadAsset_NetworkError(t *testing.T) {
 	t.Parallel()
 	// Use an unreachable URL.
 	dst := filepath.Join(t.TempDir(), "asset.bin")
-	err := downloadAsset(dst, "http://127.0.0.1:1/nonexistent")
+	err := downloadAsset(context.Background(), dst, "http://127.0.0.1:1/nonexistent")
 	if err == nil {
 		t.Fatal("expected error for unreachable URL")
 	}
@@ -1426,8 +1426,8 @@ func TestExtractFromZip_NestedPath(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nested path (path traversal protection)")
 	}
-	if !strings.Contains(err.Error(), "unsafe") {
-		t.Errorf("expected 'unsafe' error, got: %v", err)
+	if !errors.Is(err, ErrUnsafeArchivePath) {
+		t.Errorf("expected ErrUnsafeArchivePath, got: %v", err)
 	}
 }
 
@@ -1448,7 +1448,7 @@ func TestDownloadAsset_CreateFileError(t *testing.T) {
 
 	// Use a non-existent directory as dst to trigger os.Create error.
 	badDst := filepath.Join(t.TempDir(), "no-such-dir", "asset.zip")
-	err := downloadAsset(badDst, ts.URL+"/asset")
+	err := downloadAsset(context.Background(), badDst, ts.URL+"/asset")
 	if err == nil {
 		t.Error("expected error when dst dir does not exist")
 	}
@@ -1474,7 +1474,7 @@ func TestDownloadAsset_SuccessContent(t *testing.T) {
 	})
 
 	dst := filepath.Join(t.TempDir(), "downloaded.bin")
-	if err := downloadAsset(dst, ts.URL+"/asset.zip"); err != nil {
+	if err := downloadAsset(context.Background(), dst, ts.URL+"/asset.zip"); err != nil {
 		t.Fatalf("downloadAsset: %v", err)
 	}
 	got, err := os.ReadFile(dst)
@@ -1501,12 +1501,12 @@ func TestDownloadAsset_HTTPServerError(t *testing.T) {
 	})
 
 	dst := filepath.Join(t.TempDir(), "asset.zip")
-	err := downloadAsset(dst, ts.URL+"/asset")
+	err := downloadAsset(context.Background(), dst, ts.URL+"/asset")
 	if err == nil {
 		t.Error("expected error for HTTP 500")
 	}
-	if !strings.Contains(err.Error(), "500") {
-		t.Errorf("expected HTTP 500 error, got: %v", err)
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Errorf("expected ErrHTTPStatus, got: %v", err)
 	}
 }
 
@@ -1526,12 +1526,12 @@ func TestDownloadAsset_OversizedContentLength(t *testing.T) {
 	})
 
 	dst := filepath.Join(t.TempDir(), "asset.zip")
-	err := downloadAsset(dst, ts.URL+"/asset")
+	err := downloadAsset(context.Background(), dst, ts.URL+"/asset")
 	if err == nil {
 		t.Error("expected error for oversized content")
 	}
-	if !strings.Contains(err.Error(), "exceeds") {
-		t.Errorf("expected 'exceeds' error, got: %v", err)
+	if !errors.Is(err, ErrDownloadExceeded) {
+		t.Errorf("expected ErrDownloadExceeded, got: %v", err)
 	}
 }
 
@@ -1563,7 +1563,7 @@ func TestVerifyChecksum_SuccessPath(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	err := verifyChecksum(archivePath, ts.URL+"/checksums.txt", "dispatch_1.0.0_windows_amd64.zip")
+	err := verifyChecksum(context.Background(), archivePath, ts.URL+"/checksums.txt", "dispatch_1.0.0_windows_amd64.zip")
 	if err != nil {
 		t.Fatalf("verifyChecksum should succeed: %v", err)
 	}
@@ -1594,12 +1594,12 @@ func TestVerifyChecksum_HashMismatch(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(req)
 	})
 
-	err := verifyChecksum(archivePath, ts.URL+"/checksums.txt", "dispatch_1.0.0_windows_amd64.zip")
+	err := verifyChecksum(context.Background(), archivePath, ts.URL+"/checksums.txt", "dispatch_1.0.0_windows_amd64.zip")
 	if err == nil {
 		t.Error("expected error for checksum mismatch")
 	}
-	if !strings.Contains(err.Error(), "mismatch") {
-		t.Errorf("expected 'mismatch' error, got: %v", err)
+	if !errors.Is(err, ErrChecksumMismatch) {
+		t.Errorf("expected ErrChecksumMismatch, got: %v", err)
 	}
 }
 
@@ -1671,8 +1671,8 @@ func TestExtractFromTarGz_NonexistentArchive(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nonexistent archive")
 	}
-	if !strings.Contains(err.Error(), "opening archive") {
-		t.Errorf("expected 'opening archive' error, got: %v", err)
+	if !errors.Is(err, ErrOpeningArchive) {
+		t.Errorf("expected ErrOpeningArchive, got: %v", err)
 	}
 }
 
@@ -1686,8 +1686,8 @@ func TestExtractFromZip_NonexistentArchive(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for nonexistent archive")
 	}
-	if !strings.Contains(err.Error(), "opening zip") {
-		t.Errorf("expected 'opening zip' error, got: %v", err)
+	if !errors.Is(err, ErrOpeningZip) {
+		t.Errorf("expected ErrOpeningZip, got: %v", err)
 	}
 }
 
@@ -1753,12 +1753,12 @@ func TestFetchLatestVersion_HTTPError(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	_, err := fetchLatestVersion()
+	_, err := fetchLatestVersion(context.Background())
 	if err == nil {
 		t.Fatal("expected error for HTTP 503")
 	}
-	if !strings.Contains(err.Error(), "503") {
-		t.Errorf("expected 503 error, got: %v", err)
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Errorf("expected ErrHTTPStatus, got: %v", err)
 	}
 }
 
@@ -1777,12 +1777,12 @@ func TestVerifyChecksum_DownloadNetworkError(t *testing.T) {
 		return nil, fmt.Errorf("simulated network failure")
 	})
 
-	err := verifyChecksum(archivePath, "https://example.com/checksums.txt", "archive.zip")
+	err := verifyChecksum(context.Background(), archivePath, "https://example.com/checksums.txt", "archive.zip")
 	if err == nil {
 		t.Fatal("expected error for network failure")
 	}
-	if !strings.Contains(err.Error(), "downloading checksums") {
-		t.Errorf("expected 'downloading checksums' error, got: %v", err)
+	if !errors.Is(err, ErrDownloadingChecksums) {
+		t.Errorf("expected ErrDownloadingChecksums, got: %v", err)
 	}
 }
 
@@ -1803,12 +1803,12 @@ func TestVerifyChecksum_HTTPErrorStatus(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := verifyChecksum(archivePath, "https://example.com/checksums.txt", "archive.zip")
+	err := verifyChecksum(context.Background(), archivePath, "https://example.com/checksums.txt", "archive.zip")
 	if err == nil {
 		t.Fatal("expected error for HTTP 404")
 	}
-	if !strings.Contains(err.Error(), "404") {
-		t.Errorf("expected HTTP 404 error, got: %v", err)
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Errorf("expected ErrHTTPStatus, got: %v", err)
 	}
 }
 
@@ -1830,7 +1830,7 @@ func TestVerifyChecksum_ArchiveNotInChecksums(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := verifyChecksum(archivePath, "https://example.com/checksums.txt", "myarchive.zip")
+	err := verifyChecksum(context.Background(), archivePath, "https://example.com/checksums.txt", "myarchive.zip")
 	if err == nil {
 		t.Fatal("expected error when archive not found in checksums")
 	}
@@ -1853,12 +1853,12 @@ func TestVerifyChecksum_ArchiveFileMissing(t *testing.T) {
 		return w.Result(), nil
 	})
 
-	err := verifyChecksum(archivePath, "https://example.com/checksums.txt", "vanished.zip")
+	err := verifyChecksum(context.Background(), archivePath, "https://example.com/checksums.txt", "vanished.zip")
 	if err == nil {
 		t.Fatal("expected error when archive file is missing")
 	}
-	if !strings.Contains(err.Error(), "computing checksum") {
-		t.Errorf("expected 'computing checksum' error, got: %v", err)
+	if !errors.Is(err, ErrComputingChecksum) {
+		t.Errorf("expected ErrComputingChecksum, got: %v", err)
 	}
 }
 
@@ -1872,7 +1872,7 @@ func TestCheckForUpdate_FetchError(t *testing.T) {
 	})
 	setConfigDir(t, t.TempDir())
 
-	result := CheckForUpdate("1.0.0")
+	result := CheckForUpdate(context.Background(), "1.0.0")
 	if result != nil {
 		t.Error("expected nil when fetch fails")
 	}
@@ -1895,7 +1895,7 @@ func TestRunUpdate_DevVersionProceeds(t *testing.T) {
 	// 0.0.0 < 1.0.0, so the update flow continues into download/checksum
 	// stages, which fail because the mock serves JSON for all requests.
 	// The key assertion: the error is NOT about "development build".
-	err := RunUpdate("dev")
+	err := RunUpdate(context.Background(), "dev")
 	if err != nil && strings.Contains(err.Error(), "development build") {
 		t.Fatal("RunUpdate should not reject dev builds")
 	}

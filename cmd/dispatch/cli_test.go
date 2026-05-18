@@ -307,7 +307,7 @@ func TestHandleArgs_Reindex_Success(t *testing.T) {
 func TestHandleArgs_UpdateSuccess(t *testing.T) {
 	old := runUpdateFn
 	defer func() { runUpdateFn = old }()
-	runUpdateFn = func(_ string) error { return nil }
+	runUpdateFn = func(_ context.Context, _ string) error { return nil }
 
 	ch := make(chan *update.UpdateInfo, 1)
 
@@ -323,7 +323,7 @@ func TestHandleArgs_UpdateSuccess(t *testing.T) {
 func TestHandleArgs_UpdateError(t *testing.T) {
 	old := runUpdateFn
 	defer func() { runUpdateFn = old }()
-	runUpdateFn = func(_ string) error { return fmt.Errorf("network unreachable") }
+	runUpdateFn = func(_ context.Context, _ string) error { return fmt.Errorf("network unreachable") }
 
 	ch := make(chan *update.UpdateInfo, 1)
 

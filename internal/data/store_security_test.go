@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 	"testing"
@@ -41,6 +42,7 @@ func TestSQLInjection_QueryFilter(t *testing.T) {
 			// breaks out of the parameter the DB driver will error or
 			// the results will be wrong. Neither should happen.
 			sessions, err := s.ListSessions(
+				context.Background(),
 				FilterOptions{Query: payload},
 				SortOptions{Field: SortByUpdated, Order: Descending},
 				0,
@@ -75,6 +77,7 @@ func TestSQLInjection_FolderFilter(t *testing.T) {
 			populateTestData(t, s)
 
 			sessions, err := s.ListSessions(
+				context.Background(),
 				FilterOptions{Folder: payload},
 				SortOptions{Field: SortByUpdated, Order: Descending},
 				0,
@@ -96,6 +99,7 @@ func TestSQLInjection_RepositoryFilter(t *testing.T) {
 	populateTestData(t, s)
 
 	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Repository: "owner/repo-a' OR '1'='1"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -115,6 +119,7 @@ func TestSQLInjection_BranchFilter(t *testing.T) {
 	populateTestData(t, s)
 
 	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{Branch: "main' OR '1'='1"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -133,6 +138,7 @@ func TestSQLInjection_ExcludedDirs(t *testing.T) {
 	populateTestData(t, s)
 
 	sessions, err := s.ListSessions(
+		context.Background(),
 		FilterOptions{ExcludedDirs: []string{"'; DROP TABLE sessions;--"}},
 		SortOptions{Field: SortByUpdated, Order: Descending},
 		0,
@@ -162,7 +168,7 @@ func TestSQLInjection_SearchSessions(t *testing.T) {
 			defer func() { _ = s.Close() }()
 			populateTestData(t, s)
 
-			results, err := s.SearchSessions(payload, 100)
+			results, err := s.SearchSessions(context.Background(), payload, 100)
 			if err != nil {
 				t.Fatalf("SearchSessions with injection payload failed: %v", err)
 			}
@@ -180,7 +186,7 @@ func TestSQLInjection_GetSession(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	_, err := s.GetSession("'; DROP TABLE sessions;--")
+	_, err := s.GetSession(context.Background(), "'; DROP TABLE sessions;--")
 	if err == nil {
 		t.Fatal("GetSession with injection payload should return not-found error")
 	}
@@ -194,7 +200,7 @@ func TestSQLInjection_ListBranches(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("owner/repo-a' OR '1'='1")
+	branches, err := s.ListBranches(context.Background(), "owner/repo-a' OR '1'='1")
 	if err != nil {
 		t.Fatalf("ListBranches with injection payload failed: %v", err)
 	}
@@ -210,6 +216,7 @@ func TestSQLInjection_GroupSessions(t *testing.T) {
 	populateTestData(t, s)
 
 	_, err := s.GroupSessions(
+		context.Background(),
 		PivotByRepo,
 		FilterOptions{Query: "'; DROP TABLE sessions;--"},
 		SortOptions{Field: SortByUpdated, Order: Descending},
@@ -235,7 +242,7 @@ func TestMalformedData_NullBytes(t *testing.T) {
 		"summary\x00with\x00nulls", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "null-sess", 0, "msg\x00with\x00nulls", "resp\x00nulls", "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions with null-byte data: %v", err)
 	}
@@ -243,7 +250,7 @@ func TestMalformedData_NullBytes(t *testing.T) {
 		t.Fatalf("expected 1 session, got %d", len(sessions))
 	}
 
-	detail, err := s.GetSession("null-sess")
+	detail, err := s.GetSession(context.Background(), "null-sess")
 	if err != nil {
 		t.Fatalf("GetSession with null-byte data: %v", err)
 	}
@@ -262,7 +269,7 @@ func TestMalformedData_ControlCharacters(t *testing.T) {
 		"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "ctrl-sess", 0, ctrl, ctrl, "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions with control characters: %v", err)
 	}
@@ -296,7 +303,7 @@ func TestMalformedData_UnicodeEdgeCases(t *testing.T) {
 				"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 			seedTurn(t, s.db, id, 0, tc.text, tc.text, "2024-01-01T00:00:00Z")
 
-			detail, err := s.GetSession(id)
+			detail, err := s.GetSession(context.Background(), id)
 			if err != nil {
 				t.Fatalf("GetSession(%s): %v", id, err)
 			}
@@ -318,7 +325,7 @@ func TestMalformedData_ExtremelyLongStrings(t *testing.T) {
 		"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "long-sess", 0, longStr, longStr, "2024-01-01T00:00:00Z")
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions with 1MB string: %v", err)
 	}
@@ -338,7 +345,7 @@ func TestMalformedData_EmptyStrings(t *testing.T) {
 		"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "empty-sess", 0, "", "", "2024-01-01T00:00:00Z")
 
-	detail, err := s.GetSession("empty-sess")
+	detail, err := s.GetSession(context.Background(), "empty-sess")
 	if err != nil {
 		t.Fatalf("GetSession with empty strings: %v", err)
 	}
@@ -366,7 +373,7 @@ func TestMalformedData_NullColumns(t *testing.T) {
 	seedTurn(t, s.db, "null-col-sess", 0, "msg", "resp", "2024-01-01T00:00:00Z")
 
 	// COALESCE in the query should convert NULLs to empty strings.
-	detail, err := s.GetSession("null-col-sess")
+	detail, err := s.GetSession(context.Background(), "null-col-sess")
 	if err != nil {
 		t.Fatalf("GetSession with NULL columns: %v", err)
 	}
@@ -393,7 +400,7 @@ func TestMalformedData_HTMLAndScriptContent(t *testing.T) {
 		"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "xss-sess", 0, xss, xss, "2024-01-01T00:00:00Z")
 
-	detail, err := s.GetSession("xss-sess")
+	detail, err := s.GetSession(context.Background(), "xss-sess")
 	if err != nil {
 		t.Fatalf("GetSession with XSS content: %v", err)
 	}
@@ -415,7 +422,7 @@ func TestMalformedData_SQLKeywordsInContent(t *testing.T) {
 		"2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
 	seedTurn(t, s.db, "sql-kw-sess", 0, sqlContent, sqlContent, "2024-01-01T00:00:00Z")
 
-	detail, err := s.GetSession("sql-kw-sess")
+	detail, err := s.GetSession(context.Background(), "sql-kw-sess")
 	if err != nil {
 		t.Fatalf("GetSession with SQL keyword content: %v", err)
 	}
@@ -446,7 +453,7 @@ func TestMalformedData_SearchWithSpecialSQLChars(t *testing.T) {
 
 	for _, payload := range likePayloads {
 		t.Run("Search_"+truncatePayload(payload), func(t *testing.T) {
-			_, err := s.SearchSessions(payload, 100)
+			_, err := s.SearchSessions(context.Background(), payload, 100)
 			if err != nil {
 				t.Fatalf("SearchSessions(%q): %v", payload, err)
 			}
@@ -476,7 +483,7 @@ func TestErrorMessages_GetSessionNotFound(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	_, err := s.GetSession("nonexistent-id")
+	_, err := s.GetSession(context.Background(), "nonexistent-id")
 	if err == nil {
 		t.Fatal("expected error for nonexistent session")
 	}

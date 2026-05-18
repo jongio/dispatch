@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -91,14 +92,21 @@ jobs:
           # Update CONTRIBUTORS.md with all-time contributors
           go run ./cmd/contributors/ --all
 
-          # Commit updated CONTRIBUTORS.md if changed
+          # Commit updated CONTRIBUTORS.md if changed — open a PR instead of pushing directly to main
           if ! git diff --quiet CONTRIBUTORS.md; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+            CONTRIB_BRANCH="auto/contributors-${NEW_TAG}"
+            git checkout -b "$CONTRIB_BRANCH"
             git add CONTRIBUTORS.md
             git commit -m "docs: update CONTRIBUTORS.md for $NEW_TAG"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            git push origin "$CONTRIB_BRANCH"
+            gh pr create \
+              --base main \
+              --head "$CONTRIB_BRANCH" \
+              --title "docs: update CONTRIBUTORS.md for $NEW_TAG" \
+              --body "Auto-generated contributor update for release $NEW_TAG." \
+              --auto
           fi
 
           # Move contrib-notes to temp dir so GoReleaser sees a clean git state

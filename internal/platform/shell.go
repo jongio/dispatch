@@ -4,6 +4,7 @@ package platform
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -132,10 +133,10 @@ func NewResumeCmd(sessionID string, cfg ResumeConfig) (*exec.Cmd, error) {
 	} else {
 		binary := FindCLIBinary()
 		if binary == "" {
-			return nil, errors.New("ghcs/copilot CLI not found in PATH")
+			return nil, ErrCLINotFound
 		}
 		args := BuildResumeArgs(sessionID, cfg)
-		cmd = exec.Command(binary, args...)
+		cmd = exec.CommandContext(context.Background(), binary, args...)
 	}
 	if cwd := resolvedCwd(cfg.Cwd); cwd != "" {
 		cmd.Dir = cwd
@@ -168,9 +169,9 @@ func buildCustomCmd(sessionID, template string) (*exec.Cmd, error) {
 	expanded := strings.ReplaceAll(template, "{sessionId}", sessionID)
 	parts := strings.Fields(expanded)
 	if len(parts) == 0 {
-		return nil, errors.New("custom command is empty after expansion")
+		return nil, ErrEmptyAfterExpansion
 	}
-	return exec.Command(parts[0], parts[1:]...), nil
+	return exec.CommandContext(context.Background(), parts[0], parts[1:]...), nil
 }
 
 // buildResumeCommandString returns the full command string for launching
@@ -196,14 +197,14 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 		}
 		expanded := strings.ReplaceAll(cfg.CustomCommand, "{sessionId}", sessionID)
 		if strings.TrimSpace(expanded) == "" {
-			return "", errors.New("custom command is empty after expansion")
+			return "", ErrEmptyAfterExpansion
 		}
 		return expanded, nil
 	}
 
 	binary := FindCLIBinary()
 	if binary == "" {
-		return "", errors.New("ghcs/copilot CLI not found in PATH")
+		return "", ErrCLINotFound
 	}
 
 	// Choose quoting style: Windows uses double quotes (understood by
@@ -606,7 +607,7 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 				}
 				args = append(args, shell.Path, "-c", bashCmd)
 			}
-			cmd := exec.Command(p, args...)
+			cmd := exec.CommandContext(context.Background(), p, args...)
 			return startAndWaitBriefly(cmd)
 		}
 	}
@@ -614,7 +615,7 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 	// Fallback: use cmd /c start to open a new console window.
 	cmdLine := buildStartCmdLine(shell, resumeCmd)
 
-	cmd := exec.Command("cmd.exe")
+	cmd := exec.CommandContext(context.Background(), "cmd.exe")
 	setCmdLine(cmd, cmdLine)
 	if cwd != "" {
 		cmd.Dir = cwd
@@ -763,11 +764,11 @@ func launchDarwinSession(shell ShellInfo, resumeCmd string, terminal string, cwd
 				escapedShell, escapeAppleScript(resumeCmd),
 			)
 		}
-		cmd := exec.Command("osascript", "-e", script)
+		cmd := exec.CommandContext(context.Background(), "osascript", "-e", script)
 		return startAndWaitBriefly(cmd)
 	case "WezTerm":
 		if p, err := exec.LookPath("wezterm"); err == nil {
-			cmd := exec.Command(p, "start", "--", shell.Path, "-c", resumeCmd)
+			cmd := exec.CommandContext(context.Background(), p, "start", "--", shell.Path, "-c", resumeCmd)
 			if cwd != "" {
 				cmd.Dir = cwd
 			}
@@ -798,7 +799,7 @@ func launchDarwinSession(shell ShellInfo, resumeCmd string, terminal string, cwd
 			escapedShellPath, escapedCmd,
 		)
 	}
-	cmd := exec.Command("osascript", "-e", script)
+	cmd := exec.CommandContext(context.Background(), "osascript", "-e", script)
 	return startAndWaitBriefly(cmd)
 }
 
@@ -849,7 +850,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 		for _, t := range terminals {
 			if t.name == terminal {
 				if p, err := exec.LookPath(t.name); err == nil {
-					cmd := exec.Command(p, t.args()...)
+					cmd := exec.CommandContext(context.Background(), p, t.args()...)
 					if cwd != "" {
 						cmd.Dir = cwd
 					}
@@ -869,7 +870,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 	// Auto-detect: try terminals in order of popularity.
 	for _, t := range terminals {
 		if p, err := exec.LookPath(t.name); err == nil {
-			cmd := exec.Command(p, t.args()...)
+			cmd := exec.CommandContext(context.Background(), p, t.args()...)
 			if cwd != "" {
 				cmd.Dir = cwd
 			}
@@ -877,7 +878,7 @@ func launchLinuxSession(shell ShellInfo, resumeCmd string, terminal string, cwd 
 		}
 	}
 
-	return errors.New("no supported terminal emulator found; tried alacritty, kitty, wezterm, gnome-terminal, konsole, xfce4-terminal, xterm")
+	return fmt.Errorf("%w; tried alacritty, kitty, wezterm, gnome-terminal, konsole, xfce4-terminal, xterm", ErrNoTerminalEmulator)
 }
 
 // launchWSLWindowsTerminal launches a session via wt.exe from within WSL.
@@ -899,7 +900,7 @@ func launchWSLWindowsTerminal(shell ShellInfo, resumeCmd string, cwd string, lau
 	distro := os.Getenv("WSL_DISTRO_NAME")
 	args := buildWSLWTArgs(shell, resumeCmd, winCwd, distro, launchStyle, paneDirection)
 
-	cmd := exec.Command(p, args...)
+	cmd := exec.CommandContext(context.Background(), p, args...)
 	return startAndWaitBriefly(cmd)
 }
 
@@ -935,7 +936,7 @@ func buildWSLWTArgs(shell ShellInfo, resumeCmd, winCwd, distro, launchStyle, pan
 // wslToWindowsPath translates a Linux filesystem path to a Windows path
 // using the wslpath utility available inside WSL.
 func wslToWindowsPath(linuxPath string) (string, error) {
-	cmd := exec.Command("wslpath", "-w", linuxPath)
+	cmd := exec.CommandContext(context.Background(), "wslpath", "-w", linuxPath)
 	out, err := cmd.Output()
 	if err != nil {
 		// Include stderr from wslpath for better diagnostics.

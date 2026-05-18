@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ func TestCovListSessionsByIDs_Empty(t *testing.T) {
 	s := newTestStore(t)
 	defer s.Close() //nolint:errcheck // test cleanup
 
-	sessions, err := s.ListSessionsByIDs(nil)
+	sessions, err := s.ListSessionsByIDs(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs(nil): %v", err)
 	}
@@ -25,7 +26,7 @@ func TestCovListSessionsByIDs_Empty(t *testing.T) {
 		t.Errorf("expected nil, got %v", sessions)
 	}
 
-	sessions, err = s.ListSessionsByIDs([]string{})
+	sessions, err = s.ListSessionsByIDs(context.Background(), []string{})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs([]): %v", err)
 	}
@@ -39,7 +40,7 @@ func TestCovListSessionsByIDs_Found(t *testing.T) {
 	defer s.Close() //nolint:errcheck // test cleanup
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessionsByIDs([]string{"sess-1", "sess-2"})
+	sessions, err := s.ListSessionsByIDs(context.Background(), []string{"sess-1", "sess-2"})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestCovListSessionsByIDs_PreservesInputOrder(t *testing.T) {
 	populateTestData(t, s)
 
 	// Request in reverse order — output must match input order.
-	sessions, err := s.ListSessionsByIDs([]string{"sess-3", "sess-1"})
+	sessions, err := s.ListSessionsByIDs(context.Background(), []string{"sess-3", "sess-1"})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestCovListSessionsByIDs_MissingIDsSkipped(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessionsByIDs([]string{"sess-1", "nonexistent", "sess-2"})
+	sessions, err := s.ListSessionsByIDs(context.Background(), []string{"sess-1", "nonexistent", "sess-2"})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestCovListSessionsByIDs_AllMissing(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessionsByIDs([]string{"nonexistent-1", "nonexistent-2"})
+	sessions, err := s.ListSessionsByIDs(context.Background(), []string{"nonexistent-1", "nonexistent-2"})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestCovListSessionsByIDs_IncludesTurnAndFileCount(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessionsByIDs([]string{"sess-1"})
+	sessions, err := s.ListSessionsByIDs(context.Background(), []string{"sess-1"})
 	if err != nil {
 		t.Fatalf("ListSessionsByIDs: %v", err)
 	}
@@ -220,7 +221,7 @@ func TestCovListSessions_ZeroLimit(t *testing.T) {
 	populateTestData(t, s)
 
 	// limit <= 0 defaults to 100.
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -235,7 +236,7 @@ func TestCovListSessions_SmallLimit(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	sessions, err := s.ListSessions(FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 2)
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 2)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -324,7 +325,7 @@ func TestCovSearchSessions_ZeroLimit(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("auth", 0)
+	results, err := s.SearchSessions(context.Background(), "auth", 0)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -339,7 +340,7 @@ func TestCovSearchSessions_NoResults(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	results, err := s.SearchSessions("zzz_nonexistent_query_zzz", 100)
+	results, err := s.SearchSessions(context.Background(), "zzz_nonexistent_query_zzz", 100)
 	if err != nil {
 		t.Fatalf("SearchSessions: %v", err)
 	}
@@ -357,7 +358,7 @@ func TestCovGroupSessions_ZeroLimit(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	groups, err := s.GroupSessions(PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
 	if err != nil {
 		t.Fatalf("GroupSessions: %v", err)
 	}
@@ -374,7 +375,7 @@ func TestCovGroupSessions_AllPivots(t *testing.T) {
 	pivots := []PivotField{PivotByFolder, PivotByRepo, PivotByBranch, PivotByDate}
 	for _, p := range pivots {
 		t.Run(string(p), func(t *testing.T) {
-			groups, err := s.GroupSessions(p, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 100)
+			groups, err := s.GroupSessions(context.Background(), p, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 100)
 			if err != nil {
 				t.Fatalf("GroupSessions(%s): %v", p, err)
 			}
@@ -399,7 +400,7 @@ func TestCovListBranches_NoFilter(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("")
+	branches, err := s.ListBranches(context.Background(), "")
 	if err != nil {
 		t.Fatalf("ListBranches: %v", err)
 	}
@@ -413,7 +414,7 @@ func TestCovListBranches_WithFilter(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	branches, err := s.ListBranches("owner/repo-a")
+	branches, err := s.ListBranches(context.Background(), "owner/repo-a")
 	if err != nil {
 		t.Fatalf("ListBranches: %v", err)
 	}
@@ -431,7 +432,7 @@ func TestCovListFolders(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	folders, err := s.ListFolders()
+	folders, err := s.ListFolders(context.Background())
 	if err != nil {
 		t.Fatalf("ListFolders: %v", err)
 	}
@@ -449,7 +450,7 @@ func TestCovListRepositories(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	repos, err := s.ListRepositories()
+	repos, err := s.ListRepositories(context.Background())
 	if err != nil {
 		t.Fatalf("ListRepositories: %v", err)
 	}
@@ -462,7 +463,7 @@ func TestCovListRepositories_EmptyStore(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 
-	repos, err := s.ListRepositories()
+	repos, err := s.ListRepositories(context.Background())
 	if err != nil {
 		t.Fatalf("ListRepositories: %v", err)
 	}
@@ -529,7 +530,7 @@ func TestCovOpenPath_BadSQLiteFile(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	// If open succeeded, queries should fail.
-	_, err = store.ListFolders()
+	_, err = store.ListFolders(context.Background())
 	if err == nil {
 		t.Error("expected query error on invalid SQLite file")
 	}

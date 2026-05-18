@@ -78,6 +78,39 @@ const deadSessionMaxAge = 24 * time.Hour
 // are always Idle to avoid surfacing long-abandoned crashes.
 const interruptedMaxAge = 72 * time.Hour
 
+// scanSessions resolves the session-state directory, iterates valid session
+// subdirectories, and calls classify for each one. The callback receives the
+// full directory path and the directory entry; it returns the AttentionStatus
+// to record for that session. This helper eliminates the repeated preamble
+// shared by ScanAttention and ScanAttentionQuick.
+func scanSessions(classify func(dir string, entry os.DirEntry) AttentionStatus) map[string]AttentionStatus {
+	stateDir := sessionStatePath()
+	if stateDir == "" {
+		return nil
+	}
+
+	entries, err := os.ReadDir(stateDir)
+	if err != nil {
+		return nil
+	}
+
+	result := make(map[string]AttentionStatus, len(entries))
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		sessionID := e.Name()
+		if !validate.SessionID(sessionID) {
+			continue
+		}
+		dir := filepath.Join(stateDir, sessionID)
+		result[sessionID] = classify(dir, e)
+	}
+
+	return result
+}
+
 // ScanAttention reads the Copilot CLI session-state directories and returns
 // a map of session ID → AttentionStatus. The threshold parameter controls
 // how long a running session can be quiet before it is classified as stale.
@@ -85,33 +118,9 @@ const interruptedMaxAge = 72 * time.Hour
 // The scan is read-only and does not modify any files. It completes in
 // under 50 ms for 100 sessions on typical hardware.
 func ScanAttention(threshold time.Duration, workspaceRecovery bool) map[string]AttentionStatus {
-	stateDir := sessionStatePath()
-	if stateDir == "" {
-		return nil
-	}
-
-	entries, err := os.ReadDir(stateDir)
-	if err != nil {
-		return nil
-	}
-
-	result := make(map[string]AttentionStatus, len(entries))
-
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		sessionID := e.Name()
-		if !validate.SessionID(sessionID) {
-			continue
-		}
-		dir := filepath.Join(stateDir, sessionID)
-
-		status := classifySession(dir, threshold, workspaceRecovery)
-		result[sessionID] = status
-	}
-
-	return result
+	return scanSessions(func(dir string, _ os.DirEntry) AttentionStatus {
+		return classifySession(dir, threshold, workspaceRecovery)
+	})
 }
 
 // ScanAttentionQuick performs a fast first pass that only checks lock files
@@ -119,47 +128,22 @@ func ScanAttention(threshold time.Duration, workspaceRecovery bool) map[string]A
 // reading events.jsonl. Use this for the initial scan to get dots visible
 // immediately, then follow up with ScanAttention for full classification.
 func ScanAttentionQuick(threshold time.Duration, workspaceRecovery bool) map[string]AttentionStatus {
-	stateDir := sessionStatePath()
-	if stateDir == "" {
-		return nil
-	}
-
-	entries, err := os.ReadDir(stateDir)
-	if err != nil {
-		return nil
-	}
-
-	result := make(map[string]AttentionStatus, len(entries))
-
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		sessionID := e.Name()
-		if !validate.SessionID(sessionID) {
-			continue
-		}
-		dir := filepath.Join(stateDir, sessionID)
-
+	return scanSessions(func(dir string, _ os.DirEntry) AttentionStatus {
 		pidRes := findSessionPID(dir)
 		if pidRes.pid <= 0 {
 			if pidRes.hasStale && workspaceRecovery {
 				// Preliminary: mark interrupted so dots appear immediately.
 				// Full scan refines this (e.g., turn_end → Waiting).
-				result[sessionID] = AttentionInterrupted
-			} else {
-				// Dead session — skip events.jsonl for speed.
-				result[sessionID] = AttentionIdle
+				return AttentionInterrupted
 			}
-			continue
+			// Dead session — skip events.jsonl for speed.
+			return AttentionIdle
 		}
 
 		// Live session — full classification (fast since events.jsonl
 		// is typically small for active sessions).
-		result[sessionID] = classifyLiveSession(dir, threshold)
-	}
-
-	return result
+		return classifyLiveSession(dir, threshold)
+	})
 }
 
 // classifySession determines the attention status of a single session

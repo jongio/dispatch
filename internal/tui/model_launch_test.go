@@ -23,8 +23,10 @@ func TestLaunchMultiple_NoSelections_NoFolder(t *testing.T) {
 	// No selections and cursor is on a session (not a folder) — should
 	// fall through to launchSelected().
 	cmd := m.launchMultiple()
-	// launchSelected needs a shell to resolve — with no shells it returns nil.
-	_ = cmd
+	// launchSelected resolves to a platform default shell and produces a command.
+	if cmd == nil {
+		t.Error("launchMultiple should return a non-nil command when sessions exist")
+	}
 }
 
 func TestLaunchMultiple_WithSelectedSessions(t *testing.T) {
@@ -45,8 +47,10 @@ func TestLaunchMultiple_WithSelectedSessions(t *testing.T) {
 	m.sessionList.ToggleSelected() // s2
 
 	cmd := m.launchMultiple()
-	// With selected sessions, should call batchLaunchSessions
-	_ = cmd
+	// With selected sessions, batchLaunchSessions resolves shells and returns a batch command.
+	if cmd == nil {
+		t.Error("launchMultiple with selected sessions should return a non-nil command")
+	}
 }
 
 func TestLaunchMultiple_FolderSelected(t *testing.T) {
@@ -68,7 +72,10 @@ func TestLaunchMultiple_FolderSelected(t *testing.T) {
 	// Cursor is on folder node
 
 	cmd := m.launchMultiple()
-	_ = cmd
+	// Folder sessions are launched via batchLaunchSessions which resolves shells.
+	if cmd == nil {
+		t.Error("launchMultiple on folder should return a non-nil command")
+	}
 }
 
 func TestLaunchMultiple_EmptySelectedSessions(t *testing.T) {
@@ -77,8 +84,10 @@ func TestLaunchMultiple_EmptySelectedSessions(t *testing.T) {
 	m.sessionList.SetSessions(nil)
 
 	cmd := m.launchMultiple()
-	// With no sessions at all, should fall through to launchSelected
-	_ = cmd
+	// With no sessions at all, launchSelected returns nil (no cursor session).
+	if cmd != nil {
+		t.Error("launchMultiple with no sessions should return nil")
+	}
 }
 
 func TestLaunchMultiple_InPlaceModeForced(t *testing.T) {
@@ -98,7 +107,9 @@ func TestLaunchMultiple_InPlaceModeForced(t *testing.T) {
 
 	// In-place mode should be forced to tab mode for multi-launch
 	cmd := m.launchMultiple()
-	_ = cmd
+	if cmd == nil {
+		t.Error("launchMultiple in-place mode should return a non-nil command")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -124,8 +135,10 @@ func TestBatchLaunchSessions_UnderLimit(t *testing.T) {
 	}
 
 	cmd := m.batchLaunchSessions(sessions, config.LaunchModeTab)
-	// Should process all sessions — cmd may be nil if no shells configured
-	_ = cmd
+	// Should process all sessions - platform.DefaultShell() provides a shell.
+	if cmd == nil {
+		t.Error("batchLaunchSessions with valid sessions should return a non-nil command")
+	}
 	// statusInfo should be cleared
 	if m.statusInfo != "" {
 		t.Errorf("statusInfo should be empty, got %q", m.statusInfo)
@@ -143,7 +156,10 @@ func TestBatchLaunchSessions_ExceedsLimit(t *testing.T) {
 	}
 
 	cmd := m.batchLaunchSessions(sessions, config.LaunchModeTab)
-	_ = cmd
+	// Even with sessions exceeding the limit, the first maxBatchLaunch are launched.
+	if cmd == nil {
+		t.Error("batchLaunchSessions exceeding limit should still return a non-nil command")
+	}
 	// After batch launch, statusInfo is cleared (the limit message is set then cleared)
 }
 
@@ -173,7 +189,10 @@ func TestLaunchMultipleWithMode_WithSelections(t *testing.T) {
 	m.sessionList.ToggleSelected()
 
 	cmd := m.launchMultipleWithMode(config.LaunchModeTab)
-	_ = cmd
+	// With selections, should return a non-nil batch command.
+	if cmd == nil {
+		t.Error("launchMultipleWithMode with selections should return a non-nil command")
+	}
 }
 
 // ---------------------------------------------------------------------------

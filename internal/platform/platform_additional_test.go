@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,8 +232,8 @@ func TestBuildResumeCommandString_NormalPathWithoutCustomCommand(t *testing.T) {
 	})
 	if err != nil {
 		// CLI not found — that's a valid path too (covers the error branch).
-		if !strings.Contains(err.Error(), "not found") {
-			t.Errorf("unexpected error: %v", err)
+		if !errors.Is(err, ErrCLINotFound) {
+			t.Errorf("expected ErrCLINotFound, got: %v", err)
 		}
 	} else {
 		if result == "" {
@@ -287,8 +288,8 @@ func TestNewResumeCmd_CLINotFoundInPATH(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when CLI binary is not in PATH")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected 'not found' error, got: %v", err)
+	if !errors.Is(err, ErrCLINotFound) {
+		t.Errorf("expected ErrCLINotFound, got: %v", err)
 	}
 }
 
@@ -398,8 +399,8 @@ func TestBuildResumeCommandString_CLINotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when CLI binary is not in PATH")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected 'not found' in error, got: %v", err)
+	if !errors.Is(err, ErrCLINotFound) {
+		t.Errorf("expected ErrCLINotFound, got: %v", err)
 	}
 }
 

@@ -61,19 +61,30 @@ const (
 
 var (
 	updateHTTPTransport = http.DefaultTransport
-	versionPattern      = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+
+	// sharedClient is reused across sequential update requests. The
+	// transport is already shared; this avoids re-creating the wrapper
+	// struct on every call. Per-request timeouts are enforced via
+	// context.WithTimeout instead of http.Client.Timeout so that a
+	// single client can serve requests with different deadlines.
+	sharedClient = &http.Client{
+		Transport:     updateHTTPTransport,
+		CheckRedirect: httpsOnlyCheckRedirect,
+	}
+
+	versionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 func validateVersion(v string) error {
 	if !versionPattern.MatchString(v) {
-		return fmt.Errorf("invalid version %q: expected semantic version in major.minor.patch format", v)
+		return fmt.Errorf("%w: %q: expected semantic version in major.minor.patch format", ErrInvalidVersion, v)
 	}
 	return nil
 }
 
 // RunUpdate downloads and installs the latest version of dispatch. It
 // prints progress to stderr and returns an error on failure.
-func RunUpdate(currentVersion string) error {
+func RunUpdate(ctx context.Context, currentVersion string) error {
 	configDir, err := platform.ConfigDir()
 	if err != nil {
 		return fmt.Errorf("resolving config directory: %w", err)
@@ -89,12 +100,12 @@ func RunUpdate(currentVersion string) error {
 	}
 	defer releaseUpdateLock(lock)
 
-	latest, err := fetchLatestVersion()
+	latest, err := fetchLatestVersion(ctx)
 	if err != nil {
-		return fmt.Errorf("checking latest version: %w", err)
+		return fmt.Errorf("%w: %w", ErrCheckingVersion, err)
 	}
 	if err := validateVersion(latest); err != nil {
-		return fmt.Errorf("invalid latest version: %w", err)
+		return fmt.Errorf("%w: %w", ErrInvalidVersion, err)
 	}
 
 	if CompareVersions(latest, currentVersion) <= 0 {
@@ -115,20 +126,20 @@ func RunUpdate(currentVersion string) error {
 	asset := AssetName(latest)
 	assetURL := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, latest, asset)
 	archivePath := filepath.Join(tmpDir, asset)
-	if err := downloadAsset(archivePath, assetURL); err != nil {
-		return fmt.Errorf("downloading %s: %w", asset, err)
+	if err := downloadAsset(ctx, archivePath, assetURL); err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrDownloading, asset, err)
 	}
 
 	// Download and verify checksum.
 	checksumURL := fmt.Sprintf("%s/v%s/%s", downloadBaseURL, latest, checksumFileName)
-	if err := verifyChecksum(archivePath, checksumURL, asset); err != nil {
+	if err := verifyChecksum(ctx, archivePath, checksumURL, asset); err != nil {
 		return fmt.Errorf("checksum verification: %w", err)
 	}
 
 	// Extract the binary from the archive.
 	binPath, err := extractBinary(archivePath, tmpDir)
 	if err != nil {
-		return fmt.Errorf("extracting binary: %w", err)
+		return fmt.Errorf("%w: %w", ErrExtractingBinary, err)
 	}
 
 	// Replace the running binary.
@@ -164,43 +175,36 @@ func assetNameForPlatform(version, goos, goarch string) string {
 
 func httpsOnlyCheckRedirect(req *http.Request, via []*http.Request) error {
 	if req.URL.Scheme != "https" {
-		return fmt.Errorf("refusing redirect to non-HTTPS URL: %s", req.URL)
+		return fmt.Errorf("%w: %s", ErrNonHTTPS, req.URL)
 	}
 	if len(via) >= maxRedirects {
-		return errors.New("too many redirects")
+		return ErrTooManyRedirects
 	}
 	return nil
 }
 
-func newSecureClient(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout:       timeout,
-		Transport:     updateHTTPTransport,
-		CheckRedirect: httpsOnlyCheckRedirect,
-	}
-}
-
 // downloadAsset downloads a URL to a local file path with HTTPS-only
 // redirect enforcement and size limits.
-func downloadAsset(dst, url string) error {
-	client := newSecureClient(downloadTimeout)
+func downloadAsset(ctx context.Context, dst, url string) error {
+	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request for %s: %w", url, err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := sharedClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", url, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+		return fmt.Errorf("%w: HTTP %d from %s", ErrHTTPStatus, resp.StatusCode, url)
 	}
 	if resp.ContentLength > maxDownloadSize {
-		return fmt.Errorf("download exceeds %d bytes", maxDownloadSize)
+		return fmt.Errorf("%w: download exceeds %d bytes", ErrDownloadExceeded, maxDownloadSize)
 	}
 
 	out, err := os.Create(dst)
@@ -219,25 +223,26 @@ func downloadAsset(dst, url string) error {
 
 // verifyChecksum downloads the checksum file and verifies the SHA-256
 // hash of the downloaded archive.
-func verifyChecksum(archivePath, checksumURL, archiveName string) error {
-	client := newSecureClient(apiTimeout)
+func verifyChecksum(ctx context.Context, archivePath, checksumURL, archiveName string) error {
+	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, checksumURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checksumURL, nil)
 	if err != nil {
 		return fmt.Errorf("creating checksum request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := sharedClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("downloading checksums: %w", err)
+		return fmt.Errorf("%w: %w", ErrDownloadingChecksums, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d fetching checksums", resp.StatusCode)
+		return fmt.Errorf("%w: HTTP %d fetching checksums", ErrHTTPStatus, resp.StatusCode)
 	}
 	if resp.ContentLength > maxChecksumSize {
-		return fmt.Errorf("checksums file exceeds %d bytes", maxChecksumSize)
+		return fmt.Errorf("%w: checksums file exceeds %d bytes", ErrPayloadExceeded, maxChecksumSize)
 	}
 
 	checksumData, err := io.ReadAll(io.LimitReader(resp.Body, maxChecksumSize+1))
@@ -245,7 +250,7 @@ func verifyChecksum(archivePath, checksumURL, archiveName string) error {
 		return fmt.Errorf("reading checksums: %w", err)
 	}
 	if int64(len(checksumData)) > maxChecksumSize {
-		return fmt.Errorf("checksums file exceeds %d bytes", maxChecksumSize)
+		return fmt.Errorf("%w: checksums file exceeds %d bytes", ErrPayloadExceeded, maxChecksumSize)
 	}
 
 	// Find the expected hash for our archive.
@@ -257,11 +262,11 @@ func verifyChecksum(archivePath, checksumURL, archiveName string) error {
 	// Compute the actual hash of the downloaded file.
 	actualHash, err := SHA256File(archivePath)
 	if err != nil {
-		return fmt.Errorf("computing checksum: %w", err)
+		return fmt.Errorf("%w: %w", ErrComputingChecksum, err)
 	}
 
 	if actualHash != expectedHash {
-		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHash, actualHash)
+		return fmt.Errorf("%w: expected %s, got %s", ErrChecksumMismatch, expectedHash, actualHash)
 	}
 
 	return nil
@@ -281,7 +286,7 @@ func ParseChecksum(content, filename string) (string, error) {
 			return strings.ToLower(parts[0]), nil
 		}
 	}
-	return "", fmt.Errorf("no checksum found for %s", filename)
+	return "", fmt.Errorf("%w: no checksum found for %s", ErrChecksumMismatch, filename)
 }
 
 // SHA256File computes the SHA-256 hash of a file and returns it as a
@@ -307,7 +312,7 @@ func copyWithLimit(dst io.Writer, src io.Reader, maxBytes int64) error {
 		return err
 	}
 	if written > maxBytes {
-		return fmt.Errorf("payload exceeds %d bytes", maxBytes)
+		return fmt.Errorf("%w: payload exceeds %d bytes", ErrPayloadExceeded, maxBytes)
 	}
 	return nil
 }
@@ -324,7 +329,7 @@ func matchArchiveTarget(name, target string) (bool, error) {
 		return true, nil
 	}
 	if path.Base(normalized) == target {
-		return false, fmt.Errorf("unsafe archive entry path %q", name)
+		return false, fmt.Errorf("%w: %q", ErrUnsafeArchivePath, name)
 	}
 	return false, nil
 }
@@ -342,7 +347,7 @@ func extractBinary(archivePath, destDir string) (string, error) {
 func extractFromTarGz(archivePath, destDir string) (string, error) {
 	f, err := os.Open(archivePath)
 	if err != nil {
-		return "", fmt.Errorf("opening archive: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrOpeningArchive, err)
 	}
 	defer f.Close() //nolint:errcheck // read-only
 
@@ -370,7 +375,7 @@ func extractFromTarGz(archivePath, destDir string) (string, error) {
 			continue
 		}
 		if header.Typeflag != tar.TypeReg {
-			return "", fmt.Errorf("unsupported tar entry type for %s", header.Name)
+			return "", fmt.Errorf("%w: %s", ErrUnsupportedTarEntry, header.Name)
 		}
 
 		dst := filepath.Join(destDir, binaryName)
@@ -396,7 +401,7 @@ func extractFromTarGz(archivePath, destDir string) (string, error) {
 func extractFromZip(archivePath, destDir string) (string, error) {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return "", fmt.Errorf("opening zip: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrOpeningZip, err)
 	}
 	defer r.Close() //nolint:errcheck // read-only
 
@@ -469,7 +474,7 @@ func replaceUnix(newBinaryPath, exePath string) error {
 
 	src, err := os.Open(newBinaryPath)
 	if err != nil {
-		return fmt.Errorf("opening new binary: %w", err)
+		return fmt.Errorf("%w: %w", ErrOpeningBinary, err)
 	}
 	defer src.Close() //nolint:errcheck // read-only
 

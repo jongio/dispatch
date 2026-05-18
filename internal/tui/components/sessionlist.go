@@ -26,24 +26,26 @@ type displayItem struct {
 // SessionList renders a vertical list of sessions with optional collapsible
 // folder tree grouping when pivoting is active.
 type SessionList struct {
-	allItems      []displayItem                    // every item (folders + sessions)
-	visItems      []int                            // indices into allItems that are currently visible
-	expanded      map[string]struct{}              // folder path → expanded state (tree mode)
-	hiddenSet     map[string]struct{}              // session ID → hidden sessions
-	favoritedSet  map[string]struct{}              // session ID → favorited sessions
-	aiSet         map[string]struct{}              // session ID → AI-found sessions
-	attentionMap  map[string]data.AttentionStatus  // session ID → attention status
-	planMap       map[string]bool                  // session ID → has plan.md
-	workStatusMap map[string]data.WorkStatusResult // session ID → work status
-	selected      map[string]struct{}              // session ID → selected for multi-open
-	treeMode      bool                             // true when showing grouped/tree view
-	pivotField    string                           // current pivot mode (e.g. "folder", "repo")
-	cursor        int                              // position within visItems
-	anchor        int                              // anchor for Shift+click range selection
-	shifting      bool                             // true while shift+arrow range selection is active
-	scrollOffset  int                              // first visible position within visItems
-	width         int
-	height        int
+	allItems       []displayItem                    // every item (folders + sessions)
+	visItems       []int                            // indices into allItems that are currently visible
+	expanded       map[string]struct{}              // folder path → expanded state (tree mode)
+	hiddenSet      map[string]struct{}              // session ID → hidden sessions
+	favoritedSet   map[string]struct{}              // session ID → favorited sessions
+	aiSet          map[string]struct{}              // session ID → AI-found sessions
+	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
+	planMap        map[string]bool                  // session ID → has plan.md
+	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
+	selected       map[string]struct{}              // session ID → selected for multi-open
+	treeMode       bool                             // true when showing grouped/tree view
+	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
+	cursor         int                              // position within visItems
+	anchor         int                              // anchor for Shift+click range selection
+	shifting       bool                             // true while shift+arrow range selection is active
+	scrollOffset   int                              // first visible position within visItems
+	width          int
+	height         int
+	cachedPad      string // cached padding string (spaces x width)
+	cachedPadWidth int    // width used to generate cachedPad
 }
 
 // NewSessionList returns an empty SessionList.
@@ -52,6 +54,15 @@ func NewSessionList() SessionList {
 		expanded: make(map[string]struct{}),
 		selected: make(map[string]struct{}),
 	}
+}
+
+// pad returns a width-sized padding string, regenerating only when width changes.
+func (s *SessionList) pad() string {
+	if s.cachedPadWidth != s.width {
+		s.cachedPad = strings.Repeat(" ", s.width)
+		s.cachedPadWidth = s.width
+	}
+	return s.cachedPad
 }
 
 // SetSessions replaces the list content with a flat slice of sessions.
@@ -612,7 +623,7 @@ func (s SessionList) View() string {
 	}
 	// Pad to full height.
 	for len(lines) < s.height {
-		lines = append(lines, strings.Repeat(" ", s.width))
+		lines = append(lines, s.pad())
 	}
 	// Safety net: ensure exactly s.height newline-delimited lines.
 	// A wrapped row from lipgloss could produce embedded newlines.
@@ -622,7 +633,7 @@ func (s SessionList) View() string {
 		all = all[:s.height]
 	} else {
 		for len(all) < s.height {
-			all = append(all, strings.Repeat(" ", s.width))
+			all = append(all, s.pad())
 		}
 	}
 	return strings.Join(all, "\n")
@@ -826,6 +837,16 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
 }
 
+// renderDot returns a styled 2-character string (icon + space). When selected
+// is true the icon is returned unstyled so the outer SelectedStyle highlight
+// spans the row without ANSI-reset gaps.
+func renderDot(icon string, style lipgloss.Style, selected bool) string {
+	if selected {
+		return icon + " "
+	}
+	return style.Render(icon + " ")
+}
+
 // attentionDot returns a styled 2-character string (dot + space) representing
 // the attention status of the given session. If no attention data is available
 // the dot is omitted but the space is preserved for alignment.
@@ -870,15 +891,7 @@ func (s SessionList) attentionDot(sessionID string, selected bool) string {
 		icon = styles.IconAttentionIdle()
 	}
 
-	// When the row is selected, return the plain icon without lipgloss
-	// styling. lipgloss.Render appends an ANSI reset (\033[0m) that would
-	// kill the outer SelectedStyle background mid-line. Returning raw text
-	// lets the outer Render call apply a uniform highlight across the row.
-	if selected {
-		return icon + " "
-	}
-
-	return dotStyle.Render(icon + " ")
+	return renderDot(icon, dotStyle, selected)
 }
 
 // planDot returns a styled 2-character string (dot + space) for sessions
@@ -891,10 +904,7 @@ func (s SessionList) planDot(sessionID string, selected bool) string {
 
 	icon := styles.IconPlan()
 
-	if selected {
-		return icon + " "
-	}
-	return styles.PlanIndicatorStyle.Render(icon + " ")
+	return renderDot(icon, styles.PlanIndicatorStyle, selected)
 }
 
 // workStatusDot returns a styled 2-character string (icon + space) representing
@@ -925,8 +935,5 @@ func (s SessionList) workStatusDot(sessionID string, selected bool) string {
 		return "  "
 	}
 
-	if selected {
-		return icon + " "
-	}
-	return dotStyle.Render(icon + " ")
+	return renderDot(icon, dotStyle, selected)
 }

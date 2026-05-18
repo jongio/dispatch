@@ -92,6 +92,7 @@ CREATE INDEX idx_sessions_repo ON sessions(repository);
 CREATE INDEX idx_turns_session ON turns(session_id);
 CREATE INDEX idx_checkpoints_session ON checkpoints(session_id);
 CREATE INDEX idx_session_files_path ON session_files(file_path);
+CREATE INDEX idx_session_files_session ON session_files(session_id);
 CREATE INDEX idx_session_refs_type_value ON session_refs(ref_type, ref_value);
 `
 

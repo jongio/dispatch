@@ -1,16 +1,20 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
-	_ "modernc.org/sqlite"
+	"golang.org/x/sync/errgroup"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // ErrIndexBusy is returned when the session store database is locked
@@ -66,14 +70,14 @@ func OpenPath(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening session store: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("connecting to session store: %w", err)
 	}
 
 	// Detect schema version: check if host_type column exists.
 	hasHostType := false
-	rows, err := db.Query("PRAGMA table_info(sessions)")
+	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(sessions)")
 	if err == nil {
 		defer rows.Close() //nolint:errcheck
 		for rows.Next() {
@@ -93,13 +97,16 @@ func OpenPath(path string) (*Store, error) {
 
 	// Detect FTS5 search_index table availability.
 	hasFTS5 := false
-	ftsRow := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='search_index'")
+	ftsRow := db.QueryRowContext(context.Background(), "SELECT name FROM sqlite_master WHERE type='table' AND name='search_index'")
 	var ftsName string
 	if ftsRow.Scan(&ftsName) == nil && ftsName == "search_index" {
 		hasFTS5 = true
 	}
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		slog.Warn("could not resolve home directory", "error", err)
+	}
 	return &Store{db: db, hasHostType: hasHostType, hasFTS5: hasFTS5, tempDir: os.TempDir(), homeDir: homeDir}, nil
 }
 
@@ -132,7 +139,7 @@ func Maintain() error {
 	defer func() { _ = db.Close() }()
 
 	// Checkpoint WAL — consolidates write-ahead log into the main db.
-	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+	if _, err := db.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
 		if isDBBusy(err) {
 			return ErrIndexBusy
 		}
@@ -141,7 +148,7 @@ func Maintain() error {
 
 	// Rebuild FTS5 search index from source data.
 	// FTS5 table may not exist in older stores — only ignore "no such table".
-	if _, err := db.Exec("INSERT INTO search_index(search_index) VALUES('rebuild')"); err != nil {
+	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('rebuild')"); err != nil {
 		if !strings.Contains(err.Error(), "no such table") {
 			if isDBBusy(err) {
 				return ErrIndexBusy
@@ -151,7 +158,7 @@ func Maintain() error {
 	}
 
 	// Optimise FTS5 index (merge internal b-tree segments).
-	if _, err := db.Exec("INSERT INTO search_index(search_index) VALUES('optimize')"); err != nil {
+	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('optimize')"); err != nil {
 		if !strings.Contains(err.Error(), "no such table") {
 			if isDBBusy(err) {
 				return ErrIndexBusy
@@ -181,12 +188,32 @@ func LastReindexTime() time.Time {
 	return time.Time{}
 }
 
-// isDBBusy returns true if the error indicates the database is locked
-// or busy — typically because the Copilot CLI is actively reindexing.
+// isDBBusy returns true if err indicates the SQLite database is busy or
+// locked. It first tries errors.As to extract the typed *sqlite.Error and
+// check the numeric error code (SQLITE_BUSY=5, SQLITE_LOCKED=6). This
+// catches errors produced by the modernc.org/sqlite driver directly.
+//
+// A string-based fallback is retained because database/sql may rewrap driver
+// errors in ways that strip the typed *sqlite.Error (e.g. via fmt.Errorf
+// without %w in older call sites). The fallback ensures busy detection still
+// works in those edge cases.
 func isDBBusy(err error) bool {
 	if err == nil {
 		return false
 	}
+
+	// Prefer typed error code check via errors.As.
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		code := sqliteErr.Code()
+		// Mask off extended error code bits to get the primary result code.
+		primary := code & 0xFF
+		if primary == sqlite3.SQLITE_BUSY || primary == sqlite3.SQLITE_LOCKED {
+			return true
+		}
+	}
+
+	// Fallback: string matching for errors that lost the typed wrapper.
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "database is locked") ||
 		strings.Contains(msg, "database table is locked") ||
@@ -347,9 +374,16 @@ var sessionColumnsBase = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), 
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,'')`
 
 // sessionColumnsSuffix is the computed columns appended after host_type.
+// Turn and file counts come from pre-aggregated LEFT JOINs (see countJoins)
+// rather than correlated subqueries, which avoids per-row rescans.
 var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
-	(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turn_count,
-	(SELECT COUNT(DISTINCT sf.file_path) FROM session_files sf WHERE sf.session_id = s.id) AS file_count`
+	COALESCE(tc.turn_count, 0) AS turn_count,
+	COALESCE(fc.file_count, 0) AS file_count`
+
+// countJoins provides the LEFT JOINs for pre-aggregated turn and file counts.
+// Every query that uses sessionColumnsSuffix must include these joins.
+const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
+	` LEFT JOIN (SELECT session_id, COUNT(DISTINCT file_path) AS file_count FROM session_files GROUP BY session_id) fc ON fc.session_id = s.id`
 
 // sessionColumns returns the full SELECT column list, including host_type
 // when the schema supports it.
@@ -418,11 +452,11 @@ func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
 
 // ListSessions returns sessions matching the filter, ordered and limited as
 // specified. TurnCount and FileCount are computed via subqueries.
-func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
+func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
 	var fb filterBuilder
 	fb.apply(s.withAutoExclusions(filter))
 
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + fb.joinSQL() + fb.whereSQL()
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + fb.joinSQL() + fb.whereSQL()
 	q += fmt.Sprintf(" ORDER BY %s %s", sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
@@ -431,7 +465,7 @@ func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) 
 	q += limitClause
 	fb.args = append(fb.args, limit)
 
-	rows, err := s.db.Query(q, fb.args...)
+	rows, err := s.db.QueryContext(ctx, q, fb.args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying sessions: %w", err)
 	}
@@ -453,7 +487,7 @@ func (s *Store) ListSessions(filter FilterOptions, sort SortOptions, limit int) 
 
 // ListSessionsByIDs returns sessions matching the given IDs, preserving the
 // input order. IDs not found in the database are silently skipped.
-func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
+func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -469,10 +503,10 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s WHERE s.id IN (" +
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
 		strings.Join(placeholders, ",") + ")"
 
-	rows, err := s.db.Query(q, args...)
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying sessions by IDs: %w", err)
 	}
@@ -503,8 +537,8 @@ func (s *Store) ListSessionsByIDs(ids []string) ([]Session, error) {
 
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
-func (s *Store) GetSession(id string) (*SessionDetail, error) {
-	row := s.db.QueryRow("SELECT "+s.sessionColumns()+" FROM sessions s WHERE s.id = ?", id)
+func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, error) {
+	row := s.db.QueryRowContext(ctx, "SELECT "+s.sessionColumns()+" FROM sessions s"+countJoins+" WHERE s.id = ?", id)
 	sess, err := scanSession(row)
 	if err != nil {
 		return nil, fmt.Errorf("loading session %s: %w", id, err)
@@ -512,88 +546,112 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 
 	detail := &SessionDetail{Session: sess}
 
-	// Turns
-	tRows, err := s.db.Query(
-		`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
-		 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
+	// The four child queries are independent of each other; run them in
+	// parallel to reduce wall-clock latency.
+	var (
+		turns       []Turn
+		checkpoints []Checkpoint
+		files       []SessionFile
+		refs        []SessionRef
 	)
-	if err != nil {
-		return nil, fmt.Errorf("loading turns for session %s: %w", id, err)
-	}
-	defer tRows.Close() //nolint:errcheck // rows read-only
-	for tRows.Next() {
-		var t Turn
-		if err := tRows.Scan(&t.SessionID, &t.TurnIndex, &t.UserMessage, &t.AssistantResponse, &t.Timestamp); err != nil {
-			return nil, fmt.Errorf("scanning turn row: %w", err)
+
+	var eg errgroup.Group
+
+	// Turns
+	eg.Go(func() error {
+		tRows, err := s.db.QueryContext(
+			ctx,
+			`SELECT session_id, turn_index, COALESCE(user_message,''), COALESCE(assistant_response,''), COALESCE(timestamp,'')
+			 FROM turns WHERE session_id = ? ORDER BY turn_index`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading turns for session %s: %w", id, err)
 		}
-		detail.Turns = append(detail.Turns, t)
-	}
-	if err := tRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating turn rows: %w", err)
-	}
+		defer tRows.Close() //nolint:errcheck // rows read-only
+		for tRows.Next() {
+			var t Turn
+			if err := tRows.Scan(&t.SessionID, &t.TurnIndex, &t.UserMessage, &t.AssistantResponse, &t.Timestamp); err != nil {
+				return fmt.Errorf("scanning turn row: %w", err)
+			}
+			turns = append(turns, t)
+		}
+		return tRows.Err()
+	})
 
 	// Checkpoints
-	cRows, err := s.db.Query(
-		`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
-		        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
-		        COALESCE(important_files,''), COALESCE(next_steps,'')
-		 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading checkpoints for session %s: %w", id, err)
-	}
-	defer cRows.Close() //nolint:errcheck // rows read-only
-	for cRows.Next() {
-		var c Checkpoint
-		if err := cRows.Scan(&c.SessionID, &c.CheckpointNumber, &c.Title, &c.Overview,
-			&c.History, &c.WorkDone, &c.TechnicalDetails, &c.ImportantFiles, &c.NextSteps); err != nil {
-			return nil, fmt.Errorf("scanning checkpoint row: %w", err)
+	eg.Go(func() error {
+		cRows, err := s.db.QueryContext(
+			ctx,
+			`SELECT session_id, checkpoint_number, COALESCE(title,''), COALESCE(overview,''),
+			        COALESCE(history,''), COALESCE(work_done,''), COALESCE(technical_details,''),
+			        COALESCE(important_files,''), COALESCE(next_steps,'')
+			 FROM checkpoints WHERE session_id = ? ORDER BY checkpoint_number`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading checkpoints for session %s: %w", id, err)
 		}
-		detail.Checkpoints = append(detail.Checkpoints, c)
-	}
-	if err := cRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating checkpoint rows: %w", err)
-	}
+		defer cRows.Close() //nolint:errcheck // rows read-only
+		for cRows.Next() {
+			var c Checkpoint
+			if err := cRows.Scan(&c.SessionID, &c.CheckpointNumber, &c.Title, &c.Overview,
+				&c.History, &c.WorkDone, &c.TechnicalDetails, &c.ImportantFiles, &c.NextSteps); err != nil {
+				return fmt.Errorf("scanning checkpoint row: %w", err)
+			}
+			checkpoints = append(checkpoints, c)
+		}
+		return cRows.Err()
+	})
 
 	// Files
-	fRows, err := s.db.Query(
-		`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
-		 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading files for session %s: %w", id, err)
-	}
-	defer fRows.Close() //nolint:errcheck // rows read-only
-	for fRows.Next() {
-		var f SessionFile
-		if err := fRows.Scan(&f.SessionID, &f.FilePath, &f.ToolName, &f.TurnIndex, &f.FirstSeenAt); err != nil {
-			return nil, fmt.Errorf("scanning file row: %w", err)
+	eg.Go(func() error {
+		fRows, err := s.db.QueryContext(
+			ctx,
+			`SELECT session_id, COALESCE(file_path,''), COALESCE(tool_name,''), turn_index, COALESCE(first_seen_at,'')
+			 FROM session_files WHERE session_id = ? ORDER BY turn_index, file_path`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading files for session %s: %w", id, err)
 		}
-		detail.Files = append(detail.Files, f)
-	}
-	if err := fRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating file rows: %w", err)
-	}
+		defer fRows.Close() //nolint:errcheck // rows read-only
+		for fRows.Next() {
+			var f SessionFile
+			if err := fRows.Scan(&f.SessionID, &f.FilePath, &f.ToolName, &f.TurnIndex, &f.FirstSeenAt); err != nil {
+				return fmt.Errorf("scanning file row: %w", err)
+			}
+			files = append(files, f)
+		}
+		return fRows.Err()
+	})
 
 	// Refs
-	rRows, err := s.db.Query(
-		`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
-		 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("loading refs for session %s: %w", id, err)
-	}
-	defer rRows.Close() //nolint:errcheck // rows read-only
-	for rRows.Next() {
-		var r SessionRef
-		if err := rRows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scanning ref row: %w", err)
+	eg.Go(func() error {
+		rRows, err := s.db.QueryContext(
+			ctx,
+			`SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
+			 FROM session_refs WHERE session_id = ? ORDER BY turn_index`, id,
+		)
+		if err != nil {
+			return fmt.Errorf("loading refs for session %s: %w", id, err)
 		}
-		detail.Refs = append(detail.Refs, r)
+		defer rRows.Close() //nolint:errcheck // rows read-only
+		for rRows.Next() {
+			var r SessionRef
+			if err := rRows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
+				return fmt.Errorf("scanning ref row: %w", err)
+			}
+			refs = append(refs, r)
+		}
+		return rRows.Err()
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
-	if err := rRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating ref rows: %w", err)
-	}
+
+	detail.Turns = turns
+	detail.Checkpoints = checkpoints
+	detail.Files = files
+	detail.Refs = refs
 
 	return detail, nil
 }
@@ -602,28 +660,28 @@ func (s *Store) GetSession(id string) (*SessionDetail, error) {
 // and turn content, returning matches ranked by source type. Sessions with
 // zero turns are excluded. When FTS5 is available it is tried first for
 // faster BM25-ranked results; on failure it falls back to LIKE.
-func (s *Store) SearchSessions(query string, limit int) ([]SearchResult, error) {
+func (s *Store) SearchSessions(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	// Try FTS5 path first (faster, BM25-ranked).
 	if s.hasFTS5 {
-		results, err := s.SearchSessionsFTS(query, limit)
+		results, err := s.SearchSessionsFTS(ctx, query, limit)
 		if err == nil && results != nil {
 			// Merge in session_refs matches.
-			refResults := s.searchRefs(query, limit)
+			refResults := s.searchRefs(ctx, query, limit)
 			return mergeSearchResults(results, refResults, limit), nil
 		}
 		// FTS5 failed (syntax error, etc.) — fall through to LIKE.
 	}
 
-	results, err := s.searchSessionsLIKE(query, limit)
+	results, err := s.searchSessionsLIKE(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}
-	refResults := s.searchRefs(query, limit)
+	refResults := s.searchRefs(ctx, query, limit)
 	return mergeSearchResults(results, refResults, limit), nil
 }
 
 // searchSessionsLIKE is the LIKE-based fallback for SearchSessions.
-func (s *Store) searchSessionsLIKE(query string, limit int) ([]SearchResult, error) {
+func (s *Store) searchSessionsLIKE(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	pattern := "%" + escapeLIKE(query) + "%"
 
 	// Build automatic exclusion clauses (temp dir + hidden dotfolders).
@@ -669,7 +727,7 @@ func (s *Store) searchSessionsLIKE(query string, limit int) ([]SearchResult, err
 	q += limitClause
 	args = append(args, limit)
 
-	rows, err := s.db.Query(q, args...)
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("searching sessions: %w", err)
 	}
@@ -692,7 +750,7 @@ func (s *Store) searchSessionsLIKE(query string, limit int) ([]SearchResult, err
 // searchRefs returns SearchResult entries for sessions whose session_refs
 // match the query. This catches PR numbers, issue numbers, and commit refs
 // typed as bare numbers (e.g. "42" matches PR #42).
-func (s *Store) searchRefs(query string, limit int) []SearchResult {
+func (s *Store) searchRefs(ctx context.Context, query string, limit int) []SearchResult {
 	// Extract numeric portion if present (strip leading # or "PR" prefix).
 	refQuery := strings.TrimPrefix(strings.TrimPrefix(query, "#"), "PR")
 	refQuery = strings.TrimPrefix(refQuery, "pr")
@@ -724,7 +782,7 @@ func (s *Store) searchRefs(query string, limit int) []SearchResult {
 	q += " LIMIT ?"
 	args = append(args, limit)
 
-	rows, err := s.db.Query(q, args...)
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil
 	}
@@ -786,7 +844,7 @@ func escapeFTS5(query string) string {
 // SearchSessionsFTS performs a full-text search using the FTS5 search_index
 // virtual table maintained by the Copilot CLI. Results are ranked by BM25
 // relevance. Returns nil, nil if the FTS5 table is not available.
-func (s *Store) SearchSessionsFTS(query string, limit int) ([]SearchResult, error) {
+func (s *Store) SearchSessionsFTS(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	if !s.hasFTS5 {
 		return nil, nil
 	}
@@ -820,7 +878,7 @@ func (s *Store) SearchSessionsFTS(query string, limit int) ([]SearchResult, erro
 	args = append(args, extraArgs...)
 	args = append(args, limit)
 
-	rows, err := s.db.Query(q, args...)
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		// FTS5 MATCH can fail on malformed queries — return empty, not error.
 		if strings.Contains(err.Error(), "fts5") {
@@ -846,37 +904,38 @@ func (s *Store) SearchSessionsFTS(query string, limit int) ([]SearchResult, erro
 
 // ListFolders returns the distinct cwd values across all sessions, sorted
 // alphabetically.
-func (s *Store) ListFolders() ([]string, error) {
-	return s.distinctStrings("SELECT DISTINCT COALESCE(cwd,'') FROM sessions WHERE cwd IS NOT NULL AND cwd != '' ORDER BY cwd")
+func (s *Store) ListFolders(ctx context.Context) ([]string, error) {
+	return s.distinctStrings(ctx, "SELECT DISTINCT COALESCE(cwd,'') FROM sessions WHERE cwd IS NOT NULL AND cwd != '' ORDER BY cwd")
 }
 
 // ListRepositories returns the distinct non-empty repository values across
 // all sessions, sorted alphabetically.
-func (s *Store) ListRepositories() ([]string, error) {
-	return s.distinctStrings("SELECT DISTINCT repository FROM sessions WHERE repository IS NOT NULL AND repository != '' ORDER BY repository")
+func (s *Store) ListRepositories(ctx context.Context) ([]string, error) {
+	return s.distinctStrings(ctx, "SELECT DISTINCT repository FROM sessions WHERE repository IS NOT NULL AND repository != '' ORDER BY repository")
 }
 
 // ListBranches returns distinct branch values. If repository is non-empty,
 // results are filtered to that repository.
-func (s *Store) ListBranches(repository string) ([]string, error) {
+func (s *Store) ListBranches(ctx context.Context, repository string) ([]string, error) {
 	if repository != "" {
 		return s.distinctStrings(
+			ctx,
 			"SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' AND repository = ? ORDER BY branch",
 			repository,
 		)
 	}
-	return s.distinctStrings("SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' ORDER BY branch")
+	return s.distinctStrings(ctx, "SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' ORDER BY branch")
 }
 
 // GroupSessions groups sessions by the specified pivot field, applying the
 // given filter and sort order within each group.
-func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
+func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
 	var fb filterBuilder
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
-	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
-		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s%s ORDER BY pivot_label, %s %s",
+		expr, s.sessionColumns(), countJoins, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit
@@ -884,7 +943,7 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 	q += limitClause
 	fb.args = append(fb.args, limit)
 
-	rows, err := s.db.Query(q, fb.args...)
+	rows, err := s.db.QueryContext(ctx, q, fb.args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying grouped sessions: %w", err)
 	}
@@ -937,8 +996,8 @@ func (s *Store) GroupSessions(pivot PivotField, filter FilterOptions, sort SortO
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-func (s *Store) distinctStrings(query string, args ...any) ([]string, error) {
-	rows, err := s.db.Query(query, args...)
+func (s *Store) distinctStrings(ctx context.Context, query string, args ...any) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying distinct values: %w", err)
 	}

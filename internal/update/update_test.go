@@ -4,9 +4,11 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -387,7 +389,7 @@ func TestExtractFromTarGz_PathTraversalRejected(t *testing.T) {
 	}
 
 	_, err := extractFromTarGz(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsafe archive entry path") {
+	if err == nil || !errors.Is(err, ErrUnsafeArchivePath) {
 		t.Fatalf("expected unsafe path error, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(extractDir, binaryName)); !os.IsNotExist(err) {
@@ -409,7 +411,7 @@ func TestExtractFromZip_PathTraversalRejected(t *testing.T) {
 	}
 
 	_, err := extractFromZip(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsafe archive entry path") {
+	if err == nil || !errors.Is(err, ErrUnsafeArchivePath) {
 		t.Fatalf("expected unsafe path error, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(extractDir, binaryName+".exe")); !os.IsNotExist(err) {
@@ -436,7 +438,7 @@ func TestExtractFromTarGz_SymlinkRejected(t *testing.T) {
 	}
 
 	_, err := extractFromTarGz(archivePath, extractDir)
-	if err == nil || !strings.Contains(err.Error(), "unsupported tar entry type") {
+	if err == nil || !errors.Is(err, ErrUnsupportedTarEntry) {
 		t.Fatalf("expected symlink rejection error, got %v", err)
 	}
 }
@@ -454,8 +456,8 @@ func TestDownloadAsset_RejectsNonHTTPSRedirect(t *testing.T) {
 	}))
 	defer httpsRedirect.Close()
 
-	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), httpsRedirect.URL)
-	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+	err := downloadAsset(context.Background(), filepath.Join(t.TempDir(), "asset.bin"), httpsRedirect.URL)
+	if err == nil || !errors.Is(err, ErrNonHTTPS) {
 		t.Fatalf("expected non-HTTPS redirect rejection, got %v", err)
 	}
 }
@@ -468,8 +470,8 @@ func TestDownloadAsset_EnforcesMaxSize(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := downloadAsset(filepath.Join(t.TempDir(), "asset.bin"), srv.URL)
-	if err == nil || !strings.Contains(err.Error(), "download exceeds") {
+	err := downloadAsset(context.Background(), filepath.Join(t.TempDir(), "asset.bin"), srv.URL)
+	if err == nil || !errors.Is(err, ErrDownloadExceeded) {
 		t.Fatalf("expected size limit error, got %v", err)
 	}
 }
@@ -487,8 +489,8 @@ func TestVerifyChecksum_Mismatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := verifyChecksum(archivePath, srv.URL, "dispatch.tar.gz")
-	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+	err := verifyChecksum(context.Background(), archivePath, srv.URL, "dispatch.tar.gz")
+	if err == nil || !errors.Is(err, ErrChecksumMismatch) {
 		t.Fatalf("expected checksum mismatch error, got %v", err)
 	}
 }
@@ -530,7 +532,7 @@ func TestReplaceWindows_RollbackOnFailure(t *testing.T) {
 
 func TestRunUpdate_DevVersionNotBlocked(t *testing.T) {
 	t.Parallel()
-	err := RunUpdate("dev")
+	err := RunUpdate(context.Background(), "dev")
 	// Dev builds should no longer be rejected. The call may fail for other
 	// reasons (network, lock contention, etc.) but never because of
 	// the version string.
@@ -585,8 +587,10 @@ func setTestHTTPTransport(t *testing.T) {
 
 	original := updateHTTPTransport
 	updateHTTPTransport = transport
+	sharedClient.Transport = transport
 	t.Cleanup(func() {
 		updateHTTPTransport = original
+		sharedClient.Transport = original
 		transport.CloseIdleConnections()
 	})
 }

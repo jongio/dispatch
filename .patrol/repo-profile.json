@@ -1,0 +1,126 @@
+{
+  "repo": "jongio/dispatch",
+  "profile_updated": "2026-05-17T03:06:30Z",
+  "description": "Terminal UI for browsing and launching GitHub Copilot CLI sessions",
+  "language": "Go",
+  "go_version": "1.26.3",
+  "license": "MIT",
+  "latest_release": "v0.9.0",
+  "platforms": ["windows/amd64", "windows/arm64", "darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64"],
+  "codebase": {
+    "go_files": 133,
+    "packages": [
+      "cmd/dispatch",
+      "cmd/contributors",
+      "cmd/screenshots",
+      "internal/config",
+      "internal/contributors",
+      "internal/copilot",
+      "internal/data",
+      "internal/platform",
+      "internal/tui",
+      "internal/tui/components",
+      "internal/tui/markdown",
+      "internal/tui/styles",
+      "internal/update",
+      "internal/validate"
+    ],
+    "tui_framework": "Bubble Tea v2 (charm.land/bubbletea/v2)",
+    "database": "SQLite (modernc.org/sqlite - pure Go)",
+    "key_dependencies": [
+      "charm.land/bubbletea/v2 v2.0.6",
+      "charm.land/bubbles/v2 v2.1.0",
+      "charm.land/lipgloss/v2 v2.0.3",
+      "github.com/charmbracelet/glamour v1.0.0",
+      "github.com/github/copilot-sdk/go v0.3.0",
+      "modernc.org/sqlite v1.50.1"
+    ]
+  },
+  "conventions": {
+    "commit_style": "conventional_commits",
+    "commit_types_observed": ["feat", "fix", "docs", "chore", "refactor", "perf", "ci"],
+    "commit_scopes_observed": ["tui", "deps", "data", "update", "lint", "tests", "actions", "build", "test", "security", "copilot", "platform"],
+    "pr_title_style": "conventional_commits_preferred",
+    "pr_title_notes": "Most PRs use conventional commit format (feat:, fix:, chore:). Some older PRs use descriptive titles without prefix.",
+    "branch_naming": "feature branches from main",
+    "default_branch": "main"
+  },
+  "ci_cd": {
+    "ci_file": ".github/workflows/ci.yml",
+    "release_file": ".github/workflows/release.yml",
+    "pages_file": ".github/workflows/pages.yml",
+    "ci_steps": [
+      "gofmt check",
+      "go mod tidy check",
+      "gofumpt strict formatting",
+      "deadcode detection (with allowlist via mage)",
+      "go build ./cmd/dispatch/",
+      "golangci-lint (v2, via action)",
+      "go vet ./...",
+      "go test ./...",
+      "go test -race ./... -count=1",
+      "govulncheck ./..."
+    ],
+    "ci_triggers": ["push to main", "pull_request"],
+    "ci_go_version": "1.26.x",
+    "action_pins": "full SHA pinning with version comments",
+    "cross_compile_on_pr": true,
+    "release_method": "workflow_dispatch with bump type (patch/minor/major)",
+    "release_signing": "cosign + SBOM (syft)",
+    "cgo_disabled": true
+  },
+  "build_system": {
+    "tool": "Mage (magefile.org)",
+    "targets": {
+      "Install": "Test + killStale + Build + ensurePath + verify (default)",
+      "Test": "go test -race -shuffle=on ./... -count=1",
+      "Build": "go build with version ldflags into bin/",
+      "Vet": "go vet ./...",
+      "Lint": "golangci-lint run (fallback: go vet)",
+      "Preflight": "13-step CI check (format, tidy, vet, lint, WSL lint, build, test, race, WSL test, vulncheck, gofumpt, deadcode, install)",
+      "Fmt": "gofmt -w .",
+      "Clean": "rm bin/",
+      "Contributors": "regenerate CONTRIBUTORS.md",
+      "Deadcode": "deadcode with allowlist filtering",
+      "CoverageReport": "HTML coverage report",
+      "TestWSL": "run tests under WSL"
+    },
+    "dev_binary": "dispatch-dev (in bin/)"
+  },
+  "quality_tools": {
+    "formatter": "gofmt + gofumpt (strict)",
+    "linter": "golangci-lint v2",
+    "vet": "go vet",
+    "vuln_scanner": "govulncheck",
+    "dead_code": "deadcode (with allowlist)",
+    "race_detector": "enabled in CI and mage test"
+  },
+  "contributors": {
+    "primary": "Jon Gallant (jongio)",
+    "contributors": ["Wallace Breza (wbreza)"],
+    "bot_accounts": ["github-actions[bot]"]
+  },
+  "labels_in_use": [
+    "automated",
+    "repo-health",
+    "project-review",
+    "pr-learn",
+    "perf",
+    "max-quality",
+    "idiomatic-audit",
+    "enhancement",
+    "repo-profile"
+  ],
+  "open_automated_issues": 29,
+  "pr_status": {
+    "open": 1,
+    "open_details": "PR #44: fix(deps): update indirect dependencies to latest stable versions (branch: auto/dependencies/2026-05-16)"
+  },
+  "style_notes": {
+    "error_handling": "Go idiomatic (error returns, fmt.Errorf wrapping)",
+    "build_tags": "Used for platform-specific code (windows, unix, darwin, screenshots)",
+    "test_naming": "_test.go with coverage_test.go, security_test.go, bench_test.go variants",
+    "internal_packages": "All business logic under internal/",
+    "no_exported_api": "Library is internal-only; cmd/ packages are entry points"
+  }
+}
