@@ -76,6 +76,8 @@ jobs:
           echo "Bumping ${CURRENT} -> ${NEXT} (${{ inputs.bump }})"
 
       - name: Generate contributor notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
