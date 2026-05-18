@@ -1,4 +1,5 @@
-// Package validate provides shared validation helpers.
+// Package validate provides shared validation helpers used across
+// the dispatch application.
 package validate
 
 import "regexp"
