@@ -105,8 +105,7 @@ jobs:
               --base main \
               --head "$CONTRIB_BRANCH" \
               --title "docs: update CONTRIBUTORS.md for $NEW_TAG" \
-              --body "Auto-generated contributor update for release $NEW_TAG." \
-              --auto
+              --body "Auto-generated contributor update for release $NEW_TAG."
           fi
 
           # Move contrib-notes to temp dir so GoReleaser sees a clean git state
