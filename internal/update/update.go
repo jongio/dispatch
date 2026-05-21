@@ -619,6 +619,7 @@ func copyFile(src, dst string) error {
 
 	if _, err := io.Copy(out, in); err != nil {
 		_ = out.Close()
+		_ = os.Remove(dst)
 		return err
 	}
 

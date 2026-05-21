@@ -147,7 +147,7 @@ func WriteContinuationPlan(sessionID string, remaining []string, summary string)
 	// Ensure the session directory exists (it may not if the session-state
 	// was created by the store but never had a plan written).
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating session dir: %w", err)
 	}
 

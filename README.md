@@ -44,7 +44,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Refresh** (`r`) — reload the session store without restarting
 - **Demo mode** — `dispatch --demo` with synthetic data for experimentation
 - **Self-update** — `dispatch update` checks GitHub Releases and upgrades in-place; background update check notifies on new versions
-- **Maintenance** — `--rebuild-index` (manual rebuild of the session index via Copilot CLI PTY — repair action only), `--clear-cache` (reset config)
+- **Maintenance** — `--reindex` (manual rebuild of the session index via Copilot CLI PTY — repair action only), `--clear-cache` (reset config)
 - **Cross-platform** — Windows (amd64/arm64), macOS (amd64/arm64), Linux (amd64/arm64)
 
 ### Feature Highlights

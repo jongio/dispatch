@@ -99,7 +99,11 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		for {
 			n, rErr := ptty.Read(buf)
 			if n > 0 {
-				outCh <- string(buf[:n])
+				select {
+				case outCh <- string(buf[:n]):
+				case <-ctx.Done():
+					return
+				}
 			}
 			if rErr != nil {
 				return

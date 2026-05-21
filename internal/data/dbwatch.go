@@ -111,7 +111,15 @@ func (w *DBWatcher) loop() {
 				continue
 			}
 			if w.Poll() && w.onChange != nil {
-				w.onChange()
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							// Swallow panic so the watcher loop survives.
+							_ = r
+						}
+					}()
+					w.onChange()
+				}()
 			}
 		}
 	}
