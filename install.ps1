@@ -21,7 +21,6 @@ $ErrorActionPreference = 'Stop'
 $Script:Repo            = 'jongio/dispatch'
 $Script:BinaryName      = 'dispatch.exe'
 $Script:ChecksumsFile   = 'dispatch_checksums.txt'
-$Script:GitHubApi       = "https://api.github.com/repos/$Script:Repo/releases/latest"
 $Script:GitHubDownload  = "https://github.com/$Script:Repo/releases/download"
 
 # ---------------------------------------------------------------------------
@@ -72,14 +71,23 @@ function Get-DispatchVersion {
     }
 
     Write-Status 'Querying GitHub for latest release...'
-    $headers = @{ 'User-Agent' = 'dispatch-installer'; Accept = 'application/vnd.github+json' }
-    $release = Invoke-RestMethod -Uri $Script:GitHubApi -Headers $headers
 
-    if (-not $release.tag_name) {
-        Write-Fail 'Could not determine the latest version. Set $env:VERSION and retry.'
+    # Use the releases/latest redirect - no auth required, no API rate limit.
+    $redirectUrl = "https://github.com/$Script:Repo/releases/latest"
+    try {
+        $response = Invoke-WebRequest -Uri $redirectUrl -UseBasicParsing -MaximumRedirection 5
+        $finalUrl = $response.BaseResponse.RequestMessage.RequestUri.ToString()
+        if (-not $finalUrl) {
+            # PS 5.1: ResponseUri is on BaseResponse directly.
+            $finalUrl = $response.BaseResponse.ResponseUri.ToString()
+        }
+        if ($finalUrl -match '/tag/([^/]+)$') {
+            return $Matches[1]
+        }
     }
+    catch {}
 
-    return $release.tag_name
+    Write-Fail 'Could not determine the latest version. Set $env:VERSION and retry.'
 }
 
 # ---------------------------------------------------------------------------
