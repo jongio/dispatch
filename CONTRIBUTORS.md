@@ -6,7 +6,7 @@ This file is auto-generated. Run `mage contributors` to update.
 
 ## Contributors
 
-- **Jon Gallant** (@jongio) -- 112 contributions
-- **Copilot** (@Copilot) -- 99 contributions
+- **Jon Gallant** (@jongio) -- 203 contributions
+- **Copilot** (@Copilot) -- 149 contributions
 - **Wallace Breza** -- 2 contributions
 - **Wallace Breza** -- 1 contribution
