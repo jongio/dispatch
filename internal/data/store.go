@@ -784,6 +784,7 @@ func (s *Store) searchRefs(ctx context.Context, query string, limit int) []Searc
 
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
+		slog.Debug("searchRefs query failed", "error", err)
 		return nil
 	}
 	defer rows.Close() //nolint:errcheck // rows read-only
@@ -792,6 +793,7 @@ func (s *Store) searchRefs(ctx context.Context, query string, limit int) []Searc
 	for rows.Next() {
 		var r SearchResult
 		if err := rows.Scan(&r.Content, &r.SessionID, &r.SourceType, &r.SourceID); err != nil {
+			slog.Debug("searchRefs scan failed", "error", err)
 			continue
 		}
 		r.Rank = -100 // boost ref matches to top
