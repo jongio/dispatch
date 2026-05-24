@@ -14,7 +14,7 @@ require (
 	github.com/github/copilot-sdk/go v0.3.0
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	modernc.org/sqlite v1.50.1
 )
 
