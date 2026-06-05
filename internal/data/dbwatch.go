@@ -1,6 +1,8 @@
 package data
 
 import (
+	"context"
+	"database/sql"
 	"os"
 	"sync"
 	"time"
@@ -8,19 +10,23 @@ import (
 	"github.com/jongio/dispatch/internal/platform"
 )
 
-// DBWatcher monitors the session store database for changes by checking
-// the WAL file modification time. It only polls when active (TUI focused)
-// to minimize resource usage.
+// DBWatcher monitors the session store database for changes. It uses
+// SQLite's PRAGMA data_version as the primary signal (increments on each
+// external commit) and falls back to WAL file modification time when the
+// database connection is unavailable. It only polls when active (TUI
+// focused) to minimize resource usage.
 type DBWatcher struct {
-	mu       sync.Mutex
-	active   bool
-	lastMod  time.Time
-	path     string // path to session-store.db
-	interval time.Duration
-	stop     chan struct{}
-	stopOnce sync.Once
-	onChange func() // callback fired when change detected
-	started  bool
+	mu          sync.Mutex
+	active      bool
+	lastMod     time.Time
+	lastDataVer int64  // last observed PRAGMA data_version value
+	path        string // path to session-store.db
+	interval    time.Duration
+	stop        chan struct{}
+	stopOnce    sync.Once
+	onChange    func() // callback fired when change detected
+	started     bool
+	db          *sql.DB // pinned read-only connection for data_version
 }
 
 // NewDBWatcher creates a watcher for the session store. The onChange callback
@@ -51,45 +57,130 @@ func (w *DBWatcher) SetActive(active bool) {
 // Stop permanently stops the watcher. It is safe to call multiple times.
 func (w *DBWatcher) Stop() {
 	w.stopOnce.Do(func() { close(w.stop) })
+	w.mu.Lock()
+	db := w.db
+	w.db = nil
+	w.mu.Unlock()
+	if db != nil {
+		_ = db.Close()
+	}
 }
 
-// ResetBaseline updates the last-known modification time to now so the
-// next poll cycle won't fire a spurious change notification. Use this
-// after a manual reload (e.g. rebuild index) to avoid duplicate refreshes.
+// ResetBaseline updates the last-known state so the next poll cycle won't
+// fire a spurious change notification. Use this after a manual reload
+// (e.g. rebuild index) to avoid duplicate refreshes.
 func (w *DBWatcher) ResetBaseline() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.lastMod = time.Now()
+	// Re-query data_version so the next poll sees the current value.
+	if w.db != nil {
+		var ver int64
+		if err := w.db.QueryRowContext(context.Background(), "PRAGMA data_version").Scan(&ver); err == nil {
+			w.lastDataVer = ver
+		}
+	}
 }
 
-// Poll checks the WAL file for changes and returns true if it has been
+// Poll checks the database for changes and returns true if it has been
 // modified since the last check. This is also called internally by the
 // loop but can be called manually for immediate checks.
 func (w *DBWatcher) Poll() bool {
 	if w.path == "" {
 		return false
 	}
-	// Check WAL first — active writes go there before checkpoint.
-	walPath := w.path + "-wal"
-	info, err := os.Stat(walPath)
-	if err != nil {
-		// No WAL — check main db file.
-		info, err = os.Stat(w.path)
-		if err != nil {
-			return false
+
+	// Primary: PRAGMA data_version (reliable, semantic change detection).
+	changed, ok := w.pollDataVersion()
+	if ok {
+		// data_version query succeeded — it is the authoritative signal.
+		return changed
+	}
+
+	// Fallback: WAL/DB file mtime (catches changes when DB connection
+	// isn't open yet or query fails).
+	return w.pollMtime()
+}
+
+// pollDataVersion uses PRAGMA data_version to detect committed changes
+// from other connections. Returns (changed, ok) where ok indicates whether
+// the query succeeded. When ok is false, the caller should fall back to mtime.
+func (w *DBWatcher) pollDataVersion() (changed bool, ok bool) {
+	w.mu.Lock()
+	db := w.db
+	w.mu.Unlock()
+
+	// Lazily open the connection on first poll when the file exists.
+	if db == nil {
+		if _, err := os.Stat(w.path); err != nil {
+			return false, false
 		}
+		var err error
+		db, err = sql.Open("sqlite", w.path+"?mode=ro")
+		if err != nil {
+			return false, false
+		}
+		// Pin to a single physical connection so data_version values
+		// are comparable across polls (SQLite requirement).
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
+		db.SetConnMaxLifetime(0)
+
+		w.mu.Lock()
+		w.db = db
+		w.mu.Unlock()
+	}
+
+	var ver int64
+	if err := db.QueryRowContext(context.Background(), "PRAGMA data_version").Scan(&ver); err != nil {
+		// Query failed — close connection and fall through to mtime.
+		w.mu.Lock()
+		w.db = nil
+		w.mu.Unlock()
+		_ = db.Close()
+		return false, false
 	}
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	mod := info.ModTime()
+	if w.lastDataVer == 0 {
+		w.lastDataVer = ver
+		return false, true // first check, establish baseline
+	}
+	if ver != w.lastDataVer {
+		w.lastDataVer = ver
+		return true, true
+	}
+	return false, true
+}
+
+// pollMtime checks WAL and DB file modification times as a fallback.
+func (w *DBWatcher) pollMtime() bool {
+	// Check both WAL and main DB, use the latest mtime.
+	var latest time.Time
+	walPath := w.path + "-wal"
+	if info, err := os.Stat(walPath); err == nil {
+		latest = info.ModTime()
+	}
+	if info, err := os.Stat(w.path); err == nil {
+		if mod := info.ModTime(); mod.After(latest) {
+			latest = mod
+		}
+	}
+	if latest.IsZero() {
+		return false
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if w.lastMod.IsZero() {
-		w.lastMod = mod
+		w.lastMod = latest
 		return false // first check, establish baseline
 	}
-	if mod.After(w.lastMod) {
-		w.lastMod = mod
+	if latest.After(w.lastMod) {
+		w.lastMod = latest
 		return true
 	}
 	return false
