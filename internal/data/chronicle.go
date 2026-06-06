@@ -26,9 +26,6 @@ const (
 	// threshold is reached, giving the CLI time to fully settle.
 	startupGracePeriod = 2 * time.Second
 
-	// chronicleExpWait is how long to wait after sending /experimental on.
-	chronicleExpWait = 5 * time.Second
-
 	// chronicleReindexTimeout is the maximum time to wait for the reindex
 	// ETL to complete. Large session stores may take a while.
 	chronicleReindexTimeout = 120 * time.Second
@@ -213,19 +210,9 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		return err
 	}
 
-	status("⏳ Enabling experimental features...")
-
-	// 2. Enable experimental mode (required for /chronicle commands).
-	if _, err := ptty.Write([]byte("/experimental on\r\n")); err != nil {
-		return fmt.Errorf("sending /experimental on: %w", err)
-	}
-	if err := collect(chronicleExpWait, 0); err != nil {
-		return err
-	}
-
 	status("⏳ Starting chronicle reindex...")
 
-	// 3. Send /chronicle reindex.
+	// 2. Send /chronicle reindex (no longer requires /experimental on).
 	if _, err := ptty.Write([]byte("/chronicle reindex\r\n")); err != nil {
 		return fmt.Errorf("sending /chronicle reindex: %w", err)
 	}
@@ -233,7 +220,7 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		return err
 	}
 
-	// 4. Send /exit to shut down cleanly.
+	// 3. Send /exit to shut down cleanly.
 	ptty.Write([]byte("/exit\r\n")) //nolint:errcheck
 	if err := collect(chronicleExitWait, 0); err != nil {
 		return err
