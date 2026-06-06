@@ -178,7 +178,7 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(ctx, &sdk.SessionConfig{
 		Model:               defaultModel,
-		Streaming:           true,
+		Streaming:           sdk.Bool(true),
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
@@ -214,7 +214,7 @@ func (c *Client) SendMessage(ctx context.Context, prompt string) (<-chan StreamE
 	// Subscribe to session events before sending the message so we
 	// don't miss any streaming deltas.
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
-		switch event.Type {
+		switch event.Type() {
 		case sdk.SessionEventTypeAssistantMessageDelta:
 			if d, ok := event.Data.(*sdk.AssistantMessageDeltaData); ok {
 				trySend(StreamEvent{Type: EventTextDelta, Content: d.DeltaContent})
@@ -438,7 +438,7 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
 		Model:               defaultModel,
-		Streaming:           false,
+		Streaming:           sdk.Bool(false),
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
@@ -630,7 +630,7 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 	tools := defineTools(store)
 	session, err := sdkClient.CreateSession(sdkCtx, &sdk.SessionConfig{
 		Model:               defaultModel,
-		Streaming:           false,
+		Streaming:           sdk.Bool(false),
 		Tools:               tools,
 		OnPermissionRequest: sdk.PermissionHandler.ApproveAll,
 		SystemMessage: &sdk.SystemMessageConfig{
