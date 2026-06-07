@@ -89,14 +89,12 @@ func TestIconFunctions_Fallback(t *testing.T) {
 		{"IconFilter", IconFilter, fbFilter},
 		{"IconGitBranch", IconGitBranch, fbGitBranch},
 		{"IconCheck", IconCheck, fbCheck},
-		{"IconHidden", IconHidden, fbEyeSlash},
 		{"IconRepo", IconRepo, fbRepo},
 		{"IconRepoOpen", IconRepoOpen, fbRepo},
 		{"IconCalendar", IconCalendar, fbCalendar},
 		{"IconCalendarOpen", IconCalendarOpen, fbCalendar},
 		{"IconBranch", IconBranch, fbBranch},
 		{"IconBranchOpen", IconBranchOpen, fbBranch},
-		{"IconList", IconList, fbList},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -136,14 +134,12 @@ func TestIconFunctions_NerdFont(t *testing.T) {
 		{"IconFilter", IconFilter, nfFilter},
 		{"IconGitBranch", IconGitBranch, nfGitBranch + " "},
 		{"IconCheck", IconCheck, nfCheck},
-		{"IconHidden", IconHidden, nfEyeSlash},
 		{"IconRepo", IconRepo, nfRepo + " "},
 		{"IconRepoOpen", IconRepoOpen, nfRepo + " "},
 		{"IconCalendar", IconCalendar, nfCalendar + " "},
 		{"IconCalendarOpen", IconCalendarOpen, nfCalendar + " "},
 		{"IconBranch", IconBranch, nfGitBranch + " "},
 		{"IconBranchOpen", IconBranchOpen, nfGitBranch + " "},
-		{"IconList", IconList, nfList + " "},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,7 +171,6 @@ func TestIconFunctions_AllNonEmpty(t *testing.T) {
 		{"IconGear", IconGear},
 		{"IconKeyboard", IconKeyboard},
 		{"IconCheck", IconCheck},
-		{"IconHidden", IconHidden},
 		{"IconFilter", IconFilter},
 		{"IconRepo", IconRepo},
 		{"IconRepoOpen", IconRepoOpen},
@@ -183,7 +178,6 @@ func TestIconFunctions_AllNonEmpty(t *testing.T) {
 		{"IconCalendarOpen", IconCalendarOpen},
 		{"IconBranch", IconBranch},
 		{"IconBranchOpen", IconBranchOpen},
-		{"IconList", IconList},
 	}
 
 	for _, mode := range []bool{true, false} {

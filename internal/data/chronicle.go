@@ -235,6 +235,10 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		return fmt.Errorf("chronicle reindex reported an error")
 	}
 
-	// No explicit success/error — assume it worked if we got this far.
-	return nil
+	// No recognized success or error markers in the output. Rather than
+	// silently assuming success, report the ambiguity so callers can fall
+	// back to Maintain(). The exit code is unavailable because PTY-based
+	// processes don't expose it reliably, so output matching is the
+	// primary signal.
+	return fmt.Errorf("chronicle reindex finished without recognized success markers")
 }

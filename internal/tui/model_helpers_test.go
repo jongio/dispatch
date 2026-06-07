@@ -692,22 +692,6 @@ func TestFilterFavoritedGroups_OnKeepsFavorited(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// hiddenCount
-// ---------------------------------------------------------------------------
-
-func TestHiddenCount(t *testing.T) {
-	m := newTestModel()
-	if m.hiddenCount() != 0 {
-		t.Errorf("empty hiddenSet → count 0, got %d", m.hiddenCount())
-	}
-	m.hiddenSet["a"] = struct{}{}
-	m.hiddenSet["b"] = struct{}{}
-	if m.hiddenCount() != 2 {
-		t.Errorf("2 hidden → count 2, got %d", m.hiddenCount())
-	}
-}
-
-// ---------------------------------------------------------------------------
 // cycleSort
 // ---------------------------------------------------------------------------
 
