@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -36,15 +37,15 @@ func TestBuildStartCmdLine_PowerShell(t *testing.T) {
 		t.Fatal("buildStartCmdLine returned empty string")
 	}
 	// Should include the shell path.
-	if !containsStr(got, shell.Path) {
+	if !strings.Contains(got, shell.Path) {
 		t.Errorf("cmd line should contain shell path %q", shell.Path)
 	}
 	// Should use -Command for PowerShell.
-	if !containsStr(got, "-Command") {
+	if !strings.Contains(got, "-Command") {
 		t.Error("cmd line should use -Command for PowerShell")
 	}
 	// Should include -NoLogo from shell.Args.
-	if !containsStr(got, "-NoLogo") {
+	if !strings.Contains(got, "-NoLogo") {
 		t.Error("cmd line should include -NoLogo from shell.Args")
 	}
 }
@@ -55,7 +56,7 @@ func TestBuildStartCmdLine_Cmd(t *testing.T) {
 
 	got := buildStartCmdLine(shell, resumeCmd)
 
-	if !containsStr(got, "/k") {
+	if !strings.Contains(got, "/k") {
 		t.Error("cmd line should use /k for cmd.exe")
 	}
 }
@@ -66,24 +67,24 @@ func TestBuildStartCmdLine_Bash(t *testing.T) {
 
 	got := buildStartCmdLine(shell, resumeCmd)
 
-	if !containsStr(got, "-c") {
+	if !strings.Contains(got, "-c") {
 		t.Error("cmd line should use -c for bash")
 	}
-	if !containsStr(got, "--login") {
+	if !strings.Contains(got, "--login") {
 		t.Error("cmd line should include --login from shell.Args")
 	}
 	// Backslashes should be converted to forward slashes for Git Bash,
 	// and double quotes should become single quotes for bash literal quoting.
-	if containsStr(got, `C:\Users`) {
+	if strings.Contains(got, `C:\Users`) {
 		t.Error("cmd line should convert backslashes to forward slashes for Git Bash")
 	}
-	if !containsStr(got, `C:/Users`) {
+	if !strings.Contains(got, `C:/Users`) {
 		t.Error("cmd line should contain forward-slash paths for Git Bash")
 	}
-	if containsStr(got, `"C:/Users`) {
+	if strings.Contains(got, `"C:/Users`) {
 		t.Error("cmd line should use single quotes (not double) for bash path quoting")
 	}
-	if !containsStr(got, `'C:/Users`) {
+	if !strings.Contains(got, `'C:/Users`) {
 		t.Error("cmd line should contain single-quoted paths for Git Bash")
 	}
 }
@@ -158,17 +159,4 @@ func TestDefaultTerminal_Windows(t *testing.T) {
 	if terminal != termWindowsTerminal && terminal != termConhost {
 		t.Errorf("DefaultTerminal() = %q, want %q or %q", terminal, termWindowsTerminal, termConhost)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// containsStr helper (avoid importing strings in test file)
-// ---------------------------------------------------------------------------
-
-func containsStr(haystack, needle string) bool {
-	for i := 0; i <= len(haystack)-len(needle); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return true
-		}
-	}
-	return false
 }

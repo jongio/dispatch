@@ -6,7 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Section name constants for plan.md header-based task parsing.
@@ -124,14 +128,31 @@ func ScanWorkStatusQuick(planMap map[string]bool) map[string]WorkStatusResult {
 func ScanWorkStatus(sessionIDs []string, progressFn func(completed, total int)) map[string]WorkStatusResult {
 	n := len(sessionIDs)
 	result := make(map[string]WorkStatusResult, n)
-
-	for i, id := range sessionIDs {
-		result[id] = analyseSession(id)
-
-		if progressFn != nil {
-			progressFn(i+1, n)
-		}
+	if n == 0 {
+		return result
 	}
+
+	var mu sync.Mutex
+	var completed int64
+
+	var g errgroup.Group
+	g.SetLimit(runtime.NumCPU())
+
+	for _, id := range sessionIDs {
+		g.Go(func() error {
+			r := analyseSession(id)
+			mu.Lock()
+			result[id] = r
+			completed++
+			c := int(completed)
+			if progressFn != nil {
+				progressFn(c, n)
+			}
+			mu.Unlock()
+			return nil
+		})
+	}
+	_ = g.Wait()
 	return result
 }
 
