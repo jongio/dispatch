@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -681,7 +682,7 @@ func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
 	}
 
 	folder := AbbrevHome(item.folderPath)
-	count := FormatInt(item.count)
+	count := strconv.Itoa(item.count)
 
 	prefix := " " + arrow + " "
 	suffix := " (" + count + ")"
@@ -718,7 +719,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	}
 
 	relTime := RelativeTime(sess.LastActiveAt)
-	turns := FormatInt(sess.TurnCount) + "t"
+	turns := strconv.Itoa(sess.TurnCount) + "t"
 
 	// Attention dot — 2 chars (dot + space).
 	attDot := s.attentionDot(sess.ID, selected)
