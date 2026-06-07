@@ -149,7 +149,7 @@ func Maintain() error {
 	// Rebuild FTS5 search index from source data.
 	// FTS5 table may not exist in older stores — only ignore "no such table".
 	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('rebuild')"); err != nil {
-		if !strings.Contains(err.Error(), "no such table") {
+		if !isSQLiteNoSuchTable(err) {
 			if isDBBusy(err) {
 				return ErrIndexBusy
 			}
@@ -159,7 +159,7 @@ func Maintain() error {
 
 	// Optimise FTS5 index (merge internal b-tree segments).
 	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('optimize')"); err != nil {
-		if !strings.Contains(err.Error(), "no such table") {
+		if !isSQLiteNoSuchTable(err) {
 			if isDBBusy(err) {
 				return ErrIndexBusy
 			}
@@ -219,6 +219,52 @@ func isDBBusy(err error) bool {
 		strings.Contains(msg, "database table is locked") ||
 		strings.Contains(msg, "busy") ||
 		strings.Contains(msg, "locked")
+}
+
+// isSQLiteNoSuchTable returns true if err indicates a "no such table"
+// error from SQLite. It mirrors the isDBBusy pattern: typed error code
+// check via errors.As first, with a string fallback for errors that lost
+// the typed wrapper during rewrapping.
+//
+// SQLite reports "no such table" as SQLITE_ERROR (generic code 1) with the
+// table name in the message — there is no dedicated error code for it.
+func isSQLiteNoSuchTable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		primary := sqliteErr.Code() & 0xFF
+		if primary == sqlite3.SQLITE_ERROR &&
+			strings.Contains(strings.ToLower(sqliteErr.Error()), "no such table") {
+			return true
+		}
+	}
+
+	// Fallback: string matching for errors that lost the typed wrapper.
+	return strings.Contains(strings.ToLower(err.Error()), "no such table")
+}
+
+// isFTS5QueryError returns true if err indicates an FTS5-specific query
+// failure (e.g. malformed MATCH syntax). These errors are non-fatal for
+// search — the caller should return an empty result set instead of
+// propagating. Uses the same typed-first, string-fallback strategy as
+// isDBBusy and isSQLiteNoSuchTable.
+func isFTS5QueryError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		if strings.Contains(strings.ToLower(sqliteErr.Error()), "fts5") {
+			return true
+		}
+	}
+
+	// Fallback: string matching for errors that lost the typed wrapper.
+	return strings.Contains(strings.ToLower(err.Error()), "fts5")
 }
 
 // ---------------------------------------------------------------------------
@@ -883,7 +929,7 @@ func (s *Store) SearchSessionsFTS(ctx context.Context, query string, limit int) 
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		// FTS5 MATCH can fail on malformed queries — return empty, not error.
-		if strings.Contains(err.Error(), "fts5") {
+		if isFTS5QueryError(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("FTS5 search: %w", err)
