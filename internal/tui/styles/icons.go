@@ -144,9 +144,6 @@ func IconGitBranch() string { return icon(nfGitBranch+" ", fbGitBranch) }
 // IconCheck returns the check/success icon ("" or "✓").
 func IconCheck() string { return icon(nfCheck, fbCheck) }
 
-// IconHidden returns the hidden/eye-slash icon ("" or "⊘").
-func IconHidden() string { return icon(nfEyeSlash, fbEyeSlash) }
-
 // IconRepo returns the repository icon ("" or "◆").
 func IconRepo() string { return icon(nfRepo+" ", fbRepo) }
 
@@ -164,9 +161,6 @@ func IconBranch() string { return icon(nfGitBranch+" ", fbBranch) }
 
 // IconBranchOpen returns the expanded git branch icon ("" or "⎇").
 func IconBranchOpen() string { return icon(nfGitBranch+" ", fbBranch) }
-
-// IconList returns the list icon ("" or "≡").
-func IconList() string { return icon(nfList+" ", fbList) }
 
 // ---------------------------------------------------------------------------
 // Attention status dot icons

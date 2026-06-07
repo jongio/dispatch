@@ -2276,11 +2276,6 @@ func attentionPriority(status data.AttentionStatus) int {
 	}
 }
 
-// hiddenCount returns the total number of hidden sessions.
-func (m *Model) hiddenCount() int {
-	return len(m.hiddenSet)
-}
-
 // ---------------------------------------------------------------------------
 // Sort / pivot cycling
 // ---------------------------------------------------------------------------
@@ -2456,14 +2451,6 @@ func (m *Model) updateSelectionStatus() {
 	}
 }
 
-// launchNewSession opens a fresh copilot session (no --resume) in the given cwd.
-func (m *Model) launchNewSession(cwd, mode string) tea.Cmd {
-	if mode == config.LaunchModeInPlace {
-		return m.launchInPlace("", cwd)
-	}
-	return m.resolveShellAndLaunch("", cwd, mode)
-}
-
 // launchWithMode opens the selected session using the specified launch mode.
 func (m *Model) launchWithMode(mode string) tea.Cmd {
 	sess, ok := m.sessionList.Selected()
@@ -2488,7 +2475,7 @@ func (m *Model) launchNewInFolder(mode string) tea.Cmd {
 
 // resolveShellAndLaunch picks the right shell (configured, single, or picker)
 // and launches the session externally. Shared by launchWithMode and
-// launchNewSession to avoid duplicating shell-resolution logic.
+// launchNewInFolder to avoid duplicating shell-resolution logic.
 func (m *Model) resolveShellAndLaunch(sessionID, cwd, mode string) tea.Cmd {
 	launchStyle := launchStyleForMode(mode)
 

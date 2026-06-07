@@ -565,25 +565,6 @@ func TestCovVisibleHiddenSet_EmptyMap(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// hiddenCount — edge cases
-// ---------------------------------------------------------------------------
-
-func TestCovHiddenCount_Zero(t *testing.T) {
-	m := newTestModel()
-	if m.hiddenCount() != 0 {
-		t.Errorf("empty → 0, got %d", m.hiddenCount())
-	}
-}
-
-func TestCovHiddenCount_Several(t *testing.T) {
-	m := newTestModel()
-	m.hiddenSet = map[string]struct{}{"a": {}, "b": {}, "c": {}}
-	if m.hiddenCount() != 3 {
-		t.Errorf("3 hidden → 3, got %d", m.hiddenCount())
-	}
-}
-
-// ---------------------------------------------------------------------------
 // State transitions: filter panel escape
 // ---------------------------------------------------------------------------
 
