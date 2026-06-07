@@ -132,7 +132,7 @@ func TestCovListSessionsByIDs_IncludesTurnAndFileCount(t *testing.T) {
 func TestCovMaintain_NoStoreFile(t *testing.T) {
 	// When DISPATCH_DB points to a nonexistent file, Maintain should return nil.
 	t.Setenv("DISPATCH_DB", filepath.Join(t.TempDir(), "nonexistent.db"))
-	err := Maintain()
+	err := Maintain(context.Background())
 	if err != nil {
 		t.Errorf("Maintain with no store file should return nil, got %v", err)
 	}
@@ -164,7 +164,7 @@ func TestCovMaintain_ValidStore(t *testing.T) {
 	_ = db.Close()
 
 	t.Setenv("DISPATCH_DB", dbPath)
-	err = Maintain()
+	err = Maintain(context.Background())
 	if err != nil {
 		t.Errorf("Maintain failed: %v", err)
 	}

@@ -123,7 +123,7 @@ func (s *Store) Close() error {
 // checkpoints the WAL, rebuilds and optimises the FTS5 search index, then
 // closes the connection. This does NOT modify session data — only index
 // and journal maintenance. Safe to call while the read-only Store is open.
-func Maintain() error {
+func Maintain(ctx context.Context) error {
 	path, err := platform.SessionStorePath()
 	if err != nil {
 		return fmt.Errorf("resolving session store path: %w", err)
@@ -139,7 +139,7 @@ func Maintain() error {
 	defer func() { _ = db.Close() }()
 
 	// Checkpoint WAL — consolidates write-ahead log into the main db.
-	if _, err := db.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+	if _, err := db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
 		if isDBBusy(err) {
 			return ErrIndexBusy
 		}
@@ -148,7 +148,7 @@ func Maintain() error {
 
 	// Rebuild FTS5 search index from source data.
 	// FTS5 table may not exist in older stores — only ignore "no such table".
-	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('rebuild')"); err != nil {
+	if _, err := db.ExecContext(ctx, "INSERT INTO search_index(search_index) VALUES('rebuild')"); err != nil {
 		if !isSQLiteNoSuchTable(err) {
 			if isDBBusy(err) {
 				return ErrIndexBusy
@@ -158,7 +158,7 @@ func Maintain() error {
 	}
 
 	// Optimise FTS5 index (merge internal b-tree segments).
-	if _, err := db.ExecContext(context.Background(), "INSERT INTO search_index(search_index) VALUES('optimize')"); err != nil {
+	if _, err := db.ExecContext(ctx, "INSERT INTO search_index(search_index) VALUES('optimize')"); err != nil {
 		if !isSQLiteNoSuchTable(err) {
 			if isDBBusy(err) {
 				return ErrIndexBusy

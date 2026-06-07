@@ -59,7 +59,7 @@ func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 
 		if errors.Is(err, data.ErrCopilotNotFound) {
 			logCh <- "Copilot CLI not found, running index maintenance…"
-			if mErr := data.Maintain(); mErr != nil {
+			if mErr := data.Maintain(ctx); mErr != nil {
 				return ReindexFinishedMsg{Err: mErr}
 			}
 			return ReindexFinishedMsg{Err: nil}
@@ -69,7 +69,7 @@ func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 		}
 
 		// Run Maintain() after chronicle reindex to checkpoint WAL.
-		if mErr := data.Maintain(); mErr != nil {
+		if mErr := data.Maintain(ctx); mErr != nil {
 			logCh <- "Warning: post-reindex maintenance: " + mErr.Error()
 		}
 		return ReindexFinishedMsg{Err: nil}

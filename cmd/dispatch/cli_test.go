@@ -223,7 +223,7 @@ func TestHandleArgs_Reindex_CopilotNotFound(t *testing.T) {
 	chronicleReindexFn = func(_ context.Context, _ func(string)) error {
 		return data.ErrCopilotNotFound
 	}
-	maintainFn = func() error { return nil }
+	maintainFn = func(_ context.Context) error { return nil }
 
 	ch := make(chan *update.UpdateInfo, 1)
 
@@ -266,7 +266,7 @@ func TestHandleArgs_Reindex_MaintainError(t *testing.T) {
 	chronicleReindexFn = func(_ context.Context, _ func(string)) error {
 		return data.ErrCopilotNotFound
 	}
-	maintainFn = func() error { return fmt.Errorf("db locked") }
+	maintainFn = func(_ context.Context) error { return fmt.Errorf("db locked") }
 
 	ch := make(chan *update.UpdateInfo, 1)
 
@@ -291,7 +291,7 @@ func TestHandleArgs_Reindex_Success(t *testing.T) {
 		cb("Processing 10 sessions...")
 		return nil
 	}
-	maintainFn = func() error { return nil }
+	maintainFn = func(_ context.Context) error { return nil }
 
 	ch := make(chan *update.UpdateInfo, 1)
 
@@ -367,7 +367,7 @@ func TestHandleArgs_Reindex_PostMaintainWarning(t *testing.T) {
 		return nil
 	}
 	calls := 0
-	maintainFn = func() error {
+	maintainFn = func(_ context.Context) error {
 		calls++
 		if calls == 1 {
 			return fmt.Errorf("db busy")
