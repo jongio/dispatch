@@ -145,10 +145,10 @@ func ScanWorkStatus(sessionIDs []string, progressFn func(completed, total int)) 
 			result[id] = r
 			completed++
 			c := int(completed)
-			mu.Unlock()
 			if progressFn != nil {
 				progressFn(c, n)
 			}
+			mu.Unlock()
 			return nil
 		})
 	}
