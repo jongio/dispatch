@@ -1572,23 +1572,6 @@ func TestResolveShellAndLaunch_NoShells(t *testing.T) {
 	}
 }
 
-func TestLaunchNewSession_InPlace(t *testing.T) {
-	m := newTestModel()
-	cmd := m.launchNewSession("/test", config.LaunchModeInPlace)
-	// May be nil if NewResumeCmd fails (no copilot CLI), but shouldn't panic.
-	_ = cmd == nil // suppress unused warning while documenting the check
-}
-
-func TestLaunchNewSession_External(t *testing.T) {
-	m := newTestModel()
-	m.cfg.DefaultShell = ""
-	m.shells = []platform.ShellInfo{{Name: "bash", Path: "/bin/bash"}}
-	cmd := m.launchNewSession("/test", config.LaunchModeTab)
-	if cmd == nil {
-		t.Error("launchNewSession external should return non-nil cmd")
-	}
-}
-
 func TestLaunchExternal_ReturnsFunc(t *testing.T) {
 	m := newTestModel()
 	sh := platform.ShellInfo{Name: "bash", Path: "/bin/bash"}

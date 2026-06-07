@@ -26,15 +26,12 @@ import (
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 	"github.com/jongio/dispatch/internal/tui/styles"
+	"github.com/jongio/dispatch/internal/version"
 )
 
 // ---------------------------------------------------------------------------
 // Package-level configuration
 // ---------------------------------------------------------------------------
-
-// Version is set at build time via ldflags. Defaults to "dev" for
-// development builds.
-var Version = "dev"
 
 // doubleClickTimeout is the maximum interval between two mouse clicks at the
 // same Y position for them to be treated as a double-click.
@@ -1923,26 +1920,26 @@ func (m Model) renderFooter() string {
 		}
 	}
 
-	version := styles.DimStyle.Render(Version)
+	ver := styles.DimStyle.Render(version.Version)
 
 	// Right: context-sensitive keybinding hints from help.Model.
 	right := m.help.ShortView()
 
 	// If hints + left + version exceed width, drop the hints entirely
 	// to avoid wrapping. Byte-level truncation corrupts ANSI codes.
-	usedWidth := lipgloss.Width(left) + lipgloss.Width(version) + footerGapReserve
+	usedWidth := lipgloss.Width(left) + lipgloss.Width(ver) + footerGapReserve
 	if usedWidth+lipgloss.Width(right) > m.width {
 		right = ""
 	}
 
 	// Use m.width-2 so the footer totals m.width-1 characters, avoiding
 	// exact-terminal-width lines that could autowrap.
-	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - lipgloss.Width(version) - 2
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right) - lipgloss.Width(ver) - 2
 	if gap < 1 {
 		gap = 1
 	}
 
-	line := left + strings.Repeat(" ", gap) + right + " " + version
+	line := left + strings.Repeat(" ", gap) + right + " " + ver
 	return styles.StatusBarStyle.Render(line)
 }
 
@@ -2276,11 +2273,6 @@ func attentionPriority(status data.AttentionStatus) int {
 	}
 }
 
-// hiddenCount returns the total number of hidden sessions.
-func (m *Model) hiddenCount() int {
-	return len(m.hiddenSet)
-}
-
 // ---------------------------------------------------------------------------
 // Sort / pivot cycling
 // ---------------------------------------------------------------------------
@@ -2456,14 +2448,6 @@ func (m *Model) updateSelectionStatus() {
 	}
 }
 
-// launchNewSession opens a fresh copilot session (no --resume) in the given cwd.
-func (m *Model) launchNewSession(cwd, mode string) tea.Cmd {
-	if mode == config.LaunchModeInPlace {
-		return m.launchInPlace("", cwd)
-	}
-	return m.resolveShellAndLaunch("", cwd, mode)
-}
-
 // launchWithMode opens the selected session using the specified launch mode.
 func (m *Model) launchWithMode(mode string) tea.Cmd {
 	sess, ok := m.sessionList.Selected()
@@ -2488,7 +2472,7 @@ func (m *Model) launchNewInFolder(mode string) tea.Cmd {
 
 // resolveShellAndLaunch picks the right shell (configured, single, or picker)
 // and launches the session externally. Shared by launchWithMode and
-// launchNewSession to avoid duplicating shell-resolution logic.
+// launchNewInFolder to avoid duplicating shell-resolution logic.
 func (m *Model) resolveShellAndLaunch(sessionID, cwd, mode string) tea.Cmd {
 	launchStyle := launchStyleForMode(mode)
 

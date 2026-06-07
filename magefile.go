@@ -31,10 +31,6 @@ var deadcodeAllowlist = []string{
 	"keyMap.ShortHelp",             // key.Map interface impl
 	"keyMap.FullHelp",              // key.Map interface impl
 	"CurrentTheme",                 // called from screenshot.go (//go:build screenshots)
-	"Model.hiddenCount",            // tested API surface, pending production use
-	"Model.launchNewSession",       // tested API surface, pending production use
-	"IconHidden",                   // tested icon helper, pending production use
-	"IconList",                     // tested icon helper, pending production use
 }
 
 const (
@@ -47,7 +43,7 @@ const (
 var (
 	binName    = "dispatch-dev"
 	mainPkg    = "./cmd/dispatch/"
-	versionVar = "github.com/jongio/dispatch/internal/tui.Version"
+	versionVar = "github.com/jongio/dispatch/internal/version.Version"
 )
 
 // Default target when running `mage` with no args.

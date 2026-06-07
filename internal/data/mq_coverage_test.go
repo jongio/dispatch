@@ -247,7 +247,7 @@ func TestMaintain_NoStoreFile(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", filepath.Join(tmp, "AppData", "Local"))
 
 	// No store file exists — should return nil (nothing to maintain).
-	err := Maintain()
+	err := Maintain(context.Background())
 	if err != nil {
 		t.Errorf("Maintain() with no store = %v, want nil", err)
 	}
@@ -279,7 +279,7 @@ func TestMaintain_WithValidEmptyDB(t *testing.T) {
 
 	// Maintain should succeed with WAL checkpoint; FTS5 errors for
 	// missing search_index are ignored ("no such table" case).
-	err = Maintain()
+	err = Maintain(context.Background())
 	if err != nil {
 		t.Errorf("Maintain() with valid empty DB = %v, want nil", err)
 	}

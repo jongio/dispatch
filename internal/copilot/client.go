@@ -67,11 +67,21 @@ type CompletionAnalysis struct {
 	Summary        string   `json:"summary"`
 }
 
+// SessionQuerier abstracts the data store operations used by the copilot
+// package.  The concrete *data.Store satisfies this interface implicitly
+// (Go duck typing), keeping copilot decoupled from the store implementation.
+type SessionQuerier interface {
+	ListSessions(ctx context.Context, filter data.FilterOptions, sort data.SortOptions, limit int) ([]data.Session, error)
+	GetSession(ctx context.Context, id string) (*data.SessionDetail, error)
+	ListRepositories(ctx context.Context) ([]string, error)
+	SearchSessions(ctx context.Context, query string, limit int) ([]data.SearchResult, error)
+}
+
 // Client wraps the Copilot SDK to provide search and streaming chat.
 // It lazily initialises the SDK client on the first search/message,
 // and creates sessions on-demand (no idle background sessions).
 type Client struct {
-	store *data.Store
+	store SessionQuerier
 	sdk   *sdk.Client
 
 	mu        sync.Mutex
@@ -87,9 +97,9 @@ type Client struct {
 	hooks *testHooks // nil in production
 }
 
-// New creates a new copilot Client backed by the given data store.
+// New creates a new copilot Client backed by the given session querier.
 // The SDK is not started until Init is called.
-func New(store *data.Store) *Client {
+func New(store SessionQuerier) *Client {
 	return &Client{store: store}
 }
 

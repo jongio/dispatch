@@ -503,7 +503,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 // themeEntry pairs a color scheme with its filesystem-safe directory name.
 type themeEntry struct {
 	dir    string
-	scheme styles.ColorScheme
+	scheme config.ColorScheme
 }
 
 // allThemes lists every built-in scheme with its subfolder name.

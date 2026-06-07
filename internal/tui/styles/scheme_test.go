@@ -1,8 +1,13 @@
 package styles
 
 import (
+	"regexp"
 	"testing"
 )
+
+// testHexPattern validates a #RRGGBB hex color string in tests.
+// The canonical hexPattern lives in the config package with ColorScheme.
+var testHexPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 // ---------------------------------------------------------------------------
 // ColorScheme.Validate
@@ -111,7 +116,7 @@ func TestDeriveTheme_SemanticColorsAreValidHex(t *testing.T) {
 	}
 
 	for _, c := range colors {
-		if !hexPattern.MatchString(c.value) {
+		if !testHexPattern.MatchString(c.value) {
 			t.Errorf("semantic color %s = %q is not valid #RRGGBB hex", c.name, c.value)
 		}
 	}
@@ -187,7 +192,7 @@ func TestIsDarkHex(t *testing.T) {
 func TestBlendHex(t *testing.T) {
 	// Blend black and white at 50% should produce a mid-gray.
 	mid := blendHex("#000000", "#FFFFFF", 0.5)
-	if !hexPattern.MatchString(mid) {
+	if !testHexPattern.MatchString(mid) {
 		t.Fatalf("blendHex returned invalid hex: %q", mid)
 	}
 	// t=0 should return approximately the first color.

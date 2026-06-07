@@ -1,72 +1,13 @@
 package components
 
 import (
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
-
-// ---------------------------------------------------------------------------
-// FormatInt
-// ---------------------------------------------------------------------------
-
-func TestFormatInt(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		v    int
-		want string
-	}{
-		{"zero", 0, "0"},
-		{"positive single digit", 7, "7"},
-		{"positive multi digit", 42, "42"},
-		{"positive large", 123456789, "123456789"},
-		{"negative single digit", -1, "-1"},
-		{"negative multi digit", -99, "-99"},
-		{"negative large", -123456789, "-123456789"},
-		{"max int32 range", 2147483647, "2147483647"},
-		{"min int32 range", -2147483648, "-2147483648"},
-		{"one", 1, "1"},
-		{"ten", 10, "10"},
-		{"hundred", 100, "100"},
-		{"thousand", 1000, "1000"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := FormatInt(tt.v)
-			if got != tt.want {
-				t.Errorf("FormatInt(%d) = %q, want %q", tt.v, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFormatIntMaxInt(t *testing.T) {
-	t.Parallel()
-	// Verify math.MaxInt produces a valid positive numeric string.
-	got := FormatInt(math.MaxInt)
-	want := strconv.Itoa(math.MaxInt)
-	if got != want {
-		t.Errorf("FormatInt(MaxInt) = %q, want %q", got, want)
-	}
-}
-
-func TestFormatIntMinInt(t *testing.T) {
-	t.Parallel()
-	// Previously caused infinite recursion with the hand-rolled implementation.
-	// Now delegates to strconv.Itoa which handles two's complement correctly.
-	got := FormatInt(math.MinInt)
-	want := strconv.Itoa(math.MinInt)
-	if got != want {
-		t.Errorf("FormatInt(MinInt) = %q, want %q", got, want)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Truncate
@@ -719,19 +660,6 @@ func TestPadRightTruncateConsistency(t *testing.T) {
 				t.Errorf("PadRight(Truncate(%q, %d), %d) has %d runes, want %d; got %q",
 					s, w, w, len(runes), w, got)
 			}
-		}
-	}
-}
-
-// FormatInt should be consistent with strconv.Itoa for common values.
-func TestFormatIntConsistencyWithStrconv(t *testing.T) {
-	t.Parallel()
-	values := []int{0, 1, -1, 42, -42, 1000, -1000, 999999, -999999}
-	for _, v := range values {
-		got := FormatInt(v)
-		want := strconv.Itoa(v)
-		if got != want {
-			t.Errorf("FormatInt(%d) = %q, want %q", v, got, want)
 		}
 	}
 }

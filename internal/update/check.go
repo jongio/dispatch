@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -189,7 +190,11 @@ func fetchLatestVersion(ctx context.Context) (string, error) {
 	}
 
 	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	// Cap response size to prevent unbounded memory consumption from a
+	// malicious or oversized payload (matches the LimitReader pattern used
+	// in update.go for checksum downloads).
+	limitedBody := io.LimitReader(resp.Body, 1<<20) // 1 MB
+	if err := json.NewDecoder(limitedBody).Decode(&release); err != nil {
 		return "", fmt.Errorf("decoding release response: %w", err)
 	}
 

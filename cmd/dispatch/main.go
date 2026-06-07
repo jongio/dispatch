@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/jongio/dispatch/internal/tui"
 	"github.com/jongio/dispatch/internal/update"
+	"github.com/jongio/dispatch/internal/version"
 )
 
 const demoDBRel = "internal/data/testdata/fake_sessions.db"
@@ -21,7 +22,7 @@ func main() {
 	// with argument parsing and TUI startup.
 	updateCh := make(chan *update.UpdateInfo, 1)
 	go func() {
-		updateCh <- update.CheckForUpdate(context.Background(), tui.Version)
+		updateCh <- update.CheckForUpdate(context.Background(), version.Version)
 	}()
 
 	origStderr := captureOriginalStderr()
@@ -101,7 +102,7 @@ Flags:
 Environment:
   DISPATCH_DB             Path to a custom session store database
   DISPATCH_LOG            Path to a log file (enables debug logging)
-`, tui.Version)
+`, version.Version)
 }
 
 // showUpdateNotification prints an update notification to stderr if the

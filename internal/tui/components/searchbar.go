@@ -1,6 +1,8 @@
 package components
 
 import (
+	"strconv"
+
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -115,7 +117,7 @@ func (s SearchBar) View() string {
 	// MaxWidth clamp below.
 	var suffix string
 	if s.active && s.input.Value() != "" {
-		count := FormatInt(s.resultCount) + " results"
+		count := strconv.Itoa(s.resultCount) + " results"
 		if s.searching {
 			count += " (searching…)"
 		}
@@ -134,7 +136,7 @@ func (s SearchBar) View() string {
 				count += " (✦ unavailable)"
 			}
 		case s.aiResults > 0:
-			count += " (✦ " + FormatInt(s.aiResults) + " AI)"
+			count += " (✦ " + strconv.Itoa(s.aiResults) + " AI)"
 		}
 		suffix = styles.DimmedStyle.Render(" " + count)
 	}
