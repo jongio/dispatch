@@ -19,6 +19,9 @@ import (
 // ---------------------------------------------------------------------------
 // Handler methods — extracted from the Update switch for readability.
 // Each returns (Model, tea.Cmd) matching the Bubble Tea update pattern.
+//
+// TODO(#113): Consider handler registry pattern to reduce switch complexity.
+// See https://github.com/jongio/dispatch/issues/113 for full analysis.
 // ---------------------------------------------------------------------------
 
 // ----- Background color detection ------------------------------------------
@@ -156,18 +159,10 @@ func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) 
 
 func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	prevID := m.selectedSessionID()
-	m.sessions = m.filterHiddenSessions(msg.sessions)
-	m.sessions = m.filterFavoritedSessions(m.sessions)
-	m.sessions = m.filterAttentionSessions(m.sessions)
-	m.sessions = m.filterPlanSessions(m.sessions)
-	m.sessions = m.filterWorkStatusSessions(m.sessions)
+	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
 	m.groups = nil
-	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-	m.sessionList.SetFavoritedSessions(m.favoritedSet)
-	m.sessionList.SetAttentionStatuses(m.attentionMap)
-	m.sessionList.SetPlanStatuses(m.planMap)
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListStatuses()
 	m.sessionList.SetSessions(m.sessions)
 	// Restore cursor to the previously selected session if possible.
 	if prevID != "" {
@@ -188,20 +183,12 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	prevID := m.selectedSessionID()
-	m.groups = m.filterHiddenGroups(msg.groups)
-	m.groups = m.filterFavoritedGroups(m.groups)
-	m.groups = m.filterAttentionGroups(m.groups)
-	m.groups = m.filterPlanGroups(m.groups)
-	m.groups = m.filterWorkStatusGroups(m.groups)
+	m.groups = m.applyGroupFilters(msg.groups)
 	for i := range m.groups {
 		m.sortByAttention(m.groups[i].Sessions)
 	}
 	m.sessions = nil
-	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-	m.sessionList.SetFavoritedSessions(m.favoritedSet)
-	m.sessionList.SetAttentionStatuses(m.attentionMap)
-	m.sessionList.SetPlanStatuses(m.planMap)
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListStatuses()
 	m.sessionList.SetPivotField(m.pivot)
 	m.sessionList.SetGroups(m.groups)
 	if prevID != "" {
@@ -338,7 +325,7 @@ func (m Model) handlePlanContent(msg planContentMsg) (Model, tea.Cmd) { //nolint
 
 func (m Model) handleWorkStatusQuickScanned(msg workStatusQuickScannedMsg) (Model, tea.Cmd) {
 	m.workStatus.workStatusMap = msg.statuses
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)
@@ -357,7 +344,7 @@ func (m Model) handleWorkStatusScanned(msg workStatusScannedMsg) (Model, tea.Cmd
 	} else {
 		maps.Copy(m.workStatus.workStatusMap, msg.statuses)
 	}
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)
@@ -432,7 +419,7 @@ func (m Model) handleWorkStatusAIScanned(msg workStatusAIScannedMsg) (Model, tea
 			sessionsWithRemaining = append(sessionsWithRemaining, id)
 		}
 	}
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)
@@ -486,21 +473,13 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 	m.filter.DeepSearch = true // keep deep mode for subsequent reloads (time range, sort, etc.)
 	m.searchBar.SetSearching(false)
 	if msg.sessions != nil {
-		m.sessions = m.filterHiddenSessions(msg.sessions)
-		m.sessions = m.filterFavoritedSessions(m.sessions)
-		m.sessions = m.filterAttentionSessions(m.sessions)
-		m.sessions = m.filterPlanSessions(m.sessions)
-		m.sessions = m.filterWorkStatusSessions(m.sessions)
+		m.sessions = m.applySessionFilters(msg.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetSessions(m.sessions)
 	} else if msg.groups != nil {
-		m.groups = m.filterHiddenGroups(msg.groups)
-		m.groups = m.filterFavoritedGroups(m.groups)
-		m.groups = m.filterAttentionGroups(m.groups)
-		m.groups = m.filterPlanGroups(m.groups)
-		m.groups = m.filterWorkStatusGroups(m.groups)
+		m.groups = m.applyGroupFilters(msg.groups)
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
@@ -596,11 +575,7 @@ func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) 
 		return m, nil
 	}
 	// Apply full filter chain before merging (matches sessionsLoadedMsg).
-	incoming := m.filterHiddenSessions(msg.sessions)
-	incoming = m.filterFavoritedSessions(incoming)
-	incoming = m.filterAttentionSessions(incoming)
-	incoming = m.filterPlanSessions(incoming)
-	incoming = m.filterWorkStatusSessions(incoming)
+	incoming := m.applySessionFilters(msg.sessions)
 	if len(incoming) == 0 {
 		return m, nil
 	}

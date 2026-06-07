@@ -2,9 +2,14 @@ package copilot
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -393,5 +398,172 @@ func TestCoverage_AnalyzeCompletion_contextCancelledDuringRetryAfterReinit(t *te
 	}
 	if result != nil {
 		t.Error("expected nil result")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// sdkContext — unit tests (issue #114)
+// ---------------------------------------------------------------------------
+
+// TestSdkContext_ReturnsContextWithTimeout verifies sdkContext creates
+// a context with the specified timeout and a valid cancel function.
+func TestSdkContext_ReturnsContextWithTimeout(t *testing.T) {
+	t.Parallel()
+	timeout := 5 * time.Second
+	ctx, cancel := sdkContext(timeout)
+	defer cancel()
+
+	// Context should not be cancelled yet.
+	if ctx.Err() != nil {
+		t.Errorf("fresh context should not have error, got: %v", ctx.Err())
+	}
+
+	// Deadline should be set and approximately timeout from now.
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("sdkContext should set a deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining < 4*time.Second || remaining > 6*time.Second {
+		t.Errorf("remaining time %v should be close to %v", remaining, timeout)
+	}
+}
+
+// TestSdkContext_CancelStopsContext verifies the cancel function works.
+func TestSdkContext_CancelStopsContext(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := sdkContext(10 * time.Second)
+	cancel()
+
+	if ctx.Err() == nil {
+		t.Error("context should be cancelled after cancel()")
+	}
+}
+
+// TestSdkContext_UsesBackgroundParent verifies the context is derived
+// from context.Background() (not any other parent).
+func TestSdkContext_UsesBackgroundParent(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := sdkContext(time.Second)
+	defer cancel()
+
+	// A background-derived context should have no values.
+	if v := ctx.Value("nonexistent"); v != nil {
+		t.Error("sdkContext should be derived from Background (no values)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// isTransportError — unit tests (issue #114)
+// ---------------------------------------------------------------------------
+
+func TestIsTransportError_Nil(t *testing.T) {
+	t.Parallel()
+	if isTransportError(nil) {
+		t.Error("nil error should not be a transport error")
+	}
+}
+
+func TestIsTransportError_EOF(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(io.EOF) {
+		t.Error("io.EOF should be a transport error")
+	}
+}
+
+func TestIsTransportError_UnexpectedEOF(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(io.ErrUnexpectedEOF) {
+		t.Error("io.ErrUnexpectedEOF should be a transport error")
+	}
+}
+
+func TestIsTransportError_OsErrClosed(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(os.ErrClosed) {
+		t.Error("os.ErrClosed should be a transport error")
+	}
+}
+
+func TestIsTransportError_NetErrClosed(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(net.ErrClosed) {
+		t.Error("net.ErrClosed should be a transport error")
+	}
+}
+
+func TestIsTransportError_EPIPE(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(syscall.EPIPE) {
+		t.Error("syscall.EPIPE should be a transport error")
+	}
+}
+
+func TestIsTransportError_ECONNRESET(t *testing.T) {
+	t.Parallel()
+	if !isTransportError(syscall.ECONNRESET) {
+		t.Error("syscall.ECONNRESET should be a transport error")
+	}
+}
+
+func TestIsTransportError_WrappedEOF(t *testing.T) {
+	t.Parallel()
+	wrapped := fmt.Errorf("sdk broke: %w", io.EOF)
+	if !isTransportError(wrapped) {
+		t.Error("wrapped io.EOF should be a transport error")
+	}
+}
+
+func TestIsTransportError_FileAlreadyClosed(t *testing.T) {
+	t.Parallel()
+	err := errors.New("something: file already closed")
+	if !isTransportError(err) {
+		t.Error("'file already closed' string should be a transport error")
+	}
+}
+
+func TestIsTransportError_ErrorReadingHeader(t *testing.T) {
+	t.Parallel()
+	err := errors.New("error reading header from pipe")
+	if !isTransportError(err) {
+		t.Error("'error reading header' string should be a transport error")
+	}
+}
+
+func TestIsTransportError_BrokenPipe(t *testing.T) {
+	t.Parallel()
+	err := errors.New("write: broken pipe")
+	if !isTransportError(err) {
+		t.Error("'broken pipe' string should be a transport error")
+	}
+}
+
+func TestIsTransportError_ConnectionReset(t *testing.T) {
+	t.Parallel()
+	err := errors.New("read tcp: connection reset by peer")
+	if !isTransportError(err) {
+		t.Error("'connection reset' string should be a transport error")
+	}
+}
+
+func TestIsTransportError_UnrelatedError(t *testing.T) {
+	t.Parallel()
+	err := errors.New("validation failed: missing field")
+	if isTransportError(err) {
+		t.Error("unrelated error should not be a transport error")
+	}
+}
+
+func TestIsTransportError_ContextCancelled(t *testing.T) {
+	t.Parallel()
+	if isTransportError(context.Canceled) {
+		t.Error("context.Canceled should not be a transport error")
+	}
+}
+
+func TestIsTransportError_DeadlineExceeded(t *testing.T) {
+	t.Parallel()
+	if isTransportError(context.DeadlineExceeded) {
+		t.Error("context.DeadlineExceeded should not be a transport error")
 	}
 }

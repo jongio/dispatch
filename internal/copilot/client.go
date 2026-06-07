@@ -49,6 +49,15 @@ const analysisOperationTimeout = 120 * time.Second
 // and analysis). Extracted as a constant to provide a single source of truth.
 const defaultModel = "gpt-4.1"
 
+// sdkContext creates a fresh context for Copilot SDK operations.
+// The SDK spawns long-lived subprocesses whose lifecycle is managed by the
+// Client (not by individual callers), so inheriting a caller's context would
+// cause premature cancellation when the caller's request completes. Cancelling
+// mid-operation corrupts the JSON-RPC pipe ("file already closed").
+func sdkContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), timeout)
+}
+
 // testHooks allows tests to override internal behaviour without a real
 // Copilot SDK process. Only tests in this package set these fields;
 // production code leaves hooks nil.
@@ -311,11 +320,8 @@ func (c *Client) Search(ctx context.Context, query string) ([]string, error) {
 		return nil, nil
 	}
 
-	// Intentional context.Background(): the SDK Init starts a subprocess
-	// and must not be interrupted by the caller's context cancellation -
-	// aborting Start() mid-handshake leaves the subprocess half-initialised
-	// and the JSON-RPC pipe in an unrecoverable state.
-	initCtx, initCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+	// Use a decoupled context for Init — see sdkContext rationale.
+	initCtx, initCancel := sdkContext(searchOperationTimeout)
 	defer initCancel()
 	if err := c.Init(initCtx); err != nil {
 		if isTransportError(err) {
@@ -378,9 +384,8 @@ func (c *Client) Search(ctx context.Context, query string) ([]string, error) {
 		if ctx.Err() != nil {
 			return nil, nil
 		}
-		// Intentional context.Background(): same rationale as the initial
-		// Init call - protect the subprocess handshake from cancellation.
-		retryInitCtx, retryInitCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+		// Decoupled context for retry Init — see sdkContext rationale.
+		retryInitCtx, retryInitCancel := sdkContext(searchOperationTimeout)
 		if initErr := c.Init(retryInitCtx); initErr != nil {
 			retryInitCancel()
 			err = fmt.Errorf("reinit attempt %d: %w", attempt, initErr)
@@ -436,12 +441,8 @@ func (c *Client) doSearch(ctx context.Context, query string) ([]string, error) {
 	store := c.store
 	c.mu.Unlock()
 
-	// Intentional context.Background(): SDK pipe operations (CreateSession,
-	// SendAndWait) must NOT inherit the caller's context.  Cancelling mid-
-	// SendAndWait corrupts the JSON-RPC pipe and causes "file already
-	// closed" errors on subsequent calls.  The caller's ctx is checked
-	// between operations (below) so we can bail early without pipe damage.
-	sdkCtx, sdkCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+	// Decoupled context for SDK pipe operations — see sdkContext rationale.
+	sdkCtx, sdkCancel := sdkContext(searchOperationTimeout)
 	defer sdkCancel()
 
 	// Create a dedicated session for search with a focused system message.
@@ -517,9 +518,8 @@ func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planCo
 		return nil, nil
 	}
 
-	// Intentional context.Background(): same rationale as Search() - protect
-	// the subprocess Init handshake from caller cancellation.
-	initCtx, initCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+	// Use a decoupled context for Init — see sdkContext rationale.
+	initCtx, initCancel := sdkContext(searchOperationTimeout)
 	defer initCancel()
 	if err := c.Init(initCtx); err != nil {
 		if isTransportError(err) {
@@ -575,9 +575,8 @@ func (c *Client) AnalyzeCompletion(ctx context.Context, sessionID string, planCo
 		if ctx.Err() != nil {
 			return nil, nil
 		}
-		// Intentional context.Background(): same rationale as the initial
-		// Init call - protect the subprocess handshake from cancellation.
-		retryInitCtx, retryInitCancel := context.WithTimeout(context.Background(), searchOperationTimeout)
+		// Decoupled context for retry Init — see sdkContext rationale.
+		retryInitCtx, retryInitCancel := sdkContext(searchOperationTimeout)
 		if initErr := c.Init(retryInitCtx); initErr != nil {
 			retryInitCancel()
 			err = fmt.Errorf("reinit attempt %d: %w", attempt, initErr)
@@ -628,12 +627,9 @@ func (c *Client) doAnalyze(ctx context.Context, sessionID string, planContent st
 	store := c.store
 	c.mu.Unlock()
 
-	// Intentional context.Background(): SDK pipe operations must NOT inherit
-	// the caller's context - cancelling mid-SendAndWait corrupts the JSON-RPC
-	// pipe (see doSearch for full rationale).  Analysis uses a longer timeout
-	// than search because the model creates a session, processes the plan,
-	// may call tools, and returns structured JSON.
-	sdkCtx, sdkCancel := context.WithTimeout(context.Background(), analysisOperationTimeout)
+	// Decoupled context for SDK pipe operations — see sdkContext rationale.
+	// Analysis uses a longer timeout (model processes plan + may call tools).
+	sdkCtx, sdkCancel := sdkContext(analysisOperationTimeout)
 	defer sdkCancel()
 
 	// Create a dedicated non-streaming session for analysis.
