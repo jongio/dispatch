@@ -81,8 +81,8 @@ type checkpointSummary struct {
 // Tool definitions
 // ---------------------------------------------------------------------------
 
-// defineTools returns the set of Copilot tools wired to the given data.Store.
-func defineTools(store *data.Store) []sdk.Tool {
+// defineTools returns the set of Copilot tools wired to the given SessionQuerier.
+func defineTools(store SessionQuerier) []sdk.Tool {
 	return []sdk.Tool{
 		defineSearchSessionsTool(store),
 		defineGetSessionDetailTool(store),
@@ -104,7 +104,7 @@ func parseFlexibleDate(s, fieldName string) (*time.Time, error) {
 	return &t, nil
 }
 
-func defineSearchSessionsTool(store *data.Store) sdk.Tool {
+func defineSearchSessionsTool(store SessionQuerier) sdk.Tool {
 	return sdk.DefineTool(
 		"search_sessions",
 		"Search Copilot CLI sessions by keyword, repository, branch, or date range. "+
@@ -147,7 +147,7 @@ func defineSearchSessionsTool(store *data.Store) sdk.Tool {
 	)
 }
 
-func defineGetSessionDetailTool(store *data.Store) sdk.Tool {
+func defineGetSessionDetailTool(store SessionQuerier) sdk.Tool {
 	return sdk.DefineTool(
 		"get_session_detail",
 		"Get full details for a specific session including all turns, checkpoints, files, and refs.",
@@ -168,7 +168,7 @@ func defineGetSessionDetailTool(store *data.Store) sdk.Tool {
 	)
 }
 
-func defineListRepositoriesTool(store *data.Store) sdk.Tool {
+func defineListRepositoriesTool(store SessionQuerier) sdk.Tool {
 	return sdk.DefineTool(
 		"list_repositories",
 		"List all distinct repository names across all sessions.",
@@ -199,7 +199,7 @@ func defineListRepositoriesTool(store *data.Store) sdk.Tool {
 	)
 }
 
-func defineSearchDeepTool(store *data.Store) sdk.Tool {
+func defineSearchDeepTool(store SessionQuerier) sdk.Tool {
 	return sdk.DefineTool(
 		"search_deep",
 		"Perform a deep full-text search across all session content including turns, "+
@@ -224,7 +224,7 @@ func defineSearchDeepTool(store *data.Store) sdk.Tool {
 	)
 }
 
-func defineAnalyzeCompletionTool(store *data.Store) sdk.Tool {
+func defineAnalyzeCompletionTool(store SessionQuerier) sdk.Tool {
 	return sdk.DefineTool(
 		"analyze_completion",
 		"Analyze whether planned work in a session has been completed by examining "+

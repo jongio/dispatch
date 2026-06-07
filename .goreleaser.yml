@@ -6,7 +6,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -X github.com/jongio/dispatch/internal/tui.Version={{ .Version }}
+      - -X github.com/jongio/dispatch/internal/version.Version={{ .Version }}
     goos:
       - linux
       - darwin

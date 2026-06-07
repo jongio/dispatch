@@ -9,6 +9,7 @@ import (
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 	"github.com/jongio/dispatch/internal/tui/styles"
+	"github.com/jongio/dispatch/internal/version"
 )
 
 // ---------------------------------------------------------------------------
@@ -343,7 +344,7 @@ func TestResolveTheme_UnknownScheme(t *testing.T) {
 func TestResolveTheme_UserDefinedScheme(t *testing.T) {
 	cfg := config.Default()
 	cfg.Theme = "MyCustomScheme"
-	cfg.Schemes = []styles.ColorScheme{
+	cfg.Schemes = []config.ColorScheme{
 		{
 			Name:       "MyCustomScheme",
 			Foreground: "#CCCCCC", Background: "#0C0C0C",
@@ -360,7 +361,7 @@ func TestResolveTheme_UserDefinedScheme(t *testing.T) {
 func TestResolveTheme_InvalidUserScheme(t *testing.T) {
 	cfg := config.Default()
 	cfg.Theme = "BadScheme"
-	cfg.Schemes = []styles.ColorScheme{
+	cfg.Schemes = []config.ColorScheme{
 		{Name: "BadScheme"}, // empty colors → Validate() fails
 	}
 	resolveTheme(cfg) // should not panic, skips invalid scheme
@@ -427,12 +428,12 @@ func TestAppStateConstants(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Version variable
+// version.Version variable
 // ---------------------------------------------------------------------------
 
 func TestVersionDefault(t *testing.T) {
-	if Version == "" {
-		t.Error("Version should have a default value")
+	if version.Version == "" {
+		t.Error("version.Version should have a default value")
 	}
 }
 
