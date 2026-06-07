@@ -160,4 +160,3 @@ func TestDefaultTerminal_Windows(t *testing.T) {
 		t.Errorf("DefaultTerminal() = %q, want %q or %q", terminal, termWindowsTerminal, termConhost)
 	}
 }
-
