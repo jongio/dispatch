@@ -32,6 +32,29 @@ func TestDetectUnixShells_FallbackPath(t *testing.T) {
 	t.Logf("detectUnixShells found %d shells", len(shells))
 }
 
+func TestDetectUnixShells_NoDuplicateNames(t *testing.T) {
+	shells := detectUnixShells()
+	seen := make(map[string]struct{})
+	for _, s := range shells {
+		if _, exists := seen[s.Name]; exists {
+			t.Errorf("detectUnixShells returned duplicate shell name: %q", s.Name)
+		}
+		seen[s.Name] = struct{}{}
+	}
+}
+
+func TestDetectUnixShells_PathsAreAbsolute(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell paths on Windows may not be Unix-absolute")
+	}
+	shells := detectUnixShells()
+	for _, s := range shells {
+		if !strings.HasPrefix(s.Path, "/") {
+			t.Errorf("shell %q has non-absolute path: %q", s.Name, s.Path)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // defaultUnixShell - $SHELL env and fallback
 // ---------------------------------------------------------------------------
@@ -522,6 +545,15 @@ func TestDefaultTerminal_ReturnValueIsNonEmpty(t *testing.T) {
 	}
 }
 
+func TestDefaultTerminal_Idempotent(t *testing.T) {
+	// Calling multiple times should always return the same result.
+	first := DefaultTerminal()
+	second := DefaultTerminal()
+	if first != second {
+		t.Errorf("DefaultTerminal() not idempotent: %q vs %q", first, second)
+	}
+}
+
 func TestDefaultTerminal_WindowsValues(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows-specific test")
@@ -530,6 +562,27 @@ func TestDefaultTerminal_WindowsValues(t *testing.T) {
 	valid := map[string]bool{termWindowsTerminal: true, termConhost: true}
 	if !valid[term] {
 		t.Errorf("DefaultTerminal() = %q, want one of %v", term, valid)
+	}
+}
+
+func TestDefaultTerminal_DarwinValue(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific test")
+	}
+	term := DefaultTerminal()
+	if term != "Terminal.app" {
+		t.Errorf("DefaultTerminal() on macOS = %q, want %q", term, "Terminal.app")
+	}
+}
+
+func TestDefaultTerminal_LinuxValue(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux-specific test")
+	}
+	term := DefaultTerminal()
+	// On Linux, should be one of the detected terminals or "xterm" fallback.
+	if term == "" {
+		t.Error("DefaultTerminal() on Linux should not be empty")
 	}
 }
 
