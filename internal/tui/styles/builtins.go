@@ -2,8 +2,10 @@ package styles
 
 // builtins.go defines the built-in color schemes shipped with dispatch.
 
+import "github.com/jongio/dispatch/internal/config"
+
 // BuiltinSchemes maps scheme names (case-sensitive) to their definitions.
-var BuiltinSchemes = map[string]ColorScheme{
+var BuiltinSchemes = map[string]config.ColorScheme{
 	"Dispatch Dark":  DispatchDark,
 	"Dispatch Light": DispatchLight,
 	"Campbell":       Campbell,
@@ -29,7 +31,7 @@ var DefaultDarkScheme = DispatchDark
 var DefaultLightScheme = DispatchLight
 
 // DispatchDark reproduces the original hardcoded dark palette from theme.go.
-var DispatchDark = ColorScheme{
+var DispatchDark = config.ColorScheme{
 	Name:         "Dispatch Dark",
 	Foreground:   "#E4E4E7",
 	Background:   "#111111",
@@ -52,7 +54,7 @@ var DispatchDark = ColorScheme{
 }
 
 // DispatchLight reproduces the original hardcoded light palette from theme.go.
-var DispatchLight = ColorScheme{
+var DispatchLight = config.ColorScheme{
 	Name:         "Dispatch Light",
 	Foreground:   "#1A1A2E",
 	Background:   "#FAFAFA",
@@ -75,7 +77,7 @@ var DispatchLight = ColorScheme{
 }
 
 // Campbell is the default Windows Terminal color scheme.
-var Campbell = ColorScheme{
+var Campbell = config.ColorScheme{
 	Name:         "Campbell",
 	Foreground:   "#CCCCCC",
 	Background:   "#0C0C0C",
@@ -98,7 +100,7 @@ var Campbell = ColorScheme{
 }
 
 // OneHalfDark is the One Half Dark color scheme (popular WT preset).
-var OneHalfDark = ColorScheme{
+var OneHalfDark = config.ColorScheme{
 	Name:         "One Half Dark",
 	Foreground:   "#DCDFE4",
 	Background:   "#282C34",
@@ -121,7 +123,7 @@ var OneHalfDark = ColorScheme{
 }
 
 // OneHalfLight is the One Half Light color scheme (popular WT preset).
-var OneHalfLight = ColorScheme{
+var OneHalfLight = config.ColorScheme{
 	Name:         "One Half Light",
 	Foreground:   "#383A42",
 	Background:   "#FAFAFA",

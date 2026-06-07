@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
-	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
 const configFileName = "config.json"
@@ -128,7 +127,7 @@ type Config struct {
 
 	// Schemes is a list of user-defined color schemes in Windows Terminal
 	// format.  Users can paste any WT scheme JSON directly here.
-	Schemes []styles.ColorScheme `json:"schemes,omitempty"`
+	Schemes []ColorScheme `json:"schemes,omitempty"`
 
 	// PreviewPosition controls where the session detail/preview panel
 	// is displayed relative to the session list.
