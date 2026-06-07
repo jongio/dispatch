@@ -159,11 +159,7 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
 	m.groups = nil
-	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-	m.sessionList.SetFavoritedSessions(m.favoritedSet)
-	m.sessionList.SetAttentionStatuses(m.attentionMap)
-	m.sessionList.SetPlanStatuses(m.planMap)
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListStatuses()
 	m.sessionList.SetSessions(m.sessions)
 	// Restore cursor to the previously selected session if possible.
 	if prevID != "" {
@@ -189,11 +185,7 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 		m.sortByAttention(m.groups[i].Sessions)
 	}
 	m.sessions = nil
-	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-	m.sessionList.SetFavoritedSessions(m.favoritedSet)
-	m.sessionList.SetAttentionStatuses(m.attentionMap)
-	m.sessionList.SetPlanStatuses(m.planMap)
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListStatuses()
 	m.sessionList.SetPivotField(m.pivot)
 	m.sessionList.SetGroups(m.groups)
 	if prevID != "" {
@@ -330,7 +322,7 @@ func (m Model) handlePlanContent(msg planContentMsg) (Model, tea.Cmd) { //nolint
 
 func (m Model) handleWorkStatusQuickScanned(msg workStatusQuickScannedMsg) (Model, tea.Cmd) {
 	m.workStatus.workStatusMap = msg.statuses
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)
@@ -349,7 +341,7 @@ func (m Model) handleWorkStatusScanned(msg workStatusScannedMsg) (Model, tea.Cmd
 	} else {
 		maps.Copy(m.workStatus.workStatusMap, msg.statuses)
 	}
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)
@@ -424,7 +416,7 @@ func (m Model) handleWorkStatusAIScanned(msg workStatusAIScannedMsg) (Model, tea
 			sessionsWithRemaining = append(sessionsWithRemaining, id)
 		}
 	}
-	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.syncSessionListWorkStatuses()
 	if sel, ok := m.sessionList.Selected(); ok {
 		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
 			m.preview.SetWorkStatus(result)

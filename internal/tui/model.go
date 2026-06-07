@@ -2090,6 +2090,27 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 }
 
 // ---------------------------------------------------------------------------
+// Session list synchronisation helpers
+// ---------------------------------------------------------------------------
+
+// syncSessionListStatuses pushes all current status maps (hidden, favorited,
+// attention, plan, work status) to the sessionList component. Call this after
+// loading or filtering sessions/groups to keep the list's decorations in sync.
+func (m *Model) syncSessionListStatuses() {
+	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	m.sessionList.SetAttentionStatuses(m.attentionMap)
+	m.sessionList.SetPlanStatuses(m.planMap)
+	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+}
+
+// syncSessionListWorkStatuses pushes only the work status map to the
+// sessionList component. Use when only work statuses have changed.
+func (m *Model) syncSessionListWorkStatuses() {
+	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+}
+
+// ---------------------------------------------------------------------------
 // Composite filter helpers
 // ---------------------------------------------------------------------------
 
