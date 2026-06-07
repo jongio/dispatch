@@ -133,6 +133,52 @@ func TestReindexLogChanSize_IsSensible(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// StartChronicleReindex — structural tests (no binary required)
+// ---------------------------------------------------------------------------
+
+func TestStartChronicleReindex_ReturnsHandleAndTwoCmds(t *testing.T) {
+	t.Parallel()
+	handle, cmds := StartChronicleReindex()
+
+	if handle.Cancel == nil {
+		t.Fatal("StartChronicleReindex should return a handle with non-nil Cancel")
+	}
+	if len(cmds) != 2 {
+		t.Fatalf("StartChronicleReindex should return exactly 2 Cmds, got %d", len(cmds))
+	}
+	if cmds[0] == nil {
+		t.Error("run Cmd (index 0) should not be nil")
+	}
+	if cmds[1] == nil {
+		t.Error("pump Cmd (index 1) should not be nil")
+	}
+
+	// Cancel immediately to avoid leaking the goroutine spawned by the run cmd.
+	handle.Cancel()
+}
+
+func TestStartChronicleReindex_CancelStopsRunCmd(t *testing.T) {
+	t.Parallel()
+	handle, cmds := StartChronicleReindex()
+
+	// Cancel the context before executing the run cmd — this verifies
+	// the cancel mechanism is wired correctly.
+	handle.Cancel()
+
+	// Execute the run cmd; it should return a ReindexFinishedMsg
+	// (possibly with a context-cancelled error or ErrCopilotNotFound).
+	msg := cmds[0]()
+	result, ok := msg.(ReindexFinishedMsg)
+	if !ok {
+		t.Fatalf("run Cmd should return ReindexFinishedMsg, got %T", msg)
+	}
+	// The error might be nil (if Maintain succeeded after cancel) or non-nil
+	// (context cancelled, binary not found). Either is acceptable — the test
+	// proves the cancel→finish path doesn't hang or panic.
+	_ = result.Err
+}
+
+// ---------------------------------------------------------------------------
 // preview.go — plan methods at 0% coverage
 // ---------------------------------------------------------------------------
 

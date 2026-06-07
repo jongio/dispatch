@@ -60,6 +60,132 @@ func makeGroups(folders int, sessionsPerFolder int) []data.SessionGroup {
 	return groups
 }
 
+// ---------------------------------------------------------------------------
+// SelectByID
+// ---------------------------------------------------------------------------
+
+func TestSessionList_SelectByID_Found(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := []data.Session{
+		{ID: "sess-aaa", Summary: "First"},
+		{ID: "sess-bbb", Summary: "Second"},
+		{ID: "sess-ccc", Summary: "Third"},
+	}
+	sl.SetSessions(sessions)
+	sl.SetSize(80, 20)
+
+	found := sl.SelectByID("sess-bbb")
+	if !found {
+		t.Fatal("SelectByID should return true for existing session")
+	}
+	if sl.Cursor() != 1 {
+		t.Errorf("SelectByID(sess-bbb): cursor = %d, want 1", sl.Cursor())
+	}
+
+	// Verify Selected() returns the right session.
+	selected, ok := sl.Selected()
+	if !ok {
+		t.Fatal("Selected() should return true after SelectByID")
+	}
+	if selected.ID != "sess-bbb" {
+		t.Errorf("Selected().ID = %q, want %q", selected.ID, "sess-bbb")
+	}
+}
+
+func TestSessionList_SelectByID_NotFound(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions([]data.Session{
+		{ID: "sess-aaa"},
+		{ID: "sess-bbb"},
+	})
+	sl.SetSize(80, 20)
+
+	found := sl.SelectByID("nonexistent-id")
+	if found {
+		t.Error("SelectByID should return false for nonexistent ID")
+	}
+	// Cursor should remain at initial position.
+	if sl.Cursor() != 0 {
+		t.Errorf("cursor should remain 0 after failed SelectByID, got %d", sl.Cursor())
+	}
+}
+
+func TestSessionList_SelectByID_EmptyList(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+
+	found := sl.SelectByID("any-id")
+	if found {
+		t.Error("SelectByID should return false on empty list")
+	}
+}
+
+func TestSessionList_SelectByID_WithGroups(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	groups := []data.SessionGroup{
+		{
+			Label: "/home/projects",
+			Count: 2,
+			Sessions: []data.Session{
+				{ID: "sess-g1s1", Summary: "Group1 Sess1"},
+				{ID: "sess-g1s2", Summary: "Group1 Sess2"},
+			},
+		},
+		{
+			Label: "/home/work",
+			Count: 1,
+			Sessions: []data.Session{
+				{ID: "sess-g2s1", Summary: "Group2 Sess1"},
+			},
+		},
+	}
+	sl.SetGroups(groups)
+	sl.SetSize(80, 20)
+
+	// Select a session in the second group.
+	found := sl.SelectByID("sess-g2s1")
+	if !found {
+		t.Fatal("SelectByID should find session in grouped view")
+	}
+	selected, ok := sl.Selected()
+	if !ok {
+		t.Fatal("Selected() should return true after SelectByID in groups")
+	}
+	if selected.ID != "sess-g2s1" {
+		t.Errorf("Selected().ID = %q, want %q", selected.ID, "sess-g2s1")
+	}
+}
+
+func TestSessionList_SelectByID_SkipsFolders(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	groups := []data.SessionGroup{
+		{
+			Label: "/home/projects",
+			Count: 1,
+			Sessions: []data.Session{
+				{ID: "/home/projects", Summary: "Has same ID as folder path"},
+			},
+		},
+	}
+	sl.SetGroups(groups)
+	sl.SetSize(80, 20)
+
+	// The folder label and session ID happen to match — SelectByID should
+	// only match session items, not folder items.
+	found := sl.SelectByID("/home/projects")
+	if !found {
+		t.Fatal("SelectByID should find the session (not confuse it with folder)")
+	}
+	selected, ok := sl.Selected()
+	if !ok || selected.ID != "/home/projects" {
+		t.Errorf("Selected should be the session, got ok=%v, ID=%q", ok, selected.ID)
+	}
+}
+
 // TestSessionListViewConsistency verifies that every View() output during
 // scrolling has exactly height lines, each of exactly width columns.
 func TestSessionListViewConsistency(t *testing.T) {

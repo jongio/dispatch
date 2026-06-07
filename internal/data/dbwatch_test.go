@@ -337,14 +337,28 @@ func TestStop_TerminatesLoop(t *testing.T) {
 
 	w.SetActive(true)
 
-	// Give the goroutine a moment to start.
-	time.Sleep(30 * time.Millisecond)
+	// Verify the loop was marked as started (synchronous within SetActive).
+	w.mu.Lock()
+	started := w.started
+	w.mu.Unlock()
+	if !started {
+		t.Fatal("expected started=true after SetActive(true)")
+	}
 
-	// Stop should not panic or block.
-	w.Stop()
+	// Stop must complete within a reasonable deadline — if the goroutine
+	// is stuck, this test will fail via timeout rather than hanging.
+	done := make(chan struct{})
+	go func() {
+		w.Stop()
+		close(done)
+	}()
 
-	// Give the goroutine time to exit.
-	time.Sleep(30 * time.Millisecond)
+	select {
+	case <-done:
+		// Success: Stop returned without blocking.
+	case <-time.After(2 * time.Second):
+		t.Fatal("Stop() did not return within 2s — goroutine likely stuck")
+	}
 }
 
 func TestStop_ClosesDB(t *testing.T) {
