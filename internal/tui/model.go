@@ -2090,6 +2090,32 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 }
 
 // ---------------------------------------------------------------------------
+// Composite filter helpers
+// ---------------------------------------------------------------------------
+
+// applySessionFilters runs the full session filter chain (hidden, favorited,
+// attention, plan, work status) and returns the filtered result.
+func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
+	sessions = m.filterHiddenSessions(sessions)
+	sessions = m.filterFavoritedSessions(sessions)
+	sessions = m.filterAttentionSessions(sessions)
+	sessions = m.filterPlanSessions(sessions)
+	sessions = m.filterWorkStatusSessions(sessions)
+	return sessions
+}
+
+// applyGroupFilters runs the full group filter chain (hidden, favorited,
+// attention, plan, work status) and returns the filtered result.
+func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGroup {
+	groups = m.filterHiddenGroups(groups)
+	groups = m.filterFavoritedGroups(groups)
+	groups = m.filterAttentionGroups(groups)
+	groups = m.filterPlanGroups(groups)
+	groups = m.filterWorkStatusGroups(groups)
+	return groups
+}
+
+// ---------------------------------------------------------------------------
 // Hidden session filtering
 // ---------------------------------------------------------------------------
 

@@ -156,11 +156,7 @@ func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) 
 
 func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	prevID := m.selectedSessionID()
-	m.sessions = m.filterHiddenSessions(msg.sessions)
-	m.sessions = m.filterFavoritedSessions(m.sessions)
-	m.sessions = m.filterAttentionSessions(m.sessions)
-	m.sessions = m.filterPlanSessions(m.sessions)
-	m.sessions = m.filterWorkStatusSessions(m.sessions)
+	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
 	m.groups = nil
 	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
@@ -188,11 +184,7 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	prevID := m.selectedSessionID()
-	m.groups = m.filterHiddenGroups(msg.groups)
-	m.groups = m.filterFavoritedGroups(m.groups)
-	m.groups = m.filterAttentionGroups(m.groups)
-	m.groups = m.filterPlanGroups(m.groups)
-	m.groups = m.filterWorkStatusGroups(m.groups)
+	m.groups = m.applyGroupFilters(msg.groups)
 	for i := range m.groups {
 		m.sortByAttention(m.groups[i].Sessions)
 	}
@@ -486,21 +478,13 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 	m.filter.DeepSearch = true // keep deep mode for subsequent reloads (time range, sort, etc.)
 	m.searchBar.SetSearching(false)
 	if msg.sessions != nil {
-		m.sessions = m.filterHiddenSessions(msg.sessions)
-		m.sessions = m.filterFavoritedSessions(m.sessions)
-		m.sessions = m.filterAttentionSessions(m.sessions)
-		m.sessions = m.filterPlanSessions(m.sessions)
-		m.sessions = m.filterWorkStatusSessions(m.sessions)
+		m.sessions = m.applySessionFilters(msg.sessions)
 		m.groups = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
 		m.sessionList.SetSessions(m.sessions)
 	} else if msg.groups != nil {
-		m.groups = m.filterHiddenGroups(msg.groups)
-		m.groups = m.filterFavoritedGroups(m.groups)
-		m.groups = m.filterAttentionGroups(m.groups)
-		m.groups = m.filterPlanGroups(m.groups)
-		m.groups = m.filterWorkStatusGroups(m.groups)
+		m.groups = m.applyGroupFilters(msg.groups)
 		m.sessions = nil
 		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 		m.sessionList.SetFavoritedSessions(m.favoritedSet)
@@ -596,11 +580,7 @@ func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) 
 		return m, nil
 	}
 	// Apply full filter chain before merging (matches sessionsLoadedMsg).
-	incoming := m.filterHiddenSessions(msg.sessions)
-	incoming = m.filterFavoritedSessions(incoming)
-	incoming = m.filterAttentionSessions(incoming)
-	incoming = m.filterPlanSessions(incoming)
-	incoming = m.filterWorkStatusSessions(incoming)
+	incoming := m.applySessionFilters(msg.sessions)
 	if len(incoming) == 0 {
 		return m, nil
 	}
