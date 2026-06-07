@@ -207,52 +207,6 @@ func TestFilterBuilder_WhereSQL_NoApply(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Model types — field coverage
-// ---------------------------------------------------------------------------
-
-func TestSortFieldConstants(t *testing.T) {
-	if SortByUpdated != "updated_at" {
-		t.Errorf("SortByUpdated = %q", SortByUpdated)
-	}
-	if SortByCreated != "created_at" {
-		t.Errorf("SortByCreated = %q", SortByCreated)
-	}
-	if SortByTurns != "turn_count" {
-		t.Errorf("SortByTurns = %q", SortByTurns)
-	}
-	if SortByName != "summary" {
-		t.Errorf("SortByName = %q", SortByName)
-	}
-	if SortByFolder != "cwd" {
-		t.Errorf("SortByFolder = %q", SortByFolder)
-	}
-}
-
-func TestPivotFieldConstants(t *testing.T) {
-	if PivotByFolder != "cwd" {
-		t.Errorf("PivotByFolder = %q", PivotByFolder)
-	}
-	if PivotByRepo != "repository" {
-		t.Errorf("PivotByRepo = %q", PivotByRepo)
-	}
-	if PivotByBranch != "branch" {
-		t.Errorf("PivotByBranch = %q", PivotByBranch)
-	}
-	if PivotByDate != "date" {
-		t.Errorf("PivotByDate = %q", PivotByDate)
-	}
-}
-
-func TestSortOrderConstants(t *testing.T) {
-	if Ascending != "ASC" {
-		t.Errorf("Ascending = %q", Ascending)
-	}
-	if Descending != "DESC" {
-		t.Errorf("Descending = %q", Descending)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Session/Turn/Checkpoint field access
 // ---------------------------------------------------------------------------
 

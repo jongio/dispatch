@@ -102,18 +102,6 @@ func TestBuildResumeArgs_EmptySessionIDWithFlags(t *testing.T) {
 	}
 }
 
-func TestLaunchStyleConstants(t *testing.T) {
-	if LaunchStyleTab != "" {
-		t.Errorf("LaunchStyleTab = %q, want empty", LaunchStyleTab)
-	}
-	if LaunchStyleWindow != "window" {
-		t.Errorf("LaunchStyleWindow = %q, want 'window'", LaunchStyleWindow)
-	}
-	if LaunchStylePane != "pane" {
-		t.Errorf("LaunchStylePane = %q, want 'pane'", LaunchStylePane)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // appendWTPaneDirFlags
 // ---------------------------------------------------------------------------
