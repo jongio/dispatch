@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -581,8 +582,8 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		b.WriteString(wsLabel + wsValue + "\n")
 	}
 
-	field("Turns", FormatInt(s.TurnCount))
-	field("Files", FormatInt(s.FileCount))
+	field("Turns", strconv.Itoa(s.TurnCount))
+	field("Files", strconv.Itoa(s.FileCount))
 
 	// ── References ──
 	if len(p.detail.Refs) > 0 {

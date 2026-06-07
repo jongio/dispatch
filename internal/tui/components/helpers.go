@@ -209,7 +209,7 @@ func RelativeTime(timestamp string) string {
 		if days == 1 {
 			return "1d ago"
 		}
-		return FormatInt(days) + "d ago"
+		return strconv.Itoa(days) + "d ago"
 	}
 }
 
@@ -218,12 +218,5 @@ func formatDuration(value float64, unit string) string {
 	if v <= 0 {
 		v = 1
 	}
-	return FormatInt(v) + unit
-}
-
-// FormatInt formats an integer as a decimal string.
-// It delegates to strconv.Itoa which handles all edge cases including
-// math.MinInt (where negation overflows in two's complement).
-func FormatInt(v int) string {
-	return strconv.Itoa(v)
+	return strconv.Itoa(v) + unit
 }

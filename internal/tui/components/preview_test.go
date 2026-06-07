@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -259,8 +260,8 @@ func TestPreviewPanelScrollUpAfterDown(t *testing.T) {
 	turns := make([]data.Turn, 10)
 	for i := range turns {
 		turns[i] = data.Turn{
-			UserMessage:       "Question " + FormatInt(i) + " with enough text to fill space",
-			AssistantResponse: "Answer " + FormatInt(i) + " with a detailed response",
+			UserMessage:       "Question " + strconv.Itoa(i) + " with enough text to fill space",
+			AssistantResponse: "Answer " + strconv.Itoa(i) + " with a detailed response",
 		}
 	}
 	detail := &data.SessionDetail{
@@ -291,8 +292,8 @@ func TestPreviewPanelPageUpPageDown(t *testing.T) {
 	}
 	for i := range detail.Turns {
 		detail.Turns[i] = data.Turn{
-			UserMessage:       "Question " + FormatInt(i),
-			AssistantResponse: "Answer " + FormatInt(i),
+			UserMessage:       "Question " + strconv.Itoa(i),
+			AssistantResponse: "Answer " + strconv.Itoa(i),
 		}
 	}
 	p.SetDetail(detail)
@@ -500,8 +501,8 @@ func TestPreviewPanelScrollOffset(t *testing.T) {
 	turns := make([]data.Turn, 10)
 	for i := range turns {
 		turns[i] = data.Turn{
-			UserMessage:       "Question " + FormatInt(i),
-			AssistantResponse: "Answer " + FormatInt(i),
+			UserMessage:       "Question " + strconv.Itoa(i),
+			AssistantResponse: "Answer " + strconv.Itoa(i),
 		}
 	}
 	p.SetDetail(&data.SessionDetail{
@@ -879,8 +880,8 @@ func TestPreviewPanelSelectionClearedOnScroll(t *testing.T) {
 	turns := make([]data.Turn, 10)
 	for i := range turns {
 		turns[i] = data.Turn{
-			UserMessage:       "Question " + FormatInt(i),
-			AssistantResponse: "Answer " + FormatInt(i),
+			UserMessage:       "Question " + strconv.Itoa(i),
+			AssistantResponse: "Answer " + strconv.Itoa(i),
 		}
 	}
 	p.SetDetail(&data.SessionDetail{
