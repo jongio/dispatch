@@ -86,41 +86,26 @@ func TestLastReindexTime_NoStore(t *testing.T) {
 }
 
 func TestLastReindexTime_WithDBFile(t *testing.T) {
-	// Create a fake session store file structure.
+	// Use DISPATCH_DB to point SessionStorePath at our temp file.
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
-	t.Setenv("USERPROFILE", tmp)
-	localAppData := filepath.Join(tmp, "AppData", "Local")
-	t.Setenv("LOCALAPPDATA", localAppData)
-
-	// Create the session store path structure for Windows.
-	storeDir := filepath.Join(localAppData, "github-copilot", "github-copilot-cli")
-	if err := os.MkdirAll(storeDir, 0o755); err != nil {
-		t.Fatalf("creating store dir: %v", err)
-	}
-	storePath := filepath.Join(storeDir, "sessions.db")
+	storePath := filepath.Join(tmp, "session-store.db")
 	if err := os.WriteFile(storePath, []byte("fake"), 0o644); err != nil {
 		t.Fatalf("writing fake store: %v", err)
 	}
+	t.Setenv("DISPATCH_DB", storePath)
 
 	got := LastReindexTime()
-	// The function should return the mtime of the file, or zero if path
-	// resolution fails. We verify it doesn't panic.
-	_ = got
+	if got.IsZero() {
+		t.Error("LastReindexTime() returned zero time, want DB file mtime")
+	}
+	if time.Since(got) > 5*time.Second {
+		t.Errorf("LastReindexTime() = %v, expected within last 5s", got)
+	}
 }
 
 func TestLastReindexTime_WithWALFile(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
-	t.Setenv("USERPROFILE", tmp)
-	localAppData := filepath.Join(tmp, "AppData", "Local")
-	t.Setenv("LOCALAPPDATA", localAppData)
-
-	storeDir := filepath.Join(localAppData, "github-copilot", "github-copilot-cli")
-	if err := os.MkdirAll(storeDir, 0o755); err != nil {
-		t.Fatalf("creating store dir: %v", err)
-	}
-	storePath := filepath.Join(storeDir, "sessions.db")
+	storePath := filepath.Join(tmp, "session-store.db")
 	if err := os.WriteFile(storePath, []byte("fake"), 0o644); err != nil {
 		t.Fatalf("writing fake store: %v", err)
 	}
@@ -130,24 +115,20 @@ func TestLastReindexTime_WithWALFile(t *testing.T) {
 	if err := os.WriteFile(walPath, []byte("wal-data"), 0o644); err != nil {
 		t.Fatalf("writing fake WAL: %v", err)
 	}
+	t.Setenv("DISPATCH_DB", storePath)
 
 	got := LastReindexTime()
-	// Should return WAL mtime since WAL exists with size > 0.
-	_ = got
+	if got.IsZero() {
+		t.Error("LastReindexTime() returned zero time, want WAL file mtime")
+	}
+	if time.Since(got) > 5*time.Second {
+		t.Errorf("LastReindexTime() = %v, expected within last 5s", got)
+	}
 }
 
 func TestLastReindexTime_EmptyWAL(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
-	t.Setenv("USERPROFILE", tmp)
-	localAppData := filepath.Join(tmp, "AppData", "Local")
-	t.Setenv("LOCALAPPDATA", localAppData)
-
-	storeDir := filepath.Join(localAppData, "github-copilot", "github-copilot-cli")
-	if err := os.MkdirAll(storeDir, 0o755); err != nil {
-		t.Fatalf("creating store dir: %v", err)
-	}
-	storePath := filepath.Join(storeDir, "sessions.db")
+	storePath := filepath.Join(tmp, "session-store.db")
 	if err := os.WriteFile(storePath, []byte("fake"), 0o644); err != nil {
 		t.Fatalf("writing fake store: %v", err)
 	}
@@ -157,9 +138,15 @@ func TestLastReindexTime_EmptyWAL(t *testing.T) {
 	if err := os.WriteFile(walPath, []byte{}, 0o644); err != nil {
 		t.Fatalf("writing empty WAL: %v", err)
 	}
+	t.Setenv("DISPATCH_DB", storePath)
 
 	got := LastReindexTime()
-	_ = got
+	if got.IsZero() {
+		t.Error("LastReindexTime() returned zero time, want DB file mtime (empty WAL fallback)")
+	}
+	if time.Since(got) > 5*time.Second {
+		t.Errorf("LastReindexTime() = %v, expected within last 5s", got)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -340,11 +327,13 @@ func TestChronicleReindex_NoBinary(t *testing.T) {
 	// Also ensure copilot/ghcs are not in PATH.
 	t.Setenv("PATH", t.TempDir())
 
-	// This test may or may not return ErrCopilotNotFound depending on
-	// whether the system actually has Copilot CLI installed. We just
-	// verify it doesn't panic and returns a deterministic error type
-	// when the binary is genuinely not found.
-	_ = time.Now() // use time to avoid unused import
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := ChronicleReindex(ctx, nil)
+	if !errors.Is(err, ErrCopilotNotFound) {
+		t.Errorf("ChronicleReindex() = %v, want ErrCopilotNotFound", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
