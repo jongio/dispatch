@@ -168,6 +168,10 @@ type clickState struct {
 // ---------------------------------------------------------------------------
 
 // Model is the top-level Bubble Tea model for the Session Browser TUI.
+//
+// TODO(#113): Model is a God Object (60+ fields). Further extraction into
+// feature-specific sub-structs (FilterState, DataState) would improve
+// maintainability. See https://github.com/jongio/dispatch/issues/113.
 type Model struct {
 	// Current UI state.
 	state  appState

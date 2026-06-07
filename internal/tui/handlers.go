@@ -19,6 +19,9 @@ import (
 // ---------------------------------------------------------------------------
 // Handler methods — extracted from the Update switch for readability.
 // Each returns (Model, tea.Cmd) matching the Bubble Tea update pattern.
+//
+// TODO(#113): Consider handler registry pattern to reduce switch complexity.
+// See https://github.com/jongio/dispatch/issues/113 for full analysis.
 // ---------------------------------------------------------------------------
 
 // ----- Background color detection ------------------------------------------
