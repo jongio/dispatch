@@ -102,47 +102,6 @@ func TestBuildResumeArgs_EmptySessionIDWithFlags(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ResumeConfig fields
-// ---------------------------------------------------------------------------
-
-func TestResumeConfigFields(t *testing.T) {
-	cfg := ResumeConfig{
-		YoloMode:      true,
-		Agent:         "test-agent",
-		Model:         "test-model",
-		Terminal:      "test-terminal",
-		CustomCommand: "test-command",
-		Cwd:           "/tmp",
-		LaunchStyle:   LaunchStyleWindow,
-		PaneDirection: "down",
-	}
-	if !cfg.YoloMode {
-		t.Error("YoloMode should be true")
-	}
-	if cfg.Agent != "test-agent" {
-		t.Errorf("Agent = %q, want 'test-agent'", cfg.Agent)
-	}
-	if cfg.Model != "test-model" {
-		t.Errorf("Model = %q, want 'test-model'", cfg.Model)
-	}
-	if cfg.Terminal != "test-terminal" {
-		t.Errorf("Terminal = %q, want 'test-terminal'", cfg.Terminal)
-	}
-	if cfg.CustomCommand != "test-command" {
-		t.Errorf("CustomCommand = %q, want 'test-command'", cfg.CustomCommand)
-	}
-	if cfg.Cwd != "/tmp" {
-		t.Errorf("Cwd = %q, want '/tmp'", cfg.Cwd)
-	}
-	if cfg.LaunchStyle != LaunchStyleWindow {
-		t.Errorf("LaunchStyle = %q, want %q", cfg.LaunchStyle, LaunchStyleWindow)
-	}
-	if cfg.PaneDirection != "down" {
-		t.Errorf("PaneDirection = %q, want 'down'", cfg.PaneDirection)
-	}
-}
-
 func TestLaunchStyleConstants(t *testing.T) {
 	if LaunchStyleTab != "" {
 		t.Errorf("LaunchStyleTab = %q, want empty", LaunchStyleTab)
