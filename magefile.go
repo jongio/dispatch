@@ -47,7 +47,7 @@ const (
 var (
 	binName    = "dispatch-dev"
 	mainPkg    = "./cmd/dispatch/"
-	versionVar = "github.com/jongio/dispatch/internal/tui.Version"
+	versionVar = "github.com/jongio/dispatch/internal/version.Version"
 )
 
 // Default target when running `mage` with no args.

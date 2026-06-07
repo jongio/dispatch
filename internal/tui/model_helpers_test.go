@@ -9,6 +9,7 @@ import (
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 	"github.com/jongio/dispatch/internal/tui/styles"
+	"github.com/jongio/dispatch/internal/version"
 )
 
 // ---------------------------------------------------------------------------
@@ -427,12 +428,12 @@ func TestAppStateConstants(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Version variable
+// version.Version variable
 // ---------------------------------------------------------------------------
 
 func TestVersionDefault(t *testing.T) {
-	if Version == "" {
-		t.Error("Version should have a default value")
+	if version.Version == "" {
+		t.Error("version.Version should have a default value")
 	}
 }
 
