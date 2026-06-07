@@ -59,7 +59,7 @@ func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 
 		if errors.Is(err, data.ErrCopilotNotFound) {
 			logCh <- "Copilot CLI not found, running index maintenance…"
-			if mErr := data.Maintain(); mErr != nil {
+			if mErr := data.Maintain(ctx); mErr != nil {
 				return ReindexFinishedMsg{Err: mErr}
 			}
 			return ReindexFinishedMsg{Err: nil}
@@ -69,7 +69,7 @@ func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 		}
 
 		// Run Maintain() after chronicle reindex to checkpoint WAL.
-		if mErr := data.Maintain(); mErr != nil {
+		if mErr := data.Maintain(ctx); mErr != nil {
 			logCh <- "Warning: post-reindex maintenance: " + mErr.Error()
 		}
 		return ReindexFinishedMsg{Err: nil}
@@ -83,22 +83,39 @@ func StartChronicleReindex() (ReindexHandle, []tea.Cmd) {
 
 // waitForLog returns a Cmd that reads lines from the channel, batching
 // them to reduce re-render frequency. It blocks until at least one line
-// is available, then pauses briefly and drains all remaining buffered
-// lines before returning the batch as a single ReindexLogPump message.
+// is available, then waits briefly (via a timer in a select, not
+// time.Sleep) to let more lines accumulate. Using select allows the
+// goroutine to exit promptly if the channel closes during the batch
+// window, rather than blocking for the full timer duration.
 func waitForLog(ch <-chan string) tea.Cmd {
 	return func() tea.Msg {
 		// Block until at least one line is available.
 		line, ok := <-ch
 		if !ok {
-			return nil // channel closed — stop pumping
+			return nil // channel closed - stop pumping
 		}
 
 		lines := []string{line}
 
-		// Brief pause to let more lines accumulate.
-		time.Sleep(logBatchDelay)
+		// Brief pause to let more lines accumulate. Uses a timer
+		// instead of time.Sleep so we can exit if ch closes.
+		timer := time.NewTimer(logBatchDelay)
+		defer timer.Stop()
 
-		// Drain all immediately available lines.
+	batch:
+		for {
+			select {
+			case <-timer.C:
+				break batch
+			case l, ok := <-ch:
+				if !ok {
+					return ReindexLogPump{Lines: lines, ch: ch}
+				}
+				lines = append(lines, l)
+			}
+		}
+
+		// Drain all immediately available lines after the batch window.
 		for {
 			select {
 			case l, ok := <-ch:

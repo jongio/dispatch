@@ -151,7 +151,7 @@ func TestMaintain_WithFTS5(t *testing.T) {
 	_ = db.Close()
 
 	// Now run Maintain — should succeed with FTS5 rebuild + optimize
-	err = Maintain()
+	err = Maintain(context.Background())
 	if err != nil {
 		t.Errorf("Maintain() with FTS5 DB: %v", err)
 	}

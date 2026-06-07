@@ -74,7 +74,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			if rErr != nil {
 				if errors.Is(rErr, data.ErrCopilotNotFound) {
 					fmt.Println("Copilot CLI not found, running index maintenance…")
-					if mErr := maintainFn(); mErr != nil {
+					if mErr := maintainFn(context.Background()); mErr != nil {
 						fmt.Fprintf(os.Stderr, "reindex: %v\n", mErr)
 						return true, cleanup, mErr
 					}
@@ -84,7 +84,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 				}
 			}
 			// Post-reindex maintenance (WAL checkpoint + FTS5 optimize).
-			if mErr := maintainFn(); mErr != nil {
+			if mErr := maintainFn(context.Background()); mErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: post-reindex maintenance: %v\n", mErr)
 			}
 			fmt.Println("Done.")
