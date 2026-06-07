@@ -15,10 +15,10 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0
-	modernc.org/sqlite v1.51.0
+	modernc.org/sqlite v1.52.0
 )
 
-require github.com/dlclark/regexp2/v2 v2.1.2 // indirect
+require github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 
 require (
 	github.com/alecthomas/chroma/v2 v2.26.1 // indirect
@@ -32,7 +32,7 @@ require (
 	github.com/charmbracelet/ultraviolet v0.0.0-20260601155805-6cf7526a1b3f // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/golden v0.0.0-20260517005351-920740d613be // indirect
-	github.com/charmbracelet/x/exp/slice v0.0.0-20260602025833-85a30b5e440a // indirect
+	github.com/charmbracelet/x/exp/slice v0.0.0-20260607010151-cd19a2bba55f // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
