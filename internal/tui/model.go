@@ -168,6 +168,10 @@ type clickState struct {
 // ---------------------------------------------------------------------------
 
 // Model is the top-level Bubble Tea model for the Session Browser TUI.
+//
+// TODO(#113): Model is a God Object (60+ fields). Further extraction into
+// feature-specific sub-structs (FilterState, DataState) would improve
+// maintainability. See https://github.com/jongio/dispatch/issues/113.
 type Model struct {
 	// Current UI state.
 	state  appState
@@ -2087,6 +2091,53 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 		}
 	}
 	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// Session list synchronisation helpers
+// ---------------------------------------------------------------------------
+
+// syncSessionListStatuses pushes all current status maps (hidden, favorited,
+// attention, plan, work status) to the sessionList component. Call this after
+// loading or filtering sessions/groups to keep the list's decorations in sync.
+func (m *Model) syncSessionListStatuses() {
+	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	m.sessionList.SetAttentionStatuses(m.attentionMap)
+	m.sessionList.SetPlanStatuses(m.planMap)
+	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+}
+
+// syncSessionListWorkStatuses pushes only the work status map to the
+// sessionList component. Use when only work statuses have changed.
+func (m *Model) syncSessionListWorkStatuses() {
+	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+}
+
+// ---------------------------------------------------------------------------
+// Composite filter helpers
+// ---------------------------------------------------------------------------
+
+// applySessionFilters runs the full session filter chain (hidden, favorited,
+// attention, plan, work status) and returns the filtered result.
+func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
+	sessions = m.filterHiddenSessions(sessions)
+	sessions = m.filterFavoritedSessions(sessions)
+	sessions = m.filterAttentionSessions(sessions)
+	sessions = m.filterPlanSessions(sessions)
+	sessions = m.filterWorkStatusSessions(sessions)
+	return sessions
+}
+
+// applyGroupFilters runs the full group filter chain (hidden, favorited,
+// attention, plan, work status) and returns the filtered result.
+func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGroup {
+	groups = m.filterHiddenGroups(groups)
+	groups = m.filterFavoritedGroups(groups)
+	groups = m.filterAttentionGroups(groups)
+	groups = m.filterPlanGroups(groups)
+	groups = m.filterWorkStatusGroups(groups)
+	return groups
 }
 
 // ---------------------------------------------------------------------------

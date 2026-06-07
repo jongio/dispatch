@@ -51,6 +51,15 @@ type Store struct {
 	homeDir     string // user home directory, used to filter hidden dotfolder sessions
 }
 
+// closeRows closes a rows object, intentionally discarding the error.
+// sql.Rows.Close returns an error only if the rows were already closed
+// or if there was a network error on the underlying connection - neither
+// applies to local SQLite. This helper documents the intent and silences
+// the linter in one place.
+func closeRows(rows *sql.Rows) {
+	_ = rows.Close()
+}
+
 // Open opens the session store at the default platform path.
 func Open() (*Store, error) {
 	path, err := platform.SessionStorePath()
@@ -79,7 +88,7 @@ func OpenPath(path string) (*Store, error) {
 	hasHostType := false
 	rows, err := db.QueryContext(context.Background(), "PRAGMA table_info(sessions)")
 	if err == nil {
-		defer rows.Close() //nolint:errcheck
+		defer closeRows(rows)
 		for rows.Next() {
 			var cid int
 			var name, ctype string
@@ -515,7 +524,7 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 	if err != nil {
 		return nil, fmt.Errorf("querying sessions: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows read-only
+	defer closeRows(rows)
 
 	var sessions []Session
 	for rows.Next() {
@@ -556,7 +565,7 @@ func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session,
 	if err != nil {
 		return nil, fmt.Errorf("querying sessions by IDs: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows read-only
+	defer closeRows(rows)
 
 	// Index results by ID for order-preserving assembly.
 	byID := make(map[string]Session, len(ids))
@@ -613,7 +622,7 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 		if err != nil {
 			return fmt.Errorf("loading turns for session %s: %w", id, err)
 		}
-		defer tRows.Close() //nolint:errcheck // rows read-only
+		defer closeRows(tRows)
 		for tRows.Next() {
 			var t Turn
 			if err := tRows.Scan(&t.SessionID, &t.TurnIndex, &t.UserMessage, &t.AssistantResponse, &t.Timestamp); err != nil {
@@ -636,7 +645,7 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 		if err != nil {
 			return fmt.Errorf("loading checkpoints for session %s: %w", id, err)
 		}
-		defer cRows.Close() //nolint:errcheck // rows read-only
+		defer closeRows(cRows)
 		for cRows.Next() {
 			var c Checkpoint
 			if err := cRows.Scan(&c.SessionID, &c.CheckpointNumber, &c.Title, &c.Overview,
@@ -658,7 +667,7 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 		if err != nil {
 			return fmt.Errorf("loading files for session %s: %w", id, err)
 		}
-		defer fRows.Close() //nolint:errcheck // rows read-only
+		defer closeRows(fRows)
 		for fRows.Next() {
 			var f SessionFile
 			if err := fRows.Scan(&f.SessionID, &f.FilePath, &f.ToolName, &f.TurnIndex, &f.FirstSeenAt); err != nil {
@@ -679,7 +688,7 @@ func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, erro
 		if err != nil {
 			return fmt.Errorf("loading refs for session %s: %w", id, err)
 		}
-		defer rRows.Close() //nolint:errcheck // rows read-only
+		defer closeRows(rRows)
 		for rRows.Next() {
 			var r SessionRef
 			if err := rRows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
@@ -777,7 +786,7 @@ func (s *Store) searchSessionsLIKE(ctx context.Context, query string, limit int)
 	if err != nil {
 		return nil, fmt.Errorf("searching sessions: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows read-only
+	defer closeRows(rows)
 
 	var results []SearchResult
 	for rows.Next() {
@@ -833,7 +842,7 @@ func (s *Store) searchRefs(ctx context.Context, query string, limit int) []Searc
 		slog.Debug("searchRefs query failed", "error", err)
 		return nil
 	}
-	defer rows.Close() //nolint:errcheck // rows read-only
+	defer closeRows(rows)
 
 	var results []SearchResult
 	for rows.Next() {
@@ -934,7 +943,7 @@ func (s *Store) SearchSessionsFTS(ctx context.Context, query string, limit int) 
 		}
 		return nil, fmt.Errorf("FTS5 search: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck // rows read-only
+	defer closeRows(rows)
 
 	var results []SearchResult
 	for rows.Next() {
