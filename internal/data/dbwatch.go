@@ -3,12 +3,17 @@ package data
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/jongio/dispatch/internal/platform"
 )
+
+// pragmaTimeout bounds PRAGMA data_version queries so a stalled SQLite
+// connection (e.g. network-mounted file) cannot block the watcher loop.
+const pragmaTimeout = 5 * time.Second
 
 // DBWatcher monitors the session store database for changes. It uses
 // SQLite's PRAGMA data_version as the primary signal (increments on each
@@ -33,7 +38,10 @@ type DBWatcher struct {
 // is invoked (from a goroutine) whenever the DB appears to have been modified.
 // The watcher starts inactive — call SetActive(true) to begin polling.
 func NewDBWatcher(onChange func()) *DBWatcher {
-	path, _ := platform.SessionStorePath()
+	path, err := platform.SessionStorePath()
+	if err != nil {
+		slog.Debug("dbwatcher: session store path unavailable", "error", err)
+	}
 	return &DBWatcher{
 		path:     path,
 		interval: 2 * time.Second,
@@ -71,13 +79,20 @@ func (w *DBWatcher) Stop() {
 // (e.g. rebuild index) to avoid duplicate refreshes.
 func (w *DBWatcher) ResetBaseline() {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.lastMod = time.Now()
-	// Re-query data_version so the next poll sees the current value.
-	if w.db != nil {
+	db := w.db
+	w.mu.Unlock()
+
+	// Re-query data_version outside the lock so a stalled SQLite
+	// connection cannot block the entire watcher.
+	if db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), pragmaTimeout)
+		defer cancel()
 		var ver int64
-		if err := w.db.QueryRowContext(context.Background(), "PRAGMA data_version").Scan(&ver); err == nil {
+		if err := db.QueryRowContext(ctx, "PRAGMA data_version").Scan(&ver); err == nil {
+			w.mu.Lock()
 			w.lastDataVer = ver
+			w.mu.Unlock()
 		}
 	}
 }
@@ -108,16 +123,18 @@ func (w *DBWatcher) Poll() bool {
 func (w *DBWatcher) pollDataVersion() (changed bool, ok bool) {
 	w.mu.Lock()
 	db := w.db
-	w.mu.Unlock()
 
 	// Lazily open the connection on first poll when the file exists.
+	// Hold the lock through open-and-assign to prevent a race with Stop().
 	if db == nil {
 		if _, err := os.Stat(w.path); err != nil {
+			w.mu.Unlock()
 			return false, false
 		}
 		var err error
 		db, err = sql.Open("sqlite", w.path+"?mode=ro")
 		if err != nil {
+			w.mu.Unlock()
 			return false, false
 		}
 		// Pin to a single physical connection so data_version values
@@ -125,14 +142,15 @@ func (w *DBWatcher) pollDataVersion() (changed bool, ok bool) {
 		db.SetMaxOpenConns(1)
 		db.SetMaxIdleConns(1)
 		db.SetConnMaxLifetime(0)
-
-		w.mu.Lock()
 		w.db = db
-		w.mu.Unlock()
 	}
+	w.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), pragmaTimeout)
+	defer cancel()
 
 	var ver int64
-	if err := db.QueryRowContext(context.Background(), "PRAGMA data_version").Scan(&ver); err != nil {
+	if err := db.QueryRowContext(ctx, "PRAGMA data_version").Scan(&ver); err != nil {
 		// Query failed — close connection and fall through to mtime.
 		w.mu.Lock()
 		w.db = nil
