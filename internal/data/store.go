@@ -244,7 +244,7 @@ func escapeLIKE(s string) string {
 // Each value is COALESCE'd to empty-string so that SQLite's multi-arg MAX()
 // never sees NULL (which would poison the result to NULL).
 const lastActiveExpr = `MAX(
-	COALESCE((SELECT MAX(t.timestamp) FROM turns t WHERE t.session_id = s.id), ''),
+	COALESCE(tc.last_turn_at, ''),
 	COALESCE(s.updated_at, ''),
 	COALESCE(s.created_at, '')
 )`
@@ -261,8 +261,8 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 	// Sessions with activity in any of these tables are kept even if turns
 	// haven't been recorded (e.g. MCP / sub-agent work).
 	fb.wheres = append(fb.wheres,
-		`(EXISTS (SELECT 1 FROM turns t WHERE t.session_id = s.id)`+
-			` OR EXISTS (SELECT 1 FROM session_files sf3 WHERE sf3.session_id = s.id)`+
+		`(COALESCE(tc.turn_count, 0) > 0`+
+			` OR COALESCE(fc.file_count, 0) > 0`+
 			` OR EXISTS (SELECT 1 FROM checkpoints cp2 WHERE cp2.session_id = s.id)`+
 			` OR EXISTS (SELECT 1 FROM session_refs sr3 WHERE sr3.session_id = s.id))`)
 
@@ -382,7 +382,7 @@ var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
 
 // countJoins provides the LEFT JOINs for pre-aggregated turn and file counts.
 // Every query that uses sessionColumnsSuffix must include these joins.
-const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
+const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count, MAX(timestamp) AS last_turn_at FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
 	` LEFT JOIN (SELECT session_id, COUNT(DISTINCT file_path) AS file_count FROM session_files GROUP BY session_id) fc ON fc.session_id = s.id`
 
 // sessionColumns returns the full SELECT column list, including host_type
