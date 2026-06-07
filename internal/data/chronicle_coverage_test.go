@@ -174,6 +174,93 @@ func TestChronicle_OpenPath_BadSQLiteFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// findCopilotBinary — tests for the binary lookup logic
+// ---------------------------------------------------------------------------
+
+func TestFindCopilotBinary_ReturnsStringType(t *testing.T) {
+	// We can't guarantee the binary exists, but the function must not panic
+	// and must return either a valid path or an empty string.
+	result := findCopilotBinary()
+	if result != "" {
+		// If a path is returned, it should be a file that exists.
+		info, err := os.Stat(result)
+		if err != nil {
+			t.Errorf("findCopilotBinary returned %q but stat failed: %v", result, err)
+		} else if info.IsDir() {
+			t.Errorf("findCopilotBinary returned a directory: %q", result)
+		}
+	}
+	t.Logf("findCopilotBinary() = %q", result)
+}
+
+// ---------------------------------------------------------------------------
+// Maintain — without FTS5 table (exercises "no such table" graceful path)
+// ---------------------------------------------------------------------------
+
+func TestMaintain_WithoutFTS5(t *testing.T) {
+	tmp := t.TempDir()
+	storePath := filepath.Join(tmp, "sessions.db")
+	t.Setenv("DISPATCH_DB", storePath)
+
+	// Create a DB without FTS5 table — Maintain should still succeed.
+	db, err := openSQLiteRW(storePath)
+	if err != nil {
+		t.Fatalf("creating test DB: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY)`); err != nil {
+		t.Fatalf("creating sessions table: %v", err)
+	}
+	_ = db.Close()
+
+	err = Maintain(context.Background())
+	if err != nil {
+		t.Errorf("Maintain() without FTS5 should succeed, got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Maintain — cancelled context
+// ---------------------------------------------------------------------------
+
+func TestMaintain_CancelledContext(t *testing.T) {
+	tmp := t.TempDir()
+	storePath := filepath.Join(tmp, "sessions.db")
+	t.Setenv("DISPATCH_DB", storePath)
+
+	db, err := openSQLiteRW(storePath)
+	if err != nil {
+		t.Fatalf("creating test DB: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY)`); err != nil {
+		t.Fatalf("creating sessions table: %v", err)
+	}
+	_ = db.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// With a cancelled context, Maintain may or may not return an error
+	// depending on whether SQLite processes the cancellation. Both outcomes
+	// are acceptable — the function must not panic.
+	_ = Maintain(ctx)
+}
+
+// ---------------------------------------------------------------------------
+// Maintain — missing DB file returns nil
+// ---------------------------------------------------------------------------
+
+func TestMaintain_MissingDBFile(t *testing.T) {
+	tmp := t.TempDir()
+	storePath := filepath.Join(tmp, "nonexistent.db")
+	t.Setenv("DISPATCH_DB", storePath)
+
+	err := Maintain(context.Background())
+	if err != nil {
+		t.Errorf("Maintain() with missing DB should return nil, got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
