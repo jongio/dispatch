@@ -475,14 +475,12 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 	if msg.sessions != nil {
 		m.sessions = m.applySessionFilters(msg.sessions)
 		m.groups = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		m.syncSessionListStatuses()
 		m.sessionList.SetSessions(m.sessions)
 	} else if msg.groups != nil {
 		m.groups = m.applyGroupFilters(msg.groups)
 		m.sessions = nil
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		m.syncSessionListStatuses()
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroups(m.groups)
 	}
@@ -591,8 +589,7 @@ func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) 
 			}
 		}
 		m.sortByAttention(m.sessions)
-		m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
-		m.sessionList.SetFavoritedSessions(m.favoritedSet)
+		m.syncSessionListStatuses()
 		m.sessionList.SetSessions(m.sessions)
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	}
