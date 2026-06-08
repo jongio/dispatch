@@ -102,7 +102,7 @@ jobs:
             git checkout -b "$CONTRIB_BRANCH"
             git add CONTRIBUTORS.md
             git commit -m "docs: update CONTRIBUTORS.md for $NEW_TAG"
-            git push origin "$CONTRIB_BRANCH"
+            git push origin "$CONTRIB_BRANCH" --force
             gh pr create \
               --base main \
               --head "$CONTRIB_BRANCH" \
