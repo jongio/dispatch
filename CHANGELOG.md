@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.11.0] — 2026-06-08
+
+### Added
+- **View-state persistence** — sort field, sort order, pivot/grouping, time range, and preview visibility are now saved to `config.json` on every change and restored on next launch
+- `default_sort_order` config field (`"asc"` / `"desc"`) for persisting sort direction
+- Config versioning and migration system (`config_version` field) to safely evolve settings across dispatch updates
+- Migration v0→v1: auto-converts deprecated `launchInPlace` boolean to `launch_mode` string
+
+### Documentation
+- Added `default_sort_order` to README config options table
+- Noted persistence behavior on sort, sort order, pivot, and preview toggle in keybindings docs
+
 ## [v0.10.9] — 2026-06-07
 
 ### Fixed
