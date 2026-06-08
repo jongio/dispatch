@@ -101,6 +101,7 @@ Flags:
 
 Environment:
   DISPATCH_DB             Path to a custom session store database
+  DISPATCH_SESSION_STATE  Path to a custom session state directory
   DISPATCH_LOG            Path to a log file (enables debug logging)
 `, version.Version)
 }

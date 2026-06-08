@@ -45,6 +45,7 @@ import CliTable from '../components/CliTable.astro';
             <h3>Environment Variables</h3>
             <CliTable rows={[
               { name: 'DISPATCH_DB', description: 'Path to a custom session store database.' },
+              { name: 'DISPATCH_SESSION_STATE', description: 'Path to a custom session state directory.' },
               { name: 'DISPATCH_LOG', description: 'Path to a log file. Enables debug logging when set.' },
             ]} />
           </div>

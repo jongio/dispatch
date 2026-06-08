@@ -4,6 +4,116 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.10.7] — 2026-06-07
+
+### Changed
+- Moved `ColorScheme` type from `tui/styles` to `config` package (fixes upward dependency)
+- Decoupled `copilot` package from `data` via `SessionQuerier` interface
+- Moved `Version` to dedicated `internal/version` package
+- Extracted `applySessionFilters`/`applyGroupFilters` helpers (eliminates 6 repeated filter chains)
+- Added `closeRows` helper to eliminate `nolint:errcheck` in store.go
+- Added `sdkContext` helper for Copilot SDK operations
+- Replaced `FormatInt` wrapper with direct `strconv.Itoa` calls
+- Replaced `time.Sleep` with timer+select in `waitForLog` for clean shutdown
+- Used typed SQLite errors instead of string matching in store.go
+- Added `context.Context` parameter to `Maintain()`
+
+### Fixed
+- Deep search and AI session results now show attention/plan/work status indicators immediately
+- `io.LimitReader` added to GitHub API response decoding (1 MB cap)
+- Improved `ChronicleReindex` output matching reliability
+- Removed 4 dead functions (`hiddenCount`, `launchNewSession`, `IconHidden`, `IconList`)
+
+### CI
+- Pinned golangci-lint to v2.12.2 (was `latest`)
+- Cross-compile job now runs on pushes to main (was PR-only)
+- Added 60% coverage threshold enforcement
+
+### Tests
+- Added 740+ lines of new tests: handler coverage, components, platform, chronicle, copilot
+- Fixed timing-dependent `TestStop_TerminatesLoop` in dbwatch
+- Removed trivial constant-value tests
+
+## [v0.10.6] — 2026-06-06
+
+### Fixed
+- Go 1.26.4 stdlib CVE mitigations
+- DBWatcher concurrency fixes
+
+### Dependencies
+- Updated indirect dependencies
+
+## [v0.10.5] — 2026-06-05
+
+### Dependencies
+- Updated all Go dependencies to latest
+
+## [v0.10.4] — 2026-06-05
+
+### Changed
+- Session refresh uses `PRAGMA data_version` for efficient change detection
+- Simplified reindex flow
+
+## [v0.10.3] — 2026-05-21
+
+### Fixed
+- Quality sweep: code review, security, and docs fixes (#115)
+- Installer uses unauthenticated redirect for version resolution
+
+## [v0.10.1] — 2026-05-18
+
+### Fixed
+- Authenticate GitHub API requests in update command (#104)
+
+## [v0.10.0] — 2026-05-18
+
+### Changed
+- Decomposed Model struct into focused sub-models (#78)
+- Extracted Update method into per-message handler functions (#77)
+- Consolidated filter methods with shared predicate helper (#34)
+- Consolidated dot-rendering with shared `renderDot` helper (#40)
+- Deduplicated `ScanAttention` preamble with shared scanner helper (#39)
+- Deduplicated Nerd Font detection into shared helper (#80)
+- Extracted hardcoded model name to package-level constant (#81)
+- Parallelized sequential queries in `GetSession` with errgroup
+- Replaced correlated COUNT subqueries with JOIN-based aggregation
+
+### Fixed
+- Goroutine leak in `waitForDBChangeCmd` when channel is nil (#57)
+- Protected mutable style variables with `sync.RWMutex` (#51)
+- Prefer `errors.Is/As` over string-based error matching (#50)
+- Propagated context in copilot client where safe (#52)
+- Reused HTTP client and propagated context in update command (#64, #65)
+- Handled `os.UserHomeDir` error in store initialization (#79)
+
+### Performance
+- Added missing index on `session_files.session_id` (#60)
+- Cached padding string in session list render loop (#62)
+
+### CI
+- Added Dependabot config for Go, Actions, and npm (#71)
+- Pinned Go dev tool versions to prevent supply chain attacks (#76)
+- Added coverage profiling and artifact upload (#69)
+- Used PR workflow instead of direct push in release (#75)
+- Aligned pages.yml action versions with other workflows (#68)
+
+### Tests
+- Added coverage for self-update binary replacement (#85)
+- Added coverage for doAnalyze completion analysis (#84)
+- Added coverage for work status scanning pipeline (#83)
+- Added coverage for session launch and terminal detection (#82)
+- Added coverage for Windows chronicle PTY and dbwatch (#86)
+- Added meaningful assertions to TUI view and launch tests (#56)
+
+### Documentation
+- Documented all network-facing features in SECURITY.md (#72)
+- Documented glamour/lipgloss dual-dependency (#59)
+
+### Dependencies
+- Updated indirect dependencies to latest stable versions (#44)
+- Bumped Astro to 6.3.3, TypeScript to 6.0.3
+- Bumped CI actions: golangci-lint-action 9.2.0, goreleaser-action 7.2.1, setup-node 6.4.0
+
 ## [v0.9.0] — 2026-05-14
 
 ### Added
