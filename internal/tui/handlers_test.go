@@ -229,8 +229,8 @@ func TestHandlePlansScanned_WithFilterPlans(t *testing.T) {
 }
 
 // errTest is a sentinel error for test assertions.
-var errTest = errorString("test error")
+var errTest = testError("test error")
 
-type errorString string
+type testError string
 
-func (e errorString) Error() string { return string(e) }
+func (e testError) Error() string { return string(e) }
