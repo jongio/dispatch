@@ -27,10 +27,20 @@ const (
 	// maxMaxSessions is the hard upper limit for MaxSessions to prevent
 	// resource exhaustion from a maliciously large config value.
 	maxMaxSessions = 10_000
+
+	// currentConfigVersion is the schema version written to new and migrated
+	// config files. Increment this when making breaking schema changes and
+	// add a corresponding migration case in [migrate].
+	currentConfigVersion = 1
 )
 
 // Config holds the user's preferences.
 type Config struct {
+	// ConfigVersion tracks the schema version of this config file. Used to
+	// detect and apply migrations when the config schema changes across
+	// dispatch releases. The current version is set by [currentConfigVersion].
+	ConfigVersion int `json:"config_version,omitempty"`
+
 	// DefaultShell is the preferred shell name (e.g. "pwsh", "bash", "zsh").
 	DefaultShell string `json:"default_shell"`
 
@@ -45,6 +55,10 @@ type Config struct {
 	// DefaultSort is the field used to order session lists.
 	// Valid values: "updated", "created", "turns", "name", "folder".
 	DefaultSort string `json:"default_sort"`
+
+	// DefaultSortOrder is the direction used to order session lists.
+	// Valid values: "asc", "desc".
+	DefaultSortOrder string `json:"default_sort_order,omitempty"`
 
 	// DefaultPivot is the default grouping applied to session lists.
 	// Valid values: "none", "folder", "repo", "branch", "date".
@@ -193,6 +207,14 @@ const (
 	PreviewPositionTop = "top"
 )
 
+// Sort order constants for DefaultSortOrder.
+const (
+	// SortOrderAsc sorts results in ascending order.
+	SortOrderAsc = "asc"
+	// SortOrderDesc sorts results in descending order.
+	SortOrderDesc = "desc"
+)
+
 // EffectivePaneDirection returns the configured pane direction, defaulting
 // to "auto" when unset.
 func (c *Config) EffectivePaneDirection() string {
@@ -210,6 +232,17 @@ func (c *Config) EffectivePreviewPosition() string {
 		return c.PreviewPosition
 	default:
 		return PreviewPositionRight
+	}
+}
+
+// EffectiveSortOrder returns the configured sort order, defaulting to "desc"
+// when unset or invalid.
+func (c *Config) EffectiveSortOrder() string {
+	switch c.DefaultSortOrder {
+	case SortOrderAsc, SortOrderDesc:
+		return c.DefaultSortOrder
+	default:
+		return SortOrderDesc
 	}
 }
 
@@ -244,6 +277,7 @@ func (c *Config) EffectiveLaunchMode() string {
 // Default returns a Config populated with sensible default values.
 func Default() *Config {
 	return &Config{
+		ConfigVersion:           currentConfigVersion,
 		DefaultShell:            "",
 		DefaultTerminal:         "",
 		DefaultTimeRange:        "1d",
@@ -282,6 +316,9 @@ func Load() (*Config, error) {
 	}
 
 	cfg := Default() // start from defaults so missing keys keep their default
+	// Reset ConfigVersion to 0 before unmarshal so that old configs lacking
+	// the field are detected as version 0 (needing migration).
+	cfg.ConfigVersion = 0
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
@@ -294,12 +331,33 @@ func Load() (*Config, error) {
 	}
 	cfg.sanitize()
 
+	// Migrate old config schemas forward. If the version changed, persist
+	// the upgraded config so future loads skip migration.
+	if cfg.ConfigVersion < currentConfigVersion {
+		migrate(cfg)
+		cfg.ConfigVersion = currentConfigVersion
+		_ = Save(cfg) // best-effort; don't fail Load on write errors
+	}
+
 	// Allow env var override for workspace recovery (used by --demo).
 	if os.Getenv("DISPATCH_WORKSPACE_RECOVERY") == "1" {
 		cfg.WorkspaceRecovery = true
 	}
 
 	return cfg, nil
+}
+
+// migrate applies all necessary transformations to bring an old config up to
+// the current schema version. Each version bump should have a case here that
+// transforms fields from the old layout to the new one, preserving user intent.
+func migrate(cfg *Config) {
+	// v0 → v1: LaunchInPlace (bool) was replaced by LaunchMode (string).
+	// If the user had LaunchInPlace=true but LaunchMode is unset, populate it.
+	if cfg.ConfigVersion < 1 {
+		if cfg.LaunchInPlace && cfg.LaunchMode == "" {
+			cfg.LaunchMode = LaunchModeInPlace
+		}
+	}
 }
 
 // shellUnsafe contains characters that must never appear in shell or terminal
