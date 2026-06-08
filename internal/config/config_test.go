@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,6 +17,9 @@ func TestDefaultValues(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 
+	if cfg.ConfigVersion != currentConfigVersion {
+		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
+	}
 	if cfg.DefaultShell != "" {
 		t.Errorf("DefaultShell = %q, want empty", cfg.DefaultShell)
 	}
@@ -77,6 +81,7 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		DefaultTerminal:  "alacritty",
 		DefaultTimeRange: "7d",
 		DefaultSort:      "created",
+		DefaultSortOrder: "asc",
 		DefaultPivot:     "repo",
 		ShowPreview:      false,
 		MaxSessions:      50,
@@ -111,6 +116,9 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	}
 	if restored.DefaultSort != original.DefaultSort {
 		t.Errorf("DefaultSort = %q, want %q", restored.DefaultSort, original.DefaultSort)
+	}
+	if restored.DefaultSortOrder != original.DefaultSortOrder {
+		t.Errorf("DefaultSortOrder = %q, want %q", restored.DefaultSortOrder, original.DefaultSortOrder)
 	}
 	if restored.DefaultPivot != original.DefaultPivot {
 		t.Errorf("DefaultPivot = %q, want %q", restored.DefaultPivot, original.DefaultPivot)
@@ -1169,5 +1177,166 @@ func TestPreviewPositionConstants(t *testing.T) {
 	}
 	if PreviewPositionTop != "top" {
 		t.Errorf("PreviewPositionTop = %q, want 'top'", PreviewPositionTop)
+	}
+}
+
+func TestEffectiveSortOrder_DefaultsToDesc(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if got := cfg.EffectiveSortOrder(); got != SortOrderDesc {
+		t.Errorf("EffectiveSortOrder() = %q, want %q", got, SortOrderDesc)
+	}
+}
+
+func TestEffectiveSortOrder_RespectsAsc(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.DefaultSortOrder = SortOrderAsc
+	if got := cfg.EffectiveSortOrder(); got != SortOrderAsc {
+		t.Errorf("EffectiveSortOrder() = %q, want %q", got, SortOrderAsc)
+	}
+}
+
+func TestEffectiveSortOrder_InvalidFallsBackToDesc(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.DefaultSortOrder = "invalid"
+	if got := cfg.EffectiveSortOrder(); got != SortOrderDesc {
+		t.Errorf("EffectiveSortOrder() = %q, want %q", got, SortOrderDesc)
+	}
+}
+
+func TestDefaultSortOrderOmittedFromJSON(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if _, ok := raw["default_sort_order"]; ok {
+		t.Error("default_sort_order should be omitted from JSON when empty")
+	}
+}
+
+func TestDefaultSortOrderPreservedOnLoad(t *testing.T) {
+	t.Parallel()
+	jsonData := `{"default_sort_order": "asc"}`
+	cfg := Default()
+	if err := json.Unmarshal([]byte(jsonData), cfg); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if cfg.DefaultSortOrder != SortOrderAsc {
+		t.Errorf("DefaultSortOrder = %q, want %q", cfg.DefaultSortOrder, SortOrderAsc)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Config version and migration tests
+// ---------------------------------------------------------------------------
+
+func TestDefaultConfigVersion(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if cfg.ConfigVersion != currentConfigVersion {
+		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
+	}
+}
+
+func TestMigrate_V0LaunchInPlaceToLaunchMode(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		ConfigVersion: 0,
+		LaunchInPlace: true,
+	}
+	migrate(cfg)
+	if cfg.LaunchMode != LaunchModeInPlace {
+		t.Errorf("LaunchMode = %q, want %q", cfg.LaunchMode, LaunchModeInPlace)
+	}
+}
+
+func TestMigrate_V0LaunchInPlaceSkippedWhenLaunchModeSet(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		ConfigVersion: 0,
+		LaunchInPlace: true,
+		LaunchMode:    LaunchModeTab,
+	}
+	migrate(cfg)
+	if cfg.LaunchMode != LaunchModeTab {
+		t.Errorf("LaunchMode = %q, want %q (should not be overwritten)", cfg.LaunchMode, LaunchModeTab)
+	}
+}
+
+func TestLoad_MigratesAndPersistsVersion(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	// Write a v0 config (no config_version field).
+	path := filepath.Join(dir, "dispatch", configFileName)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"launchInPlace": true, "default_shell": "fish"}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// Migration should have run.
+	if cfg.LaunchMode != LaunchModeInPlace {
+		t.Errorf("LaunchMode = %q, want %q after migration", cfg.LaunchMode, LaunchModeInPlace)
+	}
+	// User settings should be preserved.
+	if cfg.DefaultShell != "fish" {
+		t.Errorf("DefaultShell = %q, want 'fish' (should survive migration)", cfg.DefaultShell)
+	}
+	// Version should be updated.
+	if cfg.ConfigVersion != currentConfigVersion {
+		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
+	}
+
+	// File should have been re-written with the new version.
+	reloaded, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile after migration: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(reloaded, &raw); err != nil {
+		t.Fatalf("Unmarshal re-written config: %v", err)
+	}
+	if v, ok := raw["config_version"]; !ok || int(v.(float64)) != currentConfigVersion {
+		t.Errorf("Persisted config_version = %v, want %d", v, currentConfigVersion)
+	}
+}
+
+func TestLoad_SkipsMigrationWhenCurrent(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	// Write a current-version config.
+	path := filepath.Join(dir, "dispatch", configFileName)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := fmt.Sprintf(`{"config_version": %d, "default_shell": "zsh"}`, currentConfigVersion)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.DefaultShell != "zsh" {
+		t.Errorf("DefaultShell = %q, want 'zsh'", cfg.DefaultShell)
+	}
+	if cfg.ConfigVersion != currentConfigVersion {
+		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
 	}
 }

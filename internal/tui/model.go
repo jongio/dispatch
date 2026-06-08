@@ -311,7 +311,7 @@ func NewModel() Model {
 
 		sort: data.SortOptions{
 			Field: sortFieldFromConfig(cfg.DefaultSort),
-			Order: data.Descending,
+			Order: sortOrderFromConfig(cfg.EffectiveSortOrder()),
 		},
 		timeRange:       cfg.DefaultTimeRange,
 		pivot:           cfg.DefaultPivot,
@@ -919,6 +919,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Preview):
 		m.showPreview = !m.showPreview
+		m.cfg.ShowPreview = m.showPreview
+		m.saveConfig()
 		m.recalcLayout()
 		if m.showPreview {
 			m.detailVersion++
@@ -2339,10 +2341,14 @@ func (m *Model) cycleSort() {
 	for i, f := range sortFields {
 		if f == m.sort.Field {
 			m.sort.Field = sortFields[(i+1)%len(sortFields)]
+			m.cfg.DefaultSort = sortFieldToConfig(m.sort.Field)
+			m.saveConfig()
 			return
 		}
 	}
 	m.sort.Field = data.SortByUpdated
+	m.cfg.DefaultSort = sortFieldToConfig(m.sort.Field)
+	m.saveConfig()
 }
 
 func (m *Model) toggleSortOrder() {
@@ -2351,6 +2357,8 @@ func (m *Model) toggleSortOrder() {
 	} else {
 		m.sort.Order = data.Descending
 	}
+	m.cfg.DefaultSortOrder = sortOrderToConfig(m.sort.Order)
+	m.saveConfig()
 }
 
 var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate}
@@ -2360,11 +2368,15 @@ func (m *Model) cyclePivot() {
 		if p == m.pivot {
 			m.pivot = pivotModes[(i+1)%len(pivotModes)]
 			m.pivotOrder = defaultPivotOrder(m.pivot)
+			m.cfg.DefaultPivot = m.pivot
+			m.saveConfig()
 			return
 		}
 	}
 	m.pivot = pivotNone
 	m.pivotOrder = data.Ascending
+	m.cfg.DefaultPivot = m.pivot
+	m.saveConfig()
 }
 
 // defaultPivotOrder returns the natural default sort direction for a pivot.
@@ -2385,11 +2397,25 @@ func (m *Model) togglePivotOrder() {
 }
 
 // ---------------------------------------------------------------------------
+// Config persistence
+// ---------------------------------------------------------------------------
+
+// saveConfig writes the current config to disk. On failure it sets statusErr
+// so the user sees a transient notification.
+func (m *Model) saveConfig() {
+	if err := config.Save(m.cfg); err != nil {
+		m.statusErr = "config save: " + err.Error()
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Time range
 // ---------------------------------------------------------------------------
 
 func (m *Model) setTimeRange(tr string) tea.Cmd {
 	m.timeRange = tr
+	m.cfg.DefaultTimeRange = tr
+	m.saveConfig()
 	m.filter.Since = timeRangeToSince(tr)
 	return m.loadSessionsCmd()
 }
@@ -3361,6 +3387,35 @@ func sortFieldFromConfig(s string) data.SortField {
 	default:
 		return data.SortByUpdated
 	}
+}
+
+func sortFieldToConfig(f data.SortField) string {
+	switch f {
+	case data.SortByCreated:
+		return "created"
+	case data.SortByTurns:
+		return "turns"
+	case data.SortByName:
+		return "name"
+	case data.SortByFolder:
+		return "folder"
+	default:
+		return "updated"
+	}
+}
+
+func sortOrderFromConfig(s string) data.SortOrder {
+	if s == config.SortOrderAsc {
+		return data.Ascending
+	}
+	return data.Descending
+}
+
+func sortOrderToConfig(o data.SortOrder) string {
+	if o == data.Ascending {
+		return config.SortOrderAsc
+	}
+	return config.SortOrderDesc
 }
 
 func pivotFieldFromString(s string) data.PivotField {
