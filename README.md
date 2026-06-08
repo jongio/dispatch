@@ -259,6 +259,7 @@ Configuration is stored in the platform-specific config directory:
 | `default_terminal` | string | `""` | Terminal emulator. Empty = auto-detect |
 | `default_time_range` | string | `"1d"` | Time filter: `1h`, `1d`, `7d`, `all` |
 | `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
+| `default_sort_order` | string | `"desc"` | Sort direction: `asc`, `desc` |
 | `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date` |
 | `show_preview` | bool | `true` | Show preview pane on startup |
 | `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |

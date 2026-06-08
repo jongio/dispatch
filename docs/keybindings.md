@@ -144,21 +144,21 @@
     - File: internal\tui\keys.go (line 69)
     - Code: key.NewBinding(key.WithKeys("s"))
     - Handler: internal\tui\model.go (lines 878-880)
-    - Behavior: Cycles through sort options (Name, Created, Updated, etc.)
+    - Behavior: Cycles through sort options (Name, Created, Updated, etc.). Persisted in config.
     - Condition: In session list view
 
 18. **S** (Shift+S) → Toggle Sort Direction
     - File: internal\tui\keys.go (line 70)
     - Code: key.NewBinding(key.WithKeys("S"))
     - Handler: internal\tui\model.go (lines 882-884)
-    - Behavior: Toggles between ascending and descending sort
+    - Behavior: Toggles between ascending and descending sort. Persisted in config.
     - Condition: In session list view
 
 19. **Tab** → Cycle Pivot Mode
     - File: internal\tui\keys.go (line 71)
     - Code: key.NewBinding(key.WithKeys("tab"))
     - Handler: internal\tui\model.go (lines 886-888)
-    - Behavior: Cycles grouping: none → folder → repo → branch → date → none
+    - Behavior: Cycles grouping: none → folder → repo → branch → date → none. Persisted in config.
     - Condition: In session list view
 
 ### Preview and Display
@@ -166,7 +166,7 @@
     - File: internal\tui\keys.go (line 72)
     - Code: key.NewBinding(key.WithKeys("p"))
     - Handler: internal\tui\model.go (lines 890-897)
-    - Behavior: Shows/hides detailed session info preview on the right
+    - Behavior: Shows/hides detailed session info preview on the right. Persisted in config.
     - Condition: In session list view
 
 20b. **o** → Toggle Conversation Sort Order
