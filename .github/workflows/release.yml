@@ -118,7 +118,11 @@ jobs:
         env:
           RELEASE_VERSION: v${{ steps.version.outputs.version }}
         run: |
-          go run mage.go -w . ChangelogCheck
+          if ! grep -q "## \[${RELEASE_VERSION}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for ${RELEASE_VERSION} -- add one before releasing"
+            exit 1
+          fi
+          echo "Found changelog entry for ${RELEASE_VERSION}"
 
       - name: Create and push tag
         run: |

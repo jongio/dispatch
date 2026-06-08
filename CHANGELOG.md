@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.10.9] — 2026-06-07
+
+### Fixed
+- Release workflow changelog gate now uses inline grep (mage not available in CI runner)
+
 ## [v0.10.8] — 2026-06-07
 
 ### Fixed
