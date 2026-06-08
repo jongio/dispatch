@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.10.8] — 2026-06-07
+
+### Fixed
+- Added changelog entries for v0.10.0-v0.10.7 (were missing from release archives)
+- Documented `DISPATCH_SESSION_STATE` environment variable in CLI help and website
+- Fixed absolute machine-specific paths in `docs/keybindings.md`
+- Updated CONTRIBUTING.md Go version (1.26.4) and project structure
+
+### CI
+- Release workflow now verifies CHANGELOG.md has an entry before tagging (`mage changelogCheck`)
+
 ## [v0.10.7] — 2026-06-07
 
 ### Changed
