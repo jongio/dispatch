@@ -114,6 +114,12 @@ jobs:
           # Move contrib-notes to temp dir so GoReleaser sees a clean git state
           mv contrib-notes.md "$RUNNER_TEMP/contrib-notes.md" 2>/dev/null || true
 
+      - name: Verify changelog entry
+        env:
+          RELEASE_VERSION: v${{ steps.version.outputs.version }}
+        run: |
+          go run mage.go -w . ChangelogCheck
+
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"

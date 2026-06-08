@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -283,6 +284,56 @@ func Clean() error {
 func Contributors() error {
 	fmt.Println("\n=== Generating CONTRIBUTORS.md ===")
 	return run("go", "run", "./cmd/contributors/", "--all")
+}
+
+// ChangelogCheck verifies that CHANGELOG.md contains an entry for the given
+// version (or the latest git tag if no version is specified). Use before
+// tagging a release to prevent shipping without changelog entries.
+func ChangelogCheck() error {
+	fmt.Println("\n=== Changelog verification ===")
+
+	// Determine which version to check: use RELEASE_VERSION env var if set
+	// (for CI), otherwise find the latest git tag.
+	version := os.Getenv("RELEASE_VERSION")
+	if version == "" {
+		out, err := cmdOutput("git", "tag", "--list", "v*", "--sort=-v:refname")
+		if err != nil {
+			return fmt.Errorf("git tag list: %w", err)
+		}
+		tags := strings.Fields(strings.TrimSpace(out))
+		if len(tags) == 0 {
+			fmt.Println("   No tags found, skipping changelog check")
+			return nil
+		}
+		version = tags[0]
+	}
+
+	// Normalize: strip leading 'v' for the search, keep it for display
+	display := version
+	if !strings.HasPrefix(version, "v") {
+		display = "v" + version
+	}
+
+	// Search CHANGELOG.md for a heading containing the version
+	f, err := os.Open(filepath.Join(projectDir(), "CHANGELOG.md"))
+	if err != nil {
+		return fmt.Errorf("open CHANGELOG.md: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "## ") && strings.Contains(line, display) {
+			fmt.Printf("   Found entry for %s\n", display)
+			return nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading CHANGELOG.md: %w", err)
+	}
+
+	return fmt.Errorf("CHANGELOG.md has no entry for %s -- add one before releasing", display)
 }
 
 // Deadcode runs dead code detection with allowlist filtering.

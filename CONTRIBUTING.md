@@ -75,6 +75,7 @@ $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.
 | `mage clean`     | Remove `bin/` directory                                  |
 | `mage testWSL`   | Run tests under WSL for Unix code paths                  |
 | `mage coverageReport` | Generate `coverage.html`                            |
+| `mage changelogCheck` | Verify CHANGELOG.md has an entry for the latest tag |
 
 ## Preflight Steps
 
