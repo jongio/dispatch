@@ -1,17 +1,19 @@
 import React from 'react';
+import { List, FolderTree, GitFork, GitBranch, Calendar } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 
 interface PivotOption {
   value: string;
   label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
 const PIVOT_OPTIONS: PivotOption[] = [
-  { value: 'none', label: 'Flat' },
-  { value: 'cwd', label: 'Folder' },
-  { value: 'repository', label: 'Repo' },
-  { value: 'branch', label: 'Branch' },
-  { value: 'date', label: 'Date' },
+  { value: 'none', label: 'Flat', icon: List },
+  { value: 'cwd', label: 'Folder', icon: FolderTree },
+  { value: 'repository', label: 'Repo', icon: GitFork },
+  { value: 'branch', label: 'Branch', icon: GitBranch },
+  { value: 'date', label: 'Date', icon: Calendar },
 ];
 
 export function PivotSelector() {
@@ -19,38 +21,29 @@ export function PivotSelector() {
 
   return (
     <div className="flex flex-col gap-0.5">
-      {PIVOT_OPTIONS.map((option) => {
-        const isActive = pivot === option.value;
-        return (
-          <button
-            key={option.value}
-            onClick={() => setPivot(option.value)}
-            className={`
-              flex items-center gap-2 px-2 py-1 text-xs rounded transition-colors duration-100 text-left
-              ${isActive
-                ? 'bg-[var(--selection-bg)] text-[var(--accent-primary)]'
-                : 'text-[var(--fg-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--fg-primary)]'
-              }
-            `}
-          >
-            <span
+      <div className="flex gap-1">
+        {PIVOT_OPTIONS.map((option) => {
+          const isActive = pivot === option.value;
+          const Icon = option.icon;
+          return (
+            <button
+              key={option.value}
+              onClick={() => setPivot(option.value)}
+              title={option.label}
               className={`
-                w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors duration-100
+                flex items-center justify-center w-7 h-7 rounded transition-all duration-100
                 ${isActive
-                  ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]'
-                  : 'border-[var(--fg-muted)]'
+                  ? 'bg-[var(--selection-bg)] text-[var(--accent-primary)] shadow-[0_0_0_1px_var(--accent-primary)]'
+                  : 'text-[var(--fg-muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--fg-primary)]'
                 }
               `}
             >
-              {isActive && (
-                <span className="block w-1.5 h-1.5 rounded-full bg-[var(--bg-primary)] m-auto mt-[1px]" />
-              )}
-            </span>
-            <span className="font-medium">{option.label}</span>
-          </button>
-        );
-      })}
-      <div className="mt-1 text-[10px] text-[var(--fg-muted)]">
+              <Icon size={14} />
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-0.5 text-[10px] text-[var(--fg-muted)]">
         Tab to cycle
       </div>
     </div>

@@ -77,6 +77,11 @@ export interface DispatchAPI {
     getShells(): Promise<ShellInfo[]>;
     getTerminals(): Promise<TerminalInfo[]>;
   };
+  window: {
+    minimize(): void;
+    maximize(): void;
+    close(): void;
+  };
   on(event: string, callback: (...args: unknown[]) => void): () => void;
 }
 
@@ -105,6 +110,11 @@ const api: DispatchAPI = {
     copyToClipboard: (text) => ipcRenderer.invoke('platform:copyToClipboard', text),
     getShells: () => ipcRenderer.invoke('platform:getShells'),
     getTerminals: () => ipcRenderer.invoke('platform:getTerminals'),
+  },
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
+    close: () => ipcRenderer.send('window:close'),
   },
   on: (event, callback) => {
     const listener = (_event: unknown, ...args: unknown[]) => callback(...args);

@@ -1,30 +1,40 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  Monitor,
+  Cloud,
+  Cog,
+  GitBranch,
+  Folder,
+  MessageSquare,
+  Star,
+  FileText,
+  EyeOff,
+} from 'lucide-react';
 import { useSessionStore, getGroupKey, type Session } from '../stores/sessionStore';
 import { useAttentionStore } from '../stores/attentionStore';
 import { AttentionDot } from './AttentionDot';
 import { GroupHeader } from './GroupHeader';
 
 /** Row height constants for the virtualizer. */
-const ROW_HEIGHT_SESSION = 48;
-const ROW_HEIGHT_GROUP = 36;
+const ROW_HEIGHT_SESSION = 32;
+const ROW_HEIGHT_GROUP = 28;
 
 /** A virtual row can be either a group header or a session item. */
 type VirtualRow =
   | { type: 'group'; key: string; sessionCount: number }
   | { type: 'session'; session: Session; flatIndex: number };
 
-/** Map host_type to a display icon. */
-function hostIcon(hostType: string): string {
+/** Render the appropriate Lucide icon for a host type. */
+function HostIcon({ hostType }: { hostType: string }) {
+  const props = { size: 12, className: 'text-[var(--fg-muted)] flex-shrink-0' };
   switch (hostType?.toLowerCase()) {
-    case 'cli':
-      return '\u{1F4BB}'; // 💻
     case 'cloud':
-      return '\u2601\uFE0F'; // ☁️
+      return <Cloud {...props} />;
     case 'actions':
-      return '\u2699\uFE0F'; // ⚙️
+      return <Cog {...props} />;
     default:
-      return '\u{1F4BB}';
+      return <Monitor {...props} />;
   }
 }
 
@@ -35,13 +45,13 @@ function formatRelativeTime(timestamp: string): string {
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return `${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 export function SessionList() {
@@ -237,6 +247,7 @@ export function SessionList() {
           const isMultiSelected = selectedIds.has(session.id);
           const isCursor = flatIndex === cursorIndex;
           const isFavorited = favorites.has(session.id);
+          const isHidden = hidden.has(session.id);
 
           return (
             <div
@@ -254,7 +265,8 @@ export function SessionList() {
                 onClick={(e) => handleClick(session.id, e)}
                 onDoubleClick={() => handleDoubleClick(session.id)}
                 className={`
-                  flex items-center px-3 h-full cursor-pointer border-b border-[var(--border-subtle)]
+                  flex items-center gap-1.5 px-2 h-full cursor-pointer
+                  border-b border-[var(--border-subtle)]
                   ${isSelected ? 'bg-[var(--selection-bg)]' : 'hover:bg-[var(--hover-bg)]'}
                   ${isMultiSelected ? 'ring-1 ring-inset ring-[var(--accent-primary)]' : ''}
                   ${isCursor && !isSelected ? 'bg-[var(--hover-bg)]' : ''}
@@ -263,59 +275,76 @@ export function SessionList() {
                 {/* Attention dot */}
                 <AttentionDot
                   status={statuses.get(session.id) ?? 'idle'}
-                  className="mr-2 flex-shrink-0"
+                  size={6}
+                  className="flex-shrink-0"
                 />
 
                 {/* Host type icon */}
-                <span className="text-sm mr-2 flex-shrink-0" aria-label={session.host_type}>
-                  {hostIcon(session.host_type)}
+                <HostIcon hostType={session.host_type} />
+
+                {/* Summary - bold, truncated, takes available space */}
+                <span className="text-xs font-semibold truncate text-[var(--fg-primary)] min-w-0 flex-1">
+                  {session.summary || 'Untitled session'}
                 </span>
 
-                {/* Main content area */}
-                <div className="flex-1 min-w-0 mr-2">
-                  {/* Top line: summary */}
-                  <div className="text-sm font-semibold truncate text-[var(--fg-primary)] leading-tight">
-                    {session.summary || 'Untitled session'}
-                  </div>
-                  {/* Bottom line: repo, branch, folder */}
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)] leading-tight mt-0.5">
-                    {session.repository && (
-                      <span className="truncate max-w-[120px]">{session.repository}</span>
-                    )}
-                    {session.branch && (
-                      <span className="truncate max-w-[90px]">\u23C7 {session.branch}</span>
-                    )}
-                    {session.cwd && (
-                      <span className="truncate max-w-[100px] text-[10px] opacity-70">
-                        {session.cwd}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                {/* Inline metadata: repo, branch, folder - muted, right-aligned */}
+                <div className="flex items-center gap-2 flex-shrink-0 text-[11px] text-[var(--fg-muted)]">
+                  {session.repository && (
+                    <span className="truncate max-w-[100px]">
+                      {session.repository}
+                    </span>
+                  )}
 
-                {/* Right-side indicators */}
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+                  {session.branch && (
+                    <span className="flex items-center gap-0.5 truncate max-w-[80px]">
+                      <GitBranch size={10} className="flex-shrink-0 opacity-70" />
+                      {session.branch}
+                    </span>
+                  )}
+
+                  {session.cwd && (
+                    <span className="flex items-center gap-0.5 truncate max-w-[80px] opacity-70">
+                      <Folder size={10} className="flex-shrink-0" />
+                      {session.cwd.split(/[/\\]/).pop()}
+                    </span>
+                  )}
+
                   {/* Turn count badge */}
-                  <span className="text-[10px] font-medium text-[var(--fg-muted)] bg-[var(--bg-tertiary)] rounded px-1 py-0.5">
+                  <span className="flex items-center gap-0.5 text-[10px] font-medium bg-[var(--bg-tertiary)] rounded px-1 py-px">
+                    <MessageSquare size={9} className="opacity-70" />
                     {session.turn_count}
                   </span>
 
-                  {/* Plan dot - shown if session has file_count > 0 as a proxy for plan existence */}
+                  {/* Plan indicator */}
                   {session.file_count > 0 && (
-                    <span className="text-[10px] text-[var(--accent-primary)]" title="Has plan">
-                      \u25CF
-                    </span>
+                    <FileText
+                      size={10}
+                      className="text-[var(--accent-primary)] flex-shrink-0"
+                      aria-label="Has plan"
+                    />
                   )}
 
                   {/* Star indicator */}
                   {isFavorited && (
-                    <span className="text-xs" title="Favorited">
-                      \u2B50
-                    </span>
+                    <Star
+                      size={11}
+                      fill="currentColor"
+                      className="text-[var(--accent-warning,#e0af68)] flex-shrink-0"
+                      aria-label="Favorited"
+                    />
+                  )}
+
+                  {/* Hidden indicator */}
+                  {isHidden && (
+                    <EyeOff
+                      size={10}
+                      className="text-[var(--fg-muted)] opacity-60 flex-shrink-0"
+                      aria-label="Hidden"
+                    />
                   )}
 
                   {/* Relative timestamp */}
-                  <span className="text-[11px] text-[var(--fg-muted)] ml-1 tabular-nums">
+                  <span className="tabular-nums text-[10px] ml-0.5 w-[28px] text-right">
                     {formatRelativeTime(session.last_active_at || session.updated_at)}
                   </span>
                 </div>

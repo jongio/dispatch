@@ -148,6 +148,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle('platform:getTerminals', async () => {
     return getTerminals();
   });
+
+  // Window control handlers (fire-and-forget)
+  ipcMain.on('window:minimize', () => mainWindow?.minimize());
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+    else mainWindow?.maximize();
+  });
+  ipcMain.on('window:close', () => mainWindow?.close());
 }
 
 app.whenReady().then(() => {

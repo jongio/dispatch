@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
+import { ChevronRight, ChevronDown, Folder, FolderOpen, Square, CheckSquare, Search } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 
 /** A single node in the directory tree. */
@@ -189,24 +190,31 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
             ${hasChildren ? 'hover:text-[var(--fg-primary)]' : 'invisible'}
           `}
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 10 10"
-            className={`transition-transform duration-100 ${isExpanded ? 'rotate-90' : ''}`}
-          >
-            <path d="M3 2 L7 5 L3 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+          {isExpanded ? (
+            <ChevronDown size={12} />
+          ) : (
+            <ChevronRight size={12} />
+          )}
         </button>
 
-        {/* Checkbox */}
-        <input
-          type="checkbox"
-          checked={!isExcluded}
-          onChange={(e) => onToggleExclude(node.path, e.target.checked)}
-          className="w-3 h-3 rounded border-[var(--border-primary)] accent-[var(--accent-primary)] cursor-pointer flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        />
+        {/* Checkbox icon */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleExclude(node.path, isExcluded); }}
+          className="flex-shrink-0 text-[var(--fg-muted)] hover:text-[var(--accent-primary)] transition-colors duration-75"
+        >
+          {isExcluded ? (
+            <Square size={14} className="text-[var(--fg-muted)]" />
+          ) : (
+            <CheckSquare size={14} className="text-[var(--accent-primary)]" />
+          )}
+        </button>
+
+        {/* Folder icon */}
+        {isExpanded && hasChildren ? (
+          <FolderOpen size={14} className="text-[var(--accent-secondary,var(--fg-muted))] flex-shrink-0" />
+        ) : (
+          <Folder size={14} className="text-[var(--fg-muted)] flex-shrink-0" />
+        )}
 
         {/* Directory name */}
         <span
@@ -219,7 +227,7 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
 
         {/* Session count badge */}
         {node.sessionCount > 0 && (
-          <span className="text-[10px] text-[var(--fg-muted)] bg-[var(--bg-tertiary)] px-1 rounded flex-shrink-0">
+          <span className="text-[10px] text-[var(--fg-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-full min-w-[18px] text-center flex-shrink-0">
             {node.sessionCount}
           </span>
         )}
@@ -339,13 +347,16 @@ export function DirectoryTree() {
   return (
     <div className="flex flex-col gap-1">
       {/* Search within tree */}
-      <input
-        type="text"
-        value={searchFilter}
-        onChange={(e) => setSearchFilter(e.target.value)}
-        placeholder="Filter dirs..."
-        className="w-full px-2 py-1 text-xs rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none focus:border-[var(--accent-primary)]"
-      />
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--bg-tertiary)]">
+        <Search size={12} className="text-[var(--fg-muted)] flex-shrink-0" />
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          placeholder="Filter dirs..."
+          className="flex-1 bg-transparent text-xs text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none"
+        />
+      </div>
 
       {/* Tree nodes */}
       <div className="max-h-[300px] overflow-y-auto">
