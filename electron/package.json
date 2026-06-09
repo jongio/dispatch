@@ -11,6 +11,8 @@
     "build": "tsc && vite build && electron-builder",
     "build:renderer": "tsc && vite build",
     "start": "electron .",
+    "postinstall": "electron-rebuild -m .",
+    "rebuild": "electron-rebuild -m .",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,10 +25,12 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@tanstack/react-virtual": "^3.0.0",
     "@types/better-sqlite3": "^7.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.0.0",
     "electron": "^35.0.0",
     "electron-builder": "^25.0.0",
@@ -43,5 +47,12 @@
     "vite": "^6.0.0",
     "vite-plugin-electron": "^0.28.0",
     "vitest": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "electron",
+      "esbuild"
+    ]
   }
 }

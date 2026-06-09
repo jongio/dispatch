@@ -8,10 +8,10 @@ export default defineConfig({
     react(),
     electron([
       {
-        entry: 'src/main/index.ts',
+        entry: resolve(__dirname, 'src/main/index.ts'),
         vite: {
           build: {
-            outDir: 'dist/main',
+            outDir: resolve(__dirname, 'dist/main'),
             rollupOptions: {
               external: ['electron', 'better-sqlite3', 'chokidar'],
             },
@@ -19,24 +19,25 @@ export default defineConfig({
         },
       },
       {
-        entry: 'src/preload/index.ts',
+        entry: resolve(__dirname, 'src/preload/index.ts'),
         onstart(args) {
           args.reload();
         },
         vite: {
           build: {
-            outDir: 'dist/preload',
+            outDir: resolve(__dirname, 'dist/preload'),
           },
         },
       },
     ]),
   ],
+  root: resolve(__dirname, 'src/renderer'),
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src/renderer'),
     },
   },
   build: {
-    outDir: 'dist/renderer',
+    outDir: resolve(__dirname, 'dist/renderer'),
   },
 });
