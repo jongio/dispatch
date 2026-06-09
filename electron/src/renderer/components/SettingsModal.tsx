@@ -50,23 +50,35 @@ export function SettingsModal() {
   const [config, setConfig] = useState<Config>(getDefaultConfig());
   const [configPath, setConfigPath] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [shells, setShells] = useState<{ value: string; label: string }[]>([]);
+  const [terminals, setTerminals] = useState<{ value: string; label: string }[]>([]);
   const [currentTheme, setCurrentTheme] = useState<string>(() => {
     return document.documentElement.getAttribute('data-theme') || 'dark';
   });
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Load config when modal opens
+  // Load config + detected shells/terminals when modal opens
   useEffect(() => {
     if (!showSettings) return;
 
     async function loadConfig() {
-      const [cfg, path] = await Promise.all([
+      const [cfg, path, detectedShells, detectedTerminals] = await Promise.all([
         window.dispatch.config.get(),
         window.dispatch.config.getPath(),
+        window.dispatch.platform.getShells(),
+        window.dispatch.platform.getTerminals(),
       ]);
       setConfig(cfg);
       setConfigPath(path);
+      setShells([
+        { value: '', label: 'Auto-detect' },
+        ...detectedShells.map((s) => ({ value: s.name, label: s.displayName })),
+      ]);
+      setTerminals([
+        { value: '', label: 'Auto-detect' },
+        ...detectedTerminals.map((t) => ({ value: t.name, label: t.displayName })),
+      ]);
     }
     loadConfig();
   }, [showSettings]);
@@ -211,21 +223,21 @@ export function SettingsModal() {
 
           {/* Terminal Section */}
           <Section title="Terminal">
-            <TextField
+            <SelectField
               label="Terminal"
               description="Preferred terminal emulator"
               value={config.default_terminal}
+              options={terminals}
               onChange={(v) => updateField('default_terminal', v)}
               onReset={() => resetField('default_terminal')}
-              placeholder="e.g. Windows Terminal, iTerm2, Alacritty"
             />
-            <TextField
+            <SelectField
               label="Shell"
               description="Preferred shell"
               value={config.default_shell}
+              options={shells}
               onChange={(v) => updateField('default_shell', v)}
               onReset={() => resetField('default_shell')}
-              placeholder="e.g. pwsh, bash, zsh"
             />
             <TextField
               label="Custom Command"
