@@ -218,7 +218,10 @@ export function useKeyboard(): void {
       }),
       'v': guard((e) => {
         e.preventDefault();
-        store.getState().togglePlanView();
+        const { previewTab, setPreviewTab, togglePlanView } = store.getState();
+        const next = previewTab === 'conversation' ? 'plan' : 'conversation';
+        setPreviewTab(next);
+        if (next === 'plan') togglePlanView(); // load plan content
       }),
       'o': guard((e) => {
         e.preventDefault();

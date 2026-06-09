@@ -177,10 +177,8 @@ function TurnBubble({
 }
 
 export function PreviewPanel() {
-  const { selectedSession, showPlanView, planContent } = useSessionStore();
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const { selectedSession, previewTab, setPreviewTab, planContent, togglePlanView } = useSessionStore();
   const [copied, setCopied] = useState(false);
-  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const handleCopyId = useCallback(async (id: string) => {
     await window.dispatch.platform.copyToClipboard(id);
@@ -188,29 +186,13 @@ export function PreviewPanel() {
     setTimeout(() => setCopied(false), 1500);
   }, []);
 
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      resizeRef.current = { startX: e.clientX, startWidth: panelWidth };
-
-      const handleMove = (moveEvent: MouseEvent) => {
-        if (!resizeRef.current) return;
-        const delta = resizeRef.current.startX - moveEvent.clientX;
-        const next = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, resizeRef.current.startWidth + delta));
-        setPanelWidth(next);
-      };
-
-      const handleUp = () => {
-        resizeRef.current = null;
-        document.removeEventListener('mousemove', handleMove);
-        document.removeEventListener('mouseup', handleUp);
-      };
-
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', handleUp);
-    },
-    [panelWidth],
-  );
+  // Load plan when switching to plan tab
+  const handleTabChange = useCallback((tab: 'conversation' | 'plan') => {
+    setPreviewTab(tab);
+    if (tab === 'plan' && selectedSession) {
+      togglePlanView();
+    }
+  }, [setPreviewTab, selectedSession, togglePlanView]);
 
   // Empty state
   if (!selectedSession) {
@@ -324,16 +306,34 @@ export function PreviewPanel() {
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="shrink-0 flex border-b border-border bg-card">
+        <button
+          onClick={() => handleTabChange('conversation')}
+          className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
+            previewTab === 'conversation'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Conversation
+        </button>
+        <button
+          onClick={() => handleTabChange('plan')}
+          className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
+            previewTab === 'plan'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Plan
+        </button>
+      </div>
+
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1 preview-selectable">
-        {/* Plan view toggle */}
-        {showPlanView ? (
+        {previewTab === 'plan' ? (
           <div className="space-y-2">
-            <SectionHeader
-              icon={<FileText size={14} className="inline-block" />}
-              title="Plan"
-              count={0}
-            />
             {planContent ? (
               <pre className="whitespace-pre-wrap break-words text-xs text-foreground font-mono leading-relaxed">
                 {planContent}

@@ -51,6 +51,8 @@ interface SessionState {
   selectedIds: Set<string>;
   searchQuery: string;
   showPreview: boolean;
+  previewPosition: 'right' | 'bottom';
+  previewTab: 'conversation' | 'plan';
   showSidebar: boolean;
   showHelp: boolean;
   showSettings: boolean;
@@ -80,6 +82,8 @@ interface SessionState {
   toggleSelection: (id: string) => void;
   setSearchQuery: (query: string) => void;
   togglePreview: () => void;
+  cyclePreviewPosition: () => void;
+  setPreviewTab: (tab: 'conversation' | 'plan') => void;
   toggleSidebar: () => void;
   toggleHelp: () => void;
   toggleSettings: () => void;
@@ -112,6 +116,8 @@ export const useSessionStore = create<SessionState>()(
   selectedIds: new Set(),
   searchQuery: '',
   showPreview: true,
+  previewPosition: 'right',
+  previewTab: 'conversation',
   showSidebar: true,
   showHelp: false,
   showSettings: false,
@@ -181,6 +187,16 @@ export const useSessionStore = create<SessionState>()(
 
   togglePreview: () => {
     set((state) => ({ showPreview: !state.showPreview }));
+  },
+
+  cyclePreviewPosition: () => {
+    set((state) => ({
+      previewPosition: state.previewPosition === 'right' ? 'bottom' : 'right',
+    }));
+  },
+
+  setPreviewTab: (tab: 'conversation' | 'plan') => {
+    set({ previewTab: tab });
   },
 
   toggleSidebar: () => {
@@ -311,6 +327,7 @@ export const useSessionStore = create<SessionState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         showPreview: state.showPreview,
+        previewPosition: state.previewPosition,
         showSidebar: state.showSidebar,
         sort: state.sort,
         sortOrder: state.sortOrder,
@@ -327,6 +344,7 @@ export const useSessionStore = create<SessionState>()(
         return {
           ...current,
           showPreview: typeof p.showPreview === 'boolean' ? p.showPreview : current.showPreview,
+          previewPosition: p.previewPosition === 'right' || p.previewPosition === 'bottom' ? p.previewPosition : current.previewPosition,
           showSidebar: typeof p.showSidebar === 'boolean' ? p.showSidebar : current.showSidebar,
           sort: typeof p.sort === 'string' ? p.sort : current.sort,
           sortOrder: p.sortOrder === 'asc' || p.sortOrder === 'desc' ? p.sortOrder : current.sortOrder,

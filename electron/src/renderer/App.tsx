@@ -13,12 +13,13 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { useResize } from './hooks/useResize';
 
 export function App() {
-  const { loadSessions, showPreview, showSidebar } = useSessionStore();
+  const { loadSessions, showPreview, showSidebar, previewPosition } = useSessionStore();
   const loadAttention = useAttentionStore((s) => s.loadAttention);
   useKeyboard();
 
   const sidebar = useResize(220, 140, 360, 'left');
-  const preview = useResize(380, 260, 600, 'right');
+  const previewH = useResize(380, 260, 600, 'right');
+  const previewV = useResize(280, 150, 500, 'left'); // for bottom position (height)
 
   useEffect(() => {
     loadSessions();
@@ -36,9 +37,9 @@ export function App() {
   }, [loadSessions, loadAttention]);
 
   return (
-    <div className="grid h-full w-full grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr_auto] bg-background text-foreground">
+    <div className="grid h-full w-full grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr] bg-background text-foreground">
       {/* Row 1: TitleBar spans all columns */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <TitleBar />
       </div>
 
@@ -63,22 +64,49 @@ export function App() {
         </div>
       )}
 
-      <main className="row-start-2 col-start-2 min-h-0 overflow-hidden">
-        <SessionTable />
+      <main className="row-start-2 col-start-2 min-h-0 overflow-hidden flex flex-col">
+        {/* Main + optional bottom preview */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {previewPosition === 'right' ? (
+            <div className="flex h-full">
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <SessionTable />
+              </div>
+              {showPreview && (
+                <>
+                  <div
+                    className="shrink-0 w-[3px] cursor-col-resize hover:bg-primary bg-border transition-colors"
+                    onMouseDown={previewH.onMouseDown}
+                  />
+                  <div className="shrink-0 min-w-0 overflow-y-auto overflow-x-hidden" style={{ width: previewH.width }}>
+                    <PreviewPanel />
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col h-full">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <SessionTable />
+              </div>
+              {showPreview && (
+                <>
+                  <div
+                    className="shrink-0 h-[3px] cursor-row-resize hover:bg-primary bg-border transition-colors"
+                    onMouseDown={previewV.onMouseDown}
+                  />
+                  <div className="shrink-0 min-h-0 overflow-y-auto overflow-x-hidden" style={{ height: previewV.width }}>
+                    <PreviewPanel />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
-      {showPreview && (
-        <div className="row-start-2 col-start-3 min-h-0 min-w-0 border-l border-border overflow-y-auto overflow-x-hidden" style={{ width: preview.width }}>
-          <PreviewPanel />
-          <div
-            className="absolute top-0 left-0 bottom-0 w-[3px] cursor-col-resize hover:bg-primary bg-border transition-colors"
-            onMouseDown={preview.onMouseDown}
-          />
-        </div>
-      )}
-
       {/* Row 3: StatusBar spans all columns */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <StatusBar />
       </div>
 
