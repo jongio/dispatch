@@ -59,6 +59,21 @@ function formatRelativeTime(timestamp: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function formatGroupDate(dateKey: string): string {
+  // dateKey could be "2026-06-09" (from getGroupingValue) or a full ISO string
+  const date = new Date(dateKey.length === 10 ? dateKey + 'T00:00:00' : dateKey);
+  if (isNaN(date.getTime())) return dateKey;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.floor((today.getTime() - target.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function HostIcon({ hostType }: { hostType: string }) {
   const props = { size: 12, className: 'text-muted-foreground flex-shrink-0' };
   switch (hostType?.toLowerCase()) {
@@ -254,6 +269,11 @@ function buildColumns(
       minSize: 50,
       maxSize: 100,
       header: 'Updated',
+      getGroupingValue: (row) => {
+        const ts = row.last_active_at || row.updated_at;
+        if (!ts) return 'Unknown';
+        return new Date(ts).toISOString().slice(0, 10); // group by day: "2026-06-09"
+      },
       cell: ({ getValue }) => (
         <span className="text-[10px] text-muted-foreground tabular-nums">
           {formatRelativeTime(getValue() as string)}
@@ -648,6 +668,10 @@ export function SessionTable() {
             if (isGrouped) {
               const groupKey = String(row.getValue(grouping[0]));
               const isCollapsed = collapsedGroups.has(groupKey);
+              // Format date group headers nicely
+              const displayKey = pivot === 'date' && groupKey
+                ? formatGroupDate(groupKey)
+                : groupKey || 'Unknown';
               return (
                 <div
                   key={`group-${groupKey}`}
@@ -668,7 +692,7 @@ export function SessionTable() {
                     <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
                   )}
                   <span className="text-[11px] font-medium text-foreground truncate flex-1">
-                    {groupKey || 'Unknown'}
+                    {displayKey}
                   </span>
                   <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded px-1 py-px flex-shrink-0">
                     {row.subRows.length}
