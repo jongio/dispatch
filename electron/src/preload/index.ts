@@ -57,6 +57,7 @@ export interface DispatchAPI {
     search(query: string): Promise<unknown[]>;
     searchDeep(query: string): Promise<unknown[]>;
     getDetail(id: string): Promise<unknown>;
+    getPlan(id: string): Promise<string | null>;
     getAttention(): Promise<Record<string, string>>;
   };
   launch: {
@@ -91,6 +92,7 @@ const api: DispatchAPI = {
     search: (query) => ipcRenderer.invoke('sessions:search', query),
     searchDeep: (query) => ipcRenderer.invoke('sessions:searchDeep', query),
     getDetail: (id) => ipcRenderer.invoke('sessions:getDetail', id),
+    getPlan: (id) => ipcRenderer.invoke('sessions:getPlan', id),
     getAttention: () => ipcRenderer.invoke('sessions:getAttention'),
   },
   launch: {

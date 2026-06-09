@@ -93,6 +93,18 @@ function registerIpcHandlers(): void {
     return store?.getDetail(id) ?? null;
   });
 
+  ipcMain.handle('sessions:getPlan', async (_event, id: string) => {
+    const { readFile } = await import('fs/promises');
+    const { homedir } = await import('os');
+    const { join } = await import('path');
+    const planPath = join(homedir(), '.copilot', 'session-state', id, 'plan.md');
+    try {
+      return await readFile(planPath, 'utf-8');
+    } catch {
+      return null;
+    }
+  });
+
   ipcMain.handle('sessions:getAttention', async () => {
     return scanAttention();
   });

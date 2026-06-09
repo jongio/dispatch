@@ -23,6 +23,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { FileText } from 'lucide-react';
 
 /** Minimum panel width in px. */
 const MIN_WIDTH = 280;
@@ -176,7 +177,7 @@ function TurnBubble({
 }
 
 export function PreviewPanel() {
-  const { selectedSession } = useSessionStore();
+  const { selectedSession, showPlanView, planContent } = useSessionStore();
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const [copied, setCopied] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -325,6 +326,24 @@ export function PreviewPanel() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1 preview-selectable">
+        {/* Plan view toggle */}
+        {showPlanView ? (
+          <div className="space-y-2">
+            <SectionHeader
+              icon={<FileText size={14} className="inline-block" />}
+              title="Plan"
+              count={0}
+            />
+            {planContent ? (
+              <pre className="whitespace-pre-wrap break-words text-xs text-foreground font-mono leading-relaxed">
+                {planContent}
+              </pre>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No plan.md found for this session.</p>
+            )}
+          </div>
+        ) : (
+        <>
         {/* Conversation section */}
         <SectionHeader
           icon={<MessagesSquare size={14} className="inline-block" />}
@@ -447,6 +466,8 @@ export function PreviewPanel() {
               )}
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>

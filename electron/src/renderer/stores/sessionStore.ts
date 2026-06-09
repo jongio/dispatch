@@ -53,6 +53,8 @@ interface SessionState {
   showSidebar: boolean;
   showHelp: boolean;
   showSettings: boolean;
+  showPlanView: boolean;
+  planContent: string | null;
   isLoading: boolean;
   sort: string;
   sortOrder: 'asc' | 'desc';
@@ -80,6 +82,7 @@ interface SessionState {
   toggleSidebar: () => void;
   toggleHelp: () => void;
   toggleSettings: () => void;
+  togglePlanView: () => void;
   setSort: (field: string) => void;
   toggleSortOrder: () => void;
   setPivot: (mode: string) => void;
@@ -109,6 +112,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   showSidebar: false,
   showHelp: false,
   showSettings: false,
+  showPlanView: false,
+  planContent: null,
   isLoading: false,
   sort: 'updated',
   sortOrder: 'desc',
@@ -209,6 +214,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   toggleSettings: () => {
     set((state) => ({ showSettings: !state.showSettings }));
+  },
+
+  togglePlanView: () => {
+    const { showPlanView, selectedSession } = get();
+    if (!showPlanView && selectedSession) {
+      // Load plan content when toggling on
+      window.dispatch.sessions.getPlan(selectedSession.session.id)
+        .then((content: unknown) => {
+          set({ planContent: content as string | null, showPlanView: true });
+        })
+        .catch(() => {
+          set({ planContent: null, showPlanView: true });
+        });
+    } else {
+      set({ showPlanView: !showPlanView });
+    }
   },
 
   moveCursor: (delta: number) => {

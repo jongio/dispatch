@@ -218,7 +218,7 @@ export function useKeyboard(): void {
       }),
       'v': guard((e) => {
         e.preventDefault();
-        // Plan view - placeholder for future implementation
+        store.getState().togglePlanView();
       }),
       'o': guard((e) => {
         e.preventDefault();
