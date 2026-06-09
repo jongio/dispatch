@@ -417,6 +417,11 @@ export function SessionTable() {
     overscan: 15,
   });
 
+  // Reset virtualizer measurements when grouping/data changes to prevent stale positions
+  React.useEffect(() => {
+    virtualizer.measure();
+  }, [pivot, flatRows.length, virtualizer]);
+
   // -------------------------------------------------------------------------
   // Interactions
   // -------------------------------------------------------------------------
@@ -551,6 +556,27 @@ export function SessionTable() {
       >
         {headerGroups.map((headerGroup) => (
           <div key={headerGroup.id} className="flex items-center h-full">
+            {/* Expand/collapse all toggle when grouped */}
+            {grouping.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (collapsedGroups.size > 0) {
+                    useSessionStore.getState().expandAllGroups();
+                  } else {
+                    useSessionStore.getState().collapseAllGroups();
+                  }
+                }}
+                className="flex items-center justify-center w-6 h-full text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                title={collapsedGroups.size > 0 ? 'Expand all (x)' : 'Collapse all (x)'}
+              >
+                {collapsedGroups.size > 0 ? (
+                  <ChevronRight size={12} />
+                ) : (
+                  <ChevronDown size={12} />
+                )}
+              </button>
+            )}
             {headerGroup.headers.map((header) => {
               const canSort = header.column.getCanSort();
               const sortDir = header.column.getIsSorted();

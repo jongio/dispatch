@@ -252,6 +252,17 @@ export function useKeyboard(): void {
         const idx = PIVOTS.indexOf(pivot as typeof PIVOTS[number]);
         const next = PIVOTS[(idx + 1) % PIVOTS.length];
         setPivot(next);
+        // Reset collapsed state when switching pivot
+        store.getState().expandAllGroups();
+      }),
+      'x': guard((e) => {
+        e.preventDefault();
+        const { collapsedGroups, expandAllGroups, collapseAllGroups } = store.getState();
+        if (collapsedGroups.size > 0) {
+          expandAllGroups();
+        } else {
+          collapseAllGroups();
+        }
       }),
       's': guard((e) => {
         e.preventDefault();
