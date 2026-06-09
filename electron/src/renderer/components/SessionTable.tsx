@@ -143,6 +143,7 @@ function buildColumns(
       enableResizing: false,
       enableSorting: false,
       header: () => null,
+      aggregatedCell: () => null,
       cell: ({ row }) => (
         <AttentionDot
           status={(statuses.get(row.original.id) as never) ?? 'idle'}
@@ -160,6 +161,7 @@ function buildColumns(
       maxSize: 28,
       enableResizing: false,
       header: () => null,
+      aggregatedCell: () => null,
       cell: ({ getValue }) => <HostIcon hostType={getValue()} />,
     }),
 
@@ -182,11 +184,15 @@ function buildColumns(
       size: 140,
       minSize: 60,
       header: 'Repository',
-      cell: ({ getValue }) => (
-        <span className="text-[10px] text-muted-foreground truncate block">
-          {getValue() || '-'}
-        </span>
-      ),
+      cell: ({ getValue }) => {
+        const repo = getValue();
+        if (!repo) return null;
+        return (
+          <span className="text-[10px] text-muted-foreground truncate block">
+            {repo}
+          </span>
+        );
+      },
     }),
 
     // Branch
@@ -197,7 +203,7 @@ function buildColumns(
       header: 'Branch',
       cell: ({ getValue }) => {
         const branch = getValue();
-        if (!branch) return <span className="text-[10px] text-muted-foreground">-</span>;
+        if (!branch) return null;
         return (
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
             <GitBranch size={10} className="flex-shrink-0 opacity-70" />
@@ -215,7 +221,7 @@ function buildColumns(
       header: 'Folder',
       cell: ({ getValue }) => {
         const cwd = getValue();
-        if (!cwd) return <span className="text-[10px] text-muted-foreground">-</span>;
+        if (!cwd) return null;
         const segment = cwd.split(/[/\\]/).pop() ?? cwd;
         return (
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
