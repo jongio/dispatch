@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Star, Sun, Moon } from 'lucide-react';
+import { Search, Star, Sun, Moon, Settings } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { cn } from '../lib/utils';
 
@@ -71,6 +71,10 @@ export function StatusBar() {
           preview
         </span>
         <span className="flex items-center gap-1">
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">,</kbd>
+          settings
+        </span>
+        <span className="flex items-center gap-1">
           <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">?</kbd>
           help
         </span>
@@ -106,6 +110,13 @@ export function StatusBar() {
           <span className="px-1 rounded bg-muted">+hidden</span>
         )}
 
+        <button
+          onClick={() => useSessionStore.getState().toggleSettings()}
+          className="p-0.5 rounded hover:bg-muted transition-colors"
+          title="Settings (,)"
+        >
+          <Settings size={12} />
+        </button>
         <button
           onClick={toggleTheme}
           className="p-0.5 rounded hover:bg-muted transition-colors"

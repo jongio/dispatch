@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Zap, Search, X, Loader2, Settings } from 'lucide-react';
+import { Zap, Search, X, Loader2 } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { cn } from '../lib/utils';
 
@@ -110,7 +110,7 @@ export function TitleBar() {
         </div>
       </div>
 
-      {/* Right: session count + settings + spacer for native window controls */}
+      {/* Right: session count + spacer for native window controls */}
       <div
         className="flex items-center gap-2 shrink-0 pr-2"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -118,13 +118,6 @@ export function TitleBar() {
         <span className="text-xs text-muted-foreground">
           {sessions.length} sessions
         </span>
-        <button
-          onClick={() => useSessionStore.getState().toggleSettings()}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Settings (,)"
-        >
-          <Settings size={14} />
-        </button>
       </div>
 
       {/* Spacer for native titleBarOverlay controls */}
