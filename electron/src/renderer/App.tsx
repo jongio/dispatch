@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Filter } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { SessionTable } from './components/SessionTable';
@@ -42,13 +43,23 @@ export function App() {
       </div>
 
       {/* Row 2: Sidebar | Main | Preview */}
-      {showSidebar && (
-        <div className="row-start-2 col-start-1 min-h-0 border-r border-border overflow-y-auto" style={{ width: sidebar.width }}>
+      {showSidebar ? (
+        <div className="row-start-2 col-start-1 relative min-h-0 border-r border-border overflow-y-auto" style={{ width: sidebar.width }}>
           <Sidebar />
           <div
-            className="absolute top-0 right-0 bottom-0 w-[3px] cursor-col-resize hover:bg-primary bg-border transition-colors"
+            className="absolute top-0 right-0 bottom-0 w-[3px] cursor-col-resize hover:bg-primary bg-transparent transition-colors"
             onMouseDown={sidebar.onMouseDown}
           />
+        </div>
+      ) : (
+        <div className="row-start-2 col-start-1 min-h-0 border-r border-border flex flex-col items-center py-2 bg-card w-9">
+          <button
+            onClick={() => useSessionStore.getState().toggleSidebar()}
+            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Show filters (f)"
+          >
+            <Filter size={16} />
+          </button>
         </div>
       )}
 

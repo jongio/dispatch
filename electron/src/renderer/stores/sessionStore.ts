@@ -109,7 +109,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   selectedIds: new Set(),
   searchQuery: '',
   showPreview: true,
-  showSidebar: false,
+  showSidebar: true,
   showHelp: false,
   showSettings: false,
   showPlanView: false,
