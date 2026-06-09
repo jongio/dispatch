@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme variables are applied dynamically via useTheme() hook.
+ * This file only contains structural styles and utilities.
+ *
+ * Fallback values below ensure the page isn't blank before JS hydrates.
+ * They match Dispatch Dark and will be overwritten immediately on mount.
+ */
 :root {
-  /* Dispatch Dark theme (default) */
   --bg-primary: #1a1b26;
   --bg-secondary: #16161e;
   --bg-tertiary: #24283b;
@@ -17,8 +23,6 @@
   --hover-bg: #292e42;
   --selection-bg: #283457;
   --focus-ring: #7aa2f7;
-
-  /* Attention status colors */
   --attention-working: #7aa2f7;
   --attention-thinking: #7dcfff;
   --attention-compacting: #bb9af7;
@@ -27,39 +31,17 @@
   --attention-stale: #e0af68;
   --attention-interrupted: #ff9e64;
   --attention-idle: #565f89;
-
-  /* Conversation */
   --conversation-user-bg: #283457;
   --conversation-assistant-bg: #1f2335;
 }
 
-/* Dispatch Light theme */
-[data-theme="light"] {
-  --bg-primary: #f5f5f5;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #e8e8e8;
-  --fg-primary: #1a1b26;
-  --fg-secondary: #4c566a;
-  --fg-muted: #9aa5ce;
-  --accent-primary: #2e7de9;
-  --accent-secondary: #7847bd;
-  --border-primary: #d4d4d8;
-  --border-subtle: #e4e4e7;
-  --hover-bg: #e8e8eb;
-  --selection-bg: #dbeafe;
-  --focus-ring: #2e7de9;
-
-  --attention-working: #2e7de9;
-  --attention-thinking: #007197;
-  --attention-compacting: #7847bd;
-  --attention-waiting: #6f42c1;
-  --attention-active: #2e7d32;
-  --attention-stale: #e65100;
-  --attention-interrupted: #d32f2f;
-  --attention-idle: #9aa5ce;
-
-  --conversation-user-bg: #dbeafe;
-  --conversation-assistant-bg: #f0f0f0;
+/* Smooth transitions when switching themes */
+:root,
+:root * {
+  transition:
+    background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out,
+    color 150ms ease-in-out;
 }
 
 * {
@@ -96,4 +78,14 @@ body {
 /* Selection in preview panel */
 .preview-selectable {
   user-select: text;
+}
+
+/* Attention dot pulse animation for active statuses */
+@keyframes attention-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }

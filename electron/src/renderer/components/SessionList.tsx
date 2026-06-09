@@ -1,8 +1,11 @@
 import React, { useCallback } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import { useAttentionStore } from '../stores/attentionStore';
+import { AttentionDot } from './AttentionDot';
 
 export function SessionList() {
   const { sessions, selectedSession, selectedIds, selectSession, toggleSelection, isLoading } = useSessionStore();
+  const statuses = useAttentionStore((s) => s.statuses);
 
   const handleClick = useCallback((id: string, e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -45,7 +48,10 @@ export function SessionList() {
             `}
           >
             {/* Attention dot */}
-            <div className="w-2 h-2 rounded-full bg-[var(--fg-muted)] mr-2 flex-shrink-0" />
+            <AttentionDot
+              status={statuses.get(session.id) ?? 'idle'}
+              className="mr-2"
+            />
 
             {/* Session info */}
             <div className="flex-1 min-w-0">

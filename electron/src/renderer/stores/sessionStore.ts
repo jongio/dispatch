@@ -50,11 +50,14 @@ interface SessionState {
   selectedIds: Set<string>;
   searchQuery: string;
   showPreview: boolean;
+  showHelp: boolean;
+  showSettings: boolean;
   isLoading: boolean;
   sort: string;
   sortOrder: 'asc' | 'desc';
   pivot: string;
   timeRange: string;
+  cursorIndex: number;
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -62,10 +65,15 @@ interface SessionState {
   toggleSelection: (id: string) => void;
   setSearchQuery: (query: string) => void;
   togglePreview: () => void;
+  toggleHelp: () => void;
+  toggleSettings: () => void;
   setSort: (field: string) => void;
   toggleSortOrder: () => void;
   setPivot: (mode: string) => void;
   setTimeRange: (range: string) => void;
+  moveCursor: (delta: number) => void;
+  selectAll: () => void;
+  deselectAll: () => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -74,11 +82,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   selectedIds: new Set(),
   searchQuery: '',
   showPreview: true,
+  showHelp: false,
+  showSettings: false,
   isLoading: false,
   sort: 'updated',
   sortOrder: 'desc',
   pivot: 'none',
   timeRange: 'all',
+  cursorIndex: 0,
 
   loadSessions: async () => {
     set({ isLoading: true });
@@ -145,5 +156,34 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setTimeRange: (range: string) => {
     set({ timeRange: range });
     get().loadSessions();
+  },
+
+  toggleHelp: () => {
+    set((state) => ({ showHelp: !state.showHelp }));
+  },
+
+  toggleSettings: () => {
+    set((state) => ({ showSettings: !state.showSettings }));
+  },
+
+  moveCursor: (delta: number) => {
+    const { sessions, cursorIndex } = get();
+    if (sessions.length === 0) return;
+    const next = Math.max(0, Math.min(sessions.length - 1, cursorIndex + delta));
+    set({ cursorIndex: next });
+    // Auto-select the session at the new cursor position
+    const session = sessions[next];
+    if (session) {
+      get().selectSession(session.id);
+    }
+  },
+
+  selectAll: () => {
+    const { sessions } = get();
+    set({ selectedIds: new Set(sessions.map((s) => s.id)) });
+  },
+
+  deselectAll: () => {
+    set({ selectedIds: new Set() });
   },
 }));

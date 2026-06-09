@@ -2,11 +2,18 @@ import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu } from 'electro
 import { join } from 'path';
 import { SessionStore } from './store';
 import { FileWatcher } from './watcher';
+import { scanAttention } from './attention';
+import { load, save, getConfigPath, openConfigDirectory } from './config';
+import type { Config } from './config';
+import { LaunchManager } from './launch';
+import type { LaunchOptions } from './launch';
+import { getShells, getTerminals } from './shells';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let store: SessionStore | null = null;
 let watcher: FileWatcher | null = null;
+let launcher: LaunchManager | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -39,6 +46,13 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Pause watcher when window is hidden/minimized, resume on focus
+  mainWindow.on('hide', () => watcher?.pause());
+  mainWindow.on('minimize', () => watcher?.pause());
+  mainWindow.on('focus', () => watcher?.resume());
+  mainWindow.on('restore', () => watcher?.resume());
+  mainWindow.on('show', () => watcher?.resume());
 }
 
 function initializeStore(): void {
@@ -46,8 +60,13 @@ function initializeStore(): void {
 }
 
 function initializeWatcher(): void {
-  watcher = new FileWatcher(() => {
-    mainWindow?.webContents.send('sessions-changed');
+  watcher = new FileWatcher({
+    onSessionsChanged: () => {
+      mainWindow?.webContents.send('sessions-changed');
+    },
+    onAttentionUpdate: () => {
+      mainWindow?.webContents.send('attention-update');
+    },
   });
   watcher.start();
 }
@@ -70,12 +89,64 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('sessions:getAttention', async () => {
-    return store?.getAttention() ?? {};
+    return scanAttention();
   });
 
   ipcMain.handle('platform:copyToClipboard', async (_event, text: string) => {
     const { clipboard } = await import('electron');
     clipboard.writeText(text);
+  });
+
+  ipcMain.handle('config:get', async () => {
+    return load();
+  });
+
+  ipcMain.handle('config:set', async (_event, config: Config) => {
+    save(config);
+  });
+
+  ipcMain.handle('config:getPath', async () => {
+    return getConfigPath();
+  });
+
+  ipcMain.handle('config:openInExplorer', async () => {
+    openConfigDirectory();
+  });
+
+  // Launch handlers
+  launcher = new LaunchManager();
+
+  ipcMain.handle('launch:inPlace', async (_event, sessionId: string, opts?: LaunchOptions) => {
+    return launcher!.launchInPlace(sessionId, opts ?? {});
+  });
+
+  ipcMain.handle('launch:newTab', async (_event, sessionId: string, opts?: LaunchOptions) => {
+    return launcher!.launchNewTab(sessionId, opts ?? {});
+  });
+
+  ipcMain.handle('launch:newWindow', async (_event, sessionId: string, opts?: LaunchOptions) => {
+    return launcher!.launchNewWindow(sessionId, opts ?? {});
+  });
+
+  ipcMain.handle('launch:splitPane', async (_event, sessionId: string, opts?: LaunchOptions) => {
+    return launcher!.launchSplitPane(sessionId, opts ?? {});
+  });
+
+  ipcMain.handle('launch:multi', async (_event, sessionIds: string[], mode: string, opts?: LaunchOptions) => {
+    const validModes = ['inPlace', 'newTab', 'newWindow', 'splitPane'] as const;
+    const launchMode = validModes.includes(mode as typeof validModes[number])
+      ? (mode as typeof validModes[number])
+      : 'newTab';
+    return launcher!.launchMulti(sessionIds, launchMode, opts ?? {});
+  });
+
+  // Platform detection handlers
+  ipcMain.handle('platform:getShells', async () => {
+    return getShells();
+  });
+
+  ipcMain.handle('platform:getTerminals', async () => {
+    return getTerminals();
   });
 }
 

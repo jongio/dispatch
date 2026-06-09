@@ -40,4 +40,8 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist/renderer'),
   },
+  test: {
+    root: resolve(__dirname),
+    include: ['tests/**/*.{test,spec}.ts'],
+  },
 });

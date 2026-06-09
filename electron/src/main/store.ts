@@ -230,12 +230,6 @@ export class SessionStore {
     return { session, turns, checkpoints, files, refs };
   }
 
-  getAttention(): Record<string, string> {
-    // Attention is computed from filesystem, not DB.
-    // This is a placeholder; real implementation scans session-state directories.
-    return {};
-  }
-
   close(): void {
     this.db?.close();
     this.db = null;
