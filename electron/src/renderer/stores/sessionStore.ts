@@ -292,6 +292,12 @@ export function getGroupKey(session: Session, pivot: string): string {
       return session.cwd || 'No folder';
     case 'branch':
       return session.branch || 'No branch';
+    case 'date': {
+      const dateStr = session.last_active_at || session.updated_at || session.created_at;
+      if (!dateStr) return 'Unknown date';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
     default:
       return '';
   }

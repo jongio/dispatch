@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { SearchBar } from './components/SearchBar';
+import { Sidebar } from './components/Sidebar';
 import { SessionList } from './components/SessionList';
 import { PreviewPanel } from './components/PreviewPanel';
 import { StatusBar } from './components/StatusBar';
@@ -40,6 +41,7 @@ export function App() {
       <SearchBar />
 
       <main className="flex flex-1 overflow-hidden">
+        <Sidebar />
         <SessionList />
         {showPreview && selectedSession && <PreviewPanel />}
       </main>
