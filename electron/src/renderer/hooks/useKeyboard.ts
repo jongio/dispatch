@@ -116,8 +116,8 @@ function guard(handler: (e: KeyboardEvent) => void, ignoreModals = false): (e: K
   };
 }
 
-/** Pivots cycle: none -> repository -> cwd -> branch -> none */
-const PIVOTS = ['none', 'repository', 'cwd', 'branch'] as const;
+/** Pivots cycle: none -> repository -> cwd -> branch -> date -> none */
+const PIVOTS = ['none', 'repository', 'cwd', 'branch', 'date'] as const;
 
 /** Sort fields cycle: updated -> created -> turns -> files */
 const SORT_FIELDS = ['updated', 'created', 'turns', 'files'] as const;
@@ -228,7 +228,7 @@ export function useKeyboard(): void {
       // Filter
       'f': guard((e) => {
         e.preventDefault();
-        // Directory filter - placeholder for future implementation
+        store.getState().toggleSidebar();
       }),
       '1': guard((e) => {
         e.preventDefault();

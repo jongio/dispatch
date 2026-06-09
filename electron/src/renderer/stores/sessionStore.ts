@@ -77,12 +77,14 @@ interface SessionState {
   toggleSelection: (id: string) => void;
   setSearchQuery: (query: string) => void;
   togglePreview: () => void;
+  toggleSidebar: () => void;
   toggleHelp: () => void;
   toggleSettings: () => void;
   setSort: (field: string) => void;
   toggleSortOrder: () => void;
   setPivot: (mode: string) => void;
   setTimeRange: (range: string) => void;
+  setExcludedDirs: (dirs: string[]) => void;
   moveCursor: (delta: number) => void;
   selectAll: () => void;
   deselectAll: () => void;
@@ -104,6 +106,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   selectedIds: new Set(),
   searchQuery: '',
   showPreview: true,
+  showSidebar: false,
   showHelp: false,
   showSettings: false,
   isLoading: false,
@@ -120,6 +123,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   favorites: new Set(),
   hidden: new Set(),
   showHidden: false,
+
+  // Directory filter state
+  excludedDirs: [],
 
   loadSessions: async () => {
     set({ isLoading: true });
@@ -169,6 +175,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((state) => ({ showPreview: !state.showPreview }));
   },
 
+  toggleSidebar: () => {
+    set((state) => ({ showSidebar: !state.showSidebar }));
+  },
+
   setSort: (field: string) => {
     set({ sort: field });
     get().loadSessions();
@@ -185,6 +195,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setTimeRange: (range: string) => {
     set({ timeRange: range });
+    get().loadSessions();
+  },
+
+  setExcludedDirs: (dirs: string[]) => {
+    set({ excludedDirs: dirs });
     get().loadSessions();
   },
 
