@@ -48,6 +48,32 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
+  // Enable Ctrl+scroll zoom and Ctrl+=/- zoom
+  mainWindow.webContents.setZoomFactor(1);
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (!mainWindow) return;
+    if (input.control || input.meta) {
+      if (input.key === '=' || input.key === '+') {
+        mainWindow.webContents.setZoomFactor(mainWindow.webContents.getZoomFactor() + 0.1);
+      } else if (input.key === '-') {
+        mainWindow.webContents.setZoomFactor(mainWindow.webContents.getZoomFactor() - 0.1);
+      } else if (input.key === '0') {
+        mainWindow.webContents.setZoomFactor(1);
+      }
+    }
+  });
+
+  // Ctrl+scroll wheel zoom
+  mainWindow.webContents.on('zoom-changed', (_event, direction) => {
+    if (!mainWindow) return;
+    const current = mainWindow.webContents.getZoomFactor();
+    if (direction === 'in') {
+      mainWindow.webContents.setZoomFactor(Math.min(3, current + 0.1));
+    } else {
+      mainWindow.webContents.setZoomFactor(Math.max(0.5, current - 0.1));
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
