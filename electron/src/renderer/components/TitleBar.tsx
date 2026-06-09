@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Zap, Search, X, Loader2 } from 'lucide-react';
+import { Zap, Search, X, Loader2, Settings } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { cn } from '../lib/utils';
 
@@ -52,11 +52,18 @@ export function TitleBar() {
         <span className="text-xs text-muted-foreground ml-1">
           {sortArrow} {sort}
         </span>
-        {pivot !== 'none' && (
-          <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-            {'\u229e'} {pivot}
-          </span>
-        )}
+        <span
+          className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted cursor-pointer hover:bg-secondary"
+          title="Press Tab to cycle grouping"
+          onClick={() => {
+            const pivots = ['none', 'repository', 'cwd', 'branch', 'date'];
+            const { pivot: p, setPivot } = useSessionStore.getState();
+            const next = pivots[(pivots.indexOf(p) + 1) % pivots.length];
+            setPivot(next);
+          }}
+        >
+          {pivot === 'none' ? 'flat' : pivot} <kbd className="text-[9px] ml-0.5 opacity-60">Tab</kbd>
+        </span>
       </div>
 
       {/* Center: search input */}
@@ -103,14 +110,21 @@ export function TitleBar() {
         </div>
       </div>
 
-      {/* Right: session count + spacer for native window controls */}
+      {/* Right: session count + settings + spacer for native window controls */}
       <div
-        className="flex items-center shrink-0 pr-2"
+        className="flex items-center gap-2 shrink-0 pr-2"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <span className="text-xs text-muted-foreground mr-2">
+        <span className="text-xs text-muted-foreground">
           {sessions.length} sessions
         </span>
+        <button
+          onClick={() => useSessionStore.getState().toggleSettings()}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Settings (,)"
+        >
+          <Settings size={14} />
+        </button>
       </div>
 
       {/* Spacer for native titleBarOverlay controls */}

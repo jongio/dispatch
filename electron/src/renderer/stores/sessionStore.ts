@@ -117,7 +117,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isLoading: false,
   sort: 'updated',
   sortOrder: 'desc',
-  pivot: 'none',
+  pivot: 'repository',
   timeRange: 'all',
   cursorIndex: 0,
 
