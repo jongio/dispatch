@@ -21,13 +21,17 @@ function createWindow(): void {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    frame: false,
     titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#00000000',
+      symbolColor: '#cccccc',
+      height: 36,
+    },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
     show: false,
   });
@@ -35,6 +39,7 @@ function createWindow(): void {
   // Load the renderer
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
