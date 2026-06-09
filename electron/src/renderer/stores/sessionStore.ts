@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface Session {
+export interface Session {
   id: string;
   cwd: string;
   repository: string;
@@ -50,6 +50,7 @@ interface SessionState {
   selectedIds: Set<string>;
   searchQuery: string;
   showPreview: boolean;
+  showSidebar: boolean;
   showHelp: boolean;
   showSettings: boolean;
   isLoading: boolean;
@@ -58,6 +59,17 @@ interface SessionState {
   pivot: string;
   timeRange: string;
   cursorIndex: number;
+
+  // Group collapse state
+  collapsedGroups: Set<string>;
+
+  // Favorites and hidden sessions
+  favorites: Set<string>;
+  hidden: Set<string>;
+  showHidden: boolean;
+
+  // Directory filter state
+  excludedDirs: string[];
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -74,6 +86,16 @@ interface SessionState {
   moveCursor: (delta: number) => void;
   selectAll: () => void;
   deselectAll: () => void;
+
+  // Group actions
+  toggleGroup: (groupKey: string) => void;
+  expandAllGroups: () => void;
+  collapseAllGroups: () => void;
+
+  // Favorites/hidden actions
+  toggleFavorite: (id: string) => void;
+  toggleHide: (id: string) => void;
+  setShowHidden: (show: boolean) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -90,6 +112,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   pivot: 'none',
   timeRange: 'all',
   cursorIndex: 0,
+
+  // Group collapse state
+  collapsedGroups: new Set(),
+
+  // Favorites and hidden sessions
+  favorites: new Set(),
+  hidden: new Set(),
+  showHidden: false,
 
   loadSessions: async () => {
     set({ isLoading: true });
@@ -186,4 +216,68 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   deselectAll: () => {
     set({ selectedIds: new Set() });
   },
+
+  // Group actions
+  toggleGroup: (groupKey: string) => {
+    const { collapsedGroups } = get();
+    const newSet = new Set(collapsedGroups);
+    if (newSet.has(groupKey)) {
+      newSet.delete(groupKey);
+    } else {
+      newSet.add(groupKey);
+    }
+    set({ collapsedGroups: newSet });
+  },
+
+  expandAllGroups: () => {
+    set({ collapsedGroups: new Set() });
+  },
+
+  collapseAllGroups: () => {
+    const { sessions, pivot } = get();
+    if (pivot === 'none') return;
+    const allKeys = new Set(sessions.map((s) => getGroupKey(s, pivot)));
+    set({ collapsedGroups: allKeys });
+  },
+
+  // Favorites/hidden actions
+  toggleFavorite: (id: string) => {
+    const { favorites } = get();
+    const newSet = new Set(favorites);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    set({ favorites: newSet });
+  },
+
+  toggleHide: (id: string) => {
+    const { hidden } = get();
+    const newSet = new Set(hidden);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    set({ hidden: newSet });
+  },
+
+  setShowHidden: (show: boolean) => {
+    set({ showHidden: show });
+  },
 }));
+
+/** Derive the group key for a session based on the active pivot mode. */
+export function getGroupKey(session: Session, pivot: string): string {
+  switch (pivot) {
+    case 'repository':
+      return session.repository || 'No repository';
+    case 'cwd':
+      return session.cwd || 'No folder';
+    case 'branch':
+      return session.branch || 'No branch';
+    default:
+      return '';
+  }
+}

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { spawn } from 'child_process';
 import { LaunchManager } from '../src/main/launch';
 import type { LaunchOptions } from '../src/main/launch';
 
@@ -21,16 +22,15 @@ vi.mock('../src/main/shells', () => ({
   ]),
 }));
 
+const spawnMock = vi.mocked(spawn);
+
 describe('LaunchManager', () => {
   let launcher: LaunchManager;
-  let spawnMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     launcher = new LaunchManager();
-    const cp = vi.mocked(await import('child_process'));
-    spawnMock = cp.spawn as ReturnType<typeof vi.fn>;
     spawnMock.mockClear();
-    spawnMock.mockReturnValue({ unref: vi.fn() });
+    spawnMock.mockReturnValue({ unref: vi.fn() } as any);
   });
 
   afterEach(() => {
@@ -51,17 +51,15 @@ describe('LaunchManager', () => {
     it('includes --yolo flag when yoloMode is true', () => {
       launcher.launchInPlace('abc-123', { yoloMode: true });
 
-      expect(spawnMock).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([expect.stringContaining('--yolo')]),
-        expect.anything(),
-      );
+      const args = spawnMock.mock.calls[0][1] as string[];
+      const command = args[args.length - 1];
+      expect(command).toContain('--yolo');
     });
 
     it('includes --agent flag when specified', () => {
       launcher.launchInPlace('abc-123', { agent: 'developer' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       const command = args[args.length - 1];
       expect(command).toContain('--agent developer');
     });
@@ -69,7 +67,7 @@ describe('LaunchManager', () => {
     it('includes --model flag when specified', () => {
       launcher.launchInPlace('abc-123', { model: 'claude-sonnet-4' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       const command = args[args.length - 1];
       expect(command).toContain('--model claude-sonnet-4');
     });
@@ -77,7 +75,7 @@ describe('LaunchManager', () => {
     it('uses customCommand when provided', () => {
       launcher.launchInPlace('abc-123', { customCommand: 'echo hello' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       const command = args[args.length - 1];
       expect(command).toBe('echo hello');
     });
@@ -89,7 +87,7 @@ describe('LaunchManager', () => {
         model: 'gpt-5',
       });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       const command = args[args.length - 1];
       expect(command).toBe('gh copilot session resume sess-id --yolo --agent tester --model gpt-5');
     });
@@ -99,7 +97,7 @@ describe('LaunchManager', () => {
     it('uses default shell when no shell specified', () => {
       launcher.launchInPlace('test-id');
 
-      // pwsh is the default
+      // pwsh is the default in our mock
       expect(spawnMock.mock.calls[0][0]).toBe('C:\\Program Files\\PowerShell\\7\\pwsh.exe');
     });
 
@@ -121,7 +119,7 @@ describe('LaunchManager', () => {
     it('uses -NoProfile -Command for pwsh', () => {
       launcher.launchInPlace('id', { shell: 'pwsh' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       expect(args[0]).toBe('-NoProfile');
       expect(args[1]).toBe('-Command');
     });
@@ -129,19 +127,19 @@ describe('LaunchManager', () => {
     it('uses /c for cmd', () => {
       launcher.launchInPlace('id', { shell: 'cmd' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       expect(args[0]).toBe('/c');
     });
   });
 
   describe('launchNewTab', () => {
     it('uses Windows Terminal wt.exe with new-tab args', () => {
-      // Mock process.platform
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
       launcher.launchNewTab('test-id');
 
-      const [binary, args] = [spawnMock.mock.calls[0][0], spawnMock.mock.calls[0][1]];
+      const binary = spawnMock.mock.calls[0][0];
+      const args = spawnMock.mock.calls[0][1] as string[];
       expect(binary).toContain('wt.exe');
       expect(args).toContain('-w');
       expect(args).toContain('0');
@@ -158,21 +156,21 @@ describe('LaunchManager', () => {
     });
 
     it('uses split-pane with -H for horizontal direction', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
       launcher.launchSplitPane('test-id', { paneDirection: 'horizontal' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       expect(args).toContain('split-pane');
       expect(args).toContain('-H');
     });
 
     it('uses split-pane with -V for vertical direction', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
       launcher.launchSplitPane('test-id', { paneDirection: 'vertical' });
 
-      const args = spawnMock.mock.calls[0][1];
+      const args = spawnMock.mock.calls[0][1] as string[];
       expect(args).toContain('split-pane');
       expect(args).toContain('-V');
     });
@@ -188,7 +186,6 @@ describe('LaunchManager', () => {
     });
 
     it('returns individual results for each session', () => {
-      // First call succeeds, then we'll test with a nonexistent shell
       const results = launcher.launchMulti(['id-1', 'id-2'], 'inPlace', { shell: 'nonexistent' });
 
       expect(results).toHaveLength(2);
