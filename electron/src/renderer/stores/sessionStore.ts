@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface Session {
   id: string;
@@ -103,7 +104,9 @@ interface SessionState {
   setShowHidden: (show: boolean) => void;
 }
 
-export const useSessionStore = create<SessionState>((set, get) => ({
+export const useSessionStore = create<SessionState>()(
+  persist(
+    (set, get) => ({
   sessions: [],
   selectedSession: null,
   selectedIds: new Set(),
@@ -302,7 +305,42 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setShowHidden: (show: boolean) => {
     set({ showHidden: show });
   },
-}));
+}),
+    {
+      name: 'dispatch-view-state',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        showPreview: state.showPreview,
+        showSidebar: state.showSidebar,
+        sort: state.sort,
+        sortOrder: state.sortOrder,
+        pivot: state.pivot,
+        timeRange: state.timeRange,
+        favorites: Array.from(state.favorites),
+        hidden: Array.from(state.hidden),
+        showHidden: state.showHidden,
+        excludedDirs: state.excludedDirs,
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as Record<string, unknown> | undefined;
+        if (!p) return current;
+        return {
+          ...current,
+          showPreview: typeof p.showPreview === 'boolean' ? p.showPreview : current.showPreview,
+          showSidebar: typeof p.showSidebar === 'boolean' ? p.showSidebar : current.showSidebar,
+          sort: typeof p.sort === 'string' ? p.sort : current.sort,
+          sortOrder: p.sortOrder === 'asc' || p.sortOrder === 'desc' ? p.sortOrder : current.sortOrder,
+          pivot: typeof p.pivot === 'string' ? p.pivot : current.pivot,
+          timeRange: typeof p.timeRange === 'string' ? p.timeRange : current.timeRange,
+          favorites: new Set(Array.isArray(p.favorites) ? p.favorites as string[] : []),
+          hidden: new Set(Array.isArray(p.hidden) ? p.hidden as string[] : []),
+          showHidden: typeof p.showHidden === 'boolean' ? p.showHidden : current.showHidden,
+          excludedDirs: Array.isArray(p.excludedDirs) ? p.excludedDirs as string[] : current.excludedDirs,
+        };
+      },
+    },
+  ),
+);
 
 /** Derive the group key for a session based on the active pivot mode. */
 export function getGroupKey(session: Session, pivot: string): string {

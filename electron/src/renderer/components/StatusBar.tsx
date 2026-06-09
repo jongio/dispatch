@@ -11,7 +11,10 @@ export function StatusBar() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fading, setFading] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark';
+    const saved = localStorage.getItem('dispatch-theme') as 'dark' | 'light' | null;
+    const t = saved || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    return t;
   });
 
   // Expose a global function for other components to trigger status messages
@@ -37,6 +40,7 @@ export function StatusBar() {
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('dispatch-theme', next);
     setTheme(next);
   };
 
