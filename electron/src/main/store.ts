@@ -138,6 +138,29 @@ export class SessionStore {
     const orderClause = this.buildOrderClause(sort, order);
     const hostTypeCol = this.hasHostType ? ", s.host_type" : ", '' as host_type";
 
+    // Time range filter
+    let timeFilter = '';
+    const params: unknown[] = [];
+    if (opts.timeRange && opts.timeRange !== 'all') {
+      const now = new Date();
+      let cutoff: Date;
+      switch (opts.timeRange) {
+        case '1h':
+          cutoff = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case '1d':
+          cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          cutoff = new Date(0);
+      }
+      timeFilter = `WHERE s.updated_at >= ?`;
+      params.push(cutoff.toISOString());
+    }
+
     const sql = `
       SELECT s.id, COALESCE(s.cwd, '') as cwd, COALESCE(s.repository, '') as repository,
              COALESCE(s.branch, '') as branch, COALESCE(s.summary, '') as summary,
@@ -150,12 +173,14 @@ export class SessionStore {
         ON t_max.session_id = s.id
       LEFT JOIN turns t ON t.session_id = s.id
       LEFT JOIN session_files f ON f.session_id = s.id
+      ${timeFilter}
       GROUP BY s.id
       ${orderClause}
       LIMIT ?
     `;
 
-    return this.db.prepare(sql).all(limit) as Session[];
+    params.push(limit);
+    return this.db.prepare(sql).all(...params) as Session[];
   }
 
   search(query: string): Session[] {

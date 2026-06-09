@@ -130,13 +130,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   loadSessions: async () => {
     set({ isLoading: true });
     try {
-      const { sort, sortOrder, searchQuery } = get();
+      const { sort, sortOrder, searchQuery, timeRange } = get();
       let sessions: Session[];
 
       if (searchQuery) {
         sessions = (await window.dispatch.sessions.search(searchQuery)) as Session[];
       } else {
-        sessions = (await window.dispatch.sessions.list({ sort, sortOrder })) as Session[];
+        sessions = (await window.dispatch.sessions.list({ sort, sortOrder, timeRange })) as Session[];
       }
 
       set({ sessions, isLoading: false });

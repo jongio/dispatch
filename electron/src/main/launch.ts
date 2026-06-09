@@ -173,19 +173,20 @@ export class LaunchManager {
 
   /**
    * Builds the argument array for executing a command within a given shell.
+   * Uses -NoExit (pwsh) or keeps stdin open so the interactive session stays alive.
    */
   private buildShellArgs(shell: ShellInfo, command: string): string[] {
     switch (shell.name) {
       case 'cmd':
-        return ['/c', command];
+        return ['/k', command];
       case 'pwsh':
       case 'powershell':
-        return ['-NoProfile', '-Command', command];
+        return ['-NoExit', '-Command', command];
       case 'wsl':
-        return ['--', 'bash', '-c', command];
+        return ['--', 'bash', '-ic', command];
       default:
-        // bash, zsh, fish, sh, git-bash
-        return ['-c', command];
+        // bash, zsh, fish, sh, git-bash — use -i for interactive
+        return ['-ic', command];
     }
   }
 
@@ -268,12 +269,13 @@ export class LaunchManager {
     title: string,
   ): LaunchResult {
     if (terminal.name === 'windows-terminal') {
-      // wt.exe -w 0 new-tab --title "Dispatch: {id}" {shell} -c "{command}"
-      const args = ['-w', '0', 'new-tab', '--title', title, shell.path, ...this.buildShellArgs(shell, command)];
+      // wt.exe -w 0 new-tab --title "title" pwsh.exe -NoExit -Command "command"
+      const shellArgs = this.buildShellArgs(shell, command);
+      const args = ['-w', '0', 'new-tab', '--title', title, shell.path, ...shellArgs];
       return this.spawnDetached(terminal.path, args);
     }
 
-    // Fallback: open in new window for terminals that don't support tabs
+    // Fallback: open in new console window
     return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
   }
 
