@@ -14,47 +14,6 @@ interface TreeNode {
 }
 
 /**
- * Builds a hierarchical tree from an array of absolute directory paths.
- * Normalizes Windows backslashes to forward slashes for consistent handling.
- */
-function buildTree(paths: string[]): TreeNode[] {
-  const root: Map<string, TreeNode> = new Map();
-
-  for (const rawPath of paths) {
-    if (!rawPath) continue;
-    // Normalize: replace backslashes, trim trailing slash
-    const normalized = rawPath.replace(/\\/g, '/').replace(/\/$/, '');
-    const segments = normalized.split('/').filter(Boolean);
-
-    let currentChildren = root;
-    let currentPath = '';
-
-    for (const segment of segments) {
-      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-
-      if (!currentChildren.has(segment)) {
-        currentChildren.set(segment, {
-          name: segment,
-          path: currentPath,
-          sessionCount: 0,
-          children: [],
-        });
-      }
-
-      const node = currentChildren.get(segment)!;
-      // Convert children array to map for lookup during build
-      const childMap = new Map(node.children.map((c) => [c.name, c]));
-      currentChildren = childMap;
-
-      // We'll set children back from the map at the end
-      node.children = Array.from(childMap.values());
-    }
-  }
-
-  return Array.from(root.values());
-}
-
-/**
  * Counts sessions per tree node by walking the tree and incrementing
  * ancestors for each matching session path.
  */

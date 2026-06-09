@@ -322,6 +322,9 @@ export function useKeyboard(): void {
         } else if (state.showSettings) {
           e.preventDefault();
           state.toggleSettings();
+        } else if (state.showSidebar) {
+          e.preventDefault();
+          state.toggleSidebar();
         }
       },
     });
