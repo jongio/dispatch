@@ -373,13 +373,13 @@ export function SessionTable() {
     columns,
     state: {
       sorting,
-      grouping: grouping.length > 0 ? grouping : undefined,
+      grouping,
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getGroupedRowModel: grouping.length > 0 ? getGroupedRowModel() : undefined,
-    getExpandedRowModel: grouping.length > 0 ? getExpandedRowModel() : undefined,
+    getGroupedRowModel: getGroupedRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
     columnResizeMode: 'onChange',
     enableColumnResizing: true,
   });

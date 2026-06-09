@@ -239,14 +239,26 @@ export function SettingsModal() {
               onChange={(v) => updateField('default_shell', v)}
               onReset={() => resetField('default_shell')}
             />
-            <TextField
-              label="Custom Command"
-              description="Custom command replacing default resume (use {sessionId} placeholder)"
-              value={config.custom_command}
-              onChange={(v) => updateField('custom_command', v)}
-              onReset={() => resetField('custom_command')}
-              placeholder="e.g. gh copilot resume {sessionId}"
-            />
+            <div className="space-y-1">
+              <ToggleField
+                label="Use Custom Command"
+                description="Override the default gh copilot session resume command"
+                checked={config.custom_command !== ''}
+                onChange={(v) => {
+                  if (!v) updateField('custom_command', '');
+                }}
+                onReset={() => resetField('custom_command')}
+              />
+              <TextField
+                label="Custom Command"
+                description="Command to run (use {sessionId} as placeholder for the session ID)"
+                value={config.custom_command}
+                onChange={(v) => updateField('custom_command', v)}
+                onReset={() => resetField('custom_command')}
+                placeholder="e.g. gh copilot resume {sessionId}"
+                disabled={config.custom_command === '' && false}
+              />
+            </div>
           </Section>
 
           {/* Appearance Section */}
@@ -375,11 +387,12 @@ interface TextFieldProps {
   onChange: (value: string) => void;
   onReset: () => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-function TextField({ label, description, value, onChange, onReset, placeholder }: TextFieldProps) {
+function TextField({ label, description, value, onChange, onReset, placeholder, disabled }: TextFieldProps) {
   return (
-    <div className="flex items-center justify-between gap-4 py-1.5 group">
+    <div className={`flex items-center justify-between gap-4 py-1.5 group ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex-1 min-w-0">
         <div className="text-sm text-foreground">{label}</div>
         <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
@@ -398,7 +411,8 @@ function TextField({ label, description, value, onChange, onReset, placeholder }
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-44 px-2 py-1 text-sm bg-muted border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          disabled={disabled}
+          className="w-44 px-2 py-1 text-sm bg-muted border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed"
         />
       </div>
     </div>
