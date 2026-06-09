@@ -57,7 +57,7 @@ export function App() {
       </main>
 
       {showPreview && (
-        <div className="row-start-2 col-start-3 min-h-0 border-l border-border overflow-auto" style={{ width: preview.width }}>
+        <div className="row-start-2 col-start-3 min-h-0 min-w-0 border-l border-border overflow-y-auto overflow-x-hidden" style={{ width: preview.width }}>
           <PreviewPanel />
           <div
             className="absolute top-0 left-0 bottom-0 w-[3px] cursor-col-resize hover:bg-primary bg-border transition-colors"

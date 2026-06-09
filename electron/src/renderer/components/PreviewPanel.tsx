@@ -214,10 +214,7 @@ export function PreviewPanel() {
   // Empty state
   if (!selectedSession) {
     return (
-      <div
-        style={{ width: panelWidth }}
-        className="border-l border-border flex flex-col items-center justify-center gap-2 text-muted-foreground"
-      >
+      <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
         <Eye size={32} className="opacity-40" />
         <span className="text-sm">Select a session</span>
       </div>
@@ -227,16 +224,7 @@ export function PreviewPanel() {
   const { session, turns, checkpoints, files, refs } = selectedSession;
 
   return (
-    <div
-      style={{ width: panelWidth }}
-      className="relative border-l border-border flex flex-col overflow-hidden"
-    >
-      {/* Draggable resize handle */}
-      <div
-        onMouseDown={handleResizeStart}
-        className="absolute top-0 left-0 bottom-0 w-1 cursor-col-resize hover:bg-primary transition-colors z-10"
-      />
-
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Sticky metadata header */}
       <div className="shrink-0 p-3 border-b border-border bg-card">
         <h2 className="text-sm font-semibold text-foreground truncate">
