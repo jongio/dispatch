@@ -48,11 +48,18 @@
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
+  background-color: var(--bg-primary);
+  color: var(--fg-primary);
 }
 
 /* Scrollbar styling */

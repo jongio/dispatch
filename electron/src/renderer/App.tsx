@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import { TitleBar } from './components/TitleBar';
 import { SearchBar } from './components/SearchBar';
 import { Sidebar } from './components/Sidebar';
@@ -20,16 +20,10 @@ export function App() {
   useTheme();
   useKeyboard();
 
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'dispatch-layout',
-    storage: localStorage,
-  });
-
   useEffect(() => {
     loadSessions();
     loadAttention();
 
-    // Listen for real-time updates from main process
     const unsubSessions = window.dispatch.on('sessions-changed', () => {
       loadSessions();
     });
@@ -43,16 +37,15 @@ export function App() {
   }, [loadSessions, loadAttention]);
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--fg-primary)]">
+    <div className="flex flex-col h-full bg-[var(--bg-primary)] text-[var(--fg-primary)]">
       <TitleBar />
       <SearchBar />
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 h-full">
         <Group
           orientation="horizontal"
-          id="dispatch-layout"
-          defaultLayout={defaultLayout}
-          onLayoutChanged={onLayoutChanged}
+          id="dispatch-panels"
+          className="h-full"
         >
           {showSidebar && (
             <Panel

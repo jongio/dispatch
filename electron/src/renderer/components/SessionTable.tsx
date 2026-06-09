@@ -517,7 +517,7 @@ export function SessionTable() {
 
   if (isLoading && sessions.length === 0) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
         <SkeletonRows />
       </div>
     );
@@ -525,7 +525,7 @@ export function SessionTable() {
 
   if (sessions.length === 0) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
         <EmptyState />
       </div>
     );
@@ -537,7 +537,7 @@ export function SessionTable() {
 
   return (
     <div
-      className="flex-1 flex flex-col overflow-hidden"
+      className="h-full flex flex-col overflow-hidden"
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
       tabIndex={0}
@@ -597,6 +597,7 @@ export function SessionTable() {
       <div
         ref={tableContainerRef}
         className="flex-1 overflow-y-auto outline-none"
+        style={columnSizeVars as React.CSSProperties}
       >
         <div
           style={{
@@ -668,7 +669,7 @@ export function SessionTable() {
                   ${isSelected ? 'bg-[var(--selection-bg)]' : ''}
                   ${!isSelected && isMultiSelected ? 'bg-[var(--selection-bg)] opacity-80' : ''}
                   ${!isSelected && !isMultiSelected && isCursor ? 'border-l-2 border-l-[var(--accent-primary)]' : ''}
-                  ${!isSelected && !isMultiSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-[var(--bg-secondary)]/30' : ''}
+                  ${!isSelected && !isMultiSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-[var(--bg-secondary)]' : ''}
                   ${!isSelected ? 'hover:bg-[var(--hover-bg)]' : ''}
                 `}
                 onClick={(e) => handleRowClick(row, e, virtualRow.index)}
