@@ -37,7 +37,6 @@ function CollapsibleSection({ title, defaultOpen = true, children }: Collapsible
 }
 
 export function Sidebar() {
-  const showSidebar = useSessionStore((s) => s.showSidebar);
   const toggleSidebar = useSessionStore((s) => s.toggleSidebar);
   const excludedDirs = useSessionStore((s) => s.excludedDirs);
   const timeRange = useSessionStore((s) => s.timeRange);
@@ -51,16 +50,8 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`
-        flex-shrink-0 overflow-hidden border-r border-[var(--border-primary)]
-        bg-[var(--bg-secondary)] flex flex-col
-        transition-[width] duration-200 ease-in-out
-      `}
-      style={{ width: showSidebar ? 250 : 0 }}
-      aria-hidden={!showSidebar}
+      className="h-full overflow-hidden bg-[var(--bg-secondary)] flex flex-col"
     >
-      {/* Inner container prevents content reflow during animation */}
-      <div className="w-[250px] h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-1.5">
@@ -97,7 +88,6 @@ export function Sidebar() {
             <PivotSelector />
           </CollapsibleSection>
         </div>
-      </div>
     </aside>
   );
 }
