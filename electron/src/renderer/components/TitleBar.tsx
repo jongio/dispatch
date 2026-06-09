@@ -31,11 +31,11 @@ export function TitleBar() {
     >
       {/* Left: brand + sort + pivot */}
       <div
-        className="flex items-center gap-2 px-3"
+        className="flex items-center gap-1.5 px-2"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <Zap size={14} strokeWidth={2} className="text-[var(--accent-primary)]" />
-        <span className="text-sm font-semibold text-[var(--fg-primary)]">Dispatch</span>
+        <span className="text-xs font-semibold text-[var(--fg-primary)]">Dispatch</span>
         <span className="text-xs text-[var(--fg-muted)]">
           {sortArrow} {sortLabel}
         </span>
@@ -68,21 +68,21 @@ export function TitleBar() {
         </span>
 
         <button
-          className="px-2 py-1 hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
+          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
           title="Minimize"
           onClick={() => window.dispatch.window.minimize()}
         >
           <Minus size={14} strokeWidth={2} />
         </button>
         <button
-          className="px-2 py-1 hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
+          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
           title="Maximize"
           onClick={() => window.dispatch.window.maximize()}
         >
           <Square size={14} strokeWidth={2} />
         </button>
         <button
-          className="px-2 py-1 hover:bg-red-600 hover:text-white text-[var(--fg-secondary)] transition-colors"
+          className="w-8 h-8 flex items-center justify-center hover:bg-red-600 hover:text-white text-[var(--fg-secondary)] transition-colors"
           title="Close"
           onClick={() => window.dispatch.window.close()}
         >

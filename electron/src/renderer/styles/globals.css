@@ -33,12 +33,10 @@
   --conversation-assistant-bg: #1f2335;
 }
 
-/* Smooth transitions when switching themes */
-:root,
-:root * {
+/* Smooth transitions when switching themes — scoped to root only to avoid input lag */
+:root {
   transition:
     background-color 150ms ease-in-out,
-    border-color 150ms ease-in-out,
     color 150ms ease-in-out;
 }
 
@@ -46,6 +44,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
 }
 
 html, body, #root {

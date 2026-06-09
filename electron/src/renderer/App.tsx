@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { Group, Panel, Separator } from 'react-resizable-panels';
+import { useEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { SearchBar } from './components/SearchBar';
 import { Sidebar } from './components/Sidebar';
@@ -8,17 +7,20 @@ import { PreviewPanel } from './components/PreviewPanel';
 import { StatusBar } from './components/StatusBar';
 import { HelpModal } from './components/HelpModal';
 import { SettingsModal } from './components/SettingsModal';
-import { ResizeHandle } from './components/ResizeHandle';
 import { useSessionStore } from './stores/sessionStore';
 import { useAttentionStore, initAttentionListener } from './stores/attentionStore';
 import { useTheme } from './hooks/useTheme';
 import { useKeyboard } from './hooks/useKeyboard';
+import { useResize } from './hooks/useResize';
 
 export function App() {
   const { loadSessions, showPreview, showSidebar } = useSessionStore();
   const loadAttention = useAttentionStore((s) => s.loadAttention);
   useTheme();
   useKeyboard();
+
+  const sidebar = useResize(220, 140, 360, 'left');
+  const preview = useResize(380, 260, 600, 'right');
 
   useEffect(() => {
     loadSessions();
@@ -27,7 +29,6 @@ export function App() {
     const unsubSessions = window.dispatch.on('sessions-changed', () => {
       loadSessions();
     });
-
     const unsubAttention = initAttentionListener();
 
     return () => {
@@ -41,56 +42,38 @@ export function App() {
       <TitleBar />
       <SearchBar />
 
-      <div className="flex-1 min-h-0 h-full">
-        <Group
-          orientation="horizontal"
-          id="dispatch-panels"
-          className="h-full"
-        >
-          {showSidebar && (
-            <Panel
-              id="sidebar"
-              defaultSize={15}
-              minSize={10}
-              maxSize={25}
-              collapsible
-            >
-              <div className="h-full overflow-hidden">
-                <Sidebar />
-              </div>
-            </Panel>
-          )}
-          {showSidebar && (
-            <Separator>
-              <ResizeHandle />
-            </Separator>
-          )}
-
-          <Panel id="main" minSize={30}>
-            <div className="h-full overflow-hidden">
-              <SessionTable />
+      {/* Main 3-panel area — plain flexbox, no library */}
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar */}
+        {showSidebar && (
+          <>
+            <div className="flex-shrink-0 overflow-y-auto" style={{ width: sidebar.width }}>
+              <Sidebar />
             </div>
-          </Panel>
+            <div
+              className="flex-shrink-0 w-[3px] cursor-col-resize hover:bg-[var(--accent-primary)] bg-[var(--border-primary)] transition-colors"
+              onMouseDown={sidebar.onMouseDown}
+            />
+          </>
+        )}
 
-          {showPreview && (
-            <Separator>
-              <ResizeHandle />
-            </Separator>
-          )}
-          {showPreview && (
-            <Panel
-              id="preview"
-              defaultSize={35}
-              minSize={20}
-              maxSize={50}
-              collapsible
-            >
-              <div className="h-full overflow-hidden">
-                <PreviewPanel />
-              </div>
-            </Panel>
-          )}
-        </Group>
+        {/* Session table — fills remaining space */}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <SessionTable />
+        </div>
+
+        {/* Preview panel */}
+        {showPreview && (
+          <>
+            <div
+              className="flex-shrink-0 w-[3px] cursor-col-resize hover:bg-[var(--accent-primary)] bg-[var(--border-primary)] transition-colors"
+              onMouseDown={preview.onMouseDown}
+            />
+            <div className="flex-shrink-0 overflow-y-auto" style={{ width: preview.width }}>
+              <PreviewPanel />
+            </div>
+          </>
+        )}
       </div>
 
       <StatusBar />

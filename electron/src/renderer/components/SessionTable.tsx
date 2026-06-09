@@ -36,8 +36,8 @@ import { AttentionDot } from './AttentionDot';
 // Constants
 // ---------------------------------------------------------------------------
 
-const ROW_HEIGHT = 32;
-const HEADER_HEIGHT = 28;
+const ROW_HEIGHT = 28;
+const HEADER_HEIGHT = 24;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -147,7 +147,7 @@ function buildColumns(
         <AttentionDot
           status={(statuses.get(row.original.id) as never) ?? 'idle'}
           size={6}
-          className="flex-shrink-0"
+          className="flex-shrink-0 mx-auto"
         />
       ),
     }),
@@ -170,7 +170,7 @@ function buildColumns(
       minSize: 120,
       header: 'Summary',
       cell: ({ getValue }) => (
-        <span className="text-xs font-semibold truncate text-[var(--fg-primary)] block">
+        <span className="text-[11px] font-semibold truncate text-[var(--fg-primary)] block">
           {getValue() || 'Untitled session'}
         </span>
       ),
@@ -183,7 +183,7 @@ function buildColumns(
       minSize: 60,
       header: 'Repository',
       cell: ({ getValue }) => (
-        <span className="text-[11px] text-[var(--fg-muted)] truncate block">
+        <span className="text-[10px] text-[var(--fg-muted)] truncate block">
           {getValue() || '-'}
         </span>
       ),
@@ -197,9 +197,9 @@ function buildColumns(
       header: 'Branch',
       cell: ({ getValue }) => {
         const branch = getValue();
-        if (!branch) return <span className="text-[11px] text-[var(--fg-muted)]">-</span>;
+        if (!branch) return <span className="text-[10px] text-[var(--fg-muted)]">-</span>;
         return (
-          <span className="flex items-center gap-0.5 text-[11px] text-[var(--fg-muted)] truncate">
+          <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] truncate">
             <GitBranch size={10} className="flex-shrink-0 opacity-70" />
             <span className="truncate">{branch}</span>
           </span>
@@ -215,10 +215,10 @@ function buildColumns(
       header: 'Folder',
       cell: ({ getValue }) => {
         const cwd = getValue();
-        if (!cwd) return <span className="text-[11px] text-[var(--fg-muted)]">-</span>;
+        if (!cwd) return <span className="text-[10px] text-[var(--fg-muted)]">-</span>;
         const segment = cwd.split(/[/\\]/).pop() ?? cwd;
         return (
-          <span className="flex items-center gap-0.5 text-[11px] text-[var(--fg-muted)] truncate">
+          <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] truncate">
             <Folder size={10} className="flex-shrink-0 opacity-70" />
             <span className="truncate">{segment}</span>
           </span>
@@ -234,7 +234,7 @@ function buildColumns(
       maxSize: 70,
       header: () => <MessageSquare size={11} className="text-[var(--fg-muted)]" />,
       cell: ({ getValue }) => (
-        <span className="flex items-center gap-0.5 text-[10px] text-[var(--fg-muted)] tabular-nums">
+        <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] tabular-nums">
           <MessageSquare size={9} className="opacity-70" />
           {getValue()}
         </span>
@@ -560,7 +560,7 @@ export function SessionTable() {
                 <div
                   key={header.id}
                   className={`
-                    group/header relative flex items-center px-1 h-full select-none
+                    group/header relative flex items-center px-1.5 h-full select-none
                     ${canSort ? 'cursor-pointer hover:bg-[var(--hover-bg)]' : ''}
                     ${isSummary ? 'flex-1 min-w-0' : ''}
                   `}
@@ -677,12 +677,14 @@ export function SessionTable() {
               >
                 {row.getVisibleCells().map((cell) => {
                   const isSummary = cell.column.id === 'summary';
+                  const isCenter = cell.column.id === 'status' || cell.column.id === 'type' || cell.column.id === 'actions';
                   return (
                     <div
                       key={cell.id}
                       className={`
-                        flex items-center px-1 h-full overflow-hidden
+                        flex items-center px-1.5 h-full overflow-hidden
                         ${isSummary ? 'flex-1 min-w-0' : ''}
+                        ${isCenter ? 'justify-center' : ''}
                       `}
                       style={isSummary ? undefined : { width: `var(--col-${cell.column.id}-size)` }}
                     >

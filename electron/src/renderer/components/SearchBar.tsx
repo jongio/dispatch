@@ -39,10 +39,10 @@ export function SearchBar() {
   }, [setSearchQuery]);
 
   return (
-    <div className="flex items-center h-9 px-3 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+    <div className="flex items-center h-8 px-2 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
       <div
         className={`
-          flex items-center flex-1 gap-2 px-2.5 rounded-md bg-[var(--bg-tertiary)]
+          flex items-center flex-1 gap-1.5 px-2 h-6 rounded-sm bg-[var(--bg-tertiary)]
           transition-shadow duration-100
           ${isFocused ? 'shadow-[0_0_0_2px_var(--focus-ring)]' : ''}
         `}
@@ -61,7 +61,7 @@ export function SearchBar() {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder="Search sessions..."
-          className="flex-1 h-7 bg-transparent text-xs text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none"
+          className="flex-1 h-6 bg-transparent text-xs text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none"
         />
         {localQuery ? (
           <button

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Eye, HelpCircle, Settings, Star } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 
 /** Temporary status messages that fade after 2s */
@@ -31,31 +31,27 @@ export function StatusBar() {
   }, []);
 
   return (
-    <div className="flex items-center h-6 px-3 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] text-xs text-[var(--fg-muted)]">
+    <div className="flex items-center h-[22px] px-2 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] text-[10px] text-[var(--fg-muted)]">
       {/* Left: key hints */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <span className="flex items-center gap-1">
-          <kbd className="px-1 rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[10px]">{'\u23ce'}</kbd>
+          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">{'\u23ce'}</kbd>
           <span>open</span>
         </span>
         <span className="flex items-center gap-1">
-          <Search size={10} strokeWidth={2} className="text-[var(--fg-muted)]" />
-          <kbd className="px-1 rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[10px]">/</kbd>
+          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">/</kbd>
           <span>search</span>
         </span>
         <span className="flex items-center gap-1">
-          <Eye size={10} strokeWidth={2} className="text-[var(--fg-muted)]" />
-          <kbd className="px-1 rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[10px]">p</kbd>
+          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">p</kbd>
           <span>preview</span>
         </span>
         <span className="flex items-center gap-1">
-          <HelpCircle size={10} strokeWidth={2} className="text-[var(--fg-muted)]" />
-          <kbd className="px-1 rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[10px]">?</kbd>
+          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">?</kbd>
           <span>help</span>
         </span>
         <span className="flex items-center gap-1">
-          <Settings size={10} strokeWidth={2} className="text-[var(--fg-muted)]" />
-          <kbd className="px-1 rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[10px]">,</kbd>
+          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">,</kbd>
           <span>settings</span>
         </span>
       </div>
@@ -63,7 +59,7 @@ export function StatusBar() {
       <div className="flex-1" />
 
       {/* Right: status info + temporary message */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {statusMessage && (
           <span
             className={`text-[var(--accent-primary)] transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
