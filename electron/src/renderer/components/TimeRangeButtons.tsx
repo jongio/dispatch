@@ -20,7 +20,7 @@ export function TimeRangeButtons() {
 
   return (
     <div className="flex items-center gap-1.5">
-      <Clock size={14} className="text-[var(--fg-muted)] flex-shrink-0" />
+      <Clock size={14} className="text-muted-foreground flex-shrink-0" />
       <div className="flex gap-0.5 flex-1">
         {TIME_RANGES.map((option) => {
           const isActive = timeRange === option.value;
@@ -32,8 +32,8 @@ export function TimeRangeButtons() {
               className={`
                 flex-1 px-2 py-1 text-[11px] font-medium rounded-full transition-colors duration-100
                 ${isActive
-                  ? 'bg-[var(--accent-primary)] text-[var(--bg-primary)]'
-                  : 'bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--fg-primary)]'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                 }
               `}
             >

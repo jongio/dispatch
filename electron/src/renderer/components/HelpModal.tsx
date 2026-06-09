@@ -31,15 +31,15 @@ export function HelpModal() {
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
     >
-      <div className="w-full max-w-lg mx-4 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg mx-4 rounded-lg border border-border bg-card shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
-          <h2 className="text-sm font-semibold text-[var(--accent-primary)]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted">
+          <h2 className="text-sm font-semibold text-primary">
             Keyboard Shortcuts
           </h2>
           <button
             onClick={toggleHelp}
-            className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-primary)] transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Esc to close
           </button>
@@ -55,8 +55,8 @@ export function HelpModal() {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-2 border-t border-[var(--border-subtle)] text-center">
-          <span className="text-xs text-[var(--fg-muted)]">
+        <div className="px-5 py-2 border-t border-border text-center">
+          <span className="text-xs text-muted-foreground">
             Press <Kbd>?</Kbd> or <Kbd>Esc</Kbd> to close
           </span>
         </div>
@@ -72,14 +72,14 @@ interface ShortcutGroupSectionProps {
 function ShortcutGroupSection({ group }: ShortcutGroupSectionProps) {
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-primary)] mb-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">
         {group.name}
       </h3>
       <div className="space-y-1">
         {group.shortcuts.map((shortcut) => (
           <div key={shortcut.label} className="flex items-center justify-between text-xs">
             <Kbd>{shortcut.label}</Kbd>
-            <span className="text-[var(--fg-secondary)] ml-2 truncate">
+            <span className="text-muted-foreground ml-2 truncate">
               {shortcut.description}
             </span>
           </div>
@@ -91,7 +91,7 @@ function ShortcutGroupSection({ group }: ShortcutGroupSectionProps) {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--fg-primary)] font-mono text-[10px] leading-none">
+    <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded border border-border bg-muted text-foreground font-mono text-[10px] leading-none">
       {children}
     </kbd>
   );

@@ -1,82 +1,78 @@
 @import "tailwindcss";
 
-/*
- * Theme variables are applied dynamically via useTheme() hook.
- * This file only contains structural styles and utilities.
- *
- * Fallback values below ensure the page isn't blank before JS hydrates.
- * They match Dispatch Dark and will be overwritten immediately on mount.
- */
-:root {
-  --bg-primary: #1a1b26;
-  --bg-secondary: #16161e;
-  --bg-tertiary: #24283b;
-  --fg-primary: #c0caf5;
-  --fg-secondary: #a9b1d6;
-  --fg-muted: #565f89;
-  --accent-primary: #7aa2f7;
-  --accent-secondary: #bb9af7;
-  --border-primary: #3b4261;
-  --border-subtle: #292e42;
-  --hover-bg: #292e42;
-  --selection-bg: #283457;
-  --focus-ring: #7aa2f7;
-  --attention-working: #7aa2f7;
-  --attention-thinking: #7dcfff;
-  --attention-compacting: #bb9af7;
-  --attention-waiting: #9d7cd8;
-  --attention-active: #9ece6a;
-  --attention-stale: #e0af68;
-  --attention-interrupted: #ff9e64;
-  --attention-idle: #565f89;
-  --conversation-user-bg: #283457;
-  --conversation-assistant-bg: #1f2335;
+:root,
+:root[data-theme="dark"] {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.18 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.72 0 0);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.3 0 0);
+  --ring: oklch(0.72 0.18 250);
+  --primary: oklch(0.72 0.18 250);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.28 0.02 250);
+  --secondary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.7 0.15 160);
+  --accent-foreground: oklch(0.145 0 0);
+  --destructive: oklch(0.65 0.25 27);
+  --destructive-foreground: oklch(0.985 0 0);
 }
 
-/* Smooth transitions when switching themes — scoped to root only to avoid input lag */
-:root {
-  transition:
-    background-color 150ms ease-in-out,
-    color 150ms ease-in-out;
+:root[data-theme="light"] {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.88 0 0);
+  --ring: oklch(0.55 0.2 250);
+  --primary: oklch(0.55 0.2 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.92 0.02 250);
+  --secondary-foreground: oklch(0.145 0 0);
+  --accent: oklch(0.55 0.15 160);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.55 0.25 27);
+  --destructive-foreground: oklch(0.99 0 0);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-variant-numeric: tabular-nums;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 }
 
 html, body, #root {
   height: 100%;
-  width: 100%;
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  user-select: none;
-  background-color: var(--bg-primary);
-  color: var(--fg-primary);
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-primary);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Selection in preview panel */
@@ -92,4 +88,19 @@ body {
   50% {
     opacity: 0.5;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

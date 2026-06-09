@@ -27,7 +27,7 @@ type VirtualRow =
 
 /** Render the appropriate Lucide icon for a host type. */
 function HostIcon({ hostType }: { hostType: string }) {
-  const props = { size: 12, className: 'text-[var(--fg-muted)] flex-shrink-0' };
+  const props = { size: 12, className: 'text-muted-foreground flex-shrink-0' };
   switch (hostType?.toLowerCase()) {
     case 'cloud':
       return <Cloud {...props} />;
@@ -188,7 +188,7 @@ export function SessionList() {
 
   if (useSessionStore.getState().isLoading && sessions.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[var(--fg-muted)]">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
         Loading sessions...
       </div>
     );
@@ -196,7 +196,7 @@ export function SessionList() {
 
   if (sessions.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[var(--fg-muted)]">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
         No sessions found. Make sure GitHub Copilot CLI has been used at least once.
       </div>
     );
@@ -266,10 +266,10 @@ export function SessionList() {
                 onDoubleClick={() => handleDoubleClick(session.id)}
                 className={`
                   flex items-center gap-1.5 px-2 h-full cursor-pointer
-                  border-b border-[var(--border-subtle)]
-                  ${isSelected ? 'bg-[var(--selection-bg)]' : 'hover:bg-[var(--hover-bg)]'}
-                  ${isMultiSelected ? 'ring-1 ring-inset ring-[var(--accent-primary)]' : ''}
-                  ${isCursor && !isSelected ? 'bg-[var(--hover-bg)]' : ''}
+                  border-b border-border
+                  ${isSelected ? 'bg-accent/20 ring-1 ring-inset ring-accent' : 'hover:bg-muted/30'}
+                  ${isMultiSelected ? 'ring-1 ring-inset ring-primary' : ''}
+                  ${isCursor && !isSelected ? 'bg-muted/30' : ''}
                 `}
               >
                 {/* Attention dot */}
@@ -283,12 +283,12 @@ export function SessionList() {
                 <HostIcon hostType={session.host_type} />
 
                 {/* Summary - bold, truncated, takes available space */}
-                <span className="text-xs font-semibold truncate text-[var(--fg-primary)] min-w-0 flex-1">
+                <span className="text-xs font-semibold truncate text-foreground min-w-0 flex-1">
                   {session.summary || 'Untitled session'}
                 </span>
 
                 {/* Inline metadata: repo, branch, folder - muted, right-aligned */}
-                <div className="flex items-center gap-2 flex-shrink-0 text-[11px] text-[var(--fg-muted)]">
+                <div className="flex items-center gap-2 flex-shrink-0 text-[11px] text-muted-foreground">
                   {session.repository && (
                     <span className="truncate max-w-[100px]">
                       {session.repository}
@@ -310,7 +310,7 @@ export function SessionList() {
                   )}
 
                   {/* Turn count badge */}
-                  <span className="flex items-center gap-0.5 text-[10px] font-medium bg-[var(--bg-tertiary)] rounded px-1 py-px">
+                  <span className="flex items-center gap-0.5 text-[10px] font-medium bg-muted rounded px-1 py-px">
                     <MessageSquare size={9} className="opacity-70" />
                     {session.turn_count}
                   </span>
@@ -319,7 +319,7 @@ export function SessionList() {
                   {session.file_count > 0 && (
                     <FileText
                       size={10}
-                      className="text-[var(--accent-primary)] flex-shrink-0"
+                      className="text-primary flex-shrink-0"
                       aria-label="Has plan"
                     />
                   )}
@@ -329,7 +329,7 @@ export function SessionList() {
                     <Star
                       size={11}
                       fill="currentColor"
-                      className="text-[var(--accent-warning,#e0af68)] flex-shrink-0"
+                      className="text-yellow-400 flex-shrink-0"
                       aria-label="Favorited"
                     />
                   )}
@@ -338,7 +338,7 @@ export function SessionList() {
                   {isHidden && (
                     <EyeOff
                       size={10}
-                      className="text-[var(--fg-muted)] opacity-60 flex-shrink-0"
+                      className="text-muted-foreground opacity-60 flex-shrink-0"
                       aria-label="Hidden"
                     />
                   )}

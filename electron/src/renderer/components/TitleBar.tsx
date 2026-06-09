@@ -1,94 +1,120 @@
-import React from 'react';
-import { Zap, Minus, Square, X, Loader2 } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { Zap, Search, X, Loader2 } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
-
-const SORT_LABELS: Record<string, string> = {
-  updated: 'updated',
-  created: 'created',
-  name: 'name',
-  turns: 'turns',
-};
-
-const PIVOT_LABELS: Record<string, string> = {
-  none: '',
-  repository: 'repo',
-  cwd: 'folder',
-  branch: 'branch',
-  date: 'date',
-};
+import { cn } from '../lib/utils';
 
 export function TitleBar() {
-  const { sessions, searchQuery, isLoading, sort, sortOrder, pivot } = useSessionStore();
+  const { sessions, searchQuery, setSearchQuery, isLoading, sort, sortOrder, pivot } = useSessionStore();
+  const [localQuery, setLocalQuery] = useState(searchQuery);
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sortLabel = SORT_LABELS[sort] ?? sort;
+  const isSearching = isLoading && localQuery.length > 0;
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(value);
+    }, 150);
+  }, [setSearchQuery]);
+
+  const handleClear = useCallback(() => {
+    setLocalQuery('');
+    setSearchQuery('');
+    inputRef.current?.focus();
+  }, [setSearchQuery]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setLocalQuery('');
+      setSearchQuery('');
+      (e.target as HTMLInputElement).blur();
+    }
+  }, [setSearchQuery]);
+
   const sortArrow = sortOrder === 'desc' ? '\u2193' : '\u2191';
-  const pivotLabel = PIVOT_LABELS[pivot] ?? pivot;
 
   return (
     <div
-      className="flex items-center h-8 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] select-none"
+      className="flex items-center h-9 bg-background border-b border-border select-none text-sm"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {/* Left: brand + sort + pivot */}
+      {/* Left: brand */}
       <div
-        className="flex items-center gap-1.5 px-2"
+        className="flex items-center gap-1.5 px-3 shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <Zap size={14} strokeWidth={2} className="text-[var(--accent-primary)]" />
-        <span className="text-xs font-semibold text-[var(--fg-primary)]">Dispatch</span>
-        <span className="text-xs text-[var(--fg-muted)]">
-          {sortArrow} {sortLabel}
+        <Zap size={14} strokeWidth={2} className="text-primary" />
+        <span className="font-semibold tracking-tight text-foreground">Dispatch</span>
+        <span className="text-xs text-muted-foreground ml-1">
+          {sortArrow} {sort}
         </span>
-        {pivotLabel && (
-          <span className="text-xs text-[var(--fg-muted)] px-1 rounded bg-[var(--bg-tertiary)]">
-            {'\u229e'} {pivotLabel}
+        {pivot !== 'none' && (
+          <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+            {'\u229e'} {pivot}
           </span>
         )}
       </div>
 
-      {/* Center: search status / loading spinner */}
-      <div className="flex-1 flex items-center justify-center gap-1.5">
-        {isLoading && (
-          <Loader2 size={14} strokeWidth={2} className="animate-spin text-[var(--fg-muted)]" />
-        )}
-        {searchQuery && !isLoading && (
-          <span className="text-xs text-[var(--fg-muted)]">
-            search: &quot;{searchQuery}&quot;
-          </span>
-        )}
-      </div>
-
-      {/* Right: session count + window controls */}
+      {/* Center: search input */}
       <div
-        className="flex items-center"
+        className="flex-1 flex items-center justify-center px-4"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <span className="text-xs text-[var(--fg-muted)] px-2">
+        <div
+          className={cn(
+            'flex items-center gap-1.5 px-2 h-6 w-full max-w-sm rounded-sm bg-muted transition-shadow duration-100',
+            isFocused && 'ring-2 ring-ring',
+          )}
+        >
+          {isSearching ? (
+            <Loader2 size={14} className="text-primary animate-spin shrink-0" />
+          ) : (
+            <Search size={14} className="text-muted-foreground shrink-0" />
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            value={localQuery}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder="Search sessions..."
+            className="flex-1 h-6 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
+          />
+          {localQuery ? (
+            <button
+              onClick={handleClear}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-75"
+            >
+              <X size={14} />
+            </button>
+          ) : (
+            !isFocused && (
+              <kbd className="text-[10px] font-mono text-muted-foreground bg-background border border-border px-1.5 py-0.5 rounded">
+                /
+              </kbd>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Right: session count + spacer for native window controls */}
+      <div
+        className="flex items-center shrink-0 pr-2"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <span className="text-xs text-muted-foreground mr-2">
           {sessions.length} sessions
         </span>
-
-        <button
-          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
-          title="Minimize"
-          onClick={() => window.dispatch.window.minimize()}
-        >
-          <Minus size={14} strokeWidth={2} />
-        </button>
-        <button
-          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--hover-bg)] text-[var(--fg-secondary)] transition-colors"
-          title="Maximize"
-          onClick={() => window.dispatch.window.maximize()}
-        >
-          <Square size={14} strokeWidth={2} />
-        </button>
-        <button
-          className="w-8 h-8 flex items-center justify-center hover:bg-red-600 hover:text-white text-[var(--fg-secondary)] transition-colors"
-          title="Close"
-          onClick={() => window.dispatch.window.close()}
-        >
-          <X size={14} strokeWidth={2} />
-        </button>
       </div>
+
+      {/* Spacer for native titleBarOverlay controls */}
+      <div className="w-[140px] shrink-0" />
     </div>
   );
 }

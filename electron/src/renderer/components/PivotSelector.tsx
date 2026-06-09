@@ -33,8 +33,8 @@ export function PivotSelector() {
               className={`
                 flex items-center justify-center w-7 h-7 rounded transition-all duration-100
                 ${isActive
-                  ? 'bg-[var(--selection-bg)] text-[var(--accent-primary)] shadow-[0_0_0_1px_var(--accent-primary)]'
-                  : 'text-[var(--fg-muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--fg-primary)]'
+                  ? 'bg-accent/20 text-primary ring-1 ring-inset ring-primary'
+                  : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground'
                 }
               `}
             >
@@ -43,7 +43,7 @@ export function PivotSelector() {
           );
         })}
       </div>
-      <div className="mt-0.5 text-[10px] text-[var(--fg-muted)]">
+      <div className="mt-0.5 text-[10px] text-muted-foreground">
         Tab to cycle
       </div>
     </div>

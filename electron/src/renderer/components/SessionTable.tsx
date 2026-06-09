@@ -60,7 +60,7 @@ function formatRelativeTime(timestamp: string): string {
 }
 
 function HostIcon({ hostType }: { hostType: string }) {
-  const props = { size: 12, className: 'text-[var(--fg-muted)] flex-shrink-0' };
+  const props = { size: 12, className: 'text-muted-foreground flex-shrink-0' };
   switch (hostType?.toLowerCase()) {
     case 'cloud':
       return <Cloud {...props} />;
@@ -73,10 +73,10 @@ function HostIcon({ hostType }: { hostType: string }) {
 
 /** Sort indicator for column headers. */
 function SortIndicator({ direction }: { direction: 'asc' | 'desc' | false }) {
-  const props = { size: 12, className: 'text-[var(--fg-muted)]' };
+  const props = { size: 12, className: 'text-muted-foreground' };
   if (direction === 'asc') return <ChevronUp {...props} />;
   if (direction === 'desc') return <ChevronDown {...props} />;
-  return <ChevronsUpDown {...props} className="text-[var(--fg-muted)] opacity-0 group-hover/header:opacity-50" />;
+  return <ChevronsUpDown {...props} className="text-muted-foreground opacity-0 group-hover/header:opacity-50" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,15 +92,15 @@ function SkeletonRows() {
           className="flex items-center gap-2 px-2 animate-pulse"
           style={{ height: ROW_HEIGHT }}
         >
-          <div className="w-[6px] h-[6px] rounded-full bg-[var(--bg-tertiary)]" />
-          <div className="w-[12px] h-[12px] rounded bg-[var(--bg-tertiary)]" />
+          <div className="w-[6px] h-[6px] rounded-full bg-muted" />
+          <div className="w-[12px] h-[12px] rounded bg-muted" />
           <div
-            className="h-[10px] rounded bg-[var(--bg-tertiary)]"
+            className="h-[10px] rounded bg-muted"
             style={{ width: `${40 + Math.random() * 40}%` }}
           />
           <div className="ml-auto flex gap-2">
-            <div className="w-[60px] h-[10px] rounded bg-[var(--bg-tertiary)]" />
-            <div className="w-[40px] h-[10px] rounded bg-[var(--bg-tertiary)]" />
+            <div className="w-[60px] h-[10px] rounded bg-muted" />
+            <div className="w-[40px] h-[10px] rounded bg-muted" />
           </div>
         </div>
       ))}
@@ -110,7 +110,7 @@ function SkeletonRows() {
 
 function EmptyState() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--fg-muted)] py-12">
+    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground py-12">
       <Inbox size={32} className="opacity-50" />
       <span className="text-xs">No sessions found</span>
       <span className="text-[10px] opacity-70">
@@ -170,7 +170,7 @@ function buildColumns(
       minSize: 120,
       header: 'Summary',
       cell: ({ getValue }) => (
-        <span className="text-[11px] font-semibold truncate text-[var(--fg-primary)] block">
+        <span className="text-[11px] font-semibold truncate text-foreground block">
           {getValue() || 'Untitled session'}
         </span>
       ),
@@ -183,7 +183,7 @@ function buildColumns(
       minSize: 60,
       header: 'Repository',
       cell: ({ getValue }) => (
-        <span className="text-[10px] text-[var(--fg-muted)] truncate block">
+        <span className="text-[10px] text-muted-foreground truncate block">
           {getValue() || '-'}
         </span>
       ),
@@ -197,9 +197,9 @@ function buildColumns(
       header: 'Branch',
       cell: ({ getValue }) => {
         const branch = getValue();
-        if (!branch) return <span className="text-[10px] text-[var(--fg-muted)]">-</span>;
+        if (!branch) return <span className="text-[10px] text-muted-foreground">-</span>;
         return (
-          <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] truncate">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
             <GitBranch size={10} className="flex-shrink-0 opacity-70" />
             <span className="truncate">{branch}</span>
           </span>
@@ -215,10 +215,10 @@ function buildColumns(
       header: 'Folder',
       cell: ({ getValue }) => {
         const cwd = getValue();
-        if (!cwd) return <span className="text-[10px] text-[var(--fg-muted)]">-</span>;
+        if (!cwd) return <span className="text-[10px] text-muted-foreground">-</span>;
         const segment = cwd.split(/[/\\]/).pop() ?? cwd;
         return (
-          <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] truncate">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
             <Folder size={10} className="flex-shrink-0 opacity-70" />
             <span className="truncate">{segment}</span>
           </span>
@@ -232,9 +232,9 @@ function buildColumns(
       size: 50,
       minSize: 40,
       maxSize: 70,
-      header: () => <MessageSquare size={11} className="text-[var(--fg-muted)]" />,
+      header: () => <MessageSquare size={11} className="text-muted-foreground" />,
       cell: ({ getValue }) => (
-        <span className="flex items-center gap-1 text-[10px] text-[var(--fg-muted)] tabular-nums">
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground tabular-nums">
           <MessageSquare size={9} className="opacity-70" />
           {getValue()}
         </span>
@@ -249,7 +249,7 @@ function buildColumns(
       maxSize: 100,
       header: 'Updated',
       cell: ({ getValue }) => (
-        <span className="text-[10px] text-[var(--fg-muted)] tabular-nums">
+        <span className="text-[10px] text-muted-foreground tabular-nums">
           {formatRelativeTime(getValue() as string)}
         </span>
       ),
@@ -274,23 +274,23 @@ function buildColumns(
               type="button"
               title={isFav ? 'Unstar' : 'Star'}
               onClick={(e) => { e.stopPropagation(); toggleFavorite(id); }}
-              className="p-0.5 rounded hover:bg-[var(--hover-bg)]"
+              className="p-0.5 rounded hover:bg-muted/30"
             >
               <Star
                 size={11}
                 fill={isFav ? 'currentColor' : 'none'}
-                className={isFav ? 'text-[var(--accent-warning,#e0af68)]' : 'text-[var(--fg-muted)]'}
+                className={isFav ? 'text-yellow-400' : 'text-muted-foreground'}
               />
             </button>
             <button
               type="button"
               title={isHid ? 'Unhide' : 'Hide'}
               onClick={(e) => { e.stopPropagation(); toggleHide(id); }}
-              className="p-0.5 rounded hover:bg-[var(--hover-bg)]"
+              className="p-0.5 rounded hover:bg-muted/30"
             >
               <EyeOff
                 size={10}
-                className={isHid ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-muted)] opacity-60'}
+                className={isHid ? 'text-foreground' : 'text-muted-foreground opacity-60'}
               />
             </button>
           </span>
@@ -546,7 +546,7 @@ export function SessionTable() {
     >
       {/* Sticky header */}
       <div
-        className="flex-shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+        className="flex-shrink-0 border-b border-border bg-card"
         style={{ height: HEADER_HEIGHT, ...columnSizeVars } as React.CSSProperties}
       >
         {headerGroups.map((headerGroup) => (
@@ -561,14 +561,14 @@ export function SessionTable() {
                   key={header.id}
                   className={`
                     group/header relative flex items-center px-1.5 h-full select-none
-                    ${canSort ? 'cursor-pointer hover:bg-[var(--hover-bg)]' : ''}
+                    ${canSort ? 'cursor-pointer hover:bg-muted/30' : ''}
                     ${isSummary ? 'flex-1 min-w-0' : ''}
                   `}
                   style={isSummary ? undefined : { width: `var(--col-${header.column.id}-size)` }}
                   onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                 >
                   {header.isPlaceholder ? null : (
-                    <span className="flex items-center gap-0.5 text-[10px] font-medium text-[var(--fg-muted)] uppercase tracking-wide truncate">
+                    <span className="flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide truncate">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {canSort && <SortIndicator direction={sortDir} />}
                     </span>
@@ -581,8 +581,8 @@ export function SessionTable() {
                       onTouchStart={header.getResizeHandler()}
                       className={`
                         absolute right-0 top-0 h-full w-[3px] cursor-col-resize
-                        hover:bg-[var(--accent-primary)] active:bg-[var(--accent-primary)]
-                        ${header.column.getIsResizing() ? 'bg-[var(--accent-primary)]' : ''}
+                        hover:bg-primary active:bg-primary
+                        ${header.column.getIsResizing() ? 'bg-primary' : ''}
                       `}
                     />
                   )}
@@ -627,18 +627,18 @@ export function SessionTable() {
                     height: ROW_HEIGHT,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className="flex items-center gap-1.5 px-2 cursor-pointer select-none bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] hover:bg-[var(--hover-bg)]"
+                  className="flex items-center gap-1.5 px-2 cursor-pointer select-none bg-card border-b border-border hover:bg-muted/30"
                   onClick={(e) => handleRowClick(row, e, virtualRow.index)}
                 >
                   {isCollapsed ? (
-                    <ChevronRight size={12} className="text-[var(--fg-muted)] flex-shrink-0" />
+                    <ChevronRight size={12} className="text-muted-foreground flex-shrink-0" />
                   ) : (
-                    <ChevronDown size={12} className="text-[var(--fg-muted)] flex-shrink-0" />
+                    <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="text-[11px] font-medium text-[var(--fg-secondary)] truncate flex-1">
+                  <span className="text-[11px] font-medium text-foreground truncate flex-1">
                     {groupKey || 'Unknown'}
                   </span>
-                  <span className="text-[10px] font-medium text-[var(--fg-muted)] bg-[var(--bg-tertiary)] rounded px-1 py-px flex-shrink-0">
+                  <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded px-1 py-px flex-shrink-0">
                     {row.subRows.length}
                   </span>
                 </div>
@@ -665,12 +665,12 @@ export function SessionTable() {
                 }}
                 className={`
                   group/row flex items-center cursor-pointer
-                  border-b border-[var(--border-subtle)]
-                  ${isSelected ? 'bg-[var(--selection-bg)]' : ''}
-                  ${!isSelected && isMultiSelected ? 'bg-[var(--selection-bg)] opacity-80' : ''}
-                  ${!isSelected && !isMultiSelected && isCursor ? 'border-l-2 border-l-[var(--accent-primary)]' : ''}
-                  ${!isSelected && !isMultiSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-[var(--bg-secondary)]' : ''}
-                  ${!isSelected ? 'hover:bg-[var(--hover-bg)]' : ''}
+                  border-b border-border
+                  ${isSelected ? 'bg-accent/20 ring-1 ring-inset ring-accent' : ''}
+                  ${!isSelected && isMultiSelected ? 'bg-accent/20 opacity-80' : ''}
+                  ${!isSelected && !isMultiSelected && isCursor ? 'border-l-2 border-l-primary' : ''}
+                  ${!isSelected && !isMultiSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-card' : ''}
+                  ${!isSelected ? 'hover:bg-muted/30' : ''}
                 `}
                 onClick={(e) => handleRowClick(row, e, virtualRow.index)}
                 onDoubleClick={() => handleRowDoubleClick(row)}

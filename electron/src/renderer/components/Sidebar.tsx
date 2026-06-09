@@ -15,16 +15,16 @@ function CollapsibleSection({ title, defaultOpen = true, children }: Collapsible
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-[var(--border-subtle)]">
+    <div className="border-b border-border">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] hover:bg-[var(--hover-bg)] transition-colors duration-75"
+        className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors duration-75"
       >
         <span>{title}</span>
         {isOpen ? (
-          <ChevronDown size={14} className="text-[var(--fg-muted)]" />
+          <ChevronDown size={14} className="text-muted-foreground" />
         ) : (
-          <ChevronRight size={14} className="text-[var(--fg-muted)]" />
+          <ChevronRight size={14} className="text-muted-foreground" />
         )}
       </button>
       {isOpen && (
@@ -50,24 +50,24 @@ export function Sidebar() {
 
   return (
     <aside
-      className="h-full overflow-hidden bg-[var(--bg-secondary)] flex flex-col"
+      className="h-full overflow-hidden bg-card flex flex-col"
     >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           <div className="flex items-center gap-1.5">
-            <Filter size={14} className="text-[var(--fg-muted)]" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)]">
+            <Filter size={14} className="text-muted-foreground" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Filters
             </span>
             {activeFilterCount > 0 && (
-              <span className="text-[10px] font-medium text-[var(--accent-primary)] bg-[var(--selection-bg)] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              <span className="text-[10px] font-medium text-primary bg-accent/20 px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                 {activeFilterCount}
               </span>
             )}
           </div>
           <button
             onClick={toggleSidebar}
-            className="p-1 rounded text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--hover-bg)] transition-colors duration-75"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors duration-75"
             title="Close sidebar (f)"
           >
             <PanelLeftClose size={14} />

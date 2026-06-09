@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Search, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, Star, Sun, Moon } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
+import { cn } from '../lib/utils';
 
 /** Temporary status messages that fade after 2s */
 let statusTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -9,6 +10,9 @@ export function StatusBar() {
   const { sessions, selectedIds, searchQuery, pivot, favorites, showHidden } = useSessionStore();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fading, setFading] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark';
+  });
 
   // Expose a global function for other components to trigger status messages
   useEffect(() => {
@@ -30,39 +34,56 @@ export function StatusBar() {
     };
   }, []);
 
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    setTheme(next);
+  };
+
   return (
-    <div className="flex items-center h-[22px] px-2 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] text-[10px] text-[var(--fg-muted)]">
-      {/* Left: key hints */}
-      <div className="flex items-center gap-2">
+    <div className="flex items-center h-7 px-3 border-t border-border bg-card text-[11px] text-muted-foreground">
+      {/* Left: item count + selection */}
+      <div className="flex items-center gap-3">
+        <span>{sessions.length} sessions</span>
+        {selectedIds.size > 0 && (
+          <span>{selectedIds.size} selected</span>
+        )}
+        {favorites.size > 0 && (
+          <span className="flex items-center gap-0.5">
+            <Star size={10} strokeWidth={2} className="text-yellow-400" />
+            {favorites.size}
+          </span>
+        )}
+      </div>
+
+      {/* Center: keyboard hints */}
+      <div className="flex-1 flex items-center justify-center gap-3 font-mono">
         <span className="flex items-center gap-1">
-          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">{'\u23ce'}</kbd>
-          <span>open</span>
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">{'\u23ce'}</kbd>
+          open
         </span>
         <span className="flex items-center gap-1">
-          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">/</kbd>
-          <span>search</span>
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">/</kbd>
+          search
         </span>
         <span className="flex items-center gap-1">
-          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">p</kbd>
-          <span>preview</span>
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">p</kbd>
+          preview
         </span>
         <span className="flex items-center gap-1">
-          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">?</kbd>
-          <span>help</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-[3px] py-[1px] rounded bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] font-mono text-[9px]">,</kbd>
-          <span>settings</span>
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">?</kbd>
+          help
         </span>
       </div>
 
-      <div className="flex-1" />
-
-      {/* Right: status info + temporary message */}
-      <div className="flex items-center gap-2">
+      {/* Right: metadata + theme toggle */}
+      <div className="flex items-center gap-3">
         {statusMessage && (
           <span
-            className={`text-[var(--accent-primary)] transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
+            className={cn(
+              'text-primary transition-opacity duration-300',
+              fading && 'opacity-0',
+            )}
           >
             {statusMessage}
           </span>
@@ -76,27 +97,22 @@ export function StatusBar() {
         )}
 
         {pivot !== 'none' && (
-          <span className="px-1 rounded bg-[var(--bg-tertiary)]">
+          <span className="px-1 rounded bg-muted">
             {'\u229e'} {pivot}
           </span>
         )}
 
-        {favorites.size > 0 && (
-          <span className="flex items-center gap-0.5">
-            <Star size={10} strokeWidth={2} className="text-yellow-400" />
-            {favorites.size}
-          </span>
-        )}
-
         {showHidden && (
-          <span className="px-1 rounded bg-[var(--bg-tertiary)]">+hidden</span>
+          <span className="px-1 rounded bg-muted">+hidden</span>
         )}
 
-        {selectedIds.size > 0 && (
-          <span>{selectedIds.size} sel</span>
-        )}
-
-        <span>{sessions.length} sessions</span>
+        <button
+          onClick={toggleTheme}
+          className="p-0.5 rounded hover:bg-muted transition-colors"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+        </button>
       </div>
     </div>
   );

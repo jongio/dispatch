@@ -78,13 +78,13 @@ function HostIcon({ hostType }: { hostType: string }) {
 function RefIcon({ type }: { type: string }) {
   switch (type) {
     case 'pr':
-      return <GitPullRequest size={14} className="inline-block text-[var(--accent-primary)]" />;
+      return <GitPullRequest size={14} className="inline-block text-primary" />;
     case 'issue':
-      return <CircleDot size={14} className="inline-block text-[var(--accent-secondary)]" />;
+      return <CircleDot size={14} className="inline-block text-accent" />;
     case 'commit':
-      return <GitCommit size={14} className="inline-block text-[var(--fg-secondary)]" />;
+      return <GitCommit size={14} className="inline-block text-muted-foreground" />;
     default:
-      return <Link size={14} className="inline-block text-[var(--fg-muted)]" />;
+      return <Link size={14} className="inline-block text-muted-foreground" />;
   }
 }
 
@@ -111,10 +111,10 @@ function SectionHeader({
   count: number;
 }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider pt-4 pb-1.5">
+    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-4 pb-1.5">
       {icon}
       <span>{title}</span>
-      <span className="ml-auto rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+      <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
         {count}
       </span>
     </div>
@@ -141,32 +141,32 @@ function TurnBubble({
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className="shrink-0 mt-1">
         {isUser ? (
-          <User size={14} className="inline-block text-[var(--accent-primary)]" />
+          <User size={14} className="inline-block text-primary" />
         ) : (
-          <Bot size={14} className="inline-block text-[var(--accent-secondary)]" />
+          <Bot size={14} className="inline-block text-accent" />
         )}
       </div>
       <div
         className={`flex-1 min-w-0 p-2 rounded-lg text-sm ${
           isUser
-            ? 'bg-[var(--conversation-user-bg)]'
-            : 'bg-[var(--conversation-assistant-bg)]'
+            ? 'bg-primary/10'
+            : 'bg-muted'
         }`}
       >
-        <div className="whitespace-pre-wrap break-words text-[var(--fg-primary)]">
+        <div className="whitespace-pre-wrap break-words text-foreground">
           {displayText}
           {needsTruncation && !expanded && '\u2026'}
         </div>
         {needsTruncation && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="mt-1 text-xs text-[var(--accent-primary)] hover:underline cursor-pointer"
+            className="mt-1 text-xs text-primary hover:underline cursor-pointer"
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>
         )}
         {timestamp && (
-          <div className="mt-1 text-[10px] text-[var(--fg-muted)]">
+          <div className="mt-1 text-[10px] text-muted-foreground">
             {formatTimestamp(timestamp)}
           </div>
         )}
@@ -216,7 +216,7 @@ export function PreviewPanel() {
     return (
       <div
         style={{ width: panelWidth }}
-        className="border-l border-[var(--border-primary)] flex flex-col items-center justify-center gap-2 text-[var(--fg-muted)]"
+        className="border-l border-border flex flex-col items-center justify-center gap-2 text-muted-foreground"
       >
         <Eye size={32} className="opacity-40" />
         <span className="text-sm">Select a session</span>
@@ -229,27 +229,27 @@ export function PreviewPanel() {
   return (
     <div
       style={{ width: panelWidth }}
-      className="relative border-l border-[var(--border-primary)] flex flex-col overflow-hidden"
+      className="relative border-l border-border flex flex-col overflow-hidden"
     >
       {/* Draggable resize handle */}
       <div
         onMouseDown={handleResizeStart}
-        className="absolute top-0 left-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent-primary)] transition-colors z-10"
+        className="absolute top-0 left-0 bottom-0 w-1 cursor-col-resize hover:bg-primary transition-colors z-10"
       />
 
       {/* Sticky metadata header */}
-      <div className="shrink-0 p-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)] truncate">
+      <div className="shrink-0 p-3 border-b border-border bg-card">
+        <h2 className="text-sm font-semibold text-foreground truncate">
           {session.summary || 'Untitled session'}
         </h2>
 
-        <div className="mt-2 space-y-1 text-xs text-[var(--fg-muted)]">
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
           {/* ID row */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[var(--fg-muted)]">ID</span>
+            <span className="text-muted-foreground">ID</span>
             <button
               onClick={() => handleCopyId(session.id)}
-              className="flex items-center gap-1 font-mono text-[var(--fg-secondary)] hover:text-[var(--accent-primary)] cursor-pointer transition-colors"
+              className="flex items-center gap-1 font-mono text-muted-foreground hover:text-primary cursor-pointer transition-colors"
               title="Click to copy full ID"
             >
               <span>{session.id.slice(0, 12)}</span>
@@ -265,7 +265,7 @@ export function PreviewPanel() {
           {session.repository && (
             <div className="flex items-center justify-between gap-2">
               <span>Repo</span>
-              <span className="text-[var(--fg-secondary)] truncate max-w-[60%] text-right">
+              <span className="text-muted-foreground truncate max-w-[60%] text-right">
                 {session.repository}
               </span>
             </div>
@@ -278,7 +278,7 @@ export function PreviewPanel() {
                 <GitBranch size={14} className="inline-block" />
                 Branch
               </span>
-              <span className="text-[var(--fg-secondary)] truncate max-w-[60%] text-right">
+              <span className="text-muted-foreground truncate max-w-[60%] text-right">
                 {session.branch}
               </span>
             </div>
@@ -291,7 +291,7 @@ export function PreviewPanel() {
                 <Folder size={14} className="inline-block" />
                 CWD
               </span>
-              <span className="font-mono text-[var(--fg-secondary)] truncate max-w-[60%] text-right">
+              <span className="font-mono text-muted-foreground truncate max-w-[60%] text-right">
                 {truncatePath(session.cwd, 30)}
               </span>
             </div>
@@ -304,7 +304,7 @@ export function PreviewPanel() {
                 <HostIcon hostType={session.host_type} />
                 Host
               </span>
-              <span className="text-[var(--fg-secondary)]">{session.host_type}</span>
+              <span className="text-muted-foreground">{session.host_type}</span>
             </div>
           )}
 
@@ -314,14 +314,14 @@ export function PreviewPanel() {
               <Clock size={14} className="inline-block" />
               Created
             </span>
-            <span className="text-[var(--fg-secondary)]">{formatTimestamp(session.created_at)}</span>
+            <span className="text-muted-foreground">{formatTimestamp(session.created_at)}</span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1">
               <Clock size={14} className="inline-block" />
               Updated
             </span>
-            <span className="text-[var(--fg-secondary)]">{formatTimestamp(session.updated_at)}</span>
+            <span className="text-muted-foreground">{formatTimestamp(session.updated_at)}</span>
           </div>
 
           {/* Turn count */}
@@ -330,7 +330,7 @@ export function PreviewPanel() {
               <MessageSquare size={14} className="inline-block" />
               Turns
             </span>
-            <span className="text-[var(--fg-secondary)]">{turns.length}</span>
+            <span className="text-muted-foreground">{turns.length}</span>
           </div>
         </div>
       </div>
@@ -376,18 +376,18 @@ export function PreviewPanel() {
               {checkpoints.slice(0, 5).map((cp) => (
                 <div
                   key={cp.checkpoint_number}
-                  className="p-2 rounded border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+                  className="p-2 rounded border border-border bg-card"
                 >
-                  <div className="text-sm font-medium text-[var(--fg-primary)]">{cp.title}</div>
+                  <div className="text-sm font-medium text-foreground">{cp.title}</div>
                   {cp.overview && (
-                    <div className="text-xs text-[var(--fg-muted)] mt-1 line-clamp-2">
+                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
                       {cp.overview}
                     </div>
                   )}
                 </div>
               ))}
               {checkpoints.length > 5 && (
-                <div className="text-xs text-[var(--fg-muted)] pl-1">
+                <div className="text-xs text-muted-foreground pl-1">
                   +{checkpoints.length - 5} more
                 </div>
               )}
@@ -409,12 +409,12 @@ export function PreviewPanel() {
                   key={i}
                   className="flex items-center gap-1.5 text-xs"
                 >
-                  <FileCode size={14} className="inline-block shrink-0 text-[var(--fg-muted)]" />
-                  <span className="font-mono text-[var(--fg-secondary)] truncate flex-1 min-w-0 direction-rtl text-left">
+                  <FileCode size={14} className="inline-block shrink-0 text-muted-foreground" />
+                  <span className="font-mono text-muted-foreground truncate flex-1 min-w-0 direction-rtl text-left">
                     {truncatePath(f.file_path)}
                   </span>
                   {f.tool_name && (
-                    <span className="shrink-0 flex items-center gap-0.5 rounded px-1 py-0.5 bg-[var(--bg-tertiary)] text-[var(--fg-muted)]">
+                    <span className="shrink-0 flex items-center gap-0.5 rounded px-1 py-0.5 bg-muted text-muted-foreground">
                       <ToolIcon tool={f.tool_name} />
                       <span className="text-[10px]">{f.tool_name}</span>
                     </span>
@@ -422,7 +422,7 @@ export function PreviewPanel() {
                 </div>
               ))}
               {files.length > 5 && (
-                <div className="text-xs text-[var(--fg-muted)] pl-1">
+                <div className="text-xs text-muted-foreground pl-1">
                   +{files.length - 5} more
                 </div>
               )}
@@ -442,10 +442,10 @@ export function PreviewPanel() {
               {refs.slice(0, 5).map((r, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-xs">
                   <RefIcon type={r.ref_type} />
-                  <span className="rounded px-1 py-0.5 bg-[var(--bg-tertiary)] text-[10px] font-medium text-[var(--fg-muted)] uppercase">
+                  <span className="rounded px-1 py-0.5 bg-muted text-[10px] font-medium text-muted-foreground uppercase">
                     {r.ref_type}
                   </span>
-                  <span className="font-mono text-[var(--fg-secondary)] truncate">
+                  <span className="font-mono text-muted-foreground truncate">
                     {r.ref_type === 'commit'
                       ? r.ref_value.slice(0, 7)
                       : r.ref_value}
@@ -453,7 +453,7 @@ export function PreviewPanel() {
                 </div>
               ))}
               {refs.length > 5 && (
-                <div className="text-xs text-[var(--fg-muted)] pl-1">
+                <div className="text-xs text-muted-foreground pl-1">
                   +{refs.length - 5} more
                 </div>
               )}

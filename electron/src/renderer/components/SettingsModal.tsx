@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
-import { useThemeStore } from '../stores/themeStore';
 import type { Config } from '../../preload/index';
 
 const LAUNCH_MODES = [
@@ -16,6 +15,12 @@ const PANE_DIRECTIONS = [
   { value: 'down', label: 'Down' },
   { value: 'left', label: 'Left' },
   { value: 'up', label: 'Up' },
+];
+
+const THEME_OPTIONS = [
+  { value: 'auto', label: 'Auto (System)' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
 ];
 
 function getDefaultConfig(): Config {
@@ -42,18 +47,14 @@ function getDefaultConfig(): Config {
 
 export function SettingsModal() {
   const { showSettings, toggleSettings } = useSessionStore();
-  const { themes: themeDefinitions, currentTheme, setTheme } = useThemeStore();
   const [config, setConfig] = useState<Config>(getDefaultConfig());
   const [configPath, setConfigPath] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<string>(() => {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  });
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
-
-  // Build theme options from the theme store
-  const themeOptions = [
-    { value: 'auto', label: 'Auto (System)' },
-    ...themeDefinitions.map((t) => ({ value: t.id, label: t.name })),
-  ];
 
   // Load config when modal opens
   useEffect(() => {
@@ -83,7 +84,6 @@ export function SettingsModal() {
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
-      // Sync theme selection to the config before saving
       const configToSave = { ...config, theme: currentTheme === 'auto' ? '' : currentTheme };
       await window.dispatch.config.set(configToSave);
       toggleSettings();
@@ -118,16 +118,17 @@ export function SettingsModal() {
   }, []);
 
   const handleThemeChange = useCallback((value: string) => {
-    // Apply theme immediately for live preview
-    const themeId = value === 'auto' ? 'auto' : value;
-    setTheme(themeId);
+    const themeId = value === 'auto' ? 'dark' : value;
+    document.documentElement.setAttribute('data-theme', themeId);
+    setCurrentTheme(value);
     setConfig((prev) => ({ ...prev, theme: value === 'auto' ? '' : value }));
-  }, [setTheme]);
+  }, []);
 
   const handleResetTheme = useCallback(() => {
-    setTheme('auto');
+    document.documentElement.setAttribute('data-theme', 'dark');
+    setCurrentTheme('auto');
     setConfig((prev) => ({ ...prev, theme: '' }));
-  }, [setTheme]);
+  }, []);
 
   const handleOpenConfigDir = useCallback(() => {
     window.dispatch.config.openInExplorer();
@@ -135,8 +136,7 @@ export function SettingsModal() {
 
   if (!showSettings) return null;
 
-  // Determine theme dropdown value
-  const themeValue = currentTheme === 'auto' ? 'auto' : currentTheme;
+  const themeValue = currentTheme;
 
   return (
     <div
@@ -146,17 +146,17 @@ export function SettingsModal() {
       onKeyDown={handleKeyDown}
     >
       <div
-        className="flex flex-col w-[600px] max-h-[85vh] rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="flex flex-col w-[600px] max-h-[85vh] rounded-lg border border-border bg-card shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)]">
-          <h2 className="text-base font-semibold text-[var(--fg-primary)]">Settings</h2>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+          <h2 className="text-base font-semibold text-foreground">Settings</h2>
           <button
             onClick={toggleSettings}
-            className="px-2 py-0.5 text-sm text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--hover-bg)] rounded"
+            className="px-2 py-0.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded"
             aria-label="Close settings"
           >
             Esc
@@ -243,7 +243,7 @@ export function SettingsModal() {
               label="Theme"
               description="Color scheme for the interface"
               value={themeValue}
-              options={themeOptions}
+              options={THEME_OPTIONS}
               onChange={handleThemeChange}
               onReset={handleResetTheme}
             />
@@ -262,10 +262,10 @@ export function SettingsModal() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
           <button
             onClick={handleOpenConfigDir}
-            className="text-xs text-[var(--fg-muted)] hover:text-[var(--accent-primary)] hover:underline truncate max-w-[280px]"
+            className="text-xs text-muted-foreground hover:text-primary hover:underline truncate max-w-[280px]"
             title={configPath}
           >
             {configPath}
@@ -274,14 +274,14 @@ export function SettingsModal() {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleSettings}
-              className="px-3 py-1.5 text-sm text-[var(--fg-secondary)] hover:bg-[var(--hover-bg)] rounded border border-[var(--border-subtle)]"
+              className="px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/30 rounded border border-border"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-[var(--accent-primary)] hover:opacity-90 rounded disabled:opacity-50"
+              className="px-3 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>
@@ -299,7 +299,7 @@ export function SettingsModal() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)] mb-2">
+      <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
         {title}
       </legend>
       {children}
@@ -324,13 +324,13 @@ const ToggleField = React.forwardRef<HTMLInputElement, ToggleFieldProps>(
     return (
       <div className="flex items-center justify-between gap-4 py-1.5 group">
         <div className="flex-1 min-w-0">
-          <div className="text-sm text-[var(--fg-primary)]">{label}</div>
-          <div className="text-xs text-[var(--fg-muted)] mt-0.5">{description}</div>
+          <div className="text-sm text-foreground">{label}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onReset}
-            className="text-xs text-[var(--fg-muted)] hover:text-[var(--accent-primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-xs text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
             title="Reset to default"
             tabIndex={-1}
           >
@@ -344,7 +344,7 @@ const ToggleField = React.forwardRef<HTMLInputElement, ToggleFieldProps>(
               onChange={(e) => onChange(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-9 h-5 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] peer-focus:ring-2 peer-focus:ring-[var(--focus-ring)] rounded-full peer peer-checked:bg-[var(--accent-primary)] after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-transform peer-checked:after:translate-x-4" />
+            <div className="w-9 h-5 bg-muted border border-border peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-transform peer-checked:after:translate-x-4" />
           </label>
         </div>
       </div>
@@ -369,13 +369,13 @@ function TextField({ label, description, value, onChange, onReset, placeholder }
   return (
     <div className="flex items-center justify-between gap-4 py-1.5 group">
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-[var(--fg-primary)]">{label}</div>
-        <div className="text-xs text-[var(--fg-muted)] mt-0.5">{description}</div>
+        <div className="text-sm text-foreground">{label}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={onReset}
-          className="text-xs text-[var(--fg-muted)] hover:text-[var(--accent-primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-xs text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
           title="Reset to default"
           tabIndex={-1}
         >
@@ -386,7 +386,7 @@ function TextField({ label, description, value, onChange, onReset, placeholder }
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-44 px-2 py-1 text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded text-[var(--fg-primary)] placeholder-[var(--fg-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)]"
+          className="w-44 px-2 py-1 text-sm bg-muted border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
     </div>
@@ -410,13 +410,13 @@ function SelectField({ label, description, value, options, onChange, onReset }: 
   return (
     <div className="flex items-center justify-between gap-4 py-1.5 group">
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-[var(--fg-primary)]">{label}</div>
-        <div className="text-xs text-[var(--fg-muted)] mt-0.5">{description}</div>
+        <div className="text-sm text-foreground">{label}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={onReset}
-          className="text-xs text-[var(--fg-muted)] hover:text-[var(--accent-primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-xs text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
           title="Reset to default"
           tabIndex={-1}
         >
@@ -425,7 +425,7 @@ function SelectField({ label, description, value, options, onChange, onReset }: 
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-44 px-2 py-1 text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded text-[var(--fg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)] appearance-none cursor-pointer"
+          className="w-44 px-2 py-1 text-sm bg-muted border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
         >
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>

@@ -39,18 +39,18 @@ export function SearchBar() {
   }, [setSearchQuery]);
 
   return (
-    <div className="flex items-center h-8 px-2 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+    <div className="flex items-center h-8 px-2 bg-background border-b border-border">
       <div
         className={`
-          flex items-center flex-1 gap-1.5 px-2 h-6 rounded-sm bg-[var(--bg-tertiary)]
+          flex items-center flex-1 gap-1.5 px-2 h-6 rounded-sm bg-muted
           transition-shadow duration-100
-          ${isFocused ? 'shadow-[0_0_0_2px_var(--focus-ring)]' : ''}
+          ${isFocused ? 'ring-2 ring-ring' : ''}
         `}
       >
         {isSearching ? (
-          <Loader2 size={14} className="text-[var(--accent-primary)] animate-spin flex-shrink-0" />
+          <Loader2 size={14} className="text-primary animate-spin flex-shrink-0" />
         ) : (
-          <Search size={14} className="text-[var(--fg-muted)] flex-shrink-0" />
+          <Search size={14} className="text-muted-foreground flex-shrink-0" />
         )}
         <input
           ref={inputRef}
@@ -61,18 +61,18 @@ export function SearchBar() {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder="Search sessions..."
-          className="flex-1 h-6 bg-transparent text-xs text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none"
+          className="flex-1 h-6 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
         {localQuery ? (
           <button
             onClick={handleClear}
-            className="p-0.5 rounded text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--hover-bg)] transition-colors duration-75"
+            className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors duration-75"
           >
             <X size={14} />
           </button>
         ) : (
           !isFocused && (
-            <kbd className="text-[10px] font-mono text-[var(--fg-muted)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded">
+            <kbd className="text-[10px] font-mono text-muted-foreground bg-background border border-border px-1.5 py-0.5 rounded">
               /
             </kbd>
           )

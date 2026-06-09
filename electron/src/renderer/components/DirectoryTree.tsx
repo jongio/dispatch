@@ -177,7 +177,7 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
       <div
         className={`
           flex items-center gap-1 py-0.5 px-1 rounded cursor-pointer text-xs
-          hover:bg-[var(--hover-bg)] transition-colors duration-75
+          hover:bg-muted/30 transition-colors duration-75
           ${isExcluded ? 'opacity-50' : ''}
         `}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
@@ -186,8 +186,8 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
         <button
           onClick={() => hasChildren && onToggleExpand(node.path)}
           className={`
-            w-4 h-4 flex items-center justify-center flex-shrink-0 text-[var(--fg-muted)]
-            ${hasChildren ? 'hover:text-[var(--fg-primary)]' : 'invisible'}
+            w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground
+            ${hasChildren ? 'hover:text-foreground' : 'invisible'}
           `}
         >
           {isExpanded ? (
@@ -200,25 +200,25 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
         {/* Checkbox icon */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExclude(node.path, isExcluded); }}
-          className="flex-shrink-0 text-[var(--fg-muted)] hover:text-[var(--accent-primary)] transition-colors duration-75"
+          className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors duration-75"
         >
           {isExcluded ? (
-            <Square size={14} className="text-[var(--fg-muted)]" />
+            <Square size={14} className="text-muted-foreground" />
           ) : (
-            <CheckSquare size={14} className="text-[var(--accent-primary)]" />
+            <CheckSquare size={14} className="text-primary" />
           )}
         </button>
 
         {/* Folder icon */}
         {isExpanded && hasChildren ? (
-          <FolderOpen size={14} className="text-[var(--accent-secondary,var(--fg-muted))] flex-shrink-0" />
+          <FolderOpen size={14} className="text-primary flex-shrink-0" />
         ) : (
-          <Folder size={14} className="text-[var(--fg-muted)] flex-shrink-0" />
+          <Folder size={14} className="text-muted-foreground flex-shrink-0" />
         )}
 
         {/* Directory name */}
         <span
-          className="truncate text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] flex-1"
+          className="truncate text-foreground hover:text-foreground flex-1"
           onClick={() => hasChildren && onToggleExpand(node.path)}
           title={node.path}
         >
@@ -227,7 +227,7 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
 
         {/* Session count badge */}
         {node.sessionCount > 0 && (
-          <span className="text-[10px] text-[var(--fg-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-full min-w-[18px] text-center flex-shrink-0">
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full min-w-[18px] text-center flex-shrink-0">
             {node.sessionCount}
           </span>
         )}
@@ -338,7 +338,7 @@ export function DirectoryTree() {
 
   if (sessions.length === 0) {
     return (
-      <div className="text-xs text-[var(--fg-muted)] px-2 py-1">
+      <div className="text-xs text-muted-foreground px-2 py-1">
         No sessions loaded
       </div>
     );
@@ -347,21 +347,21 @@ export function DirectoryTree() {
   return (
     <div className="flex flex-col gap-1">
       {/* Search within tree */}
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--bg-tertiary)]">
-        <Search size={12} className="text-[var(--fg-muted)] flex-shrink-0" />
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted">
+        <Search size={12} className="text-muted-foreground flex-shrink-0" />
         <input
           type="text"
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
           placeholder="Filter dirs..."
-          className="flex-1 bg-transparent text-xs text-[var(--fg-primary)] placeholder-[var(--fg-muted)] outline-none"
+          className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 
       {/* Tree nodes */}
       <div className="max-h-[300px] overflow-y-auto">
         {filteredTree.length === 0 ? (
-          <div className="text-xs text-[var(--fg-muted)] px-2 py-1">
+          <div className="text-xs text-muted-foreground px-2 py-1">
             {searchFilter ? 'No matching directories' : 'No directories'}
           </div>
         ) : (
@@ -383,7 +383,7 @@ export function DirectoryTree() {
       {excludedDirs.length > 0 && (
         <button
           onClick={() => setExcludedDirs([])}
-          className="text-[10px] text-[var(--accent-primary)] hover:underline px-2 text-left"
+          className="text-[10px] text-primary hover:underline px-2 text-left"
         >
           Clear all filters ({excludedDirs.length})
         </button>

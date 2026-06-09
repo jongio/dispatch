@@ -77,7 +77,7 @@ export function ShellPicker({ isOpen, onSelect, onClose }: ShellPickerProps) {
       onKeyDown={handleKeyDown}
     >
       <div
-        className="w-[360px] max-h-[400px] rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-2xl flex flex-col overflow-hidden"
+        className="w-[360px] max-h-[400px] rounded-lg bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="Select a shell"
@@ -85,9 +85,9 @@ export function ShellPicker({ isOpen, onSelect, onClose }: ShellPickerProps) {
         ref={(el) => el?.focus()}
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Select Shell</h2>
-          <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Select Shell</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Choose which shell to use for this session
           </p>
         </div>
@@ -95,13 +95,13 @@ export function ShellPicker({ isOpen, onSelect, onClose }: ShellPickerProps) {
         {/* Shell list */}
         <div ref={listRef} className="flex-1 overflow-y-auto py-1" role="listbox">
           {isLoading && (
-            <div className="flex items-center justify-center py-8 text-sm text-[var(--fg-muted)]">
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               Detecting shells...
             </div>
           )}
 
           {!isLoading && shells.length === 0 && (
-            <div className="flex items-center justify-center py-8 text-sm text-[var(--fg-muted)]">
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               No shells detected
             </div>
           )}
@@ -116,29 +116,29 @@ export function ShellPicker({ isOpen, onSelect, onClose }: ShellPickerProps) {
               className={`
                 flex items-center px-4 py-2.5 cursor-pointer transition-colors
                 ${index === selectedIndex
-                  ? 'bg-[var(--selection-bg)]'
-                  : 'hover:bg-[var(--hover-bg)]'
+                  ? 'bg-accent/20 ring-1 ring-inset ring-accent'
+                  : 'hover:bg-muted/30'
                 }
               `}
             >
               {/* Shell icon placeholder */}
-              <div className="w-6 h-6 rounded flex items-center justify-center bg-[var(--bg-tertiary)] text-xs font-mono text-[var(--fg-muted)] flex-shrink-0">
+              <div className="w-6 h-6 rounded flex items-center justify-center bg-muted text-xs font-mono text-muted-foreground flex-shrink-0">
                 {shell.name.charAt(0).toUpperCase()}
               </div>
 
               {/* Shell info */}
               <div className="ml-3 flex-1 min-w-0">
-                <div className="text-sm font-medium text-[var(--fg-primary)]">
+                <div className="text-sm font-medium text-foreground">
                   {shell.displayName}
                 </div>
-                <div className="text-xs text-[var(--fg-muted)] truncate font-mono">
+                <div className="text-xs text-muted-foreground truncate font-mono">
                   {shell.path}
                 </div>
               </div>
 
               {/* Default badge */}
               {shell.isDefault && (
-                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] flex-shrink-0">
+                <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/20 text-primary flex-shrink-0">
                   default
                 </span>
               )}
@@ -147,7 +147,7 @@ export function ShellPicker({ isOpen, onSelect, onClose }: ShellPickerProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--fg-muted)]">
+        <div className="px-4 py-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
           <span>↑↓ navigate</span>
           <span>Enter select · Esc cancel</span>
         </div>
