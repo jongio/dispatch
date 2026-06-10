@@ -38,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { rcedit } = require('rcedit');
+  const { rcedit } = await import('rcedit');
   console.log(`[icon:dev] writing ${iconPath} → ${exePath}`);
   await rcedit(exePath, {
     icon: iconPath,

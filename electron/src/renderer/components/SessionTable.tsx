@@ -477,15 +477,32 @@ export function SessionTable() {
         }
       } else {
         anchorRef.current = flatIndex;
+        // Plain click clears multi-selection
+        const { selectedIds, deselectAll } = useSessionStore.getState();
+        if (selectedIds.size > 0) {
+          deselectAll();
+        }
         selectSession(id);
       }
     },
     [grouping, toggleGroup, toggleSelection, selectSession, flatRows],
   );
 
-  const handleRowDoubleClick = useCallback((row: Row<Session>) => {
+  const handleRowDoubleClick = useCallback((e: React.MouseEvent, row: Row<Session>) => {
+    e.preventDefault();
     if (row.getIsGrouped()) return;
-    window.dispatch.launch.inPlace(row.original.id);
+    const { selectedIds } = useSessionStore.getState();
+    if (selectedIds.size > 1 && selectedIds.has(row.original.id)) {
+      // Double-clicked a selected row while multi-selected — launch all
+      window.dispatch.launch.multi(Array.from(selectedIds)).catch((err) => {
+        console.error('Multi-launch failed:', err);
+      });
+    } else {
+      // Launch just this one
+      window.dispatch.launch.session(row.original.id).catch((err) => {
+        console.error('Launch failed:', err);
+      });
+    }
   }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -720,16 +737,16 @@ export function SessionTable() {
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
                 className={`
-                  group/row flex items-center cursor-pointer
+                  group/row flex items-center cursor-pointer select-none
                   border-b border-border
-                  ${isSelected ? 'bg-accent/20 ring-1 ring-inset ring-accent' : ''}
-                  ${!isSelected && isMultiSelected ? 'bg-accent/20 opacity-80' : ''}
-                  ${!isSelected && !isMultiSelected && isCursor ? 'border-l-2 border-l-primary' : ''}
-                  ${!isSelected && !isMultiSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-card' : ''}
-                  ${!isSelected ? 'hover:bg-muted/30' : ''}
+                  ${isMultiSelected ? 'bg-primary/15 ring-1 ring-inset ring-primary/40' : ''}
+                  ${!isMultiSelected && isSelected ? 'bg-accent/20 ring-1 ring-inset ring-accent' : ''}
+                  ${!isMultiSelected && !isSelected && isCursor ? 'border-l-2 border-l-primary' : ''}
+                  ${!isMultiSelected && !isSelected && !isCursor && virtualRow.index % 2 === 1 ? 'bg-card' : ''}
+                  ${!isMultiSelected && !isSelected ? 'hover:bg-muted/30' : ''}
                 `}
                 onClick={(e) => handleRowClick(row, e, virtualRow.index)}
-                onDoubleClick={() => handleRowDoubleClick(row)}
+                onDoubleClick={(e) => handleRowDoubleClick(e, row)}
               >
                 {row.getVisibleCells().map((cell) => {
                   const isSummary = cell.column.id === 'summary';

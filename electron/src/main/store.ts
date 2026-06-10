@@ -85,12 +85,7 @@ export class SessionStore {
   }
 
   private getStorePath(): string {
-    const home = homedir();
-    // Platform-specific session store paths
-    if (process.platform === 'win32') {
-      return join(home, '.copilot', 'session-store.db');
-    }
-    return join(home, '.copilot', 'session-store.db');
+    return join(homedir(), '.copilot', 'session-store.db');
   }
 
   private open(): void {
@@ -100,12 +95,17 @@ export class SessionStore {
       return;
     }
 
-    this.db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('query_only = ON');
+    try {
+      this.db = new Database(dbPath, { readonly: true, fileMustExist: true });
+      this.db.pragma('busy_timeout = 3000');
+      this.db.pragma('query_only = ON');
 
-    // Detect schema capabilities
-    this.detectCapabilities();
+      // Detect schema capabilities
+      this.detectCapabilities();
+    } catch (err) {
+      console.error('Failed to open session store:', err);
+      this.db = null;
+    }
   }
 
   private detectCapabilities(): void {

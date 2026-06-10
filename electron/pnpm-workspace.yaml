@@ -1,0 +1,4 @@
+allowBuilds:
+  electron: true
+minimumReleaseAgeExclude:
+  - electron@42.4.0

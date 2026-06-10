@@ -1,6 +1,24 @@
-import { spawn, execFile } from 'child_process';
+import { spawn, execFile, execSync } from 'child_process';
 import { getShells, getTerminals } from './shells';
 import type { ShellInfo, TerminalInfo } from './shells';
+
+/**
+ * The static Windows Terminal window name. All sessions launched from Electron
+ * reuse this named window, opening each session as a new tab within it.
+ */
+const WT_WINDOW_NAME = 'dispatch';
+
+/**
+ * Strict pattern for valid session IDs. Only alphanumeric, dots, hyphens,
+ * and underscores allowed. Prevents shell injection via session ID.
+ */
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
+
+/**
+ * Pattern for safe CLI argument values (agent name, model name).
+ * Allows alphanumeric, hyphens, dots, underscores, and forward slashes.
+ */
+const SAFE_ARG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._\-/]{0,127}$/;
 
 export interface LaunchOptions {
   shell?: string;
@@ -9,7 +27,6 @@ export interface LaunchOptions {
   agent?: string;
   model?: string;
   customCommand?: string;
-  paneDirection?: 'horizontal' | 'vertical';
 }
 
 export interface LaunchResult {
@@ -19,111 +36,100 @@ export interface LaunchResult {
 
 /**
  * LaunchManager handles spawning terminal sessions with the Copilot CLI.
- * All launched processes are detached so they outlive the Dispatch window.
+ *
+ * From Electron, the launch model is simple: always open a new tab in the
+ * named "dispatch" Windows Terminal window. If the window doesn't exist yet,
+ * Windows Terminal creates it automatically.
  */
 export class LaunchManager {
   private cachedShells: ShellInfo[] | null = null;
   private cachedTerminals: TerminalInfo[] | null = null;
+  private cachedCliBinary: string | null = null;
 
   /**
-   * Opens a terminal in the current context (in-place).
-   * Spawns the shell directly without a new window/tab.
+   * Launches a session as a new tab in the "dispatch" Windows Terminal window.
    */
-  launchInPlace(sessionId: string, opts: LaunchOptions = {}): LaunchResult {
+  launch(sessionId: string, opts: LaunchOptions = {}): LaunchResult {
+    console.log('[LaunchManager.launch] sessionId:', sessionId);
+    const validationError = this.validateInputs(sessionId, opts);
+    if (validationError) {
+      console.log('[LaunchManager.launch] VALIDATION FAILED:', validationError);
+      return { success: false, error: validationError };
+    }
+
     const command = this.buildResumeCommand(sessionId, opts);
     const shell = this.resolveShell(opts.shell);
     if (!shell) {
+      console.log('[LaunchManager.launch] NO SHELL FOUND');
       return { success: false, error: 'No suitable shell found on this system.' };
     }
 
+    const terminal = this.resolveTerminal(opts.terminal);
+    console.log('[LaunchManager.launch] terminal:', terminal?.name, 'shell:', shell.name);
+
+    if (terminal?.name === 'windows-terminal') {
+      return this.launchInWindowsTerminal(terminal, shell, command, sessionId);
+    }
+
+    // Fallback for non-WT platforms: open in whatever terminal is available
+    if (terminal) {
+      return this.launchInTerminalTab(terminal, shell, command, sessionId);
+    }
+
+    // Last resort: spawn shell directly
     return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
   }
 
   /**
-   * Opens a new terminal tab with the session.
+   * Launches multiple sessions, each as a new tab.
+   * Staggers spawns slightly to avoid WT race conditions with named windows.
    */
-  launchNewTab(sessionId: string, opts: LaunchOptions = {}): LaunchResult {
-    const command = this.buildResumeCommand(sessionId, opts);
-    const shell = this.resolveShell(opts.shell);
-    if (!shell) {
-      return { success: false, error: 'No suitable shell found on this system.' };
+  launchMulti(sessionIds: string[], opts: LaunchOptions = {}): LaunchResult[] {
+    const results: LaunchResult[] = [];
+    for (let i = 0; i < sessionIds.length; i++) {
+      if (i > 0) {
+        const start = Date.now();
+        while (Date.now() - start < 500) { /* wait for WT to register the window */ }
+      }
+      results.push(this.launch(sessionIds[i], opts));
     }
-
-    const terminal = this.resolveTerminal(opts.terminal);
-    if (!terminal) {
-      // Fall back to in-place spawn if no terminal supports tabs
-      return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
-    }
-
-    return this.launchInTerminalTab(terminal, shell, command, sessionId);
+    return results;
   }
 
   /**
-   * Opens a new terminal window with the session.
+   * Validates all user-supplied inputs before command construction.
+   * Returns an error message if validation fails, or null if valid.
    */
-  launchNewWindow(sessionId: string, opts: LaunchOptions = {}): LaunchResult {
-    const command = this.buildResumeCommand(sessionId, opts);
-    const shell = this.resolveShell(opts.shell);
-    if (!shell) {
-      return { success: false, error: 'No suitable shell found on this system.' };
+  private validateInputs(sessionId: string, opts: LaunchOptions): string | null {
+    if (!SESSION_ID_PATTERN.test(sessionId)) {
+      return `Invalid session ID: must match ${SESSION_ID_PATTERN.source}`;
     }
-
-    const terminal = this.resolveTerminal(opts.terminal);
-    if (!terminal) {
-      return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
+    if (opts.agent && !SAFE_ARG_PATTERN.test(opts.agent)) {
+      return 'Invalid agent name: contains disallowed characters.';
     }
-
-    return this.launchInTerminalWindow(terminal, shell, command, sessionId);
+    if (opts.model && !SAFE_ARG_PATTERN.test(opts.model)) {
+      return 'Invalid model name: contains disallowed characters.';
+    }
+    if (opts.customCommand && opts.customCommand.length > 1024) {
+      return 'Custom command exceeds maximum length (1024 chars).';
+    }
+    return null;
   }
 
   /**
-   * Opens a split pane in the terminal (Windows Terminal, iTerm2, Konsole).
-   */
-  launchSplitPane(sessionId: string, opts: LaunchOptions = {}): LaunchResult {
-    const command = this.buildResumeCommand(sessionId, opts);
-    const shell = this.resolveShell(opts.shell);
-    if (!shell) {
-      return { success: false, error: 'No suitable shell found on this system.' };
-    }
-
-    const terminal = this.resolveTerminal(opts.terminal);
-    if (!terminal?.supportsSplitPane) {
-      return { success: false, error: `Split pane is not supported by ${terminal?.displayName ?? 'the available terminal'}.` };
-    }
-
-    return this.launchInSplitPane(terminal, shell, command, opts.paneDirection ?? 'horizontal', sessionId);
-  }
-
-  /**
-   * Launches multiple sessions in parallel.
-   */
-  launchMulti(
-    sessionIds: string[],
-    mode: 'inPlace' | 'newTab' | 'newWindow' | 'splitPane',
-    opts: LaunchOptions = {},
-  ): LaunchResult[] {
-    const launcher = {
-      inPlace: (id: string) => this.launchInPlace(id, opts),
-      newTab: (id: string) => this.launchNewTab(id, opts),
-      newWindow: (id: string) => this.launchNewWindow(id, opts),
-      splitPane: (id: string) => this.launchSplitPane(id, opts),
-    };
-
-    return sessionIds.map((id) => launcher[mode](id));
-  }
-
-  /**
-   * Builds the `gh copilot session resume` command string with flags.
+   * Builds the resume command string using the correct Copilot CLI binary.
+   * Prefers "ghcs" (Copilot CLI standalone), falls back to "copilot".
    */
   private buildResumeCommand(sessionId: string, opts: LaunchOptions): string {
     if (opts.customCommand) {
-      return opts.customCommand;
+      return opts.customCommand.replace('{sessionId}', sessionId);
     }
 
-    const parts = ['gh', 'copilot', 'session', 'resume', sessionId];
+    const binary = this.findCliBinary();
+    const parts = [binary, '--resume', sessionId];
 
     if (opts.yoloMode) {
-      parts.push('--yolo');
+      parts.push('--allow-all');
     }
     if (opts.agent) {
       parts.push('--agent', opts.agent);
@@ -133,6 +139,47 @@ export class LaunchManager {
     }
 
     return parts.join(' ');
+  }
+
+  /**
+   * Returns the Copilot CLI binary name. Checks PATH first, then well-known
+   * install locations (Electron often has a stripped PATH).
+   */
+  private findCliBinary(): string {
+    if (this.cachedCliBinary) return this.cachedCliBinary;
+
+    // Try PATH lookup
+    try {
+      const cmd = process.platform === 'win32' ? 'where copilot' : 'which copilot';
+      const result = execSync(cmd, { encoding: 'utf-8', timeout: 3000 }).trim();
+      if (result) {
+        this.cachedCliBinary = 'copilot';
+        return 'copilot';
+      }
+    } catch {
+      // not on PATH
+    }
+
+    // Check well-known install paths (Electron often has a stripped PATH)
+    const { existsSync } = require('fs');
+    const { join } = require('path');
+    const candidates = process.platform === 'win32'
+      ? [
+          join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'copilot.cmd'),
+          join(process.env.LOCALAPPDATA || '', 'npm', 'copilot.cmd'),
+          join(process.env.APPDATA || '', 'npm', 'copilot.cmd'),
+        ]
+      : ['/usr/local/bin/copilot', '/usr/bin/copilot'];
+
+    for (const p of candidates) {
+      if (p && existsSync(p)) {
+        this.cachedCliBinary = p;
+        return p;
+      }
+    }
+
+    this.cachedCliBinary = 'copilot';
+    return 'copilot';
   }
 
   private resolveShell(shellName?: string): ShellInfo | null {
@@ -173,7 +220,6 @@ export class LaunchManager {
 
   /**
    * Builds the argument array for executing a command within a given shell.
-   * Uses -NoExit (pwsh) or keeps stdin open so the interactive session stays alive.
    */
   private buildShellArgs(shell: ShellInfo, command: string): string[] {
     switch (shell.name) {
@@ -185,7 +231,7 @@ export class LaunchManager {
       case 'wsl':
         return ['--', 'bash', '-ic', command];
       default:
-        // bash, zsh, fish, sh, git-bash — use -i for interactive
+        // bash, zsh, fish, sh, git-bash
         return ['-ic', command];
     }
   }
@@ -207,6 +253,34 @@ export class LaunchManager {
     }
   }
 
+  /**
+   * Opens a new tab in the named "dispatch" Windows Terminal window.
+   * Uses bare 'wt.exe' name — Node resolves it via PATH, which handles
+   * Windows App Execution Aliases correctly (unlike full reparse-point paths).
+   */
+  private launchInWindowsTerminal(
+    _terminal: TerminalInfo,
+    shell: ShellInfo,
+    command: string,
+    sessionId: string,
+  ): LaunchResult {
+    const title = `Dispatch: ${sessionId.slice(0, 8)}`;
+    // Use bare exe names — Node's spawn resolves via PATH+PATHEXT
+    const shellExe = shell.name === 'cmd' ? 'cmd.exe'
+      : shell.name === 'powershell' ? 'powershell.exe'
+      : 'pwsh.exe';
+    const args = ['-w', WT_WINDOW_NAME, 'new-tab', '--title', title, shellExe];
+    if (shell.name === 'cmd') {
+      args.push('/k', command);
+    } else {
+      args.push('-NoExit', '-Command', command);
+    }
+    return this.spawnDetached('wt.exe', args);
+  }
+
+  /**
+   * Fallback for non-Windows platforms: open a new tab in the detected terminal.
+   */
   private launchInTerminalTab(
     terminal: TerminalInfo,
     shell: ShellInfo,
@@ -216,99 +290,11 @@ export class LaunchManager {
     const title = `Dispatch: ${sessionId.slice(0, 8)}`;
 
     switch (process.platform) {
-      case 'win32':
-        return this.launchWindowsTerminalTab(terminal, shell, command, title);
       case 'darwin':
         return this.launchMacTerminalTab(terminal, shell, command, title);
       default:
         return this.launchLinuxTerminalTab(terminal, shell, command);
     }
-  }
-
-  private launchInTerminalWindow(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    sessionId: string,
-  ): LaunchResult {
-    const title = `Dispatch: ${sessionId.slice(0, 8)}`;
-
-    switch (process.platform) {
-      case 'win32':
-        return this.launchWindowsTerminalWindow(terminal, shell, command, title);
-      case 'darwin':
-        return this.launchMacTerminalWindow(terminal, shell, command, title);
-      default:
-        return this.launchLinuxTerminalWindow(terminal, shell, command, title);
-    }
-  }
-
-  private launchInSplitPane(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    direction: 'horizontal' | 'vertical',
-    sessionId: string,
-  ): LaunchResult {
-    switch (process.platform) {
-      case 'win32':
-        return this.launchWindowsTerminalSplitPane(terminal, shell, command, direction);
-      case 'darwin':
-        return this.launchMacSplitPane(terminal, shell, command, direction);
-      default:
-        return this.launchLinuxSplitPane(terminal, shell, command, direction);
-    }
-  }
-
-  // ─── Windows Terminal ──────────────────────────────────────────────
-
-  private launchWindowsTerminalTab(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    title: string,
-  ): LaunchResult {
-    if (terminal.name === 'windows-terminal') {
-      // wt.exe -w 0 new-tab --title "title" pwsh.exe -NoExit -Command "command"
-      const shellArgs = this.buildShellArgs(shell, command);
-      const args = ['-w', '0', 'new-tab', '--title', title, shell.path, ...shellArgs];
-      return this.spawnDetached(terminal.path, args);
-    }
-
-    // Fallback: open in new console window
-    return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
-  }
-
-  private launchWindowsTerminalWindow(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    title: string,
-  ): LaunchResult {
-    if (terminal.name === 'windows-terminal') {
-      // wt.exe new-tab --title "Dispatch: {id}" {shell} -c "{command}"
-      const args = ['new-tab', '--title', title, shell.path, ...this.buildShellArgs(shell, command)];
-      return this.spawnDetached(terminal.path, args);
-    }
-
-    // Generic: spawn the shell directly (opens a new console window on Windows)
-    return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
-  }
-
-  private launchWindowsTerminalSplitPane(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    direction: 'horizontal' | 'vertical',
-  ): LaunchResult {
-    if (terminal.name !== 'windows-terminal') {
-      return { success: false, error: `${terminal.displayName} does not support split panes.` };
-    }
-
-    // wt.exe -w 0 split-pane --size 0.5 -H|-V {shell} -c "{command}"
-    const dirFlag = direction === 'horizontal' ? '-H' : '-V';
-    const args = ['-w', '0', 'split-pane', '--size', '0.5', dirFlag, shell.path, ...this.buildShellArgs(shell, command)];
-    return this.spawnDetached(terminal.path, args);
   }
 
   // ─── macOS ─────────────────────────────────────────────────────────
@@ -325,7 +311,7 @@ export class LaunchManager {
           activate
           tell application "System Events" to keystroke "t" using command down
           delay 0.3
-          do script "${escapeAppleScript(this.buildFullShellCommand(shell, command))}" in front window
+          do script "${escapeAppleScript(command)}" in front window
           set custom title of front window to "${escapeAppleScript(title)}"
         end tell
       `);
@@ -338,46 +324,14 @@ export class LaunchManager {
           tell current window
             create tab with default profile
             tell current session of current tab
-              write text "${escapeAppleScript(this.buildFullShellCommand(shell, command))}"
+              write text "${escapeAppleScript(command)}"
             end tell
           end tell
         end tell
       `);
     }
 
-    // Generic: spawn directly
-    return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
-  }
-
-  private launchMacTerminalWindow(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    title: string,
-  ): LaunchResult {
-    if (terminal.name === 'terminal') {
-      return this.runAppleScript(`
-        tell application "Terminal"
-          activate
-          do script "${escapeAppleScript(this.buildFullShellCommand(shell, command))}"
-          set custom title of front window to "${escapeAppleScript(title)}"
-        end tell
-      `);
-    }
-
-    if (terminal.name === 'iterm2') {
-      return this.runAppleScript(`
-        tell application "iTerm"
-          activate
-          create window with default profile
-          tell current session of current window
-            write text "${escapeAppleScript(this.buildFullShellCommand(shell, command))}"
-          end tell
-        end tell
-      `);
-    }
-
-    // Alacritty, Kitty, Warp: spawn with -e flag
+    // Alacritty, Kitty, etc.
     if (terminal.name === 'alacritty') {
       return this.spawnDetached(terminal.path, ['-e', shell.path, ...this.buildShellArgs(shell, command)]);
     }
@@ -389,30 +343,6 @@ export class LaunchManager {
     return this.spawnDetached(shell.path, this.buildShellArgs(shell, command));
   }
 
-  private launchMacSplitPane(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    direction: 'horizontal' | 'vertical',
-  ): LaunchResult {
-    if (terminal.name === 'iterm2') {
-      const splitCmd = direction === 'horizontal' ? 'split horizontally' : 'split vertically';
-      return this.runAppleScript(`
-        tell application "iTerm"
-          activate
-          tell current session of current window
-            ${splitCmd} with default profile
-          end tell
-          tell current session of current window
-            write text "${escapeAppleScript(this.buildFullShellCommand(shell, command))}"
-          end tell
-        end tell
-      `);
-    }
-
-    return { success: false, error: `${terminal.displayName} does not support split panes on macOS.` };
-  }
-
   // ─── Linux ─────────────────────────────────────────────────────────
 
   private launchLinuxTerminalTab(
@@ -420,73 +350,19 @@ export class LaunchManager {
     shell: ShellInfo,
     command: string,
   ): LaunchResult {
-    const fullCommand = this.buildFullShellCommand(shell, command);
-
     switch (terminal.name) {
       case 'gnome-terminal':
-        return this.spawnDetached(terminal.path, ['--tab', '--', shell.path, '-c', fullCommand]);
+        return this.spawnDetached(terminal.path, ['--tab', '--', shell.path, '-c', command]);
       case 'konsole':
-        return this.spawnDetached(terminal.path, ['--new-tab', '-e', shell.path, '-c', fullCommand]);
+        return this.spawnDetached(terminal.path, ['--new-tab', '-e', shell.path, '-c', command]);
       case 'kitty':
-        return this.spawnDetached(terminal.path, ['@', 'new-window', '--', shell.path, '-c', fullCommand]);
+        return this.spawnDetached(terminal.path, ['@', 'new-window', '--', shell.path, '-c', command]);
       default:
-        return this.spawnDetached(terminal.path, ['-e', shell.path, '-c', fullCommand]);
+        return this.spawnDetached(terminal.path, ['-e', shell.path, '-c', command]);
     }
-  }
-
-  private launchLinuxTerminalWindow(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    title: string,
-  ): LaunchResult {
-    const fullCommand = this.buildFullShellCommand(shell, command);
-
-    switch (terminal.name) {
-      case 'gnome-terminal':
-        return this.spawnDetached(terminal.path, ['--title', title, '--', shell.path, '-c', fullCommand]);
-      case 'konsole':
-        return this.spawnDetached(terminal.path, ['-e', shell.path, '-c', fullCommand]);
-      case 'alacritty':
-        return this.spawnDetached(terminal.path, ['--title', title, '-e', shell.path, '-c', fullCommand]);
-      case 'kitty':
-        return this.spawnDetached(terminal.path, ['--title', title, '--', shell.path, '-c', fullCommand]);
-      case 'xterm':
-        return this.spawnDetached(terminal.path, ['-T', title, '-e', shell.path, '-c', fullCommand]);
-      default:
-        return this.spawnDetached(terminal.path, ['-e', shell.path, '-c', fullCommand]);
-    }
-  }
-
-  private launchLinuxSplitPane(
-    terminal: TerminalInfo,
-    shell: ShellInfo,
-    command: string,
-    direction: 'horizontal' | 'vertical',
-  ): LaunchResult {
-    if (terminal.name === 'konsole') {
-      const splitArg = direction === 'horizontal' ? '--split=left-right' : '--split=top-bottom';
-      const fullCommand = this.buildFullShellCommand(shell, command);
-      return this.spawnDetached(terminal.path, [splitArg, '-e', shell.path, '-c', fullCommand]);
-    }
-
-    return { success: false, error: `${terminal.displayName} does not support split panes on Linux.` };
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────
-
-  /**
-   * Builds a full command string for shells that need it (e.g., when embedding
-   * in AppleScript or passing to a terminal emulator).
-   */
-  private buildFullShellCommand(shell: ShellInfo, command: string): string {
-    switch (shell.name) {
-      case 'fish':
-        return command;
-      default:
-        return command;
-    }
-  }
 
   private runAppleScript(script: string): LaunchResult {
     try {
@@ -524,3 +400,4 @@ function formatSpawnError(err: unknown): string {
   }
   return 'An unknown error occurred while launching the terminal.';
 }
+

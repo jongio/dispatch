@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Zap, Search, X, Loader2 } from 'lucide-react';
+import { Zap, Search, X, Loader2, RefreshCw } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { cn } from '../lib/utils';
 
@@ -43,10 +43,7 @@ export function TitleBar() {
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: brand */}
-      <div
-        className="flex items-center gap-1.5 px-3 shrink-0"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      <div className="flex items-center gap-1.5 px-3 shrink-0">
         <Zap size={14} strokeWidth={2} className="text-primary" />
         <span className="font-semibold tracking-tight text-foreground">Dispatch</span>
         <span className="text-xs text-muted-foreground ml-1">
@@ -54,6 +51,7 @@ export function TitleBar() {
         </span>
         <span
           className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted cursor-pointer hover:bg-secondary"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title="Press Tab to cycle grouping"
           onClick={() => {
             const pivots = ['none', 'repository', 'cwd', 'branch', 'date'];
@@ -67,15 +65,13 @@ export function TitleBar() {
       </div>
 
       {/* Center: search input */}
-      <div
-        className="flex-1 flex items-center justify-center px-4"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      <div className="flex-1 flex items-center justify-center px-4">
         <div
           className={cn(
             'flex items-center gap-1.5 px-2 h-6 w-full max-w-sm rounded-sm bg-muted transition-shadow duration-100',
             isFocused && 'ring-2 ring-ring',
           )}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {isSearching ? (
             <Loader2 size={14} className="text-primary animate-spin shrink-0" />
@@ -110,11 +106,16 @@ export function TitleBar() {
         </div>
       </div>
 
-      {/* Right: session count + spacer for native window controls */}
-      <div
-        className="flex items-center gap-2 shrink-0 pr-2"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      {/* Right: refresh + session count + spacer for native window controls */}
+      <div className="flex items-center gap-2 shrink-0 pr-2">
+        <button
+          onClick={() => useSessionStore.getState().loadSessions()}
+          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          title="Refresh (r)"
+        >
+          <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+        </button>
         <span className="text-xs text-muted-foreground">
           {sessions.length} sessions
         </span>

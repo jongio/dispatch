@@ -125,7 +125,7 @@ describe('shells module', () => {
         expect(terminal.displayName).toBeTruthy();
         expect(typeof terminal.isDefault).toBe('boolean');
         expect(typeof terminal.supportsNewTab).toBe('boolean');
-        expect(typeof terminal.supportsSplitPane).toBe('boolean');
+
       }
     });
 
@@ -145,7 +145,7 @@ describe('shells module', () => {
 
       expect(wt).toBeDefined();
       expect(wt!.supportsNewTab).toBe(true);
-      expect(wt!.supportsSplitPane).toBe(true);
+
     });
   });
 });

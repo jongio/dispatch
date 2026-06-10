@@ -13,8 +13,6 @@ export interface Config {
   yoloMode: boolean;
   agent: string;
   model: string;
-  launch_mode: string;
-  pane_direction: string;
   custom_command: string;
   theme: string;
   workspace_recovery: boolean;
@@ -33,7 +31,6 @@ export interface TerminalInfo {
   displayName: string;
   isDefault: boolean;
   supportsNewTab: boolean;
-  supportsSplitPane: boolean;
 }
 
 export interface LaunchOptions {
@@ -43,7 +40,6 @@ export interface LaunchOptions {
   agent?: string;
   model?: string;
   customCommand?: string;
-  paneDirection?: 'horizontal' | 'vertical';
 }
 
 export interface LaunchResult {
@@ -59,13 +55,11 @@ export interface DispatchAPI {
     getDetail(id: string): Promise<unknown>;
     getPlan(id: string): Promise<string | null>;
     getAttention(): Promise<Record<string, string>>;
+    refresh(): Promise<{ triggered: boolean; lastRefresh: number }>;
   };
   launch: {
-    inPlace(sessionId: string, opts?: LaunchOptions): Promise<LaunchResult>;
-    newTab(sessionId: string, opts?: LaunchOptions): Promise<LaunchResult>;
-    newWindow(sessionId: string, opts?: LaunchOptions): Promise<LaunchResult>;
-    splitPane(sessionId: string, opts?: LaunchOptions): Promise<LaunchResult>;
-    multi(sessionIds: string[], mode: string, opts?: LaunchOptions): Promise<LaunchResult[]>;
+    session(sessionId: string, opts?: LaunchOptions): Promise<LaunchResult>;
+    multi(sessionIds: string[], opts?: LaunchOptions): Promise<LaunchResult[]>;
   };
   config: {
     get(): Promise<Config>;
@@ -86,6 +80,8 @@ export interface DispatchAPI {
   on(event: string, callback: (...args: unknown[]) => void): () => void;
 }
 
+const ALLOWED_EVENTS = new Set(['sessions-changed', 'attention-update']);
+
 const api: DispatchAPI = {
   sessions: {
     list: (opts) => ipcRenderer.invoke('sessions:list', opts),
@@ -94,13 +90,11 @@ const api: DispatchAPI = {
     getDetail: (id) => ipcRenderer.invoke('sessions:getDetail', id),
     getPlan: (id) => ipcRenderer.invoke('sessions:getPlan', id),
     getAttention: () => ipcRenderer.invoke('sessions:getAttention'),
+    refresh: () => ipcRenderer.invoke('sessions:refresh'),
   },
   launch: {
-    inPlace: (sessionId, opts) => ipcRenderer.invoke('launch:inPlace', sessionId, opts),
-    newTab: (sessionId, opts) => ipcRenderer.invoke('launch:newTab', sessionId, opts),
-    newWindow: (sessionId, opts) => ipcRenderer.invoke('launch:newWindow', sessionId, opts),
-    splitPane: (sessionId, opts) => ipcRenderer.invoke('launch:splitPane', sessionId, opts),
-    multi: (sessionIds, mode, opts) => ipcRenderer.invoke('launch:multi', sessionIds, mode, opts),
+    session: (sessionId, opts) => ipcRenderer.invoke('launch:session', sessionId, opts),
+    multi: (sessionIds, opts) => ipcRenderer.invoke('launch:multi', sessionIds, opts),
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),
@@ -119,6 +113,10 @@ const api: DispatchAPI = {
     close: () => ipcRenderer.send('window:close'),
   },
   on: (event, callback) => {
+    if (!ALLOWED_EVENTS.has(event)) {
+      console.warn(`Blocked subscription to unknown event: ${event}`);
+      return () => {};
+    }
     const listener = (_event: unknown, ...args: unknown[]) => callback(...args);
     ipcRenderer.on(event, listener);
     return () => {

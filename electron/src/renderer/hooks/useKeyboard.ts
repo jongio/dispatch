@@ -33,9 +33,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     name: 'Launch',
     shortcuts: [
-      { key: 't', label: 't', description: 'Open in new tab' },
-      { key: 'w', label: 'w', description: 'Open in window' },
-      { key: 'e', label: 'e', description: 'Open in pane' },
+      { key: 'Enter', label: 'Enter', description: 'Launch session' },
       { key: 'L', label: 'L', description: 'Launch all selected' },
     ],
   },
@@ -79,6 +77,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: 'c', label: 'c', description: 'Copy session ID' },
       { key: 'y', label: 'y', description: 'Copy preview' },
       { key: 'r', label: 'r', description: 'Refresh' },
+      { key: 'F5', label: 'F5', description: 'Force refresh (background)' },
     ],
   },
   {
@@ -151,9 +150,20 @@ export function useKeyboard(): void {
       }),
       'Enter': guard((e) => {
         e.preventDefault();
-        const { selectedSession } = store.getState();
-        if (selectedSession) {
-          window.dispatch.launch.inPlace(selectedSession.session.id);
+        const { sessions, cursorIndex, selectedIds, deselectAll } = store.getState();
+        if (selectedIds.size > 0) {
+          window.dispatch.launch.multi(Array.from(selectedIds)).then(() => {
+            deselectAll();
+          }).catch((err) => {
+            console.error('Multi-launch failed:', err);
+          });
+        } else {
+          const session = sessions[cursorIndex];
+          if (session) {
+            window.dispatch.launch.session(session.id).catch((err) => {
+              console.error('Launch failed:', err);
+            });
+          }
         }
       }),
       ' ': guard((e) => {
@@ -166,33 +176,14 @@ export function useKeyboard(): void {
       }),
 
       // Launch
-      't': guard((e) => {
-        e.preventDefault();
-        const { selectedSession } = store.getState();
-        if (selectedSession) {
-          window.dispatch.launch.newTab(selectedSession.session.id);
-        }
-      }),
-      'w': guard((e) => {
-        e.preventDefault();
-        const { selectedSession } = store.getState();
-        if (selectedSession) {
-          window.dispatch.launch.newWindow(selectedSession.session.id);
-        }
-      }),
-      'e': guard((e) => {
-        e.preventDefault();
-        const { selectedSession } = store.getState();
-        if (selectedSession) {
-          window.dispatch.launch.splitPane(selectedSession.session.id);
-        }
-      }),
       'Shift+l': guard((e) => {
         e.preventDefault();
         const { selectedIds } = store.getState();
         const ids = Array.from(selectedIds);
         if (ids.length > 0) {
-          window.dispatch.launch.multi(ids, 'tab');
+          window.dispatch.launch.multi(ids).catch((err) => {
+            console.error('Multi-launch failed:', err);
+          });
         }
       }),
 
@@ -312,6 +303,10 @@ export function useKeyboard(): void {
         }
       }),
       'r': guard((e) => {
+        e.preventDefault();
+        store.getState().loadSessions();
+      }),
+      'F5': guard((e) => {
         e.preventDefault();
         store.getState().loadSessions();
       }),

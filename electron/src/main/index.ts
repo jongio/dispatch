@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { join } from 'path';
 import { SessionStore } from './store';
 import { FileWatcher } from './watcher';
+import { SessionRefresher, createRefresherForWindow } from './refresher';
 import { scanAttention } from './attention';
 import { load, save, getConfigPath, openConfigDirectory } from './config';
 import type { Config } from './config';
@@ -10,9 +11,9 @@ import type { LaunchOptions } from './launch';
 import { getShells, getTerminals } from './shells';
 
 let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
 let store: SessionStore | null = null;
 let watcher: FileWatcher | null = null;
+let refresher: SessionRefresher | null = null;
 let launcher: LaunchManager | null = null;
 
 function createWindow(): void {
@@ -31,18 +32,27 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
     show: false,
   });
 
   // Load the renderer
-  if (process.env.VITE_DEV_SERVER_URL) {
+  if (!app.isPackaged && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
+
+  // Block navigation to external URLs (defense against XSS → IPC bridge access)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env.VITE_DEV_SERVER_URL ?? '';
+    if (!url.startsWith('file://') && (!devUrl || !url.startsWith(devUrl))) {
+      event.preventDefault();
+    }
+  });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show();
@@ -102,6 +112,11 @@ function initializeWatcher(): void {
   watcher.start();
 }
 
+function initializeRefresher(): void {
+  if (!mainWindow) return;
+  refresher = createRefresherForWindow(mainWindow, 30_000);
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('sessions:list', async (_event, opts) => {
     return store?.list(opts) ?? [];
@@ -120,10 +135,19 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('sessions:getPlan', async (_event, id: string) => {
+    // Validate session ID to prevent path traversal
+    if (!id || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(id)) {
+      return null;
+    }
     const { readFile } = await import('fs/promises');
     const { homedir } = await import('os');
-    const { join } = await import('path');
-    const planPath = join(homedir(), '.copilot', 'session-state', id, 'plan.md');
+    const { join, resolve } = await import('path');
+    const baseDir = join(homedir(), '.copilot', 'session-state');
+    const planPath = join(baseDir, id, 'plan.md');
+    // Verify resolved path stays within the expected directory
+    if (!resolve(planPath).startsWith(resolve(baseDir))) {
+      return null;
+    }
     try {
       return await readFile(planPath, 'utf-8');
     } catch {
@@ -159,28 +183,34 @@ function registerIpcHandlers(): void {
   // Launch handlers
   launcher = new LaunchManager();
 
-  ipcMain.handle('launch:inPlace', async (_event, sessionId: string, opts?: LaunchOptions) => {
-    return launcher!.launchInPlace(sessionId, opts ?? {});
+  ipcMain.handle('launch:session', async (_event, sessionId: string, opts?: LaunchOptions) => {
+    // Merge user config defaults into launch options
+    const config = load();
+    const mergedOpts: LaunchOptions = {
+      shell: config.default_shell || undefined,
+      terminal: config.default_terminal || undefined,
+      yoloMode: config.yoloMode,
+      agent: config.agent || undefined,
+      model: config.model || undefined,
+      customCommand: config.custom_command || undefined,
+      ...opts,
+    };
+    const result = launcher!.launch(sessionId, mergedOpts);
+    return result;
   });
 
-  ipcMain.handle('launch:newTab', async (_event, sessionId: string, opts?: LaunchOptions) => {
-    return launcher!.launchNewTab(sessionId, opts ?? {});
-  });
-
-  ipcMain.handle('launch:newWindow', async (_event, sessionId: string, opts?: LaunchOptions) => {
-    return launcher!.launchNewWindow(sessionId, opts ?? {});
-  });
-
-  ipcMain.handle('launch:splitPane', async (_event, sessionId: string, opts?: LaunchOptions) => {
-    return launcher!.launchSplitPane(sessionId, opts ?? {});
-  });
-
-  ipcMain.handle('launch:multi', async (_event, sessionIds: string[], mode: string, opts?: LaunchOptions) => {
-    const validModes = ['inPlace', 'newTab', 'newWindow', 'splitPane'] as const;
-    const launchMode = validModes.includes(mode as typeof validModes[number])
-      ? (mode as typeof validModes[number])
-      : 'newTab';
-    return launcher!.launchMulti(sessionIds, launchMode, opts ?? {});
+  ipcMain.handle('launch:multi', async (_event, sessionIds: string[], opts?: LaunchOptions) => {
+    const config = load();
+    const mergedOpts: LaunchOptions = {
+      shell: config.default_shell || undefined,
+      terminal: config.default_terminal || undefined,
+      yoloMode: config.yoloMode,
+      agent: config.agent || undefined,
+      model: config.model || undefined,
+      customCommand: config.custom_command || undefined,
+      ...opts,
+    };
+    return launcher!.launchMulti(sessionIds, mergedOpts);
   });
 
   // Platform detection handlers
@@ -190,6 +220,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('platform:getTerminals', async () => {
     return getTerminals();
+  });
+
+  // Manual refresh handler
+  ipcMain.handle('sessions:refresh', async () => {
+    const triggered = refresher?.manualRefresh() ?? false;
+    if (!triggered) {
+      // If refresher didn't fire (already in progress), send event directly
+      mainWindow?.webContents.send('sessions-changed');
+    }
+    return { triggered, lastRefresh: refresher?.lastRefresh ?? 0 };
   });
 
   // Window control handlers (fire-and-forget)
@@ -202,9 +242,22 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(() => {
+  // Set Content-Security-Policy headers (production only — dev needs inline for HMR)
+  if (app.isPackaged) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"],
+        },
+      });
+    });
+  }
+
   initializeStore();
   createWindow();
   initializeWatcher();
+  initializeRefresher();
   registerIpcHandlers();
 
   app.on('activate', () => {
@@ -216,12 +269,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   watcher?.stop();
+  refresher?.stop();
   store?.close();
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
 });

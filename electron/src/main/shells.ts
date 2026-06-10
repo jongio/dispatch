@@ -16,7 +16,6 @@ export interface TerminalInfo {
   displayName: string;
   isDefault: boolean;
   supportsNewTab: boolean;
-  supportsSplitPane: boolean;
 }
 
 /**
@@ -192,16 +191,17 @@ function detectLinuxShells(): ShellInfo[] {
 function detectWindowsTerminals(): TerminalInfo[] {
   const terminals: TerminalInfo[] = [];
 
-  // Windows Terminal (wt.exe)
-  const wtPath = findOnPath('wt.exe');
-  if (wtPath) {
+  // Windows Terminal (wt.exe) — App Execution Aliases cannot be stat'd
+  // (EACCES on reparse points), so use PATH lookup only. Do NOT verify
+  // with existsSync — it returns false for these zero-byte alias stubs.
+  const wtOnPath = findOnPath('wt.exe');
+  if (wtOnPath !== null) {
     terminals.push({
       name: 'windows-terminal',
-      path: wtPath,
+      path: 'wt.exe', // Use bare name — spawn resolves via PATH
       displayName: 'Windows Terminal',
       isDefault: true,
       supportsNewTab: true,
-      supportsSplitPane: true,
     });
   }
 
@@ -212,9 +212,8 @@ function detectWindowsTerminals(): TerminalInfo[] {
       name: 'cmd',
       path: cmdPath,
       displayName: 'Command Prompt Window',
-      isDefault: !wtPath,
+      isDefault: !wtOnPath,
       supportsNewTab: false,
-      supportsSplitPane: false,
     });
   }
 
@@ -230,7 +229,6 @@ function detectWindowsTerminals(): TerminalInfo[] {
       displayName: 'PowerShell Window',
       isDefault: false,
       supportsNewTab: false,
-      supportsSplitPane: false,
     });
   }
 
@@ -247,7 +245,6 @@ function detectMacTerminals(): TerminalInfo[] {
     displayName: 'Terminal',
     isDefault: true,
     supportsNewTab: true,
-    supportsSplitPane: false,
   });
 
   // iTerm2
@@ -263,7 +260,6 @@ function detectMacTerminals(): TerminalInfo[] {
       displayName: 'iTerm2',
       isDefault: false,
       supportsNewTab: true,
-      supportsSplitPane: true,
     });
   }
 
@@ -276,7 +272,6 @@ function detectMacTerminals(): TerminalInfo[] {
       displayName: 'Alacritty',
       isDefault: false,
       supportsNewTab: false,
-      supportsSplitPane: false,
     });
   }
 
@@ -288,7 +283,6 @@ function detectMacTerminals(): TerminalInfo[] {
       displayName: 'Warp',
       isDefault: false,
       supportsNewTab: true,
-      supportsSplitPane: true,
     });
   }
 
@@ -301,7 +295,6 @@ function detectMacTerminals(): TerminalInfo[] {
       displayName: 'Kitty',
       isDefault: false,
       supportsNewTab: true,
-      supportsSplitPane: false,
     });
   }
 
@@ -316,13 +309,12 @@ function detectLinuxTerminals(): TerminalInfo[] {
     binary: string;
     displayName: string;
     supportsNewTab: boolean;
-    supportsSplitPane: boolean;
   }> = [
-    { name: 'gnome-terminal', binary: 'gnome-terminal', displayName: 'GNOME Terminal', supportsNewTab: true, supportsSplitPane: false },
-    { name: 'konsole', binary: 'konsole', displayName: 'Konsole', supportsNewTab: true, supportsSplitPane: true },
-    { name: 'alacritty', binary: 'alacritty', displayName: 'Alacritty', supportsNewTab: false, supportsSplitPane: false },
-    { name: 'kitty', binary: 'kitty', displayName: 'Kitty', supportsNewTab: true, supportsSplitPane: false },
-    { name: 'xterm', binary: 'xterm', displayName: 'XTerm', supportsNewTab: false, supportsSplitPane: false },
+    { name: 'gnome-terminal', binary: 'gnome-terminal', displayName: 'GNOME Terminal', supportsNewTab: true },
+    { name: 'konsole', binary: 'konsole', displayName: 'Konsole', supportsNewTab: true },
+    { name: 'alacritty', binary: 'alacritty', displayName: 'Alacritty', supportsNewTab: false },
+    { name: 'kitty', binary: 'kitty', displayName: 'Kitty', supportsNewTab: true },
+    { name: 'xterm', binary: 'xterm', displayName: 'XTerm', supportsNewTab: false },
   ];
 
   let foundDefault = false;
@@ -335,7 +327,6 @@ function detectLinuxTerminals(): TerminalInfo[] {
         displayName: candidate.displayName,
         isDefault: !foundDefault,
         supportsNewTab: candidate.supportsNewTab,
-        supportsSplitPane: candidate.supportsSplitPane,
       });
       foundDefault = true;
     }
@@ -358,7 +349,11 @@ function findOnPath(binary: string): string | null {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const firstLine = result.trim().split('\n')[0]?.trim();
-    return firstLine && existsSync(firstLine) ? firstLine : null;
+    if (!firstLine) return null;
+    // On Windows, App Execution Aliases (WindowsApps) are reparse points
+    // that fail existsSync/stat. Trust `where.exe` output directly.
+    if (process.platform === 'win32') return firstLine;
+    return existsSync(firstLine) ? firstLine : null;
   } catch {
     return null;
   }

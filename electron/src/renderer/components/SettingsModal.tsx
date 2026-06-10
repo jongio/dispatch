@@ -2,21 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import type { Config } from '../../preload/index';
 
-const LAUNCH_MODES = [
-  { value: 'in-place', label: 'In Place' },
-  { value: 'tab', label: 'New Tab' },
-  { value: 'window', label: 'New Window' },
-  { value: 'pane', label: 'Split Pane' },
-];
-
-const PANE_DIRECTIONS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'right', label: 'Right' },
-  { value: 'down', label: 'Down' },
-  { value: 'left', label: 'Left' },
-  { value: 'up', label: 'Up' },
-];
-
 const THEME_OPTIONS = [
   { value: 'auto', label: 'Auto (System)' },
   { value: 'dark', label: 'Dark' },
@@ -37,8 +22,6 @@ function getDefaultConfig(): Config {
     yoloMode: false,
     agent: '',
     model: '',
-    launch_mode: 'tab',
-    pane_direction: 'auto',
     custom_command: '',
     theme: '',
     workspace_recovery: true,
@@ -202,22 +185,6 @@ export function SettingsModal() {
               onChange={(v) => updateField('model', v)}
               onReset={() => resetField('model')}
               placeholder="e.g. claude-sonnet-4"
-            />
-            <SelectField
-              label="Launch Mode"
-              description="How sessions open in the terminal"
-              value={config.launch_mode}
-              options={LAUNCH_MODES}
-              onChange={(v) => updateField('launch_mode', v)}
-              onReset={() => resetField('launch_mode')}
-            />
-            <SelectField
-              label="Pane Direction"
-              description="Split direction when launch mode is pane"
-              value={config.pane_direction}
-              options={PANE_DIRECTIONS}
-              onChange={(v) => updateField('pane_direction', v)}
-              onReset={() => resetField('pane_direction')}
             />
           </Section>
 

@@ -17,8 +17,6 @@ export interface Config {
   yoloMode: boolean;
   agent: string;
   model: string;
-  launch_mode: string;
-  pane_direction: string;
   custom_command: string;
   theme: string;
   workspace_recovery: boolean;
@@ -55,8 +53,6 @@ export function getDefault(): Config {
     yoloMode: false,
     agent: '',
     model: '',
-    launch_mode: 'tab',
-    pane_direction: 'auto',
     custom_command: '',
     theme: '',
     workspace_recovery: true,

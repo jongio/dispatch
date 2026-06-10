@@ -6,7 +6,9 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      include: ['src/renderer/**/*.{tsx,jsx}'],
+    }),
     tailwindcss(),
     electron([
       {
@@ -14,7 +16,7 @@ export default defineConfig({
         vite: {
           build: {
             outDir: resolve(__dirname, 'dist/main'),
-            rollupOptions: {
+            rolldownOptions: {
               external: ['electron', 'better-sqlite3', 'chokidar'],
             },
           },
@@ -33,7 +35,7 @@ export default defineConfig({
       },
     ]),
   ],
-  root: resolve(__dirname, 'src/renderer'),
+  root: resolve(__dirname),
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src/renderer'),
