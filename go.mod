@@ -13,7 +13,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/github/copilot-sdk/go v1.0.0
 	github.com/lucasb-eyer/go-colorful v1.4.0
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.21.0
 	golang.org/x/sys v0.45.0
 	modernc.org/sqlite v1.52.0
 )
