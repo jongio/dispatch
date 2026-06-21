@@ -15,7 +15,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0
-	modernc.org/sqlite v1.52.0
+	modernc.org/sqlite v1.53.0
 )
 
 require github.com/dlclark/regexp2/v2 v2.2.1 // indirect
@@ -65,8 +65,7 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
-	modernc.org/libc v1.72.5 // indirect
+	modernc.org/libc v1.73.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
