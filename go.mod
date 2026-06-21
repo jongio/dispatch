@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/creack/pty v1.1.24
-	github.com/github/copilot-sdk/go v1.0.0
+	github.com/github/copilot-sdk/go v1.0.2
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0

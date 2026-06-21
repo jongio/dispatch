@@ -56,8 +56,8 @@ github.com/dlclark/regexp2/v2 v2.2.1 h1:mf4KkFUj0gJuarK8P+LgiS+Lit7m9N1yAwEfPbee
 github.com/dlclark/regexp2/v2 v2.2.1/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
-github.com/github/copilot-sdk/go v1.0.0 h1:spzqYzKv8l3bpeK43jPBtDcI//TSR8rI2ZcUAO/zFN0=
-github.com/github/copilot-sdk/go v1.0.0/go.mod h1:I6YKZQzUXhHZd8a2TkSOcBa8FMVL34QiEg2yxiaXghw=
+github.com/github/copilot-sdk/go v1.0.2 h1:trjxOqsC9zH4hT1IVQRHwgUcIpIDan6boEEpif/GaXY=
+github.com/github/copilot-sdk/go v1.0.2/go.mod h1:I6YKZQzUXhHZd8a2TkSOcBa8FMVL34QiEg2yxiaXghw=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
