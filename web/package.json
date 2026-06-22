@@ -10,7 +10,7 @@
     "test": "astro check && astro build"
   },
   "dependencies": {
-    "astro": "^6.3.3"
+    "astro": "^6.4.8"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
