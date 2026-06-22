@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.11.1] — 2026-06-21
+
+### Changed
+- Updated all Go dependencies to latest (copilot-sdk v1.0.2, sqlite v1.53.0, lipgloss v2.0.4, x/sync v0.21.0, x/sys v0.46.0, and others)
+- Updated astro to v6.4.8 in website
+- Bumped actions/checkout from v6 to v7.0.0 in CI workflows
+- Applied npm audit fixes (postcss, vite)
+
 ## [v0.11.0] — 2026-06-08
 
 ### Added
