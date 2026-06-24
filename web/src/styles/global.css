@@ -269,6 +269,12 @@ tr:hover td {
   gap: var(--space-10);
 }
 
+.features-link {
+  text-align: center;
+  margin-top: var(--space-8);
+  font-size: var(--text-lg);
+}
+
 @media (max-width: 768px) {
   .grid-2, .grid-3 {
     grid-template-columns: 1fr;
