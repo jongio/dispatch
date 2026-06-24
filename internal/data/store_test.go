@@ -906,6 +906,90 @@ func TestFilterCombinedRepositoryAndBranch(t *testing.T) {
 	}
 }
 
+func TestFilterByExcludedWords_Summary(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// "auth" appears in sess-1 summary "Implement auth module"
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"auth"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with ExcludedWords: %v", err)
+	}
+	for _, sess := range sessions {
+		if sess.ID == "sess-1" {
+			t.Error("sess-1 should be excluded by ExcludedWords matching summary")
+		}
+	}
+}
+
+func TestFilterByExcludedWords_TurnContent(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// "fuzzy" appears in sess-2 turn "Implement fuzzy search"
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"fuzzy"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with ExcludedWords (turn): %v", err)
+	}
+	for _, sess := range sessions {
+		if sess.ID == "sess-2" {
+			t.Error("sess-2 should be excluded by ExcludedWords matching turn content")
+		}
+	}
+}
+
+func TestFilterByExcludedWords_CaseInsensitive(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// "AUTH" should match case-insensitively against "Implement auth module"
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"AUTH"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with ExcludedWords (case): %v", err)
+	}
+	for _, sess := range sessions {
+		if sess.ID == "sess-1" {
+			t.Error("sess-1 should be excluded by case-insensitive ExcludedWords match")
+		}
+	}
+}
+
+func TestFilterByExcludedWords_MultipleWords(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// "auth" excludes sess-1, "experiment" excludes sess-4
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"auth", "experiment"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with multiple ExcludedWords: %v", err)
+	}
+	for _, sess := range sessions {
+		if sess.ID == "sess-1" || sess.ID == "sess-4" {
+			t.Errorf("%s should be excluded by ExcludedWords", sess.ID)
+		}
+	}
+}
+
 func TestFilterNoResults(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()

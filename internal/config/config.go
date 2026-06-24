@@ -115,6 +115,11 @@ type Config struct {
 	// Terminal and Shell settings are still used.
 	CustomCommand string `json:"custom_command,omitempty"`
 
+	// ExcludedWords is a list of words used to filter sessions from the
+	// dispatch list. Sessions whose summary or turn content contains any
+	// of these words (case-insensitive) are hidden from the session list.
+	ExcludedWords []string `json:"excluded_words,omitempty"`
+
 	// HiddenSessions is a list of session IDs that the user has chosen to
 	// hide from the main session list. They can be revealed with the
 	// "show hidden" toggle and unhidden individually.
