@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.12.1] — 2026-06-24
+
+### Changed
+- Compacted session list row layout — merged check and cursor into a single selector column, reduced tree indent from 4 to 2 spaces, and fixed host icon to a constant-width column for consistent text alignment
+- Added tests for narrow-width rendering, tree-mode indent, and selector state transitions
+- Updated indirect dependencies (charmbracelet/ultraviolet, charmbracelet/x/exp/slice)
+
 ## [v0.12.0] — 2026-06-24
 
 ### Added
