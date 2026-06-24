@@ -20,6 +20,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 
 - **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
+- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
 - **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, created, turns) with toggleable direction
 - **Grouping (pivot) modes** (`Tab`) — flat, folder, repo, branch, date — displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
@@ -34,7 +35,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
-- **Settings panel** (`,`) — 10 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery
+- **Settings panel** (`,`) — 12 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Excluded Words
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
 - **Help overlay** (`?`) — two-column grouped keyboard shortcuts
