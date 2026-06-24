@@ -4,7 +4,18 @@ import { marked } from 'marked';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const changelogPath = path.resolve(import.meta.dirname, '../../..', 'CHANGELOG.md');
+// Resolve CHANGELOG.md from the repo root. During Astro build, the source
+// file lives at web/src/pages/ so we go up 3 levels to reach the repo root.
+// We try multiple paths to handle both local dev and CI environments.
+const candidates = [
+  path.resolve(import.meta.dirname, '..', '..', '..', 'CHANGELOG.md'),
+  path.resolve(process.cwd(), '..', 'CHANGELOG.md'),
+  path.resolve(process.cwd(), 'CHANGELOG.md'),
+];
+const changelogPath = candidates.find(p => fs.existsSync(p));
+if (!changelogPath) {
+  throw new Error('CHANGELOG.md not found. Tried: ' + candidates.join(', '));
+}
 const raw = fs.readFileSync(changelogPath, 'utf-8');
 
 // Strip the "# Changelog" title and the format preamble.
