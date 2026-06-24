@@ -208,6 +208,10 @@ type FilterOptions struct {
 	HasRefs      bool       `json:"has_refs,omitempty"`
 	ExcludedDirs []string   `json:"excluded_dirs,omitempty"`
 
+	// ExcludedWords is a list of words that hide sessions whose summary
+	// or turn content contains any of these words (case-insensitive).
+	ExcludedWords []string `json:"excluded_words,omitempty"`
+
 	// DeepSearch controls the breadth of the text search. When false
 	// (default / quick mode), only session-level fields are searched
 	// (summary, branch, repository, cwd). When true (deep mode), related

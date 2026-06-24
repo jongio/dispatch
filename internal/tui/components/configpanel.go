@@ -31,6 +31,7 @@ const (
 	cfgTheme
 	cfgWorkspaceRecovery
 	cfgPreviewPosition
+	cfgExcludedWords
 	cfgFieldCount
 )
 
@@ -52,6 +53,7 @@ type ConfigPanel struct {
 	theme             string // active color scheme name ("auto" or a scheme name)
 	workspaceRecovery bool
 	previewPosition   string // "right", "bottom", "left", "top"
+	excludedWords     string // comma-separated list of filter words
 
 	// Available options for cycling.
 	terminals  []string
@@ -95,6 +97,7 @@ type ConfigValues struct {
 	Theme             string
 	WorkspaceRecovery bool
 	PreviewPosition   string
+	ExcludedWords     string // comma-separated filter words
 }
 
 // SetValues loads the config panel state from external values.
@@ -110,6 +113,7 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.theme = v.Theme
 	c.workspaceRecovery = v.WorkspaceRecovery
 	c.previewPosition = v.PreviewPosition
+	c.excludedWords = v.ExcludedWords
 }
 
 // Values returns the current state of all editable fields.
@@ -126,6 +130,7 @@ func (c *ConfigPanel) Values() ConfigValues {
 		Theme:             c.theme,
 		WorkspaceRecovery: c.workspaceRecovery,
 		PreviewPosition:   c.previewPosition,
+		ExcludedWords:     c.excludedWords,
 	}
 }
 
@@ -210,6 +215,11 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.textInput.SetValue(c.customCommand)
 		c.textInput.CharLimit = 256
 		return c.textInput.Focus()
+	case cfgExcludedWords:
+		c.editing = true
+		c.textInput.SetValue(c.excludedWords)
+		c.textInput.CharLimit = 512
+		return c.textInput.Focus()
 	case cfgTheme:
 		c.theme = c.cycleTheme(c.theme)
 	case cfgWorkspaceRecovery:
@@ -235,6 +245,8 @@ func (c *ConfigPanel) ConfirmEdit() {
 		c.model = val
 	case cfgCustomCommand:
 		c.customCommand = val
+	case cfgExcludedWords:
+		c.excludedWords = val
 	default:
 		// Non-editable fields are ignored.
 	}
@@ -288,6 +300,7 @@ func (c ConfigPanel) View() string {
 		{"Theme", themeDisplay(c.theme), false},
 		{"Crash Recovery", boolDisplay(c.workspaceRecovery), false},
 		{"Preview Position", previewPositionDisplay(c.previewPosition), false},
+		{"Excluded Words", stringDisplay(c.excludedWords), false},
 	}
 
 	var body strings.Builder
@@ -326,6 +339,14 @@ func (c ConfigPanel) View() string {
 		body.WriteString(styles.DimmedStyle.Render("  {sessionId} is replaced with the session ID at launch.") + "\n")
 		body.WriteString(styles.DimmedStyle.Render("  Overrides Yolo, Agent, and Model when set.") + "\n")
 		body.WriteString(styles.DimmedStyle.Render("  Example: my-tool --session {sessionId}") + "\n")
+	}
+
+	// Contextual help when the Excluded Words field is focused.
+	if c.cursor == cfgExcludedWords {
+		body.WriteString("\n")
+		body.WriteString(styles.DimmedStyle.Render("  Comma-separated words to filter out sessions.") + "\n")
+		body.WriteString(styles.DimmedStyle.Render("  Matches against session name and turn content.") + "\n")
+		body.WriteString(styles.DimmedStyle.Render("  Example: MANDATORY, internal, secret") + "\n")
 	}
 
 	body.WriteString("\n")

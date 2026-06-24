@@ -1643,8 +1643,8 @@ func TestHandleConfigKey_EscapeClosesPanel(t *testing.T) {
 	if rm.state != stateSessionList {
 		t.Errorf("state = %v, want stateSessionList", rm.state)
 	}
-	if cmd != nil {
-		t.Error("escape from config should return nil cmd")
+	if cmd == nil {
+		t.Error("escape from config should return a reload cmd")
 	}
 }
 
@@ -4062,5 +4062,37 @@ func TestLaunchExternal_ErrorIncludesContext(t *testing.T) {
 	errStr := errMsg.err.Error()
 	if !strings.Contains(errStr, "test-shell") {
 		t.Errorf("error %q should mention shell name", errStr)
+	}
+}
+
+func TestParseExcludedWords(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"empty string", "", nil},
+		{"whitespace only", "   ", nil},
+		{"single word", "MANDATORY", []string{"MANDATORY"}},
+		{"multiple words", "foo, bar, baz", []string{"foo", "bar", "baz"}},
+		{"trailing comma", "foo, bar,", []string{"foo", "bar"}},
+		{"leading comma", ",foo", []string{"foo"}},
+		{"extra whitespace", "  one ,  two  , three  ", []string{"one", "two", "three"}},
+		{"duplicate commas", "a,,b", []string{"a", "b"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseExcludedWords(tc.input)
+			if len(got) != len(tc.want) {
+				t.Fatalf("parseExcludedWords(%q) = %v (len %d), want %v (len %d)",
+					tc.input, got, len(got), tc.want, len(tc.want))
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Errorf("parseExcludedWords(%q)[%d] = %q, want %q",
+						tc.input, i, got[i], tc.want[i])
+				}
+			}
+		})
 	}
 }

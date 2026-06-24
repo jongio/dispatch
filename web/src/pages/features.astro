@@ -440,12 +440,14 @@ import Carousel from '../components/Carousel.astro';
         <div class="feature-text">
           <h2>Settings Panel</h2>
           <p>
-            <kbd>,</kbd> (comma) to open. Nine editable fields: Yolo Mode (boolean
+            <kbd>,</kbd> (comma) to open. Twelve editable fields: Yolo Mode (boolean
             toggle), Agent (text), Model (text), Launch Mode (selector:
             in-place/tab/window/pane), Pane Direction (selector: auto/right/down/left/up,
             dimmed when not in pane mode), Terminal (selector), Shell (selector),
             Custom Command (text with <code>{"{sessionId}"}</code> placeholder),
-            and Theme (selector).
+            Theme (selector), Crash Recovery (boolean toggle), Preview Position
+            (selector: right/bottom/left/top), and Excluded Words (text,
+            comma-separated).
           </p>
           <ul>
             <li><kbd>Enter</kbd> to edit or toggle a field</li>
@@ -454,8 +456,33 @@ import Carousel from '../components/Carousel.astro';
           </ul>
         </div>
         <div class="feature-screenshots">
-          <Screenshot src="one-half-light/config-panel.png" alt="Settings panel showing all nine configuration fields" caption="Settings panel with all options" />
+          <Screenshot src="one-half-light/config-panel.png" alt="Settings panel showing all configuration fields" caption="Settings panel with all options" />
           <Screenshot src="one-half-light/config-editing.png" alt="Text field in edit mode with cursor" caption="Editing a text field" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Word Filtering -->
+    <section class="section" id="word-filter">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Word Filtering</h2>
+          <p>
+            Hide sessions whose name or conversation content contains specific
+            words. Configure via the Settings panel (<kbd>,</kbd>) in the
+            "Excluded Words" field. Enter a comma-separated list of words;
+            matching is case-insensitive.
+          </p>
+          <ul>
+            <li>Matches against session summary (the name shown in the list)</li>
+            <li>Matches against user messages in conversation turns</li>
+            <li>Case-insensitive: "MANDATORY" matches "mandatory", "Mandatory", etc.</li>
+            <li>Multiple words: each word filters independently (OR logic)</li>
+            <li>Persisted to config, applied on every session load</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/excluded-words.png" alt="Settings panel showing Excluded Words field with comma-separated filter words" caption="Configuring excluded words" />
         </div>
       </div>
     </section>

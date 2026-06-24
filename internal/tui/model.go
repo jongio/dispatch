@@ -284,6 +284,7 @@ func NewModel() Model {
 		Theme:             cfg.Theme,
 		WorkspaceRecovery: cfg.WorkspaceRecovery,
 		PreviewPosition:   cfg.EffectivePreviewPosition(),
+		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -344,6 +345,7 @@ func NewModel() Model {
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
+	m.filter.ExcludedWords = cfg.ExcludedWords
 	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
 	return m
 }
@@ -801,6 +803,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			CustomCommand:     m.cfg.CustomCommand,
 			Theme:             m.cfg.Theme,
 			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
+			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -1215,7 +1218,7 @@ func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.configPanel.ConfirmEdit()
 			m.saveConfigFromPanel()
-			return m, nil
+			return m, m.loadSessionsCmd()
 		default:
 			var cmd tea.Cmd
 			m.configPanel, cmd = m.configPanel.Update(msg)
@@ -1225,9 +1228,8 @@ func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, keys.Escape):
-		// Cancel — close without saving (changes already persisted per-toggle).
 		m.state = stateSessionList
-		return m, nil
+		return m, m.loadSessionsCmd()
 	case key.Matches(msg, keys.Up):
 		m.configPanel.MoveUp()
 	case key.Matches(msg, keys.Down):
@@ -1259,6 +1261,8 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
 	m.previewPosition = v.PreviewPosition
+	m.cfg.ExcludedWords = parseExcludedWords(v.ExcludedWords)
+	m.filter.ExcludedWords = m.cfg.ExcludedWords
 	resolveTheme(m.cfg)
 	// If the user switched back to "auto", re-apply with the detected
 	// terminal brightness so colours adapt immediately.
@@ -1270,6 +1274,25 @@ func (m *Model) saveConfigFromPanel() {
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
+}
+
+// parseExcludedWords splits a comma-separated string into trimmed, non-empty words.
+func parseExcludedWords(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	words := make([]string, 0, len(parts))
+	for _, p := range parts {
+		w := strings.TrimSpace(p)
+		if w != "" {
+			words = append(words, w)
+		}
+	}
+	if len(words) == 0 {
+		return nil
+	}
+	return words
 }
 
 // ---------------------------------------------------------------------------

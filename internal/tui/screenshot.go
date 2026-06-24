@@ -455,6 +455,18 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.recalcLayout()
 		addOverlay("config-editing", m)
 	}
+	{
+		m := newBase()
+		m.state = stateConfigPanel
+		m.configPanel.SetValues(c.configVals)
+		m.configPanel.SetThemeOptions(c.themeNames)
+		// Navigate to the Excluded Words field (index 11).
+		for range 11 {
+			m.configPanel.MoveDown()
+		}
+		m.recalcLayout()
+		addOverlay("excluded-words", m)
+	}
 
 	// ── Shell picker ──────────────────────────────────────────────────
 	{
@@ -640,6 +652,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 			Shell:             "pwsh",
 			Theme:             "Dispatch Dark",
 			WorkspaceRecovery: true,
+			ExcludedWords:     "MANDATORY, context_aware",
 		},
 		themeNames: append([]string{"auto"}, styles.BuiltinSchemeNames()...),
 	}

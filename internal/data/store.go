@@ -368,6 +368,15 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 			fb.args = append(fb.args, escapeLIKE(dir)+"%")
 		}
 	}
+	if len(f.ExcludedWords) > 0 {
+		for _, word := range f.ExcludedWords {
+			pattern := "%" + escapeLIKE(strings.ToLower(word)) + "%"
+			fb.wheres = append(fb.wheres,
+				`(LOWER(COALESCE(s.summary,'')) NOT LIKE ? ESCAPE '\'`+
+					` AND NOT EXISTS (SELECT 1 FROM turns t3 WHERE t3.session_id = s.id AND LOWER(t3.user_message) LIKE ? ESCAPE '\'))`)
+			fb.args = append(fb.args, pattern, pattern)
+		}
+	}
 }
 
 func (fb *filterBuilder) joinSQL() string {
