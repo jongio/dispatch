@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v0.12.0] — 2026-06-24
 
 ### Added
 - **Word filtering** — new `excluded_words` config option and Settings panel field. Enter a comma-separated list of words; sessions whose name or turn content contains any word (case-insensitive) are hidden from the list
