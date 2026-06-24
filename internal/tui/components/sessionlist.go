@@ -721,41 +721,51 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	relTime := RelativeTime(sess.LastActiveAt)
 	turns := strconv.Itoa(sess.TurnCount) + "t"
 
-	// Attention dot — 2 chars (dot + space).
-	attDot := s.attentionDot(sess.ID, selected)
+	// ── Row layout ─────────────────────────────────────────────────────
+	//   [indent 0|2][selector 2][att 2][host 2][plan 2][work 2] summary …
+	//
+	// The selector merges cursor pointer and multi-select check into one
+	// 2-char column, saving 2 chars vs the old separate columns. Combined
+	// with the reduced tree indent (2 vs 4), the prefix is 4 chars shorter
+	// than before.
 
-	// Host type icon — 2 chars (icon + space) if set, else empty.
-	hostIcon := styles.IconHostType(sess.HostType)
-	hostDotW := 0
-	if hostIcon != "" {
-		hostIcon += " "
-		hostDotW = 2
+	// Selector: combines cursor pointer and multi-select check into 2 chars.
+	isChecked := s.IsSelected(sess.ID)
+	var selector string
+	switch {
+	case isChecked && selected:
+		selector = styles.IconCheck() + " "
+	case isChecked:
+		selector = styles.IconCheck() + " "
+	case selected:
+		selector = " " + styles.IconPointer()
+	default:
+		selector = "  "
 	}
 
-	// Plan dot — 2 chars (dot + space) if plan exists, else 2 spaces.
-	plnDot := s.planDot(sess.ID, selected)
+	// Status dots — each is a fixed 2 chars (icon + space) for alignment.
+	attDot := s.attentionDot(sess.ID, selected)
 
-	// Work status dot — 2 chars (icon + space) if work status known, else 2 spaces.
+	hostDot := styles.IconHostType(sess.HostType)
+	if hostDot != "" {
+		hostDot += " "
+	} else {
+		hostDot = "  "
+	}
+
+	plnDot := s.planDot(sess.ID, selected)
 	wrkDot := s.workStatusDot(sess.ID, selected)
 
 	// In tree mode, indent sessions under their folder.
 	indent := ""
 	if s.treeMode {
-		indent = "    "
-		w -= 4
+		indent = "  "
+		w -= 2
 	}
 
-	indicator := "  "
-	if selected {
-		indicator = styles.IconPointer() + " "
-	}
-	// Show check mark for multi-selected sessions.
-	checkMark := "  "
-	if s.IsSelected(sess.ID) {
-		checkMark = styles.IconCheck() + " "
-	}
-
+	const selectorW = 2
 	const dotW = 2     // attention dot + space
+	const hostDotW = 2 // host icon + space (always reserved)
 	const planDotW = 2 // plan dot + space
 	const wrkDotW = 2  // work status dot + space
 	const timeW = 9
@@ -764,18 +774,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-2-dotW-hostDotW-planDotW-wrkDotW-2-timeW-spacing)
-		line := indent + checkMark + indicator + attDot + hostIcon + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
-		if selected {
-			return styles.SelectedStyle.Render(PadToWidth(line, s.width))
-		}
-		if hidden {
-			return styles.HiddenStyle.Render(PadToWidth(line, s.width))
-		}
-		if favorited {
-			return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
-		}
-		return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
+		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-wrkDotW-timeW-spacing)
+		line := indent + selector + attDot + hostDot + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		return s.applyRowStyle(line, selected, hidden, favorited)
 	}
 
 	// Show folder/repo columns at wider terminals.
@@ -787,7 +788,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - 2 - dotW - hostDotW - planDotW - wrkDotW - 2 - timeW - turnsW - 2*spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - wrkDotW - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -800,10 +801,9 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	var b strings.Builder
 	b.WriteString(indent)
-	b.WriteString(checkMark)
-	b.WriteString(indicator)
+	b.WriteString(selector)
 	b.WriteString(attDot)
-	b.WriteString(hostIcon)
+	b.WriteString(hostDot)
 	b.WriteString(plnDot)
 	b.WriteString(wrkDot)
 	b.WriteString(PadRight(summary, summaryW))
@@ -824,18 +824,22 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString("  ")
 	b.WriteString(PadLeft(turns, turnsW))
 
-	line := b.String()
+	return s.applyRowStyle(b.String(), selected, hidden, favorited)
+}
 
+// applyRowStyle renders a row line with the appropriate style based on state.
+func (s SessionList) applyRowStyle(line string, selected, hidden, favorited bool) string {
+	padded := PadToWidth(line, s.width)
 	if selected {
-		return styles.SelectedStyle.Render(PadToWidth(line, s.width))
+		return styles.SelectedStyle.Render(padded)
 	}
 	if hidden {
-		return styles.HiddenStyle.Render(PadToWidth(line, s.width))
+		return styles.HiddenStyle.Render(padded)
 	}
 	if favorited {
-		return styles.FavoritedStyle.Render(PadToWidth(line, s.width))
+		return styles.FavoritedStyle.Render(padded)
 	}
-	return lipgloss.NewStyle().Render(PadToWidth(line, s.width))
+	return lipgloss.NewStyle().Render(padded)
 }
 
 // renderDot returns a styled 2-character string (icon + space). When selected

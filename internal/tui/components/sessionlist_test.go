@@ -1204,3 +1204,130 @@ func TestRenderSessionRow_HostTypeWidthConsistency(t *testing.T) {
 		sl.MoveDown()
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Narrow-width rendering (w < 50)
+// ---------------------------------------------------------------------------
+
+func TestRenderSessionRow_NarrowWidth(t *testing.T) {
+	t.Parallel()
+	const width = 40
+	const height = 10
+
+	sessions := []data.Session{
+		{ID: "narrow-1", Summary: "Short summary", TurnCount: 2, LastActiveAt: "2025-01-01T00:00:00Z"},
+		{ID: "narrow-2", Summary: "A much longer summary that should be truncated at narrow width", TurnCount: 5, LastActiveAt: "2025-01-01T00:00:00Z", HostType: "cli"},
+	}
+
+	sl := NewSessionList()
+	sl.SetSessions(sessions)
+	sl.SetSize(width, height)
+
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) != height {
+		t.Fatalf("View() has %d lines, want %d", len(lines), height)
+	}
+
+	for i, line := range lines {
+		plain := stripAnsi(line)
+		pw := len([]rune(plain))
+		if pw != width {
+			t.Errorf("line %d: width=%d want %d, line=%q", i, pw, width, plain)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tree-mode indent (2 spaces)
+// ---------------------------------------------------------------------------
+
+func TestRenderSessionRow_TreeModeIndent(t *testing.T) {
+	t.Parallel()
+	const width = 100
+	const height = 10
+
+	groups := makeGroups(1, 2)
+	sl := NewSessionList()
+	sl.SetGroups(groups)
+
+	// Expand the folder to show children.
+	sl.ExpandAll()
+	sl.SetSize(width, height)
+
+	view := sl.View()
+	lines := strings.Split(view, "\n")
+
+	// Line 0 is the folder header, line 1 is the first session.
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines, got %d", len(lines))
+	}
+
+	// Session lines (index 1, 2) should start with 2-space indent.
+	for _, idx := range []int{1, 2} {
+		plain := stripAnsi(lines[idx])
+		if len(plain) < 2 {
+			t.Fatalf("line %d too short: %q", idx, plain)
+		}
+		if plain[:2] != "  " {
+			t.Errorf("line %d: expected 2-space indent, got prefix %q", idx, plain[:4])
+		}
+		pw := len([]rune(plain))
+		if pw != width {
+			t.Errorf("line %d: width=%d want %d", idx, pw, width)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Selector column: all 4 states
+// ---------------------------------------------------------------------------
+
+func TestRenderSessionRow_SelectorStates(t *testing.T) {
+	t.Parallel()
+	const width = 100
+	const height = 10
+
+	sessions := []data.Session{
+		{ID: "sel-1", Summary: "First session", TurnCount: 1, LastActiveAt: "2025-01-01T00:00:00Z"},
+		{ID: "sel-2", Summary: "Second session", TurnCount: 2, LastActiveAt: "2025-01-01T00:00:00Z"},
+		{ID: "sel-3", Summary: "Third session", TurnCount: 3, LastActiveAt: "2025-01-01T00:00:00Z"},
+	}
+
+	sl := NewSessionList()
+	sl.SetSessions(sessions)
+	sl.SetSize(width, height)
+
+	// All lines should have consistent width in each state.
+	// State 1: cursor on first, nothing multi-selected.
+	view := sl.View()
+	for i, line := range strings.Split(view, "\n") {
+		plain := stripAnsi(line)
+		pw := len([]rune(plain))
+		if pw != width {
+			t.Errorf("state1 line %d: width=%d want %d", i, pw, width)
+		}
+	}
+
+	// State 2: multi-select first row, cursor stays on first.
+	sl.ToggleSelected()
+	view = sl.View()
+	for i, line := range strings.Split(view, "\n") {
+		plain := stripAnsi(line)
+		pw := len([]rune(plain))
+		if pw != width {
+			t.Errorf("state2 line %d: width=%d want %d", i, pw, width)
+		}
+	}
+
+	// State 3: move cursor to second, first is still multi-selected (check only).
+	sl.MoveDown()
+	view = sl.View()
+	for i, line := range strings.Split(view, "\n") {
+		plain := stripAnsi(line)
+		pw := len([]rune(plain))
+		if pw != width {
+			t.Errorf("state3 line %d: width=%d want %d", i, pw, width)
+		}
+	}
+}
