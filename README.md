@@ -260,9 +260,12 @@ Configuration is stored in the platform-specific config directory:
 | `default_terminal` | string | `""` | Terminal emulator. Empty = auto-detect |
 | `default_time_range` | string | `"1d"` | Time filter: `1h`, `1d`, `7d`, `all` |
 | `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
+| `default_sort_order` | string | `"desc"` | Sort direction: `asc`, `desc` |
 | `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date` |
+| `default_collapsed` | bool | `false` | Start group headers collapsed (single-line) |
 | `show_preview` | bool | `true` | Show preview pane on startup |
 | `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |
+| `conversation_newest_first` | bool | `true` | Show newest conversation turns first in preview |
 | `max_sessions` | int | `100` | Maximum sessions to load |
 | `yoloMode` | bool | `false` | Pass `--allow-all` to Copilot CLI (auto-confirm commands) |
 | `agent` | string | `""` | Pass `--agent <name>` to Copilot CLI |
@@ -271,6 +274,8 @@ Configuration is stored in the platform-specific config directory:
 | `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` (see note below) |
 | `custom_command` | string | `""` | Custom launch command (`{sessionId}` is replaced) |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
+| `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
+| `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
 | `workspace_recovery` | bool | `true` | Detect sessions interrupted by crash/reboot |
 | `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
