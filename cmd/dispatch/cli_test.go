@@ -94,9 +94,7 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
 	var buf bytes.Buffer
-	if err := runDoctor(&buf); err != nil {
-		t.Fatalf("runDoctor: %v", err)
-	}
+	runDoctor(&buf)
 	out := buf.String()
 	for _, want := range []string{
 		"Dispatch doctor",

@@ -53,10 +53,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, nil
 
 		case "doctor":
-			if dErr := runDoctor(os.Stdout); dErr != nil {
-				fmt.Fprintf(os.Stderr, "doctor: %v\n", dErr)
-				return true, cleanup, dErr
-			}
+			runDoctor(os.Stdout)
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, nil
 
@@ -109,7 +106,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 	return false, cleanup, nil
 }
 
-func runDoctor(w io.Writer) error {
+func runDoctor(w io.Writer) {
 	if w == nil {
 		w = io.Discard
 	}
@@ -142,8 +139,6 @@ func runDoctor(w io.Writer) error {
 	} else {
 		fmt.Fprintf(w, "Copilot CLI: found (%s)\n", p)
 	}
-
-	return nil
 }
 
 func printPathStatus(w io.Writer, label, path string, wantDir bool) {
