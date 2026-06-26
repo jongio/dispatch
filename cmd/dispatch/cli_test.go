@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -80,6 +81,66 @@ func TestHandleArgs_VersionCommand(t *testing.T) {
 	done, _, err := handleArgs([]string{"version"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for version; got done=%v, err=%v", done, err)
+	}
+}
+
+func TestRunCompletion_SupportedShells(t *testing.T) {
+	for _, tc := range []struct {
+		shell string
+		want  string
+	}{
+		{"bash", "complete -F _dispatch_completion dispatch disp"},
+		{"zsh", "#compdef dispatch disp"},
+		{"powershell", "Register-ArgumentCompleter"},
+		{"pwsh", "Register-ArgumentCompleter"},
+	} {
+		t.Run(tc.shell, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := runCompletion(&buf, tc.shell); err != nil {
+				t.Fatalf("runCompletion: %v", err)
+			}
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Errorf("completion output missing %q:\n%s", tc.want, buf.String())
+			}
+		})
+	}
+}
+
+func TestRunCompletion_UnsupportedShell(t *testing.T) {
+	var buf bytes.Buffer
+	err := runCompletion(&buf, "fish")
+	if err == nil {
+		t.Fatal("expected error for unsupported shell")
+	}
+	if !strings.Contains(err.Error(), "unsupported shell") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestHandleArgs_Completion(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, cleanup, err := handleArgs([]string{"completion", "bash"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !done {
+		t.Error("expected done=true for completion")
+	}
+	if cleanup != nil {
+		t.Error("expected cleanup=nil for completion")
+	}
+}
+
+func TestHandleArgs_CompletionMissingShell(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, _, err := handleArgs([]string{"completion"}, io.Discard, ch)
+	if err == nil {
+		t.Fatal("expected error for missing shell")
+	}
+	if !done {
+		t.Error("expected done=true for completion error")
 	}
 }
 
