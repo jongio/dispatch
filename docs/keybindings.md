@@ -190,6 +190,13 @@
      - Behavior: Cycles preview pane position: right → bottom → left → top → right. Persisted in config.
      - Condition: In session list view
 
+20e. **C** (Shift+C) → Copy Resume Command
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "copy resume cmd"))
+     - Handler: internal\tui\model.go
+     - Behavior: Copies the selected session's resume command to the system clipboard using the same launch settings as Dispatch.
+     - Condition: Only when a session is selected
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))
