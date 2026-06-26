@@ -304,6 +304,11 @@ func configPath() (string, error) {
 	return filepath.Join(dir, configFileName), nil
 }
 
+// ConfigPath returns the full path to the configuration file.
+func ConfigPath() (string, error) {
+	return configPath()
+}
+
 // Load reads the configuration file from disk and returns the parsed Config.
 // If the file does not exist, Load returns [Default] values with a nil error.
 func Load() (*Config, error) {

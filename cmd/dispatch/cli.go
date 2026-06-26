@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/update"
 	"github.com/jongio/dispatch/internal/version"
 )
@@ -48,6 +50,14 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 				fmt.Fprintf(os.Stderr, "update: %v\n", uErr)
 				return true, cleanup, uErr
 			}
+			return true, cleanup, nil
+
+		case "doctor":
+			if dErr := runDoctor(os.Stdout); dErr != nil {
+				fmt.Fprintf(os.Stderr, "doctor: %v\n", dErr)
+				return true, cleanup, dErr
+			}
+			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, nil
 
 		case "--demo":
@@ -97,6 +107,60 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 		}
 	}
 	return false, cleanup, nil
+}
+
+func runDoctor(w io.Writer) error {
+	if w == nil {
+		w = io.Discard
+	}
+
+	fmt.Fprintf(w, "Dispatch doctor\n")
+	fmt.Fprintf(w, "Version: %s\n", version.Version)
+	fmt.Fprintf(w, "OS: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(w, "\n")
+
+	if p, err := config.ConfigPath(); err != nil {
+		fmt.Fprintf(w, "Config: error: %v\n", err)
+	} else {
+		printPathStatus(w, "Config", p, false)
+	}
+
+	if p, err := platform.SessionStorePath(); err != nil {
+		fmt.Fprintf(w, "Session store: error: %v\n", err)
+	} else {
+		printPathStatus(w, "Session store", p, false)
+	}
+
+	if p := data.SessionStatePath(); p == "" {
+		fmt.Fprintf(w, "Session state: missing\n")
+	} else {
+		printPathStatus(w, "Session state", p, true)
+	}
+
+	if p := platform.FindCLIBinary(); p == "" {
+		fmt.Fprintf(w, "Copilot CLI: missing\n")
+	} else {
+		fmt.Fprintf(w, "Copilot CLI: found (%s)\n", p)
+	}
+
+	return nil
+}
+
+func printPathStatus(w io.Writer, label, path string, wantDir bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		fmt.Fprintf(w, "%s: missing (%s)\n", label, path)
+		return
+	}
+	if wantDir && !info.IsDir() {
+		fmt.Fprintf(w, "%s: wrong type, expected directory (%s)\n", label, path)
+		return
+	}
+	if !wantDir && info.IsDir() {
+		fmt.Fprintf(w, "%s: wrong type, expected file (%s)\n", label, path)
+		return
+	}
+	fmt.Fprintf(w, "%s: found (%s)\n", label, path)
 }
 
 // setupLogRedirect opens the log file (if configured via DISPATCH_LOG) and
