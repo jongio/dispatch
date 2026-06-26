@@ -225,6 +225,14 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 	return quote(binary) + " " + strings.Join(quoted, " "), nil
 }
 
+// BuildResumeCommandString returns the shell command Dispatch uses to start or
+// resume a Copilot CLI session, including configured flags and custom command
+// templates. It is exported for UI and diagnostics code that need to display or
+// copy the same command used by the launcher.
+func BuildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error) {
+	return buildResumeCommandString(sessionID, cfg)
+}
+
 // shellQuote wraps s in POSIX single quotes if it contains whitespace or
 // shell metacharacters. Single quotes suppress all shell interpretation;
 // embedded single quotes are escaped with the POSIX end-escape-reopen idiom (end quote,
