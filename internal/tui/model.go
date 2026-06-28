@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -433,6 +434,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- DB watcher (external session store changes) --------------------
 	case sessionsChangedMsg:
 		return m.handleSessionsChanged()
+
+	// ----- Export done -----------------------------------------------------
+	case exportDoneMsg:
+		return m.handleExportDone(msg)
 
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
@@ -1025,6 +1030,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.CopyPreview):
 		return m.handleCopyPreview()
 
+	case key.Matches(msg, keys.Export):
+		return m.handleExport()
+
 	case key.Matches(msg, keys.JumpNextAttention):
 		return m.handleJumpNextAttention()
 
@@ -1188,6 +1196,70 @@ func (m Model) handleCopyPreview() (tea.Model, tea.Cmd) {
 	}
 	m.statusInfo = statusCopiedPreview
 	return m, clearStatusAfter(2 * time.Second)
+}
+
+// handleExport exports the selected session(s) to Markdown files in the
+// config directory's exports folder. When multi-select is active, all
+// selected sessions are exported; otherwise only the current session.
+func (m Model) handleExport() (tea.Model, tea.Cmd) {
+	if m.store == nil {
+		return m, nil
+	}
+
+	store := m.store
+	var ids []string
+
+	if sel := m.sessionList.SelectedSessions(); len(sel) > 0 {
+		for _, s := range sel {
+			ids = append(ids, s.ID)
+		}
+	} else if sess, ok := m.sessionList.Selected(); ok {
+		ids = append(ids, sess.ID)
+	}
+
+	if len(ids) == 0 {
+		return m, nil
+	}
+
+	return m, func() tea.Msg {
+		exportDir, err := data.ExportDir()
+		if err != nil {
+			return exportDoneMsg{err: err}
+		}
+
+		var paths []string
+		for _, id := range ids {
+			detail, err := store.GetSession(context.Background(), id)
+			if err != nil {
+				slog.Warn("export: failed to load session", "id", id, "err", err)
+				continue
+			}
+			path, err := data.ExportSession(detail, exportDir)
+			if err != nil {
+				return exportDoneMsg{err: err}
+			}
+			paths = append(paths, path)
+		}
+		return exportDoneMsg{paths: paths}
+	}
+}
+
+// handleExportDone processes the result of an async export operation.
+func (m Model) handleExportDone(msg exportDoneMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = "export: " + msg.err.Error()
+		return m, clearStatusAfter(3 * time.Second)
+	}
+	if len(msg.paths) == 0 {
+		m.statusErr = "export: no sessions exported"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	if len(msg.paths) == 1 {
+		m.statusInfo = "Exported: " + filepath.Base(msg.paths[0])
+	} else {
+		m.statusInfo = fmt.Sprintf("Exported %d sessions", len(msg.paths))
+	}
+	return m, clearStatusAfter(3 * time.Second)
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic

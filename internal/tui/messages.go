@@ -164,3 +164,9 @@ type continuationPlanCreatedMsg struct {
 // sessionsChangedMsg indicates the session store database has been modified
 // externally and the session list should be refreshed.
 type sessionsChangedMsg struct{}
+
+// exportDoneMsg reports the result of exporting session(s) to Markdown files.
+type exportDoneMsg struct {
+	paths []string // paths of successfully written files
+	err   error
+}

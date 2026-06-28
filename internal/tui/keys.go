@@ -49,13 +49,14 @@ type keyMap struct {
 	CopyPreview       key.Binding
 	ExpandCollapseAll key.Binding
 	ScanWorkStatus    key.Binding
+	Export            key.Binding
 	ShiftUp           key.Binding
 	ShiftDown         key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Hide, k.Star, k.CopyID, k.CopyPreview, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Hide, k.Star, k.CopyID, k.CopyPreview, k.Export, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -65,7 +66,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Reindex, k.ScanWorkStatus, k.Config},
+		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Export, k.Reindex, k.ScanWorkStatus, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
@@ -117,6 +118,7 @@ var keys = keyMap{
 	CopyPreview:       key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy preview")),
 	ExpandCollapseAll: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "expand/collapse all")),
 	ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
+	Export:            key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "export markdown")),
 	ShiftUp:           key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("shift+↑", "extend select up")),
 	ShiftDown:         key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+↓", "extend select down")),
 }
