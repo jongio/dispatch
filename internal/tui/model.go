@@ -291,6 +291,7 @@ func NewModel() Model {
 		Theme:             cfg.Theme,
 		WorkspaceRecovery: cfg.WorkspaceRecovery,
 		PreviewPosition:   cfg.EffectivePreviewPosition(),
+		RedactSecrets:     cfg.RedactPreviewSecrets,
 		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
 	})
 
@@ -354,6 +355,7 @@ func NewModel() Model {
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
 	m.filter.ExcludedWords = cfg.ExcludedWords
 	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
+	m.preview.SetRedactSecrets(cfg.RedactPreviewSecrets)
 	return m
 }
 
@@ -825,6 +827,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			CustomCommand:     m.cfg.CustomCommand,
 			Theme:             m.cfg.Theme,
 			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
+			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
+			RedactSecrets:     m.cfg.RedactPreviewSecrets,
 			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
 		})
 		m.state = stateConfigPanel
@@ -1352,6 +1356,8 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
 	m.previewPosition = v.PreviewPosition
+	m.cfg.RedactPreviewSecrets = v.RedactSecrets
+	m.preview.SetRedactSecrets(v.RedactSecrets)
 	m.cfg.ExcludedWords = parseExcludedWords(v.ExcludedWords)
 	m.filter.ExcludedWords = m.cfg.ExcludedWords
 	resolveTheme(m.cfg)

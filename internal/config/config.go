@@ -169,6 +169,12 @@ type Config struct {
 	// WorkspaceRecovery enables detection of sessions interrupted by
 	// crash/reboot. When false, stale lock files are ignored. Default true.
 	WorkspaceRecovery bool `json:"workspace_recovery"`
+
+	// RedactPreviewSecrets enables replacement of common secret patterns
+	// (bearer tokens, GitHub PATs, Azure connection strings, .env secrets)
+	// with [redacted] in the preview pane. Only affects rendering; stored
+	// session data is never modified.
+	RedactPreviewSecrets bool `json:"redact_preview_secrets,omitempty"`
 }
 
 // LaunchMode describes how sessions are opened in the terminal.

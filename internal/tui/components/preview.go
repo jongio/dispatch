@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/markdown"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
@@ -21,6 +22,7 @@ type PreviewPanel struct {
 	scroll          int
 	totalLines      int                   // cached line count for scroll clamping
 	newestFirst     bool                  // conversation turn display order
+	redactSecrets   bool                  // mask common secret patterns in turn text
 	convHeaderLine  int                   // content line where "Conversation" label is rendered (-1 = none)
 	idFieldLine     int                   // content line where "ID: ..." is rendered (-1 = none)
 	planContent     string                // plan.md content (empty when no plan)
@@ -60,6 +62,17 @@ func (p *PreviewPanel) ToggleConversationSort() bool {
 	p.newestFirst = !p.newestFirst
 	p.updateTotalLines()
 	return p.newestFirst
+}
+
+// SetRedactSecrets enables or disables secret redaction in preview text.
+func (p *PreviewPanel) SetRedactSecrets(enabled bool) {
+	p.redactSecrets = enabled
+	p.updateTotalLines()
+}
+
+// RedactSecrets returns whether secret redaction is active.
+func (p *PreviewPanel) RedactSecrets() bool {
+	return p.redactSecrets
 }
 
 // SetDetail updates the displayed session detail.
@@ -633,6 +646,19 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 			copy(turns, p.detail.Turns)
 			for i, j := 0, len(turns)-1; i < j; i, j = i+1, j-1 {
 				turns[i], turns[j] = turns[j], turns[i]
+			}
+		}
+
+		// Apply secret redaction to a copy so stored data is never modified.
+		if p.redactSecrets {
+			if !p.newestFirst {
+				// Make a copy if we haven't already (newestFirst already copied).
+				turns = make([]data.Turn, len(turns))
+				copy(turns, p.detail.Turns)
+			}
+			for i := range turns {
+				turns[i].UserMessage = platform.RedactSecrets(turns[i].UserMessage)
+				turns[i].AssistantResponse = platform.RedactSecrets(turns[i].AssistantResponse)
 			}
 		}
 
