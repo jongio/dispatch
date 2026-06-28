@@ -203,6 +203,7 @@ type FilterOptions struct {
 	Folder       string     `json:"folder,omitempty"`
 	Repository   string     `json:"repository,omitempty"`
 	Branch       string     `json:"branch,omitempty"`
+	HostType     string     `json:"host_type,omitempty"`
 	Since        *time.Time `json:"since,omitempty"`
 	Until        *time.Time `json:"until,omitempty"`
 	HasRefs      bool       `json:"has_refs,omitempty"`

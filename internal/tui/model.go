@@ -145,6 +145,7 @@ type searchState struct {
 	copilotSearching     bool                // true when SDK search is in progress
 	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
 	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
+	lastRawInput         string              // last raw search bar text (for change detection)
 }
 
 // workStatusState groups fields related to work status scanning.
@@ -228,9 +229,10 @@ type Model struct {
 	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
 
 	// Focused sub-models.
-	click      clickState
-	search     searchState
-	workStatus workStatusState
+	click        clickState
+	search       searchState
+	workStatus   workStatusState
+	searchFilter SearchFilter // structured tokens parsed from search bar input
 
 	// Launch mode requested when showing the shell picker.
 	pendingLaunchMode string
@@ -706,7 +708,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			// The filter stays applied so subsequent operations (time range,
 			// sort, pivot) continue to honour the search term. To clear the
 			// search, press Escape again from the session list.
-			if m.filter.Query != "" {
+			if m.filter.Query != "" || m.searchFilter.HasTokens() {
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
@@ -714,14 +716,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.searchBar.Blur()
 			// If deep search hasn't run yet, trigger it now.
-			if m.search.deepSearchPending && m.filter.Query != "" {
+			if m.search.deepSearchPending && (m.filter.Query != "" || m.searchFilter.HasTokens()) {
 				m.search.deepSearchPending = false
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
 			// Ensure deep mode is active for any confirmed query so that
 			// subsequent reloads (time range, sort, pivot) also search deeply.
-			if m.filter.Query != "" {
+			if m.filter.Query != "" || m.searchFilter.HasTokens() {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
@@ -734,8 +736,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			sb, cmd = sb.Update(msg)
 			m.searchBar = sb
 			newQuery := m.searchBar.Value()
-			if newQuery != m.filter.Query {
-				m.filter.Query = newQuery
+			if newQuery != m.search.lastRawInput {
+				m.search.lastRawInput = newQuery
+				// Parse structured tokens from the input.
+				m.searchFilter = ParseSearchTokens(newQuery)
+				m.applySearchTokens()
 				m.filter.DeepSearch = false
 				// Quick search fires immediately; schedule deep search.
 				m.search.deepSearchVersion++
@@ -778,9 +783,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Clear active search query when Escape is pressed in the session list.
-		if m.filter.Query != "" {
+		if m.filter.Query != "" || m.searchFilter.HasTokens() {
 			m.filter.Query = ""
 			m.filter.DeepSearch = false
+			m.searchFilter = SearchFilter{}
+			m.search.lastRawInput = ""
+			m.clearSearchTokenFilters()
 			m.searchBar.SetValue("")
 			m.searchBar.SetSearching(false)
 			m.searchBar.SetAISearching(false)
@@ -1900,9 +1908,14 @@ func (m Model) renderHeader() string {
 func (m Model) renderBadges() string {
 	// Active filter badges.
 	badges := m.filterPanel.ActiveBadges()
-	parts := make([]string, 0, len(badges)+3)
+	parts := make([]string, 0, len(badges)+4)
 	for _, b := range badges {
 		parts = append(parts, styles.BadgeStyle.Render(b))
+	}
+
+	// Search token badge — shows active structured tokens.
+	if summary := m.searchFilter.TokenSummary(); summary != "" {
+		parts = append(parts, styles.ActiveBadgeStyle.Render(summary))
 	}
 
 	// Inline time range selector — show key shortcuts (1-4).

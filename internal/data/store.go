@@ -351,6 +351,10 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 		fb.wheres = append(fb.wheres, "s.branch = ?")
 		fb.args = append(fb.args, f.Branch)
 	}
+	if f.HostType != "" {
+		fb.wheres = append(fb.wheres, "s.host_type = ?")
+		fb.args = append(fb.args, f.HostType)
+	}
 	if f.Since != nil {
 		fb.wheres = append(fb.wheres, lastActiveExpr+" >= ?")
 		fb.args = append(fb.args, f.Since.UTC().Format(time.RFC3339))

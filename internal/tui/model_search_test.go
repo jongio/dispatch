@@ -25,6 +25,7 @@ func newTestModel() Model {
 		searchBar:       components.NewSearchBar(),
 		sessionList:     components.NewSessionList(),
 		hiddenSet:       make(map[string]struct{}),
+		attentionFilter: make(map[data.AttentionStatus]struct{}),
 	}
 }
 
