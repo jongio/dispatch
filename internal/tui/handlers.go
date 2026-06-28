@@ -178,7 +178,7 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
 }
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
@@ -202,7 +202,7 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
 }
 
 func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
@@ -264,7 +264,7 @@ func (m Model) handleAttentionScanned(msg attentionScannedMsg) (Model, tea.Cmd) 
 	// is active, also reload sessions so the list reflects updated
 	// statuses. The reload no longer fires another scan (that was an
 	// infinite loop), so the tick is the sole driver of periodic scans.
-	cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd()}
+	cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd(), m.scanGitStatesCmd()}
 	if len(m.attentionFilter) > 0 {
 		cmds = append(cmds, m.loadSessionsCmd())
 	}
@@ -454,6 +454,19 @@ func (m Model) handleContinuationPlanCreated(msg continuationPlanCreatedMsg) (Mo
 		m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — press v on a session to view", msg.updated)
 	}
 	return m, m.completeWorkStatusScan()
+}
+
+// ----- Git workspace state scanning ----------------------------------------
+
+func (m Model) handleGitStateScanned(msg gitStateScannedMsg) (Model, tea.Cmd) {
+	m.gitStateMap = msg.states
+	m.sessionList.SetGitStates(m.gitStateMap)
+	// When the git-dirty filter is active, reload sessions so the list
+	// reflects the detected states.
+	if m.filterGitDirty {
+		return m, m.loadSessionsCmd()
+	}
+	return m, nil
 }
 
 // ----- Deep search ---------------------------------------------------------

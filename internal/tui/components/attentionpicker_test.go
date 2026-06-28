@@ -117,6 +117,12 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 		t.Errorf("after 8th MoveDown cursor = %d, want %d (work complete)", p.cursor, workCompleteIndex)
 	}
 
+	// Next: git dirty row.
+	p.MoveDown()
+	if p.cursor != gitDirtyRowIndex {
+		t.Errorf("after 9th MoveDown cursor = %d, want %d (git dirty)", p.cursor, gitDirtyRowIndex)
+	}
+
 	// Wrap to top.
 	p.MoveDown()
 	if p.cursor != 0 {
@@ -125,8 +131,13 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 
 	// Wrap to bottom.
 	p.MoveUp()
+	if p.cursor != gitDirtyRowIndex {
+		t.Errorf("MoveUp should wrap: cursor = %d, want %d", p.cursor, gitDirtyRowIndex)
+	}
+
+	p.MoveUp()
 	if p.cursor != workCompleteIndex {
-		t.Errorf("MoveUp should wrap: cursor = %d, want %d", p.cursor, workCompleteIndex)
+		t.Errorf("after MoveUp from git dirty cursor = %d, want %d", p.cursor, workCompleteIndex)
 	}
 
 	p.MoveUp()

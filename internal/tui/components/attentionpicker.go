@@ -56,8 +56,8 @@ func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
 }
 
 // totalRows returns the number of rows in the picker
-// (attention entries + plan row + favorites row + separator + 2 work status rows).
-func totalRows() int { return len(attentionEntries) + 1 + 1 + 1 + 2 } // +1 plan, +1 favorites, +1 separator, +2 work
+// (attention entries + plan row + favorites row + separator + 2 work status rows + git dirty row).
+func totalRows() int { return len(attentionEntries) + 1 + 1 + 1 + 2 + 1 } // +1 plan, +1 favorites, +1 separator, +2 work, +1 git
 
 // Row indices for non-attention entries.
 var (
@@ -66,6 +66,7 @@ var (
 	workSeparatorRowIndex = favoritesRowIndex + 1
 	workIncompleteIndex   = workSeparatorRowIndex + 1
 	workCompleteIndex     = workIncompleteIndex + 1
+	gitDirtyRowIndex      = workCompleteIndex + 1
 )
 
 // AttentionPicker renders a compact overlay for selecting which attention
@@ -85,6 +86,10 @@ type AttentionPicker struct {
 	workStatusFilter  map[data.WorkStatus]struct{} // checked work statuses
 	workStatusCounts  map[data.WorkStatus]int      // session counts per work status
 	workStatusScanned bool                         // true when work scan has completed
+
+	// Git workspace state filter row.
+	filterGitDirty bool // "Git changes" row checked
+	gitDirtyCount  int  // sessions with local git changes
 
 	width  int
 	height int
@@ -151,6 +156,8 @@ func (p *AttentionPicker) Toggle() {
 		} else {
 			p.workStatusFilter[data.WorkStatusComplete] = struct{}{}
 		}
+	case gitDirtyRowIndex:
+		p.filterGitDirty = !p.filterGitDirty
 	default:
 		// Attention status row.
 		if p.cursor < len(attentionEntries) {
@@ -189,7 +196,7 @@ func (p *AttentionPicker) SetCounts(counts map[data.AttentionStatus]int) {
 
 // HasSelection returns true when at least one filter is active.
 func (p *AttentionPicker) HasSelection() bool {
-	return len(p.selected) > 0 || p.filterPlans || p.filterFavorites || len(p.workStatusFilter) > 0
+	return len(p.selected) > 0 || p.filterPlans || p.filterFavorites || len(p.workStatusFilter) > 0 || p.filterGitDirty
 }
 
 // FilterPlans returns whether the "Has plan" row is checked.
@@ -247,6 +254,21 @@ func (p *AttentionPicker) SetWorkStatusCounts(counts map[data.WorkStatus]int) {
 // SetWorkStatusScanned records whether the work status scan has completed.
 func (p *AttentionPicker) SetWorkStatusScanned(v bool) {
 	p.workStatusScanned = v
+}
+
+// FilterGitDirty returns whether the "Git changes" row is checked.
+func (p *AttentionPicker) FilterGitDirty() bool {
+	return p.filterGitDirty
+}
+
+// SetFilterGitDirty sets the "Git changes" row state.
+func (p *AttentionPicker) SetFilterGitDirty(v bool) {
+	p.filterGitDirty = v
+}
+
+// SetGitDirtyCount sets the session count shown beside the "Git changes" row.
+func (p *AttentionPicker) SetGitDirtyCount(n int) {
+	p.gitDirtyCount = n
 }
 
 // View renders the attention picker overlay.
@@ -342,6 +364,20 @@ func (p AttentionPicker) View() string {
 		}
 		line := fmt.Sprintf("  %s %s %-16s %s", check, dot, "Complete work", countStr)
 		if p.cursor == workCompleteIndex {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// Git workspace: has local changes.
+	{
+		check := checkboxOff
+		if p.filterGitDirty {
+			check = checkboxOn
+		}
+		dot := styles.GitDirtyStyle.Render(styles.IconGitDirty())
+		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Git changes", p.gitDirtyCount)
+		if p.cursor == gitDirtyRowIndex {
 			line = styles.SelectedStyle.Render(line)
 		}
 		body.WriteString(line + "\n")

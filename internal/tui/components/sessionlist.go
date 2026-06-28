@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
@@ -36,6 +37,7 @@ type SessionList struct {
 	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
 	planMap        map[string]bool                  // session ID → has plan.md
 	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
+	gitStateMap    map[string]platform.GitState     // session ID → git workspace state
 	selected       map[string]struct{}              // session ID → selected for multi-open
 	treeMode       bool                             // true when showing grouped/tree view
 	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
@@ -143,6 +145,12 @@ func (s *SessionList) SetPlanStatuses(m map[string]bool) {
 // indicators on each session row.
 func (s *SessionList) SetWorkStatuses(m map[string]data.WorkStatusResult) {
 	s.workStatusMap = m
+}
+
+// SetGitStates updates the git workspace state map used to render git state
+// badges on each session row.
+func (s *SessionList) SetGitStates(m map[string]platform.GitState) {
+	s.gitStateMap = m
 }
 
 // SetSize updates the available rendering dimensions.
@@ -755,6 +763,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	plnDot := s.planDot(sess.ID, selected)
 	wrkDot := s.workStatusDot(sess.ID, selected)
+	gitDot := s.gitStateDot(sess.ID, selected)
 
 	// In tree mode, indent sessions under their folder.
 	indent := ""
@@ -768,14 +777,15 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	const hostDotW = 2 // host icon + space (always reserved)
 	const planDotW = 2 // plan dot + space
 	const wrkDotW = 2  // work status dot + space
+	const gitDotW = 2  // git state dot + space
 	const timeW = 9
 	const turnsW = 5
 	const spacing = 2
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-wrkDotW-timeW-spacing)
-		line := indent + selector + attDot + hostDot + plnDot + wrkDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-wrkDotW-gitDotW-timeW-spacing)
+		line := indent + selector + attDot + hostDot + plnDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		return s.applyRowStyle(line, selected, hidden, favorited)
 	}
 
@@ -788,7 +798,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - selectorW - dotW - hostDotW - planDotW - wrkDotW - timeW - turnsW - 2*spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -806,6 +816,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(hostDot)
 	b.WriteString(plnDot)
 	b.WriteString(wrkDot)
+	b.WriteString(gitDot)
 	b.WriteString(PadRight(summary, summaryW))
 	if folderW > 0 {
 		b.WriteString("  ")
@@ -941,4 +952,41 @@ func (s SessionList) workStatusDot(sessionID string, selected bool) string {
 	}
 
 	return renderDot(icon, dotStyle, selected)
+}
+
+// gitStateDot returns a styled 2-character string (icon + space) representing
+// the git workspace state of the given session. Returns two spaces if no git
+// state data is available or the state is unknown/clean.
+func (s SessionList) gitStateDot(sessionID string, selected bool) string {
+	if s.gitStateMap == nil {
+		return "  "
+	}
+	state, ok := s.gitStateMap[sessionID]
+	if !ok || state == platform.GitStateUnknown || state == platform.GitStateClean {
+		return "  "
+	}
+
+	var dotStyle lipgloss.Style
+	var gitIcon string
+	switch state {
+	case platform.GitStateDirty:
+		dotStyle = styles.GitDirtyStyle
+		gitIcon = styles.IconGitDirty()
+	case platform.GitStateUntracked:
+		dotStyle = styles.GitUntrackedStyle
+		gitIcon = styles.IconGitUntracked()
+	case platform.GitStateAhead:
+		dotStyle = styles.GitAheadStyle
+		gitIcon = styles.IconGitAhead()
+	case platform.GitStateBehind:
+		dotStyle = styles.GitBehindStyle
+		gitIcon = styles.IconGitBehind()
+	case platform.GitStateMissing:
+		dotStyle = styles.GitMissingStyle
+		gitIcon = styles.IconGitMissing()
+	default:
+		return "  "
+	}
+
+	return renderDot(gitIcon, dotStyle, selected)
 }

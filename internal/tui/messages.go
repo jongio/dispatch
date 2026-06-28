@@ -170,3 +170,13 @@ type exportDoneMsg struct {
 	paths []string // paths of successfully written files
 	err   error
 }
+
+// ---------------------------------------------------------------------------
+// Git workspace state messages
+// ---------------------------------------------------------------------------
+
+// gitStateScannedMsg delivers git workspace state data from the background
+// scanner that runs bounded git commands against each session directory.
+type gitStateScannedMsg struct {
+	states map[string]platform.GitState
+}

@@ -99,6 +99,12 @@ func SetTheme(t *Theme) {
 	WorkCompleteStyle = t.WorkCompleteStyle
 	WorkIncompleteStyle = t.WorkIncompleteStyle
 	WorkAnalyzingStyle = t.WorkAnalyzingStyle
+	GitCleanStyle = t.GitCleanStyle
+	GitDirtyStyle = t.GitDirtyStyle
+	GitUntrackedStyle = t.GitUntrackedStyle
+	GitAheadStyle = t.GitAheadStyle
+	GitBehindStyle = t.GitBehindStyle
+	GitMissingStyle = t.GitMissingStyle
 }
 
 // CurrentTheme returns the active Theme (never nil after init).
@@ -262,6 +268,14 @@ var (
 
 	// WorkAnalyzingStyle renders indicators for sessions being analyzed.
 	WorkAnalyzingStyle lipgloss.Style
+
+	// Git workspace state indicator styles.
+	GitCleanStyle     lipgloss.Style
+	GitDirtyStyle     lipgloss.Style
+	GitUntrackedStyle lipgloss.Style
+	GitAheadStyle     lipgloss.Style
+	GitBehindStyle    lipgloss.Style
+	GitMissingStyle   lipgloss.Style
 )
 
 // applyLegacyDefaults initialises the exported variables with the original
@@ -363,6 +377,14 @@ func applyLegacyDefaults(isDark bool) {
 	WorkCompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80"))).Bold(true)
 	WorkIncompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#CA8A04"), c("#FACC15"))).Bold(true)
 	WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#9333EA"), c("#C084FC")))
+
+	// Git workspace state styles — legacy adaptive defaults.
+	GitCleanStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80")))
+	GitDirtyStyle = lipgloss.NewStyle().Foreground(lightDark(c("#CA8A04"), c("#FACC15"))).Bold(true)
+	GitUntrackedStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE")))
+	GitAheadStyle = lipgloss.NewStyle().Foreground(lightDark(c("#2563EB"), c("#60A5FA")))
+	GitBehindStyle = lipgloss.NewStyle().Foreground(lightDark(c("#9333EA"), c("#C084FC")))
+	GitMissingStyle = lipgloss.NewStyle().Foreground(le).Bold(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
 	primary := "#7C6FF4"

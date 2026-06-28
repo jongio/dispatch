@@ -256,6 +256,10 @@ type Model struct {
 	planMap     map[string]bool
 	filterPlans bool // when true, only show sessions with a plan.md file
 
+	// Git workspace state tracking — scanned from session directories.
+	gitStateMap    map[string]platform.GitState
+	filterGitDirty bool // when true, only show sessions with local git changes
+
 	// DB watcher — monitors session-store.db for external modifications.
 	dbWatcher *data.DBWatcher
 	dbWatchCh chan struct{} // receives pings from the watcher callback
@@ -492,6 +496,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case continuationPlanCreatedMsg:
 		return m.handleContinuationPlanCreated(msg)
 
+	// ----- Git workspace state scanning ------------------------------------
+	case gitStateScannedMsg:
+		return m.handleGitStateScanned(msg)
+
 	// ----- Deep search debounce -------------------------------------------
 	case deepSearchTickMsg:
 		return m.handleDeepSearchTick(msg)
@@ -680,6 +688,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.showFavorited = m.attentionPicker.FilterFavorites()
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.workStatus.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
+			m.filterGitDirty = m.attentionPicker.FilterGitDirty()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
 		}
@@ -1055,6 +1064,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
+		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
+		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -1630,6 +1641,8 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
+		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
+		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -2011,6 +2024,9 @@ func (m Model) renderFooter() string {
 	if m.filterPlans {
 		left += "  " + styles.ActiveBadgeStyle.Render("! plans")
 	}
+	if m.filterGitDirty {
+		left += "  " + styles.ActiveBadgeStyle.Render("! git changes")
+	}
 	if len(m.workStatus.filterWorkStatus) > 0 {
 		var wsNames []string
 		if _, ok := m.workStatus.filterWorkStatus[data.WorkStatusIncomplete]; ok {
@@ -2216,6 +2232,7 @@ func (m *Model) syncSessionListStatuses() {
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 	m.sessionList.SetPlanStatuses(m.planMap)
 	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.sessionList.SetGitStates(m.gitStateMap)
 }
 
 // syncSessionListWorkStatuses pushes only the work status map to the
@@ -2236,17 +2253,19 @@ func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
 	sessions = m.filterAttentionSessions(sessions)
 	sessions = m.filterPlanSessions(sessions)
 	sessions = m.filterWorkStatusSessions(sessions)
+	sessions = m.filterGitDirtySessions(sessions)
 	return sessions
 }
 
 // applyGroupFilters runs the full group filter chain (hidden, favorited,
-// attention, plan, work status) and returns the filtered result.
+// attention, plan, work status, git state) and returns the filtered result.
 func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGroup {
 	groups = m.filterHiddenGroups(groups)
 	groups = m.filterFavoritedGroups(groups)
 	groups = m.filterAttentionGroups(groups)
 	groups = m.filterPlanGroups(groups)
 	groups = m.filterWorkStatusGroups(groups)
+	groups = m.filterGitDirtyGroups(groups)
 	return groups
 }
 
@@ -2396,6 +2415,40 @@ func (m *Model) filterWorkStatusGroups(groups []data.SessionGroup) []data.Sessio
 		}
 		_, match := m.workStatus.filterWorkStatus[result.Status]
 		return match
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Git state session filtering
+// ---------------------------------------------------------------------------
+
+// filterGitDirtySessions removes sessions that don't have local git changes
+// (dirty, untracked, ahead, or behind) when filterGitDirty is active.
+func (m *Model) filterGitDirtySessions(sessions []data.Session) []data.Session {
+	if !m.filterGitDirty || len(m.gitStateMap) == 0 {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		state := m.gitStateMap[s.ID]
+		return state == platform.GitStateDirty ||
+			state == platform.GitStateUntracked ||
+			state == platform.GitStateAhead ||
+			state == platform.GitStateBehind
+	})
+}
+
+// filterGitDirtyGroups removes sessions without local git changes from grouped
+// results when filterGitDirty is active. Empty groups are dropped.
+func (m *Model) filterGitDirtyGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.filterGitDirty || len(m.gitStateMap) == 0 {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		state := m.gitStateMap[s.ID]
+		return state == platform.GitStateDirty ||
+			state == platform.GitStateUntracked ||
+			state == platform.GitStateAhead ||
+			state == platform.GitStateBehind
 	})
 }
 
@@ -2961,6 +3014,35 @@ func (m Model) scanPlansCmd() tea.Cmd {
 	}
 }
 
+// scanGitStatesCmd runs git workspace state detection for all visible sessions.
+// It collects session IDs and their working directories, then runs bounded
+// git commands in the background.
+func (m Model) scanGitStatesCmd() tea.Cmd {
+	// Build a map of session ID to directory for all loaded sessions.
+	sessionDirs := make(map[string]string)
+	if m.sessions != nil {
+		for _, s := range m.sessions {
+			if s.Cwd != "" {
+				sessionDirs[s.ID] = s.Cwd
+			}
+		}
+	}
+	for _, g := range m.groups {
+		for _, s := range g.Sessions {
+			if s.Cwd != "" {
+				sessionDirs[s.ID] = s.Cwd
+			}
+		}
+	}
+	if len(sessionDirs) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		states := platform.ScanGitStates(sessionDirs)
+		return gitStateScannedMsg{states: states}
+	}
+}
+
 // loadPlanContentCmd reads the plan.md content for a specific session.
 func (m Model) loadPlanContentCmd(sessionID string) tea.Cmd {
 	return func() tea.Msg {
@@ -3279,6 +3361,19 @@ func (m Model) workStatusCounts() map[data.WorkStatus]int {
 		counts[r.Status]++
 	}
 	return counts
+}
+
+// gitDirtySessionCount returns the number of sessions with local git changes
+// (dirty, untracked, ahead, or behind).
+func (m Model) gitDirtySessionCount() int {
+	n := 0
+	for _, state := range m.gitStateMap {
+		switch state {
+		case platform.GitStateDirty, platform.GitStateUntracked, platform.GitStateAhead, platform.GitStateBehind:
+			n++
+		}
+	}
+	return n
 }
 
 const deepSearchDelay = 300 * time.Millisecond
