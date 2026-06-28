@@ -36,8 +36,8 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260622092850-f39628c8a989 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
-	github.com/charmbracelet/x/exp/golden v0.0.0-20260622092256-25656177ba8e // indirect
-	github.com/charmbracelet/x/exp/slice v0.0.0-20260622092256-25656177ba8e // indirect
+	github.com/charmbracelet/x/exp/golden v0.0.0-20260628005914-6eb80f72a239 // indirect
+	github.com/charmbracelet/x/exp/slice v0.0.0-20260628005914-6eb80f72a239 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
