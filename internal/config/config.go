@@ -34,6 +34,73 @@ const (
 	currentConfigVersion = 1
 )
 
+// NamedView holds a saved combination of list state filters that can be
+// applied together to quickly switch between common session browsing setups.
+type NamedView struct {
+	// Name is the unique display name for this view (e.g. "Work", "Personal").
+	Name string `json:"name"`
+
+	// Search is the search text to apply.
+	Search string `json:"search,omitempty"`
+
+	// TimeRange is the time filter (e.g. "1h", "1d", "7d", "all").
+	TimeRange string `json:"time_range,omitempty"`
+
+	// Sort is the sort field (e.g. "updated", "created", "turns", "name", "folder").
+	Sort string `json:"sort,omitempty"`
+
+	// SortOrder is the sort direction ("asc" or "desc").
+	SortOrder string `json:"sort_order,omitempty"`
+
+	// Pivot is the grouping mode (e.g. "none", "folder", "repo", "branch", "date").
+	Pivot string `json:"pivot,omitempty"`
+
+	// FavoritesOnly restricts the list to favorited sessions.
+	FavoritesOnly bool `json:"favorites_only,omitempty"`
+
+	// ShowHidden includes hidden sessions in the list.
+	ShowHidden bool `json:"show_hidden,omitempty"`
+
+	// ExcludedDirs overrides the global excluded directories for this view.
+	ExcludedDirs []string `json:"excluded_dirs,omitempty"`
+}
+
+// Validate returns an error if the view has invalid or missing fields.
+func (v *NamedView) Validate() error {
+	if v.Name == "" {
+		return errors.New("named view: name is required")
+	}
+	if v.TimeRange != "" {
+		switch v.TimeRange {
+		case "1h", "1d", "7d", "all":
+		default:
+			return fmt.Errorf("named view %q: invalid time_range %q", v.Name, v.TimeRange)
+		}
+	}
+	if v.Sort != "" {
+		switch v.Sort {
+		case "updated", "created", "turns", "name", "folder":
+		default:
+			return fmt.Errorf("named view %q: invalid sort %q", v.Name, v.Sort)
+		}
+	}
+	if v.SortOrder != "" {
+		switch v.SortOrder {
+		case "asc", "desc":
+		default:
+			return fmt.Errorf("named view %q: invalid sort_order %q", v.Name, v.SortOrder)
+		}
+	}
+	if v.Pivot != "" {
+		switch v.Pivot {
+		case "none", "folder", "repo", "branch", "date":
+		default:
+			return fmt.Errorf("named view %q: invalid pivot %q", v.Name, v.Pivot)
+		}
+	}
+	return nil
+}
+
 // Config holds the user's preferences.
 type Config struct {
 	// ConfigVersion tracks the schema version of this config file. Used to
@@ -175,6 +242,14 @@ type Config struct {
 	// with [redacted] in the preview pane. Only affects rendering; stored
 	// session data is never modified.
 	RedactPreviewSecrets bool `json:"redact_preview_secrets,omitempty"`
+
+	// Views is a list of named views, each storing a combination of
+	// filter/sort/pivot settings that can be applied together.
+	Views []NamedView `json:"views,omitempty"`
+
+	// ActiveView is the name of the currently active named view.
+	// Empty or "Default" means no named view is active.
+	ActiveView string `json:"active_view,omitempty"`
 }
 
 // LaunchMode describes how sessions are opened in the terminal.
@@ -233,6 +308,27 @@ func (c *Config) EffectivePaneDirection() string {
 		return c.PaneDirection
 	}
 	return PaneDirectionAuto
+}
+
+// FindView returns the named view with the given name, or nil if not found.
+func (c *Config) FindView(name string) *NamedView {
+	for i := range c.Views {
+		if c.Views[i].Name == name {
+			return &c.Views[i]
+		}
+	}
+	return nil
+}
+
+// ValidViews returns only the views that pass validation.
+func (c *Config) ValidViews() []NamedView {
+	valid := make([]NamedView, 0, len(c.Views))
+	for _, v := range c.Views {
+		if v.Validate() == nil {
+			valid = append(valid, v)
+		}
+	}
+	return valid
 }
 
 // EffectivePreviewPosition returns the configured preview panel position,

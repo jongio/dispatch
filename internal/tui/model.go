@@ -122,6 +122,7 @@ const (
 	stateShellPicker              // shell selection overlay
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
+	stateViewPicker               // named view selection overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -214,6 +215,7 @@ type Model struct {
 	shellPicker     components.ShellPicker
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
+	viewPicker      components.ViewPicker
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -223,6 +225,7 @@ type Model struct {
 	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
 	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
 	showFavorited   bool
+	activeView      string              // name of the active named view (empty means Default)
 	reindexing      bool
 	reindexLog      []string                  // log lines streamed from chronicle reindex
 	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
@@ -338,6 +341,7 @@ func NewModel() Model {
 		configPanel:     cp,
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
+		viewPicker:      components.NewViewPicker(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
 	}
@@ -356,6 +360,16 @@ func NewModel() Model {
 	m.filter.ExcludedWords = cfg.ExcludedWords
 	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
 	m.preview.SetRedactSecrets(cfg.RedactPreviewSecrets)
+
+	// Named views: populate picker and apply the persisted active view.
+	m.viewPicker.SetViews(cfg.ValidViews())
+	if cfg.ActiveView != "" && cfg.ActiveView != "Default" {
+		if v := cfg.FindView(cfg.ActiveView); v != nil {
+			m.activeView = cfg.ActiveView
+			m.applyNamedView(v)
+		}
+	}
+
 	return m
 }
 
@@ -581,6 +595,9 @@ func (m Model) View() tea.View {
 		case stateAttentionPicker:
 			content = m.attentionPicker.View()
 
+		case stateViewPicker:
+			content = m.viewPicker.View()
+
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
 				content = m.renderReindexOverlay()
@@ -691,6 +708,48 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.workStatus.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
 			m.filterGitDirty = m.attentionPicker.FilterGitDirty()
+			m.state = stateSessionList
+			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateViewPicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.viewPicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.viewPicker.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			selected := m.viewPicker.Selected()
+			if selected == "Default" {
+				m.activeView = ""
+			} else {
+				m.activeView = selected
+			}
+			// Persist active view.
+			m.cfg.ActiveView = m.activeView
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+			// Apply the view settings.
+			if m.activeView != "" {
+				if v := m.cfg.FindView(m.activeView); v != nil {
+					m.applyNamedView(v)
+				}
+			} else {
+				// Reset to config defaults when switching back to Default.
+				m.timeRange = m.cfg.DefaultTimeRange
+				m.filter.Since = timeRangeToSince(m.timeRange)
+				m.sort.Field = sortFieldFromConfig(m.cfg.DefaultSort)
+				m.sort.Order = sortOrderFromConfig(m.cfg.EffectiveSortOrder())
+				m.pivot = m.cfg.DefaultPivot
+				m.showFavorited = false
+				m.showHidden = false
+				m.filter.ExcludedDirs = m.cfg.ExcludedDirs
+				m.searchBar.SetValue("")
+			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
 		}
@@ -1072,6 +1131,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
+		return m, nil
+
+	case key.Matches(msg, keys.ViewSwitch):
+		m.viewPicker.SetViews(m.cfg.ValidViews())
+		m.viewPicker.SetActiveView(m.activeView)
+		m.viewPicker.SetSize(m.width, m.height)
+		m.state = stateViewPicker
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
@@ -1980,6 +2046,11 @@ func (m Model) renderBadges() string {
 	// Favorites filter indicator.
 	if m.showFavorited {
 		parts = append(parts, styles.ActiveBadgeStyle.Render("★ Favorites"))
+	}
+
+	// Active named view indicator.
+	if m.activeView != "" {
+		parts = append(parts, styles.ActiveBadgeStyle.Render("⊞ "+m.activeView))
 	}
 
 	if len(parts) == 0 {
@@ -3659,5 +3730,31 @@ func timeRangeToSince(r string) *time.Time {
 		return &t
 	default: // "all"
 		return nil
+	}
+}
+
+// applyNamedView applies the settings from a named view to the model state.
+// It does not trigger a session reload; the caller must do so.
+func (m *Model) applyNamedView(v *config.NamedView) {
+	if v.TimeRange != "" {
+		m.timeRange = v.TimeRange
+		m.filter.Since = timeRangeToSince(m.timeRange)
+	}
+	if v.Sort != "" {
+		m.sort.Field = sortFieldFromConfig(v.Sort)
+	}
+	if v.SortOrder != "" {
+		m.sort.Order = sortOrderFromConfig(v.SortOrder)
+	}
+	if v.Pivot != "" {
+		m.pivot = v.Pivot
+	}
+	if v.Search != "" {
+		m.searchBar.SetValue(v.Search)
+	}
+	m.showFavorited = v.FavoritesOnly
+	m.showHidden = v.ShowHidden
+	if len(v.ExcludedDirs) > 0 {
+		m.filter.ExcludedDirs = v.ExcludedDirs
 	}
 }
