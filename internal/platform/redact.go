@@ -10,8 +10,9 @@ const redactedPlaceholder = "[redacted]"
 // secretPatterns defines compiled regular expressions for common secret
 // shapes that should be masked in preview rendering.
 var secretPatterns = []*regexp.Regexp{
-	// Bearer tokens in Authorization headers.
-	regexp.MustCompile(`(?i)(Bearer\s+)\S+`),
+	// Bearer tokens in Authorization headers (token must be 20+ chars to avoid
+	// false positives on natural language like "bearer of bad news").
+	regexp.MustCompile(`(?i)(Bearer\s+)\S{20,}`),
 
 	// GitHub personal access tokens (classic and fine-grained).
 	regexp.MustCompile(`ghp_[A-Za-z0-9]{36,}`),
@@ -21,10 +22,10 @@ var secretPatterns = []*regexp.Regexp{
 	// Azure connection strings (storage, service bus, etc.).
 	regexp.MustCompile(`(?i)((?:AccountKey|SharedAccessKey|SharedAccessKeyName)\s*=\s*)[^\s;]+`),
 
-	// .env style assignments for keys containing sensitive words.
-	// Matches: TOKEN=value, SECRET=value, PASSWORD=value, KEY=value
-	// (case-insensitive key, value is everything after = until end of line).
-	regexp.MustCompile(`(?im)^([A-Za-z_]*(?:TOKEN|SECRET|PASSWORD|KEY)[A-Za-z_]*\s*=\s*).+$`),
+	// .env style assignments for keys containing sensitive words as standalone
+	// segments (preceded by _ or at start, followed by _ or end of name).
+	// Avoids false positives on KEYBOARD, MONKEY, TURKEY, etc.
+	regexp.MustCompile(`(?im)^([A-Za-z_]*?(?:(?:^|_)(?:TOKEN|SECRET|PASSWORD|KEY))(?:_[A-Za-z_]*)?\s*=\s*).+$`),
 }
 
 // replacements maps each pattern index to a replacement function.

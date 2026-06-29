@@ -122,7 +122,7 @@ func TestRedactSecrets_NormalTextUnchanged(t *testing.T) {
 }
 
 func TestRedactSecrets_MultipleSecrets(t *testing.T) {
-	input := "Bearer mytoken123 and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij"
+	input := "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij"
 	got := RedactSecrets(input)
 	if !contains(got, "Bearer [redacted]") {
 		t.Errorf("expected Bearer to be redacted, got: %q", got)
