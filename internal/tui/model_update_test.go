@@ -2127,6 +2127,93 @@ func TestHandleKey_CopyID_Error(t *testing.T) {
 	}
 }
 
+func TestHandleKey_CopyResumeCommand_Success(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.cfg.CustomCommand = "copilot --resume {sessionId} --agent test-agent"
+	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
+
+	result, cmd := m.Update(runeKeyMsg('C'))
+	rm := result.(Model)
+	if copied != "copilot --resume abc-123 --agent test-agent" {
+		t.Errorf("clipboard text = %q", copied)
+	}
+	if rm.statusInfo != statusCopiedResumeCommand {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, statusCopiedResumeCommand)
+	}
+	if rm.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty", rm.statusErr)
+	}
+	if cmd == nil {
+		t.Error("CopyResumeCommand success should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyResumeCommand_NoSession(t *testing.T) {
+	m := newTestModel()
+	result, cmd := m.Update(runeKeyMsg('C'))
+	rm := result.(Model)
+	if rm.statusInfo != "" || rm.statusErr != "" {
+		t.Errorf("status = (%q, %q), want empty", rm.statusInfo, rm.statusErr)
+	}
+	if cmd != nil {
+		t.Error("CopyResumeCommand with no session should return nil cmd")
+	}
+}
+
+func TestHandleKey_CopyResumeCommand_BuildError(t *testing.T) {
+	orig := clipboardWrite
+	clipboardWrite = func(string) error {
+		t.Fatal("clipboard should not be called when command build fails")
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.cfg.CustomCommand = "bad\ncommand {sessionId}"
+	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
+
+	result, cmd := m.Update(runeKeyMsg('C'))
+	rm := result.(Model)
+	if !strings.Contains(rm.statusErr, "resume command:") {
+		t.Errorf("statusErr = %q, want resume command error", rm.statusErr)
+	}
+	if cmd == nil {
+		t.Error("CopyResumeCommand build error should return clearStatusAfter cmd")
+	}
+}
+
+func TestHandleKey_CopyResumeCommand_ClipboardError(t *testing.T) {
+	orig := clipboardWrite
+	clipboardWrite = func(string) error {
+		return errors.New("no display")
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.cfg.CustomCommand = "copilot --resume {sessionId}"
+	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
+
+	result, cmd := m.Update(runeKeyMsg('C'))
+	rm := result.(Model)
+	if !strings.Contains(rm.statusErr, "clipboard:") {
+		t.Errorf("statusErr = %q, want clipboard error", rm.statusErr)
+	}
+	if rm.statusInfo != "" {
+		t.Errorf("statusInfo = %q, want empty", rm.statusInfo)
+	}
+	if cmd == nil {
+		t.Error("CopyResumeCommand clipboard error should return clearStatusAfter cmd")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // CopyPreview (y key)
 // ---------------------------------------------------------------------------

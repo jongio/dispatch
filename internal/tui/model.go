@@ -53,6 +53,10 @@ const (
 	// copied to the clipboard.
 	statusCopiedID = "Copied session ID ✓"
 
+	// statusCopiedResumeCommand is the status message shown when a session's
+	// resume command is copied to the clipboard.
+	statusCopiedResumeCommand = "Copied resume command ✓"
+
 	// statusCopiedPreview is the status message shown when preview content
 	// is copied to the clipboard via the y key.
 	statusCopiedPreview = "Copied to clipboard ✓"
@@ -1025,6 +1029,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.CopyPreview):
 		return m.handleCopyPreview()
 
+	case key.Matches(msg, keys.CopyResumeCommand):
+		return m.handleCopyResumeCommand()
+
 	case key.Matches(msg, keys.JumpNextAttention):
 		return m.handleJumpNextAttention()
 
@@ -1152,6 +1159,27 @@ func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
 		return m, clearStatusAfter(2 * time.Second)
 	}
 	m.statusInfo = statusCopiedID
+	return m, clearStatusAfter(2 * time.Second)
+}
+
+// handleCopyResumeCommand copies the selected session's resume command to the
+// system clipboard. It mirrors the same launch options used by Dispatch when
+// opening sessions so copied commands match the configured workflow.
+func (m Model) handleCopyResumeCommand() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	cmd, err := platform.BuildResumeCommandString(sess.ID, m.resumeConfigForSession(sess.Cwd))
+	if err != nil {
+		m.statusErr = "resume command: " + err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	if err := clipboardWrite(cmd); err != nil {
+		m.statusErr = "clipboard: " + err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.statusInfo = statusCopiedResumeCommand
 	return m, clearStatusAfter(2 * time.Second)
 }
 
@@ -2640,13 +2668,7 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 // runs the Copilot CLI session resume in the current terminal, and quits
 // the TUI when the session ends.
 func (m *Model) launchInPlace(sessionID, cwd string) tea.Cmd {
-	cfg := platform.ResumeConfig{
-		YoloMode:      m.cfg.YoloMode,
-		Agent:         m.cfg.Agent,
-		Model:         m.cfg.Model,
-		CustomCommand: m.cfg.CustomCommand,
-		Cwd:           cwd,
-	}
+	cfg := m.resumeConfigForSession(cwd)
 	cmd, err := platform.NewResumeCmd(sessionID, cfg)
 	if err != nil {
 		m.statusErr = err.Error()
@@ -2671,16 +2693,8 @@ func launchStyleForMode(mode string) string {
 
 // launchExternal opens the session in a new tab, window, or pane depending on launchStyle.
 func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchStyle string) tea.Cmd {
-	cfg := platform.ResumeConfig{
-		YoloMode:      m.cfg.YoloMode,
-		Agent:         m.cfg.Agent,
-		Model:         m.cfg.Model,
-		Terminal:      m.cfg.DefaultTerminal,
-		CustomCommand: m.cfg.CustomCommand,
-		Cwd:           cwd,
-		LaunchStyle:   launchStyle,
-		PaneDirection: m.cfg.EffectivePaneDirection(),
-	}
+	cfg := m.resumeConfigForSession(cwd)
+	cfg.LaunchStyle = launchStyle
 	return func() tea.Msg {
 		if err := platform.LaunchSession(shell, sessionID, cfg); err != nil {
 			detail := fmt.Sprintf("launch failed: %v (shell=%s, terminal=%s)",
@@ -2688,6 +2702,18 @@ func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchS
 			return dataErrorMsg{err: errors.New(detail)}
 		}
 		return nil
+	}
+}
+
+func (m Model) resumeConfigForSession(cwd string) platform.ResumeConfig {
+	return platform.ResumeConfig{
+		YoloMode:      m.cfg.YoloMode,
+		Agent:         m.cfg.Agent,
+		Model:         m.cfg.Model,
+		Terminal:      m.cfg.DefaultTerminal,
+		CustomCommand: m.cfg.CustomCommand,
+		Cwd:           cwd,
+		PaneDirection: m.cfg.EffectivePaneDirection(),
 	}
 }
 
