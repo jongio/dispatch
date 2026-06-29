@@ -125,6 +125,7 @@ const (
 	stateAttentionPicker          // attention status filter overlay
 	stateViewPicker               // named view selection overlay
 	stateFilePicker               // file picker overlay
+	stateCompareView              // compare two sessions overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -220,6 +221,7 @@ type Model struct {
 	attentionPicker components.AttentionPicker
 	viewPicker      components.ViewPicker
 	filePicker      components.FilePicker
+	compareView     components.CompareView
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -477,6 +479,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileOpenedMsg:
 		return m.handleFileOpened(msg)
 
+	case compareDetailMsg:
+		return m.handleCompareDetail(msg)
+
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
 		return m.handleClearStatus()
@@ -616,6 +621,9 @@ func (m Model) View() tea.View {
 
 		case stateFilePicker:
 			content = m.filePicker.View()
+
+		case stateCompareView:
+			content = m.compareView.View()
 
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
@@ -786,6 +794,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if sf, ok := m.filePicker.Selected(); ok {
 				return m, m.openFileCmd(sf.FilePath)
 			}
+		}
+		return m, nil
+
+	case stateCompareView:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up), key.Matches(msg, keys.PreviewScrollUp):
+			m.compareView.ScrollUp()
+		case key.Matches(msg, keys.Down), key.Matches(msg, keys.PreviewScrollDown):
+			m.compareView.ScrollDown()
+		case key.Matches(msg, keys.CopyID):
+			// 'c' copies compare summary to clipboard.
+			txt := m.compareView.PlainText()
+			if err := clipboardWrite(txt); err != nil {
+				m.statusErr = "clipboard: " + err.Error()
+			} else {
+				m.statusInfo = "Copied compare summary \u2713"
+			}
+			return m, clearStatusAfter(2 * time.Second)
 		}
 		return m, nil
 
@@ -1265,6 +1293,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.sessionList.DeselectAll()
 		m.statusInfo = ""
 		return m, nil
+
+	case key.Matches(msg, keys.Compare):
+		return m.handleCompare()
 	}
 
 	return m, nil
@@ -1455,6 +1486,46 @@ func (m Model) handleExportDone(msg exportDoneMsg) (Model, tea.Cmd) {
 		m.statusInfo = fmt.Sprintf("Exported %d sessions", len(msg.paths))
 	}
 	return m, clearStatusAfter(3 * time.Second)
+}
+
+// handleCompare opens the compare view when exactly two sessions are selected.
+// Otherwise, it shows a status hint.
+func (m Model) handleCompare() (tea.Model, tea.Cmd) {
+	sel := m.sessionList.SelectedSessions()
+	if len(sel) != 2 {
+		m.statusInfo = "Select exactly 2 sessions to compare (space to toggle)"
+		return m, clearStatusAfter(3 * time.Second)
+	}
+
+	store := m.store
+	if store == nil {
+		return m, nil
+	}
+
+	idA, idB := sel[0].ID, sel[1].ID
+	return m, func() tea.Msg {
+		left, err := store.GetSession(context.Background(), idA)
+		if err != nil {
+			return compareDetailMsg{err: err}
+		}
+		right, err := store.GetSession(context.Background(), idB)
+		if err != nil {
+			return compareDetailMsg{err: err}
+		}
+		return compareDetailMsg{left: left, right: right}
+	}
+}
+
+// handleCompareDetail processes the async result of loading two sessions for comparison.
+func (m Model) handleCompareDetail(msg compareDetailMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = "compare: " + msg.err.Error()
+		return m, clearStatusAfter(3 * time.Second)
+	}
+	m.compareView.SetSessions(msg.left, msg.right)
+	m.compareView.SetSize(m.width, m.height)
+	m.state = stateCompareView
+	return m, nil
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic

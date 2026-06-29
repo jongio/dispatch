@@ -186,3 +186,10 @@ type fileOpenedMsg struct {
 	path string
 	err  error
 }
+
+// compareDetailMsg delivers two session details for side-by-side comparison.
+type compareDetailMsg struct {
+	left  *data.SessionDetail
+	right *data.SessionDetail
+	err   error
+}

@@ -42,6 +42,9 @@ func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) { //nolint:u
 	m.width = msg.Width
 	m.height = msg.Height
 	m.recalcLayout()
+	if m.state == stateCompareView {
+		m.compareView.SetSize(m.width, m.height)
+	}
 	return m, nil
 }
 
