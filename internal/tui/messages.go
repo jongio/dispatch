@@ -193,3 +193,8 @@ type compareDetailMsg struct {
 	right *data.SessionDetail
 	err   error
 }
+
+// cmdPaletteActionMsg is dispatched when the user executes a command from the palette.
+type cmdPaletteActionMsg struct {
+	action string
+}

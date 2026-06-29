@@ -126,6 +126,7 @@ const (
 	stateViewPicker               // named view selection overlay
 	stateFilePicker               // file picker overlay
 	stateCompareView              // compare two sessions overlay
+	stateCmdPalette               // command palette overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -222,6 +223,7 @@ type Model struct {
 	viewPicker      components.ViewPicker
 	filePicker      components.FilePicker
 	compareView     components.CompareView
+	cmdPalette      components.CmdPalette
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -357,6 +359,7 @@ func NewModel() Model {
 		attentionPicker: components.NewAttentionPicker(),
 		viewPicker:      components.NewViewPicker(),
 		filePicker:      components.NewFilePicker(),
+		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
 	}
@@ -580,6 +583,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionExitMsg:
 		return m.handleSessionExit(msg)
 
+	// ----- Command palette action ------------------------------------------
+	case cmdPaletteActionMsg:
+		return m.handleCmdPaletteAction(msg)
+
 	// ----- Keyboard --------------------------------------------------------
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -624,6 +631,9 @@ func (m Model) View() tea.View {
 
 		case stateCompareView:
 			content = m.compareView.View()
+
+		case stateCmdPalette:
+			content = m.cmdPalette.View()
 
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
@@ -817,6 +827,31 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case stateCmdPalette:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.cmdPalette.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.cmdPalette.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			if action, ok := m.cmdPalette.Selected(); ok {
+				m.state = stateSessionList
+				return m, func() tea.Msg { return cmdPaletteActionMsg{action: action} }
+			}
+		case msg.Code == tea.KeyBackspace:
+			m.cmdPalette.Backspace()
+		default:
+			// Any printable rune is typed into the filter.
+			if msg.Text != "" && msg.Mod == 0 {
+				for _, r := range msg.Text {
+					m.cmdPalette.TypeRune(r)
+				}
+			}
+		}
+		return m, nil
+
 	default:
 		// stateLoading and stateSessionList fall through to the
 		// main key handler below.
@@ -975,6 +1010,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Help):
 		m.state = stateHelpOverlay
+		return m, nil
+
+	case key.Matches(msg, keys.CmdPalette):
+		m.openCmdPalette()
 		return m, nil
 
 	case key.Matches(msg, keys.Config):
