@@ -130,6 +130,18 @@ func (m Model) handleClearStatus() (Model, tea.Cmd) { //nolint:unparam
 	return m, nil
 }
 
+// ----- File opened result --------------------------------------------------
+
+func (m Model) handleFileOpened(msg fileOpenedMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.filePicker.SetWarning(msg.err.Error())
+		return m, nil
+	}
+	m.filePicker.ClearWarning()
+	m.statusInfo = "Opened " + msg.path
+	return m, clearStatusAfter(2 * time.Second)
+}
+
 // ----- Pending click fire (single-click debounce) --------------------------
 
 func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -123,6 +124,7 @@ const (
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
 	stateViewPicker               // named view selection overlay
+	stateFilePicker               // file picker overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -217,6 +219,7 @@ type Model struct {
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
 	viewPicker      components.ViewPicker
+	filePicker      components.FilePicker
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -351,6 +354,7 @@ func NewModel() Model {
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
 		viewPicker:      components.NewViewPicker(),
+		filePicker:      components.NewFilePicker(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
 	}
@@ -469,6 +473,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- Export done -----------------------------------------------------
 	case exportDoneMsg:
 		return m.handleExportDone(msg)
+
+	case fileOpenedMsg:
+		return m.handleFileOpened(msg)
 
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
@@ -606,6 +613,9 @@ func (m Model) View() tea.View {
 
 		case stateViewPicker:
 			content = m.viewPicker.View()
+
+		case stateFilePicker:
+			content = m.filePicker.View()
 
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
@@ -761,6 +771,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateFilePicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.filePicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.filePicker.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			if sf, ok := m.filePicker.Selected(); ok {
+				return m, m.openFileCmd(sf.FilePath)
+			}
 		}
 		return m, nil
 
@@ -1191,6 +1216,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.viewPicker.SetActiveView(m.activeView)
 		m.viewPicker.SetSize(m.width, m.height)
 		m.state = stateViewPicker
+		return m, nil
+
+	case key.Matches(msg, keys.OpenFile):
+		if m.detail != nil && len(m.detail.Files) > 0 {
+			m.filePicker.SetFiles(m.detail.Files)
+			m.filePicker.SetSize(m.width, m.height)
+			m.state = stateFilePicker
+		}
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
@@ -3683,6 +3716,18 @@ func (m Model) fetchAISessionsCmd(ids []string, version int) tea.Cmd {
 			return aiSessionsLoadedMsg{version: version}
 		}
 		return aiSessionsLoadedMsg{version: version, sessions: sessions}
+	}
+}
+
+// openFileCmd opens a file using the platform default application. It checks
+// that the file exists before attempting to open it.
+func (m Model) openFileCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		if _, err := os.Stat(path); err != nil {
+			return fileOpenedMsg{path: path, err: fmt.Errorf("file not found: %s", path)}
+		}
+		err := platform.OpenFile(path)
+		return fileOpenedMsg{path: path, err: err}
 	}
 }
 

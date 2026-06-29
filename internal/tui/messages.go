@@ -180,3 +180,9 @@ type exportDoneMsg struct {
 type gitStateScannedMsg struct {
 	states map[string]platform.GitState
 }
+
+// fileOpenedMsg reports the result of opening a file with the platform opener.
+type fileOpenedMsg struct {
+	path string
+	err  error
+}

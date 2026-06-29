@@ -54,11 +54,12 @@ type keyMap struct {
 	ShiftUp           key.Binding
 	ShiftDown         key.Binding
 	ViewSwitch        key.Binding
+	OpenFile          key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Hide, k.Star, k.Note, k.CopyID, k.CopyPreview, k.Export, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Hide, k.Star, k.Note, k.CopyID, k.CopyPreview, k.Export, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.OpenFile, k.ViewSwitch, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -68,7 +69,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Export, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
+		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.CopyID, k.CopyPreview, k.Export, k.OpenFile, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.Quit},
@@ -125,4 +126,5 @@ var keys = keyMap{
 	ShiftUp:           key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("shift+\u2191", "extend select up")),
 	ShiftDown:         key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+\u2193", "extend select down")),
 	ViewSwitch:        key.NewBinding(key.WithKeys("V"), key.WithHelp("V", "switch view")),
+	OpenFile:          key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "open file")),
 }
