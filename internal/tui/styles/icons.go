@@ -62,6 +62,7 @@ const (
 	// Host type icons — distinguish session origin (GitHub, Azure DevOps).
 	nfGitHub = "\uf09b" //  nf-fa-github
 	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
+	nfPencil = "\uf040" //  nf-fa-pencil
 )
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ const (
 
 	fbGitHub = "⊙"
 	fbADO    = "☁"
+	fbPencil = "✎"
 )
 
 // ---------------------------------------------------------------------------
@@ -203,6 +205,9 @@ func IconCollapseAll() string { return "⊟" }
 
 // IconPlan returns a filled dot for sessions that have a plan.md file.
 func IconPlan() string { return icon(nfBullet, fbAttentionDot) }
+
+// IconNote returns a pencil icon for sessions that have a user note.
+func IconNote() string { return icon(nfPencil, fbPencil) }
 
 // IconWorkComplete returns a check icon for sessions with all planned work complete.
 func IconWorkComplete() string { return icon(nfCheck, fbCheck) }

@@ -209,6 +209,7 @@ type Model struct {
 	// Sub-components.
 	sessionList     components.SessionList
 	searchBar       components.SearchBar
+	noteInput       components.NoteInput
 	filterPanel     components.FilterPanel
 	preview         components.PreviewPanel
 	help            components.HelpOverlay
@@ -224,6 +225,7 @@ type Model struct {
 	showHidden      bool
 	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
 	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	notesSet        map[string]struct{} // session ID → struct{} for fast note-existence lookup
 	showFavorited   bool
 	activeView      string              // name of the active named view (empty means Default)
 	reindexing      bool
@@ -317,6 +319,11 @@ func NewModel() Model {
 		favoritedSet[id] = struct{}{}
 	}
 
+	notesSet := make(map[string]struct{}, len(cfg.SessionNotes))
+	for id := range cfg.SessionNotes {
+		notesSet[id] = struct{}{}
+	}
+
 	m := Model{
 		state: stateLoading,
 		cfg:   cfg,
@@ -331,9 +338,11 @@ func NewModel() Model {
 		previewPosition: cfg.EffectivePreviewPosition(),
 		hiddenSet:       hiddenSet,
 		favoritedSet:    favoritedSet,
+		notesSet:        notesSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
+		noteInput:       components.NewNoteInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
 		help:            components.NewHelpOverlay(),
@@ -760,6 +769,47 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// main key handler below.
 	}
 
+	// ---------- Note input focused ------------------------------------------
+	if m.noteInput.Focused() {
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.noteInput.Blur()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			sessionID := m.noteInput.SessionID()
+			noteText := m.noteInput.Value()
+			m.noteInput.Blur()
+
+			// Update or remove the note in config.
+			if noteText == "" {
+				delete(m.cfg.SessionNotes, sessionID)
+				delete(m.notesSet, sessionID)
+			} else {
+				if m.cfg.SessionNotes == nil {
+					m.cfg.SessionNotes = make(map[string]string)
+				}
+				m.cfg.SessionNotes[sessionID] = noteText
+				m.notesSet[sessionID] = struct{}{}
+			}
+
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+
+			// Update UI state.
+			m.sessionList.SetNoteSessions(m.notesSet)
+			m.preview.SetNote(noteText)
+			m.statusInfo = "Note saved"
+			return m, clearStatusAfter(2 * time.Second)
+		default:
+			var cmd tea.Cmd
+			ni := m.noteInput
+			ni, cmd = ni.Update(msg)
+			m.noteInput = ni
+			return m, cmd
+		}
+	}
+
 	// ---------- Search bar focused ----------------------------------------
 	if m.searchBar.Focused() {
 		switch {
@@ -1104,6 +1154,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Star):
 		return m.handleToggleFavorite()
 
+	case key.Matches(msg, keys.Note):
+		return m.handleEditNote()
+
 	case key.Matches(msg, keys.CopyID):
 		return m.handleCopyID()
 
@@ -1235,6 +1288,20 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 
 	m.sessionList.SetFavoritedSessions(m.favoritedSet)
 	cmd := m.loadSessionsCmd()
+	return m, cmd
+}
+
+// handleEditNote opens the inline note input for the currently selected session.
+func (m Model) handleEditNote() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	currentNote := ""
+	if m.cfg.SessionNotes != nil {
+		currentNote = m.cfg.SessionNotes[sess.ID]
+	}
+	cmd := m.noteInput.Focus(sess.ID, currentNote)
 	return m, cmd
 }
 
@@ -2069,6 +2136,12 @@ func (m Model) renderSeparator() string {
 }
 
 func (m Model) renderFooter() string {
+	// When note input is active, show it instead of the normal footer.
+	if m.noteInput.Focused() {
+		m.noteInput.SetWidth(m.width)
+		return m.noteInput.View()
+	}
+
 	count := m.sessionList.SessionCount()
 
 	// Left: session count + active filter summary.
@@ -2306,6 +2379,7 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 func (m *Model) syncSessionListStatuses() {
 	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	m.sessionList.SetNoteSessions(m.notesSet)
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 	m.sessionList.SetPlanStatuses(m.planMap)
 	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)

@@ -17,6 +17,7 @@ import (
 type PreviewPanel struct {
 	detail          *data.SessionDetail
 	attentionStatus data.AttentionStatus
+	note            string                // user note for the current session
 	width           int
 	height          int
 	scroll          int
@@ -80,6 +81,12 @@ func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
 	p.ClearSelection()
+	p.updateTotalLines()
+}
+
+// SetNote updates the user note shown at the top of the preview.
+func (p *PreviewPanel) SetNote(note string) {
+	p.note = note
 	p.updateTotalLines()
 }
 
@@ -535,6 +542,13 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		summary := CleanSummary(s.Summary)
 		wrapped := wordWrap(summary, contentW)
 		b.WriteString(lipgloss.NewStyle().Bold(true).Render(wrapped) + "\n\n")
+	}
+
+	// ── Note ──
+	if p.note != "" {
+		noteLabel := styles.PreviewLabelStyle.Render(styles.IconNote() + " Note: ")
+		noteValue := styles.NoteIndicatorStyle.Render(wordWrap(p.note, max(1, contentW-lipgloss.Width(noteLabel))))
+		b.WriteString(noteLabel + noteValue + "\n\n")
 	}
 
 	// ── Identity fields ──

@@ -196,6 +196,12 @@ type Config struct {
 	// as favorites. They can be filtered with the "filter favorites" toggle.
 	FavoriteSessions []string `json:"favoriteSessions,omitempty"`
 
+	// SessionNotes maps session IDs to user-defined note strings.
+	// Notes provide context about why a session matters or what follow-up
+	// is needed. They are displayed in the preview panel and indicated
+	// by a marker in the session list.
+	SessionNotes map[string]string `json:"sessionNotes,omitempty"`
+
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
 	// query the Copilot backend for semantically relevant sessions.

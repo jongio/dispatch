@@ -38,6 +38,7 @@ type SessionList struct {
 	planMap        map[string]bool                  // session ID → has plan.md
 	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
 	gitStateMap    map[string]platform.GitState     // session ID → git workspace state
+	notesSet       map[string]struct{}              // session ID → has a user note
 	selected       map[string]struct{}              // session ID → selected for multi-open
 	treeMode       bool                             // true when showing grouped/tree view
 	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
@@ -121,6 +122,12 @@ func (s *SessionList) SetHiddenSessions(set map[string]struct{}) {
 // render those sessions with a "★" marker.
 func (s *SessionList) SetFavoritedSessions(set map[string]struct{}) {
 	s.favoritedSet = set
+}
+
+// SetNoteSessions updates the set of session IDs that have a user note,
+// used to render those sessions with a pencil marker.
+func (s *SessionList) SetNoteSessions(set map[string]struct{}) {
+	s.notesSet = set
 }
 
 // SetAISessions updates the set of AI-found session IDs, used to
@@ -730,7 +737,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	turns := strconv.Itoa(sess.TurnCount) + "t"
 
 	// ── Row layout ─────────────────────────────────────────────────────
-	//   [indent 0|2][selector 2][att 2][host 2][plan 2][work 2] summary …
+	//   [indent 0|2][selector 2][att 2][host 2][plan 2][note 2][work 2] summary …
 	//
 	// The selector merges cursor pointer and multi-select check into one
 	// 2-char column, saving 2 chars vs the old separate columns. Combined
@@ -762,6 +769,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	}
 
 	plnDot := s.planDot(sess.ID, selected)
+	ntDot := s.noteDot(sess.ID, selected)
 	wrkDot := s.workStatusDot(sess.ID, selected)
 	gitDot := s.gitStateDot(sess.ID, selected)
 
@@ -776,6 +784,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	const dotW = 2     // attention dot + space
 	const hostDotW = 2 // host icon + space (always reserved)
 	const planDotW = 2 // plan dot + space
+	const noteDotW = 2 // note dot + space
 	const wrkDotW = 2  // work status dot + space
 	const gitDotW = 2  // git state dot + space
 	const timeW = 9
@@ -784,8 +793,8 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-wrkDotW-gitDotW-timeW-spacing)
-		line := indent + selector + attDot + hostDot + plnDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-noteDotW-wrkDotW-gitDotW-timeW-spacing)
+		line := indent + selector + attDot + hostDot + plnDot + ntDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		return s.applyRowStyle(line, selected, hidden, favorited)
 	}
 
@@ -798,7 +807,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - selectorW - dotW - hostDotW - planDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -815,6 +824,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(attDot)
 	b.WriteString(hostDot)
 	b.WriteString(plnDot)
+	b.WriteString(ntDot)
 	b.WriteString(wrkDot)
 	b.WriteString(gitDot)
 	b.WriteString(PadRight(summary, summaryW))
@@ -921,6 +931,18 @@ func (s SessionList) planDot(sessionID string, selected bool) string {
 	icon := styles.IconPlan()
 
 	return renderDot(icon, styles.PlanIndicatorStyle, selected)
+}
+
+// noteDot returns a styled 2-character string (pencil + space) for sessions
+// that have a user note, or two spaces if no note exists.
+func (s SessionList) noteDot(sessionID string, selected bool) string {
+	if s.notesSet == nil {
+		return "  "
+	}
+	if _, ok := s.notesSet[sessionID]; !ok {
+		return "  "
+	}
+	return renderDot(styles.IconNote(), styles.NoteIndicatorStyle, selected)
 }
 
 // workStatusDot returns a styled 2-character string (icon + space) representing

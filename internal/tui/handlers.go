@@ -216,6 +216,12 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	}
 	m.detail = msg.detail
 	m.preview.SetDetail(m.detail)
+	// Set the user note for this session (if any).
+	if m.cfg.SessionNotes != nil {
+		m.preview.SetNote(m.cfg.SessionNotes[m.detail.Session.ID])
+	} else {
+		m.preview.SetNote("")
+	}
 	m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
 	m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 	if result, ok := m.workStatus.workStatusMap[m.detail.Session.ID]; ok {

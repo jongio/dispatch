@@ -96,6 +96,7 @@ func SetTheme(t *Theme) {
 	AttentionThinkingStyle = t.AttentionThinkingStyle
 	AttentionCompactingStyle = t.AttentionCompactingStyle
 	PlanIndicatorStyle = t.PlanIndicatorStyle
+	NoteIndicatorStyle = t.NoteIndicatorStyle
 	WorkCompleteStyle = t.WorkCompleteStyle
 	WorkIncompleteStyle = t.WorkIncompleteStyle
 	WorkAnalyzingStyle = t.WorkAnalyzingStyle
@@ -260,6 +261,9 @@ var (
 	// PlanIndicatorStyle renders the dot for sessions that have a plan.md file.
 	PlanIndicatorStyle lipgloss.Style
 
+	// NoteIndicatorStyle renders the pencil marker for sessions that have a user note.
+	NoteIndicatorStyle lipgloss.Style
+
 	// WorkCompleteStyle renders indicators for sessions with all planned work complete.
 	WorkCompleteStyle lipgloss.Style
 
@@ -374,6 +378,7 @@ func applyLegacyDefaults(isDark bool) {
 	AttentionThinkingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE")))               // Cyan
 	AttentionCompactingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00"))).Faint(true) // Dim yellow
 	PlanIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#0891B2"), c("#22D3EE"))).Bold(true)
+	NoteIndicatorStyle = lipgloss.NewStyle().Foreground(lightDark(c("#D97706"), c("#FBBF24"))).Bold(true)
 	WorkCompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#16A34A"), c("#4ADE80"))).Bold(true)
 	WorkIncompleteStyle = lipgloss.NewStyle().Foreground(lightDark(c("#CA8A04"), c("#FACC15"))).Bold(true)
 	WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(lightDark(c("#9333EA"), c("#C084FC")))
