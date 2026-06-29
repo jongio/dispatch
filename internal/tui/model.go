@@ -1141,6 +1141,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.Timeline):
+		if m.showPreview && m.detail != nil {
+			m.preview.ToggleTimeline()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Reindex):
 		if !m.reindexing {
 			m.reindexing = true
