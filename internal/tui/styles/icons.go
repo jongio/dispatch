@@ -235,9 +235,6 @@ func IconHostType(hostType string) string {
 // Git workspace state icons
 // ---------------------------------------------------------------------------
 
-// IconGitClean returns a check icon for clean git workspaces.
-func IconGitClean() string { return icon(nfCheck, "✓") }
-
 // IconGitDirty returns a modified icon for dirty git workspaces.
 func IconGitDirty() string { return icon("\uf069", "✱") } // nf-fa-asterisk
 

@@ -359,6 +359,7 @@ func NewModel() Model {
 		attentionPicker: components.NewAttentionPicker(),
 		viewPicker:      components.NewViewPicker(),
 		filePicker:      components.NewFilePicker(),
+		compareView:     components.NewCompareView(),
 		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
