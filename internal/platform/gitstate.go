@@ -32,23 +32,34 @@ const (
 	GitStateMissing
 )
 
+// Git state label constants returned by [GitState.String].
+const (
+	gitLabelUnknown   = "unknown"
+	gitLabelClean     = "clean"
+	gitLabelDirty     = "dirty"
+	gitLabelUntracked = "untracked"
+	gitLabelAhead     = "ahead"
+	gitLabelBehind    = "behind"
+	gitLabelMissing   = "missing"
+)
+
 // String returns a human-readable label for the git state.
 func (g GitState) String() string {
 	switch g {
 	case GitStateClean:
-		return "clean"
+		return gitLabelClean
 	case GitStateDirty:
-		return "dirty"
+		return gitLabelDirty
 	case GitStateUntracked:
-		return "untracked"
+		return gitLabelUntracked
 	case GitStateAhead:
-		return "ahead"
+		return gitLabelAhead
 	case GitStateBehind:
-		return "behind"
+		return gitLabelBehind
 	case GitStateMissing:
-		return "missing"
+		return gitLabelMissing
 	default:
-		return "unknown"
+		return gitLabelUnknown
 	}
 }
 

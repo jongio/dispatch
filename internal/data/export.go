@@ -52,18 +52,18 @@ func RenderMarkdown(detail *SessionDetail) string {
 	b.WriteString("## Metadata\n\n")
 	b.WriteString("| Field | Value |\n")
 	b.WriteString("|-------|-------|\n")
-	b.WriteString(fmt.Sprintf("| ID | `%s` |\n", s.ID))
-	b.WriteString(fmt.Sprintf("| Folder | `%s` |\n", s.Cwd))
+	fmt.Fprintf(&b, "| ID | `%s` |\n", s.ID)
+	fmt.Fprintf(&b, "| Folder | `%s` |\n", s.Cwd)
 	if s.Repository != "" {
-		b.WriteString(fmt.Sprintf("| Repository | %s |\n", s.Repository))
+		fmt.Fprintf(&b, "| Repository | %s |\n", s.Repository)
 	}
 	if s.Branch != "" {
-		b.WriteString(fmt.Sprintf("| Branch | %s |\n", s.Branch))
+		fmt.Fprintf(&b, "| Branch | %s |\n", s.Branch)
 	}
-	b.WriteString(fmt.Sprintf("| Created | %s |\n", s.CreatedAt))
-	b.WriteString(fmt.Sprintf("| Last Active | %s |\n", s.LastActiveAt))
-	b.WriteString(fmt.Sprintf("| Turns | %d |\n", s.TurnCount))
-	b.WriteString(fmt.Sprintf("| Files | %d |\n", s.FileCount))
+	fmt.Fprintf(&b, "| Created | %s |\n", s.CreatedAt)
+	fmt.Fprintf(&b, "| Last Active | %s |\n", s.LastActiveAt)
+	fmt.Fprintf(&b, "| Turns | %d |\n", s.TurnCount)
+	fmt.Fprintf(&b, "| Files | %d |\n", s.FileCount)
 	b.WriteString("\n")
 
 	// ── Conversation ──
@@ -85,7 +85,7 @@ func RenderMarkdown(detail *SessionDetail) string {
 	if len(detail.Checkpoints) > 0 {
 		b.WriteString("## Checkpoints\n\n")
 		for _, cp := range detail.Checkpoints {
-			b.WriteString(fmt.Sprintf("### %d. %s\n\n", cp.CheckpointNumber, cp.Title))
+			fmt.Fprintf(&b, "### %d. %s\n\n", cp.CheckpointNumber, cp.Title)
 			if cp.Overview != "" {
 				b.WriteString(cp.Overview + "\n\n")
 			}
@@ -101,7 +101,7 @@ func RenderMarkdown(detail *SessionDetail) string {
 				continue
 			}
 			seen[f.FilePath] = struct{}{}
-			b.WriteString(fmt.Sprintf("- `%s` (%s)\n", f.FilePath, f.ToolName))
+			fmt.Fprintf(&b, "- `%s` (%s)\n", f.FilePath, f.ToolName)
 		}
 		b.WriteString("\n")
 	}
@@ -116,7 +116,7 @@ func RenderMarkdown(detail *SessionDetail) string {
 				continue
 			}
 			seen[key] = struct{}{}
-			b.WriteString(fmt.Sprintf("- %s: %s\n", ref.RefType, ref.RefValue))
+			fmt.Fprintf(&b, "- %s: %s\n", ref.RefType, ref.RefValue)
 		}
 		b.WriteString("\n")
 	}

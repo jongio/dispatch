@@ -3672,6 +3672,8 @@ func (m Model) gitDirtySessionCount() int {
 		switch state {
 		case platform.GitStateDirty, platform.GitStateUntracked, platform.GitStateAhead, platform.GitStateBehind:
 			n++
+		case platform.GitStateUnknown, platform.GitStateClean, platform.GitStateMissing:
+			// Not counted as "dirty".
 		}
 	}
 	return n

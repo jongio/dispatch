@@ -72,28 +72,28 @@ func (v *NamedView) Validate() error {
 	}
 	if v.TimeRange != "" {
 		switch v.TimeRange {
-		case "1h", "1d", "7d", "all":
+		case TimeRange1h, TimeRange1d, TimeRange7d, TimeRangeAll:
 		default:
 			return fmt.Errorf("named view %q: invalid time_range %q", v.Name, v.TimeRange)
 		}
 	}
 	if v.Sort != "" {
 		switch v.Sort {
-		case "updated", "created", "turns", "name", "folder":
+		case SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder:
 		default:
 			return fmt.Errorf("named view %q: invalid sort %q", v.Name, v.Sort)
 		}
 	}
 	if v.SortOrder != "" {
 		switch v.SortOrder {
-		case "asc", "desc":
+		case SortOrderAsc, SortOrderDesc:
 		default:
 			return fmt.Errorf("named view %q: invalid sort_order %q", v.Name, v.SortOrder)
 		}
 	}
 	if v.Pivot != "" {
 		switch v.Pivot {
-		case "none", "folder", "repo", "branch", "date":
+		case PivotNone, PivotFolder, PivotRepo, PivotBranch, PivotDate:
 		default:
 			return fmt.Errorf("named view %q: invalid pivot %q", v.Name, v.Pivot)
 		}
@@ -305,6 +305,32 @@ const (
 	SortOrderAsc = "asc"
 	// SortOrderDesc sorts results in descending order.
 	SortOrderDesc = "desc"
+)
+
+// Time range constants for NamedView.TimeRange.
+const (
+	TimeRange1h  = "1h"
+	TimeRange1d  = "1d"
+	TimeRange7d  = "7d"
+	TimeRangeAll = "all"
+)
+
+// Sort field constants for NamedView.Sort and DefaultSort.
+const (
+	SortFieldUpdated = "updated"
+	SortFieldCreated = "created"
+	SortFieldTurns   = "turns"
+	SortFieldName    = "name"
+	SortFieldFolder  = "folder"
+)
+
+// Pivot mode constants for NamedView.Pivot.
+const (
+	PivotNone   = "none"
+	PivotFolder = "folder"
+	PivotRepo   = "repo"
+	PivotBranch = "branch"
+	PivotDate   = "date"
 )
 
 // EffectivePaneDirection returns the configured pane direction, defaulting
