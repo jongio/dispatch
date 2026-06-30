@@ -268,11 +268,11 @@ func (t *Theme) buildStyles() {
 	t.WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))             // BrightMagenta (dim)
 
 	// Git workspace state indicators.
-	t.GitCleanStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10]))            // BrightGreen
-	t.GitDirtyStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true) // BrightYellow
-	t.GitUntrackedStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14]))        // BrightCyan
-	t.GitAheadStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[12]))            // BrightBlue
-	t.GitBehindStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))           // BrightMagenta
+	t.GitCleanStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10]))             // BrightGreen
+	t.GitDirtyStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true)  // BrightYellow
+	t.GitUntrackedStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14]))         // BrightCyan
+	t.GitAheadStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[12]))             // BrightBlue
+	t.GitBehindStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))            // BrightMagenta
 	t.GitMissingStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[9])).Bold(true) // BrightRed
 }
 

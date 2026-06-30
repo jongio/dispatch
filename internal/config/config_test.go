@@ -1433,7 +1433,7 @@ func TestConfig_ValidViews(t *testing.T) {
 	cfg := &Config{
 		Views: []NamedView{
 			{Name: "Good", TimeRange: "1d"},
-			{Name: "", TimeRange: "1d"}, // invalid: empty name
+			{Name: "", TimeRange: "1d"},     // invalid: empty name
 			{Name: "Bad", TimeRange: "99d"}, // invalid: bad time range
 			{Name: "AlsoGood", Sort: "turns"},
 		},

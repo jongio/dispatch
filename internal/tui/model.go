@@ -234,7 +234,7 @@ type Model struct {
 	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
 	notesSet        map[string]struct{} // session ID → struct{} for fast note-existence lookup
 	showFavorited   bool
-	activeView      string              // name of the active named view (empty means Default)
+	activeView      string // name of the active named view (empty means Default)
 	reindexing      bool
 	reindexLog      []string                  // log lines streamed from chronicle reindex
 	reindexVP       viewport.Model            // scrollable viewport for reindex overlay

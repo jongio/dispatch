@@ -17,7 +17,7 @@ import (
 type PreviewPanel struct {
 	detail          *data.SessionDetail
 	attentionStatus data.AttentionStatus
-	note            string                // user note for the current session
+	note            string // user note for the current session
 	width           int
 	height          int
 	scroll          int

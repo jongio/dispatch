@@ -12,8 +12,8 @@ type Command struct {
 	Name        string
 	Shortcut    string
 	Description string
-	Action      string          // unique action ID dispatched on selection
-	Enabled     func() bool     // returns false to disable/hide the command
+	Action      string      // unique action ID dispatched on selection
+	Enabled     func() bool // returns false to disable/hide the command
 }
 
 // CmdPalette renders a filterable, executable command overlay.
