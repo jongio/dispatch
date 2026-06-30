@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.13.0] — 2026-06-30
+
+### Added
+- **Markdown export** (`X`) — export selected sessions as structured Markdown documents to `~/.config/dispatch/exports/`
+- **Git workspace badges** — colored status indicators (dirty, untracked, ahead, behind, missing) next to each session based on its working directory
+- **Search tokens** — structured filtering in the search bar with `repo:`, `branch:`, `folder:`, `host:`, `status:`, `has:plan`, `is:favorite`, `is:hidden`
+- **Preview secret redaction** — automatically masks Bearer tokens, GitHub PATs, Azure connection strings, and .env secrets in the preview pane (toggle in config)
+- **Local session notes** (`m`) — attach personal notes to any session, stored locally in config
+- **Named views** (`V`) — save and switch between filter presets (e.g., "Work", "Personal")
+- **Open touched files** (`F`) — file picker overlay to open files a session touched in your system editor
+- **Activity timeline** (`T`) — chronological view of all session events (turns, checkpoints, files, refs) in the preview pane
+- **Compare sessions** (`D`) — side-by-side comparison of two selected sessions (metadata, files, refs with diff highlighting)
+- **Command palette** (`:`) — filterable overlay listing all available commands with keyboard shortcuts
+- "Git changes" filter in the attention picker
+
+### Fixed
+- Security: replaced `cmd /c start` with `explorer.exe` for file opening on Windows to prevent command injection
+- Reduced false positives in secret redaction (20-char minimum for Bearer, segment boundaries for .env keywords)
+
+### Changed
+- Upgraded all Go dependencies to latest
+- Extracted string constants for sort fields, time ranges, pivot modes, and sort orders (goconst compliance)
+
 ## [v0.12.1] — 2026-06-24
 
 ### Changed
