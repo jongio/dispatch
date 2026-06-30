@@ -36,9 +36,9 @@ jobs:
       CGO_ENABLED: "0"           # Match release build settings
     steps:
       # Pin actions to full SHA for supply-chain security.
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.26.x"
 
@@ -68,14 +68,14 @@ jobs:
 
       - name: Check dead code
         run: |
-          go install golang.org/x/tools/cmd/deadcode@v0.45.0 || { echo "deadcode install failed, skipping"; exit 0; }
+          go install golang.org/x/tools/cmd/deadcode@v0.47.0 || { echo "deadcode install failed, skipping"; exit 0; }
           go install github.com/magefile/mage@v1.17.2 || { echo "mage install failed, skipping"; exit 0; }
           mage deadcode
 
       - run: go build ./cmd/dispatch/
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: "v2.12.2"
           install-mode: goinstall
@@ -100,7 +100,7 @@ jobs:
           fi
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
           path: coverage.out
@@ -112,7 +112,7 @@ jobs:
 
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
+          go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           govulncheck ./...
 
   # Verify the binary compiles for all release platforms.
@@ -122,9 +122,9 @@ jobs:
     env:
       CGO_ENABLED: "0"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.26.x"
 
