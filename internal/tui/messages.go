@@ -164,3 +164,37 @@ type continuationPlanCreatedMsg struct {
 // sessionsChangedMsg indicates the session store database has been modified
 // externally and the session list should be refreshed.
 type sessionsChangedMsg struct{}
+
+// exportDoneMsg reports the result of exporting session(s) to Markdown files.
+type exportDoneMsg struct {
+	paths []string // paths of successfully written files
+	err   error
+}
+
+// ---------------------------------------------------------------------------
+// Git workspace state messages
+// ---------------------------------------------------------------------------
+
+// gitStateScannedMsg delivers git workspace state data from the background
+// scanner that runs bounded git commands against each session directory.
+type gitStateScannedMsg struct {
+	states map[string]platform.GitState
+}
+
+// fileOpenedMsg reports the result of opening a file with the platform opener.
+type fileOpenedMsg struct {
+	path string
+	err  error
+}
+
+// compareDetailMsg delivers two session details for side-by-side comparison.
+type compareDetailMsg struct {
+	left  *data.SessionDetail
+	right *data.SessionDetail
+	err   error
+}
+
+// cmdPaletteActionMsg is dispatched when the user executes a command from the palette.
+type cmdPaletteActionMsg struct {
+	action string
+}

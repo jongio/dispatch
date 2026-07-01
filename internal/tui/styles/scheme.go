@@ -93,10 +93,21 @@ type Theme struct {
 	// Plan indicator style.
 	PlanIndicatorStyle lipgloss.Style
 
+	// Note indicator style.
+	NoteIndicatorStyle lipgloss.Style
+
 	// Work status indicator styles.
 	WorkCompleteStyle   lipgloss.Style
 	WorkIncompleteStyle lipgloss.Style
 	WorkAnalyzingStyle  lipgloss.Style
+
+	// Git workspace state indicator styles.
+	GitCleanStyle     lipgloss.Style
+	GitDirtyStyle     lipgloss.Style
+	GitUntrackedStyle lipgloss.Style
+	GitAheadStyle     lipgloss.Style
+	GitBehindStyle    lipgloss.Style
+	GitMissingStyle   lipgloss.Style
 }
 
 // DeriveTheme produces a complete Theme from a raw ColorScheme.
@@ -248,10 +259,21 @@ func (t *Theme) buildStyles() {
 	// Plan indicator — BrightCyan from the ANSI palette.
 	t.PlanIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14])).Bold(true)
 
+	// Note indicator — BrightYellow from the ANSI palette.
+	t.NoteIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true)
+
 	// Work status indicators — green (complete), yellow (incomplete), magenta (analyzing).
 	t.WorkCompleteStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10])).Bold(true)   // BrightGreen
 	t.WorkIncompleteStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true) // BrightYellow
 	t.WorkAnalyzingStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))             // BrightMagenta (dim)
+
+	// Git workspace state indicators.
+	t.GitCleanStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10]))             // BrightGreen
+	t.GitDirtyStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true)  // BrightYellow
+	t.GitUntrackedStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[14]))         // BrightCyan
+	t.GitAheadStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[12]))             // BrightBlue
+	t.GitBehindStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13]))            // BrightMagenta
+	t.GitMissingStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[9])).Bold(true) // BrightRed
 }
 
 // ---------------------------------------------------------------------------

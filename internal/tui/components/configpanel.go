@@ -31,6 +31,7 @@ const (
 	cfgTheme
 	cfgWorkspaceRecovery
 	cfgPreviewPosition
+	cfgRedactSecrets
 	cfgExcludedWords
 	cfgFieldCount
 )
@@ -53,6 +54,7 @@ type ConfigPanel struct {
 	theme             string // active color scheme name ("auto" or a scheme name)
 	workspaceRecovery bool
 	previewPosition   string // "right", "bottom", "left", "top"
+	redactSecrets     bool
 	excludedWords     string // comma-separated list of filter words
 
 	// Available options for cycling.
@@ -97,6 +99,7 @@ type ConfigValues struct {
 	Theme             string
 	WorkspaceRecovery bool
 	PreviewPosition   string
+	RedactSecrets     bool
 	ExcludedWords     string // comma-separated filter words
 }
 
@@ -113,6 +116,7 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.theme = v.Theme
 	c.workspaceRecovery = v.WorkspaceRecovery
 	c.previewPosition = v.PreviewPosition
+	c.redactSecrets = v.RedactSecrets
 	c.excludedWords = v.ExcludedWords
 }
 
@@ -130,6 +134,7 @@ func (c *ConfigPanel) Values() ConfigValues {
 		Theme:             c.theme,
 		WorkspaceRecovery: c.workspaceRecovery,
 		PreviewPosition:   c.previewPosition,
+		RedactSecrets:     c.redactSecrets,
 		ExcludedWords:     c.excludedWords,
 	}
 }
@@ -226,6 +231,8 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.workspaceRecovery = !c.workspaceRecovery
 	case cfgPreviewPosition:
 		c.previewPosition = cyclePreviewPosition(c.previewPosition)
+	case cfgRedactSecrets:
+		c.redactSecrets = !c.redactSecrets
 	default:
 		// cfgFieldCount is a sentinel; no action needed.
 	}
@@ -300,6 +307,7 @@ func (c ConfigPanel) View() string {
 		{"Theme", themeDisplay(c.theme), false},
 		{"Crash Recovery", boolDisplay(c.workspaceRecovery), false},
 		{"Preview Position", previewPositionDisplay(c.previewPosition), false},
+		{"Redact Secrets", boolDisplay(c.redactSecrets), false},
 		{"Excluded Words", stringDisplay(c.excludedWords), false},
 	}
 

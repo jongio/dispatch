@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/markdown"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
@@ -16,17 +17,21 @@ import (
 type PreviewPanel struct {
 	detail          *data.SessionDetail
 	attentionStatus data.AttentionStatus
+	note            string // user note for the current session
 	width           int
 	height          int
 	scroll          int
 	totalLines      int                   // cached line count for scroll clamping
 	newestFirst     bool                  // conversation turn display order
+	redactSecrets   bool                  // mask common secret patterns in turn text
 	convHeaderLine  int                   // content line where "Conversation" label is rendered (-1 = none)
 	idFieldLine     int                   // content line where "ID: ..." is rendered (-1 = none)
 	planContent     string                // plan.md content (empty when no plan)
 	planViewMode    bool                  // when true, render plan instead of session detail
 	hasPlan         bool                  // whether the session has a plan.md file
 	workStatus      data.WorkStatusResult // current session's work status
+
+	timelineMode bool // when true, render activity timeline instead of session detail
 
 	// Selection state — tracks click-drag text selection in the preview pane.
 	selStart     [2]int // [line, col] in rendered content
@@ -62,11 +67,28 @@ func (p *PreviewPanel) ToggleConversationSort() bool {
 	return p.newestFirst
 }
 
+// SetRedactSecrets enables or disables secret redaction in preview text.
+func (p *PreviewPanel) SetRedactSecrets(enabled bool) {
+	p.redactSecrets = enabled
+	p.updateTotalLines()
+}
+
+// RedactSecrets returns whether secret redaction is active.
+func (p *PreviewPanel) RedactSecrets() bool {
+	return p.redactSecrets
+}
+
 // SetDetail updates the displayed session detail.
 func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
 	p.ClearSelection()
+	p.updateTotalLines()
+}
+
+// SetNote updates the user note shown at the top of the preview.
+func (p *PreviewPanel) SetNote(note string) {
+	p.note = note
 	p.updateTotalLines()
 }
 
@@ -141,6 +163,28 @@ func (p *PreviewPanel) ExitPlanView() {
 		p.scroll = 0
 		p.updateTotalLines()
 	}
+}
+
+// ToggleTimeline switches between timeline mode and the current view.
+// Returns the new timeline mode state. Requires a session detail to be set.
+func (p *PreviewPanel) ToggleTimeline() bool {
+	if p.detail == nil {
+		return false
+	}
+	p.timelineMode = !p.timelineMode
+	// Exit plan view when entering timeline mode to avoid ambiguity.
+	if p.timelineMode {
+		p.planViewMode = false
+	}
+	p.scroll = 0
+	p.ClearSelection()
+	p.updateTotalLines()
+	return p.timelineMode
+}
+
+// TimelineMode returns true when the preview is showing the activity timeline.
+func (p *PreviewPanel) TimelineMode() bool {
+	return p.timelineMode
 }
 
 // SetSize updates the panel dimensions.
@@ -226,6 +270,9 @@ func (p *PreviewPanel) Content() string {
 	}
 	if p.detail == nil {
 		return ""
+	}
+	if p.timelineMode {
+		return p.renderTimelineContent()
 	}
 	content, _, _ := p.renderContent()
 	return content
@@ -385,6 +432,15 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.idFieldLine = -1
 		return
 	}
+	if p.timelineMode && p.detail != nil {
+		content := p.renderTimelineContent()
+		p.renderedLines = strings.Split(content, "\n")
+		p.plainLines = stripLines(p.renderedLines)
+		p.totalLines = len(p.renderedLines)
+		p.convHeaderLine = -1
+		p.idFieldLine = -1
+		return
+	}
 	if p.detail == nil {
 		p.totalLines = 0
 		p.convHeaderLine = -1
@@ -419,6 +475,8 @@ func (p PreviewPanel) View() string {
 	var content string
 	if p.planViewMode && p.planContent != "" {
 		content = p.renderPlanContent()
+	} else if p.timelineMode && p.detail != nil {
+		content = p.renderTimelineContent()
 	} else {
 		content, _, _ = p.renderContent()
 	}
@@ -522,6 +580,13 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		summary := CleanSummary(s.Summary)
 		wrapped := wordWrap(summary, contentW)
 		b.WriteString(lipgloss.NewStyle().Bold(true).Render(wrapped) + "\n\n")
+	}
+
+	// ── Note ──
+	if p.note != "" {
+		noteLabel := styles.PreviewLabelStyle.Render(styles.IconNote() + " Note: ")
+		noteValue := styles.NoteIndicatorStyle.Render(wordWrap(p.note, max(1, contentW-lipgloss.Width(noteLabel))))
+		b.WriteString(noteLabel + noteValue + "\n\n")
 	}
 
 	// ── Identity fields ──
@@ -636,6 +701,19 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 			}
 		}
 
+		// Apply secret redaction to a copy so stored data is never modified.
+		if p.redactSecrets {
+			if !p.newestFirst {
+				// Make a copy if we haven't already (newestFirst already copied).
+				turns = make([]data.Turn, len(turns))
+				copy(turns, p.detail.Turns)
+			}
+			for i := range turns {
+				turns[i].UserMessage = platform.RedactSecrets(turns[i].UserMessage)
+				turns[i].AssistantResponse = platform.RedactSecrets(turns[i].AssistantResponse)
+			}
+		}
+
 		b.WriteString(RenderConversation(turns, contentW))
 	}
 
@@ -687,6 +765,13 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 
 // renderPlanContent renders the plan.md content as styled markdown using
 // Glamour, with a cyan "Plan" header and a hint to return.
+// renderTimelineContent produces the timeline view content.
+func (p PreviewPanel) renderTimelineContent() string {
+	contentW := max(1, p.width-4)
+	entries := BuildTimeline(p.detail)
+	return RenderTimeline(entries, contentW)
+}
+
 func (p PreviewPanel) renderPlanContent() string {
 	contentW := max(1, p.width-4) // text area = total - border(2) - padding(2)
 

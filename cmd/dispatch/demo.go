@@ -89,12 +89,21 @@ func setupDemo() (cleanup func(), err error) {
 		return nil, err
 	}
 
+	// Inject turns containing secrets so the redaction feature is demonstrable.
+	if err := injectDemoSecrets(tmpDB); err != nil {
+		return nil, err
+	}
+
 	_ = os.Setenv("DISPATCH_DB", tmpDB)
 	_ = os.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
 	// Force workspace recovery on so interrupted session dots are visible
 	// regardless of the user's config setting.
 	_ = os.Setenv("DISPATCH_WORKSPACE_RECOVERY", "1")
+
+	// Enable synthetic git state badges so all badge types are visible
+	// without requiring real git repos on disk.
+	_ = os.Setenv("DISPATCH_DEMO_GIT_STATES", "1")
 
 	ok = true
 	return func() { os.RemoveAll(tmpDir) }, nil
@@ -319,5 +328,63 @@ func createDemoPlanFiles(stateDir string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// injectDemoSecrets adds turn messages containing secret patterns to the
+// demo database so the "Redact Secrets" toggle has visible content to mask.
+func injectDemoSecrets(dbPath string) error {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("demo secrets open: %w", err)
+	}
+	defer db.Close()
+
+	// Insert a user message with various secret patterns into the first session.
+	const sessionID = "fa800b7b-3a24-4e3b-9f2d-a414198b27ab"
+	// Use obviously-fake secrets that trigger our redaction patterns but
+	// do NOT match real vendor formats (Stripe, GitHub, etc.) to avoid
+	// GitHub push protection blocking the commit.
+	secretMsg := `Here's the config I'm using:
+
+AUTH_TOKEN=xfake0demo0token0value0not0real0key0abc
+API_KEY=super_secret_production_key_do_not_share
+
+curl -H "Authorization: Bearer xfake.demo.token.value.not.real.abcdefghijklmnopqrstuvwxyz0123456789ABCD"
+
+Also found this in the env:
+AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=mystore;AccountKey=xFakeDemoKeyNotReal0abcdef==;EndpointSuffix=core.windows.net"`
+
+	assistantResp := `I see several secrets in your configuration that should not be committed:
+
+1. AUTH_TOKEN — this is a live API key
+2. The Bearer token in your curl command is a JWT
+3. The Azure connection string contains an AccountKey
+
+I recommend moving these to a .env file and adding it to .gitignore.`
+
+	ctx := context.Background()
+
+	// Get the max turn_index for this session so we append after existing turns.
+	var maxIdx int
+	err = db.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(MAX(turn_index), -1) FROM turns WHERE session_id = ?`,
+		sessionID,
+	).Scan(&maxIdx)
+	if err != nil {
+		return fmt.Errorf("demo secrets max idx: %w", err)
+	}
+
+	_, err = db.ExecContext(
+		ctx,
+		`INSERT INTO turns (session_id, turn_index, user_message, assistant_response, timestamp)
+		 VALUES (?, ?, ?, ?, datetime('now'))`,
+		sessionID, maxIdx+1, secretMsg, assistantResp,
+	)
+	if err != nil {
+		return fmt.Errorf("demo secrets insert: %w", err)
+	}
+
 	return nil
 }

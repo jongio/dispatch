@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -121,6 +123,10 @@ const (
 	stateShellPicker              // shell selection overlay
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
+	stateViewPicker               // named view selection overlay
+	stateFilePicker               // file picker overlay
+	stateCompareView              // compare two sessions overlay
+	stateCmdPalette               // command palette overlay
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -144,6 +150,7 @@ type searchState struct {
 	copilotSearching     bool                // true when SDK search is in progress
 	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
 	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
+	lastRawInput         string              // last raw search bar text (for change detection)
 }
 
 // workStatusState groups fields related to work status scanning.
@@ -206,12 +213,17 @@ type Model struct {
 	// Sub-components.
 	sessionList     components.SessionList
 	searchBar       components.SearchBar
+	noteInput       components.NoteInput
 	filterPanel     components.FilterPanel
 	preview         components.PreviewPanel
 	help            components.HelpOverlay
 	shellPicker     components.ShellPicker
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
+	viewPicker      components.ViewPicker
+	filePicker      components.FilePicker
+	compareView     components.CompareView
+	cmdPalette      components.CmdPalette
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -220,16 +232,19 @@ type Model struct {
 	showHidden      bool
 	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
 	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	notesSet        map[string]struct{} // session ID → struct{} for fast note-existence lookup
 	showFavorited   bool
+	activeView      string // name of the active named view (empty means Default)
 	reindexing      bool
 	reindexLog      []string                  // log lines streamed from chronicle reindex
 	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
 	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
 
 	// Focused sub-models.
-	click      clickState
-	search     searchState
-	workStatus workStatusState
+	click        clickState
+	search       searchState
+	workStatus   workStatusState
+	searchFilter SearchFilter // structured tokens parsed from search bar input
 
 	// Launch mode requested when showing the shell picker.
 	pendingLaunchMode string
@@ -252,6 +267,10 @@ type Model struct {
 	// Plan status tracking — scanned from session-state directories.
 	planMap     map[string]bool
 	filterPlans bool // when true, only show sessions with a plan.md file
+
+	// Git workspace state tracking — scanned from session directories.
+	gitStateMap    map[string]platform.GitState
+	filterGitDirty bool // when true, only show sessions with local git changes
 
 	// DB watcher — monitors session-store.db for external modifications.
 	dbWatcher *data.DBWatcher
@@ -284,6 +303,7 @@ func NewModel() Model {
 		Theme:             cfg.Theme,
 		WorkspaceRecovery: cfg.WorkspaceRecovery,
 		PreviewPosition:   cfg.EffectivePreviewPosition(),
+		RedactSecrets:     cfg.RedactPreviewSecrets,
 		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
 	})
 
@@ -306,6 +326,11 @@ func NewModel() Model {
 		favoritedSet[id] = struct{}{}
 	}
 
+	notesSet := make(map[string]struct{}, len(cfg.SessionNotes))
+	for id := range cfg.SessionNotes {
+		notesSet[id] = struct{}{}
+	}
+
 	m := Model{
 		state: stateLoading,
 		cfg:   cfg,
@@ -320,9 +345,11 @@ func NewModel() Model {
 		previewPosition: cfg.EffectivePreviewPosition(),
 		hiddenSet:       hiddenSet,
 		favoritedSet:    favoritedSet,
+		notesSet:        notesSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
+		noteInput:       components.NewNoteInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
 		help:            components.NewHelpOverlay(),
@@ -330,6 +357,10 @@ func NewModel() Model {
 		configPanel:     cp,
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
+		viewPicker:      components.NewViewPicker(),
+		filePicker:      components.NewFilePicker(),
+		compareView:     components.NewCompareView(),
+		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
 	}
@@ -347,6 +378,17 @@ func NewModel() Model {
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
 	m.filter.ExcludedWords = cfg.ExcludedWords
 	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
+	m.preview.SetRedactSecrets(cfg.RedactPreviewSecrets)
+
+	// Named views: populate picker and apply the persisted active view.
+	m.viewPicker.SetViews(cfg.ValidViews())
+	if cfg.ActiveView != "" && cfg.ActiveView != "Default" {
+		if v := cfg.FindView(cfg.ActiveView); v != nil {
+			m.activeView = cfg.ActiveView
+			m.applyNamedView(v)
+		}
+	}
+
 	return m
 }
 
@@ -434,6 +476,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionsChangedMsg:
 		return m.handleSessionsChanged()
 
+	// ----- Export done -----------------------------------------------------
+	case exportDoneMsg:
+		return m.handleExportDone(msg)
+
+	case fileOpenedMsg:
+		return m.handleFileOpened(msg)
+
+	case compareDetailMsg:
+		return m.handleCompareDetail(msg)
+
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
 		return m.handleClearStatus()
@@ -485,6 +537,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case continuationPlanCreatedMsg:
 		return m.handleContinuationPlanCreated(msg)
 
+	// ----- Git workspace state scanning ------------------------------------
+	case gitStateScannedMsg:
+		return m.handleGitStateScanned(msg)
+
 	// ----- Deep search debounce -------------------------------------------
 	case deepSearchTickMsg:
 		return m.handleDeepSearchTick(msg)
@@ -528,6 +584,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionExitMsg:
 		return m.handleSessionExit(msg)
 
+	// ----- Command palette action ------------------------------------------
+	case cmdPaletteActionMsg:
+		return m.handleCmdPaletteAction(msg)
+
 	// ----- Keyboard --------------------------------------------------------
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -563,6 +623,18 @@ func (m Model) View() tea.View {
 
 		case stateAttentionPicker:
 			content = m.attentionPicker.View()
+
+		case stateViewPicker:
+			content = m.viewPicker.View()
+
+		case stateFilePicker:
+			content = m.filePicker.View()
+
+		case stateCompareView:
+			content = m.compareView.View()
+
+		case stateCmdPalette:
+			content = m.cmdPalette.View()
 
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
@@ -673,14 +745,158 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.showFavorited = m.attentionPicker.FilterFavorites()
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.workStatus.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
+			m.filterGitDirty = m.attentionPicker.FilterGitDirty()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateViewPicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.viewPicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.viewPicker.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			selected := m.viewPicker.Selected()
+			if selected == "Default" {
+				m.activeView = ""
+			} else {
+				m.activeView = selected
+			}
+			// Persist active view.
+			m.cfg.ActiveView = m.activeView
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+			// Apply the view settings.
+			if m.activeView != "" {
+				if v := m.cfg.FindView(m.activeView); v != nil {
+					m.applyNamedView(v)
+				}
+			} else {
+				// Reset to config defaults when switching back to Default.
+				m.timeRange = m.cfg.DefaultTimeRange
+				m.filter.Since = timeRangeToSince(m.timeRange)
+				m.sort.Field = sortFieldFromConfig(m.cfg.DefaultSort)
+				m.sort.Order = sortOrderFromConfig(m.cfg.EffectiveSortOrder())
+				m.pivot = m.cfg.DefaultPivot
+				m.showFavorited = false
+				m.showHidden = false
+				m.filter.ExcludedDirs = m.cfg.ExcludedDirs
+				m.searchBar.SetValue("")
+			}
+			m.state = stateSessionList
+			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateFilePicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.filePicker.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.filePicker.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			if sf, ok := m.filePicker.Selected(); ok {
+				return m, m.openFileCmd(sf.FilePath)
+			}
+		}
+		return m, nil
+
+	case stateCompareView:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up), key.Matches(msg, keys.PreviewScrollUp):
+			m.compareView.ScrollUp()
+		case key.Matches(msg, keys.Down), key.Matches(msg, keys.PreviewScrollDown):
+			m.compareView.ScrollDown()
+		case key.Matches(msg, keys.CopyID):
+			// 'c' copies compare summary to clipboard.
+			txt := m.compareView.PlainText()
+			if err := clipboardWrite(txt); err != nil {
+				m.statusErr = "clipboard: " + err.Error()
+			} else {
+				m.statusInfo = "Copied compare summary \u2713"
+			}
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case stateCmdPalette:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up):
+			m.cmdPalette.MoveUp()
+		case key.Matches(msg, keys.Down):
+			m.cmdPalette.MoveDown()
+		case key.Matches(msg, keys.Enter):
+			if action, ok := m.cmdPalette.Selected(); ok {
+				m.state = stateSessionList
+				return m, func() tea.Msg { return cmdPaletteActionMsg{action: action} }
+			}
+		case msg.Code == tea.KeyBackspace:
+			m.cmdPalette.Backspace()
+		default:
+			// Any printable rune is typed into the filter.
+			if msg.Text != "" && msg.Mod == 0 {
+				for _, r := range msg.Text {
+					m.cmdPalette.TypeRune(r)
+				}
+			}
 		}
 		return m, nil
 
 	default:
 		// stateLoading and stateSessionList fall through to the
 		// main key handler below.
+	}
+
+	// ---------- Note input focused ------------------------------------------
+	if m.noteInput.Focused() {
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.noteInput.Blur()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			sessionID := m.noteInput.SessionID()
+			noteText := m.noteInput.Value()
+			m.noteInput.Blur()
+
+			// Update or remove the note in config.
+			if noteText == "" {
+				delete(m.cfg.SessionNotes, sessionID)
+				delete(m.notesSet, sessionID)
+			} else {
+				if m.cfg.SessionNotes == nil {
+					m.cfg.SessionNotes = make(map[string]string)
+				}
+				m.cfg.SessionNotes[sessionID] = noteText
+				m.notesSet[sessionID] = struct{}{}
+			}
+
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+
+			// Update UI state.
+			m.sessionList.SetNoteSessions(m.notesSet)
+			m.preview.SetNote(noteText)
+			m.statusInfo = "Note saved"
+			return m, clearStatusAfter(2 * time.Second)
+		default:
+			var cmd tea.Cmd
+			ni := m.noteInput
+			ni, cmd = ni.Update(msg)
+			m.noteInput = ni
+			return m, cmd
+		}
 	}
 
 	// ---------- Search bar focused ----------------------------------------
@@ -701,7 +917,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			// The filter stays applied so subsequent operations (time range,
 			// sort, pivot) continue to honour the search term. To clear the
 			// search, press Escape again from the session list.
-			if m.filter.Query != "" {
+			if m.filter.Query != "" || m.searchFilter.HasTokens() {
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
@@ -709,14 +925,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.searchBar.Blur()
 			// If deep search hasn't run yet, trigger it now.
-			if m.search.deepSearchPending && m.filter.Query != "" {
+			if m.search.deepSearchPending && (m.filter.Query != "" || m.searchFilter.HasTokens()) {
 				m.search.deepSearchPending = false
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
 			// Ensure deep mode is active for any confirmed query so that
 			// subsequent reloads (time range, sort, pivot) also search deeply.
-			if m.filter.Query != "" {
+			if m.filter.Query != "" || m.searchFilter.HasTokens() {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
@@ -729,8 +945,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			sb, cmd = sb.Update(msg)
 			m.searchBar = sb
 			newQuery := m.searchBar.Value()
-			if newQuery != m.filter.Query {
-				m.filter.Query = newQuery
+			if newQuery != m.search.lastRawInput {
+				m.search.lastRawInput = newQuery
+				// Parse structured tokens from the input.
+				m.searchFilter = ParseSearchTokens(newQuery)
+				m.applySearchTokens()
 				m.filter.DeepSearch = false
 				// Quick search fires immediately; schedule deep search.
 				m.search.deepSearchVersion++
@@ -773,9 +992,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Clear active search query when Escape is pressed in the session list.
-		if m.filter.Query != "" {
+		if m.filter.Query != "" || m.searchFilter.HasTokens() {
 			m.filter.Query = ""
 			m.filter.DeepSearch = false
+			m.searchFilter = SearchFilter{}
+			m.search.lastRawInput = ""
+			m.clearSearchTokenFilters()
 			m.searchBar.SetValue("")
 			m.searchBar.SetSearching(false)
 			m.searchBar.SetAISearching(false)
@@ -791,6 +1013,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.state = stateHelpOverlay
 		return m, nil
 
+	case key.Matches(msg, keys.CmdPalette):
+		m.openCmdPalette()
+		return m, nil
+
 	case key.Matches(msg, keys.Config):
 		m.configPanel.SetValues(components.ConfigValues{
 			YoloMode:          m.cfg.YoloMode,
@@ -803,6 +1029,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			CustomCommand:     m.cfg.CustomCommand,
 			Theme:             m.cfg.Theme,
 			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
+			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
+			RedactSecrets:     m.cfg.RedactPreviewSecrets,
 			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
 		})
 		m.state = stateConfigPanel
@@ -981,6 +1209,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.Timeline):
+		if m.showPreview && m.detail != nil {
+			m.preview.ToggleTimeline()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.Reindex):
 		if !m.reindexing {
 			m.reindexing = true
@@ -1019,11 +1253,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Star):
 		return m.handleToggleFavorite()
 
+	case key.Matches(msg, keys.Note):
+		return m.handleEditNote()
+
 	case key.Matches(msg, keys.CopyID):
 		return m.handleCopyID()
 
 	case key.Matches(msg, keys.CopyPreview):
 		return m.handleCopyPreview()
+
+	case key.Matches(msg, keys.Export):
+		return m.handleExport()
 
 	case key.Matches(msg, keys.JumpNextAttention):
 		return m.handleJumpNextAttention()
@@ -1039,8 +1279,25 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
+		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
+		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
+		return m, nil
+
+	case key.Matches(msg, keys.ViewSwitch):
+		m.viewPicker.SetViews(m.cfg.ValidViews())
+		m.viewPicker.SetActiveView(m.activeView)
+		m.viewPicker.SetSize(m.width, m.height)
+		m.state = stateViewPicker
+		return m, nil
+
+	case key.Matches(msg, keys.OpenFile):
+		if m.detail != nil && len(m.detail.Files) > 0 {
+			m.filePicker.SetFiles(m.detail.Files)
+			m.filePicker.SetSize(m.width, m.height)
+			m.state = stateFilePicker
+		}
 		return m, nil
 
 	case key.Matches(msg, keys.Space):
@@ -1076,6 +1333,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.sessionList.DeselectAll()
 		m.statusInfo = ""
 		return m, nil
+
+	case key.Matches(msg, keys.Compare):
+		return m.handleCompare()
 	}
 
 	return m, nil
@@ -1141,6 +1401,20 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handleEditNote opens the inline note input for the currently selected session.
+func (m Model) handleEditNote() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	currentNote := ""
+	if m.cfg.SessionNotes != nil {
+		currentNote = m.cfg.SessionNotes[sess.ID]
+	}
+	cmd := m.noteInput.Focus(sess.ID, currentNote)
+	return m, cmd
+}
+
 // handleCopyID copies the selected session's ID to the system clipboard.
 func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
 	sess, ok := m.sessionList.Selected()
@@ -1188,6 +1462,110 @@ func (m Model) handleCopyPreview() (tea.Model, tea.Cmd) {
 	}
 	m.statusInfo = statusCopiedPreview
 	return m, clearStatusAfter(2 * time.Second)
+}
+
+// handleExport exports the selected session(s) to Markdown files in the
+// config directory's exports folder. When multi-select is active, all
+// selected sessions are exported; otherwise only the current session.
+func (m Model) handleExport() (tea.Model, tea.Cmd) {
+	if m.store == nil {
+		return m, nil
+	}
+
+	store := m.store
+	var ids []string
+
+	if sel := m.sessionList.SelectedSessions(); len(sel) > 0 {
+		for _, s := range sel {
+			ids = append(ids, s.ID)
+		}
+	} else if sess, ok := m.sessionList.Selected(); ok {
+		ids = append(ids, sess.ID)
+	}
+
+	if len(ids) == 0 {
+		return m, nil
+	}
+
+	return m, func() tea.Msg {
+		exportDir, err := data.ExportDir()
+		if err != nil {
+			return exportDoneMsg{err: err}
+		}
+
+		var paths []string
+		for _, id := range ids {
+			detail, err := store.GetSession(context.Background(), id)
+			if err != nil {
+				slog.Warn("export: failed to load session", "id", id, "err", err)
+				continue
+			}
+			path, err := data.ExportSession(detail, exportDir)
+			if err != nil {
+				return exportDoneMsg{err: err}
+			}
+			paths = append(paths, path)
+		}
+		return exportDoneMsg{paths: paths}
+	}
+}
+
+// handleExportDone processes the result of an async export operation.
+func (m Model) handleExportDone(msg exportDoneMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = "export: " + msg.err.Error()
+		return m, clearStatusAfter(3 * time.Second)
+	}
+	if len(msg.paths) == 0 {
+		m.statusErr = "export: no sessions exported"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	if len(msg.paths) == 1 {
+		m.statusInfo = "Exported: " + filepath.Base(msg.paths[0])
+	} else {
+		m.statusInfo = fmt.Sprintf("Exported %d sessions", len(msg.paths))
+	}
+	return m, clearStatusAfter(3 * time.Second)
+}
+
+// handleCompare opens the compare view when exactly two sessions are selected.
+// Otherwise, it shows a status hint.
+func (m Model) handleCompare() (tea.Model, tea.Cmd) {
+	sel := m.sessionList.SelectedSessions()
+	if len(sel) != 2 {
+		m.statusInfo = "Select exactly 2 sessions to compare (space to toggle)"
+		return m, clearStatusAfter(3 * time.Second)
+	}
+
+	store := m.store
+	if store == nil {
+		return m, nil
+	}
+
+	idA, idB := sel[0].ID, sel[1].ID
+	return m, func() tea.Msg {
+		left, err := store.GetSession(context.Background(), idA)
+		if err != nil {
+			return compareDetailMsg{err: err}
+		}
+		right, err := store.GetSession(context.Background(), idB)
+		if err != nil {
+			return compareDetailMsg{err: err}
+		}
+		return compareDetailMsg{left: left, right: right}
+	}
+}
+
+// handleCompareDetail processes the async result of loading two sessions for comparison.
+func (m Model) handleCompareDetail(msg compareDetailMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = "compare: " + msg.err.Error()
+		return m, clearStatusAfter(3 * time.Second)
+	}
+	m.compareView.SetSessions(msg.left, msg.right)
+	m.compareView.SetSize(m.width, m.height)
+	m.state = stateCompareView
+	return m, nil
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic
@@ -1261,6 +1639,8 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
 	m.previewPosition = v.PreviewPosition
+	m.cfg.RedactPreviewSecrets = v.RedactSecrets
+	m.preview.SetRedactSecrets(v.RedactSecrets)
 	m.cfg.ExcludedWords = parseExcludedWords(v.ExcludedWords)
 	m.filter.ExcludedWords = m.cfg.ExcludedWords
 	resolveTheme(m.cfg)
@@ -1550,6 +1930,8 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusFilter(m.workStatus.filterWorkStatus)
 		m.attentionPicker.SetWorkStatusCounts(m.workStatusCounts())
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
+		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
+		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -1828,9 +2210,14 @@ func (m Model) renderHeader() string {
 func (m Model) renderBadges() string {
 	// Active filter badges.
 	badges := m.filterPanel.ActiveBadges()
-	parts := make([]string, 0, len(badges)+3)
+	parts := make([]string, 0, len(badges)+4)
 	for _, b := range badges {
 		parts = append(parts, styles.BadgeStyle.Render(b))
+	}
+
+	// Search token badge — shows active structured tokens.
+	if summary := m.searchFilter.TokenSummary(); summary != "" {
+		parts = append(parts, styles.ActiveBadgeStyle.Render(summary))
 	}
 
 	// Inline time range selector — show key shortcuts (1-4).
@@ -1878,6 +2265,11 @@ func (m Model) renderBadges() string {
 		parts = append(parts, styles.ActiveBadgeStyle.Render("★ Favorites"))
 	}
 
+	// Active named view indicator.
+	if m.activeView != "" {
+		parts = append(parts, styles.ActiveBadgeStyle.Render("⊞ "+m.activeView))
+	}
+
 	if len(parts) == 0 {
 		return ""
 	}
@@ -1894,6 +2286,12 @@ func (m Model) renderSeparator() string {
 }
 
 func (m Model) renderFooter() string {
+	// When note input is active, show it instead of the normal footer.
+	if m.noteInput.Focused() {
+		m.noteInput.SetWidth(m.width)
+		return m.noteInput.View()
+	}
+
 	count := m.sessionList.SessionCount()
 
 	// Left: session count + active filter summary.
@@ -1925,6 +2323,9 @@ func (m Model) renderFooter() string {
 	}
 	if m.filterPlans {
 		left += "  " + styles.ActiveBadgeStyle.Render("! plans")
+	}
+	if m.filterGitDirty {
+		left += "  " + styles.ActiveBadgeStyle.Render("! git changes")
 	}
 	if len(m.workStatus.filterWorkStatus) > 0 {
 		var wsNames []string
@@ -2128,9 +2529,11 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 func (m *Model) syncSessionListStatuses() {
 	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	m.sessionList.SetNoteSessions(m.notesSet)
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 	m.sessionList.SetPlanStatuses(m.planMap)
 	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
+	m.sessionList.SetGitStates(m.gitStateMap)
 }
 
 // syncSessionListWorkStatuses pushes only the work status map to the
@@ -2151,17 +2554,19 @@ func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
 	sessions = m.filterAttentionSessions(sessions)
 	sessions = m.filterPlanSessions(sessions)
 	sessions = m.filterWorkStatusSessions(sessions)
+	sessions = m.filterGitDirtySessions(sessions)
 	return sessions
 }
 
 // applyGroupFilters runs the full group filter chain (hidden, favorited,
-// attention, plan, work status) and returns the filtered result.
+// attention, plan, work status, git state) and returns the filtered result.
 func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGroup {
 	groups = m.filterHiddenGroups(groups)
 	groups = m.filterFavoritedGroups(groups)
 	groups = m.filterAttentionGroups(groups)
 	groups = m.filterPlanGroups(groups)
 	groups = m.filterWorkStatusGroups(groups)
+	groups = m.filterGitDirtyGroups(groups)
 	return groups
 }
 
@@ -2311,6 +2716,40 @@ func (m *Model) filterWorkStatusGroups(groups []data.SessionGroup) []data.Sessio
 		}
 		_, match := m.workStatus.filterWorkStatus[result.Status]
 		return match
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Git state session filtering
+// ---------------------------------------------------------------------------
+
+// filterGitDirtySessions removes sessions that don't have local git changes
+// (dirty, untracked, ahead, or behind) when filterGitDirty is active.
+func (m *Model) filterGitDirtySessions(sessions []data.Session) []data.Session {
+	if !m.filterGitDirty || len(m.gitStateMap) == 0 {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		state := m.gitStateMap[s.ID]
+		return state == platform.GitStateDirty ||
+			state == platform.GitStateUntracked ||
+			state == platform.GitStateAhead ||
+			state == platform.GitStateBehind
+	})
+}
+
+// filterGitDirtyGroups removes sessions without local git changes from grouped
+// results when filterGitDirty is active. Empty groups are dropped.
+func (m *Model) filterGitDirtyGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.filterGitDirty || len(m.gitStateMap) == 0 {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		state := m.gitStateMap[s.ID]
+		return state == platform.GitStateDirty ||
+			state == platform.GitStateUntracked ||
+			state == platform.GitStateAhead ||
+			state == platform.GitStateBehind
 	})
 }
 
@@ -2876,6 +3315,66 @@ func (m Model) scanPlansCmd() tea.Cmd {
 	}
 }
 
+// scanGitStatesCmd runs git workspace state detection for all visible sessions.
+// It collects session IDs and their working directories, then runs bounded
+// git commands in the background.
+func (m Model) scanGitStatesCmd() tea.Cmd {
+	// Build a map of session ID to directory for all loaded sessions.
+	sessionDirs := make(map[string]string)
+	if m.sessions != nil {
+		for _, s := range m.sessions {
+			if s.Cwd != "" {
+				sessionDirs[s.ID] = s.Cwd
+			}
+		}
+	}
+	for _, g := range m.groups {
+		for _, s := range g.Sessions {
+			if s.Cwd != "" {
+				sessionDirs[s.ID] = s.Cwd
+			}
+		}
+	}
+	if len(sessionDirs) == 0 {
+		return nil
+	}
+
+	// In demo mode, return synthetic git states so all badge types are visible
+	// without requiring real git repos on disk.
+	if os.Getenv("DISPATCH_DEMO_GIT_STATES") != "" {
+		return func() tea.Msg {
+			states := demoGitStates(sessionDirs)
+			return gitStateScannedMsg{states: states}
+		}
+	}
+
+	return func() tea.Msg {
+		states := platform.ScanGitStates(sessionDirs)
+		return gitStateScannedMsg{states: states}
+	}
+}
+
+// demoGitStates assigns a rotating set of git states to sessions so all
+// badge types are visible in demo mode. The order cycles through dirty,
+// ahead, untracked, behind, clean, and missing.
+func demoGitStates(sessionDirs map[string]string) map[string]platform.GitState {
+	cycle := []platform.GitState{
+		platform.GitStateDirty,
+		platform.GitStateAhead,
+		platform.GitStateUntracked,
+		platform.GitStateBehind,
+		platform.GitStateClean,
+		platform.GitStateMissing,
+	}
+	states := make(map[string]platform.GitState, len(sessionDirs))
+	i := 0
+	for id := range sessionDirs {
+		states[id] = cycle[i%len(cycle)]
+		i++
+	}
+	return states
+}
+
 // loadPlanContentCmd reads the plan.md content for a specific session.
 func (m Model) loadPlanContentCmd(sessionID string) tea.Cmd {
 	return func() tea.Msg {
@@ -3196,6 +3695,21 @@ func (m Model) workStatusCounts() map[data.WorkStatus]int {
 	return counts
 }
 
+// gitDirtySessionCount returns the number of sessions with local git changes
+// (dirty, untracked, ahead, or behind).
+func (m Model) gitDirtySessionCount() int {
+	n := 0
+	for _, state := range m.gitStateMap {
+		switch state {
+		case platform.GitStateDirty, platform.GitStateUntracked, platform.GitStateAhead, platform.GitStateBehind:
+			n++
+		case platform.GitStateUnknown, platform.GitStateClean, platform.GitStateMissing:
+			// Not counted as "dirty".
+		}
+	}
+	return n
+}
+
 const deepSearchDelay = 300 * time.Millisecond
 
 // scheduleDeepSearch returns a tea.Cmd that fires a deepSearchTickMsg after
@@ -3355,6 +3869,18 @@ func (m Model) fetchAISessionsCmd(ids []string, version int) tea.Cmd {
 	}
 }
 
+// openFileCmd opens a file using the platform default application. It checks
+// that the file exists before attempting to open it.
+func (m Model) openFileCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		if _, err := os.Stat(path); err != nil {
+			return fileOpenedMsg{path: path, err: fmt.Errorf("file not found: %s", path)}
+		}
+		err := platform.OpenFile(path)
+		return fileOpenedMsg{path: path, err: err}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Group sorting helpers
 // ---------------------------------------------------------------------------
@@ -3473,5 +3999,31 @@ func timeRangeToSince(r string) *time.Time {
 		return &t
 	default: // "all"
 		return nil
+	}
+}
+
+// applyNamedView applies the settings from a named view to the model state.
+// It does not trigger a session reload; the caller must do so.
+func (m *Model) applyNamedView(v *config.NamedView) {
+	if v.TimeRange != "" {
+		m.timeRange = v.TimeRange
+		m.filter.Since = timeRangeToSince(m.timeRange)
+	}
+	if v.Sort != "" {
+		m.sort.Field = sortFieldFromConfig(v.Sort)
+	}
+	if v.SortOrder != "" {
+		m.sort.Order = sortOrderFromConfig(v.SortOrder)
+	}
+	if v.Pivot != "" {
+		m.pivot = v.Pivot
+	}
+	if v.Search != "" {
+		m.searchBar.SetValue(v.Search)
+	}
+	m.showFavorited = v.FavoritesOnly
+	m.showHidden = v.ShowHidden
+	if len(v.ExcludedDirs) > 0 {
+		m.filter.ExcludedDirs = v.ExcludedDirs
 	}
 }

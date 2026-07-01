@@ -608,6 +608,272 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- Loading & Empty States -->
+    <section class="section" id="states">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Loading &amp; Empty States</h2>
+          <p>
+            A loading spinner is shown while sessions are fetched from the
+            database. An empty state message appears when no sessions match
+            the current search query or active filters.
+          </p>
+          <ul>
+            <li>Spinner visible on startup during initial database read</li>
+            <li>Empty state differentiates "no results" from "no sessions"</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/loading-state.png" alt="Loading spinner displayed during startup" caption="Loading spinner on startup" />
+          <Screenshot src="one-half-light/empty-state.png" alt="Empty state message when no sessions match filters" caption="Empty state with no matching sessions" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Markdown Export -->
+    <section class="section" id="export">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Markdown Export</h2>
+          <p>
+            Press <kbd>X</kbd> to export the selected session (or all selected sessions)
+            as a structured Markdown document. Exports include session metadata, full
+            conversation history, checkpoints, referenced files, and external refs.
+            Files are saved to <code>~/.config/dispatch/exports/</code>.
+          </p>
+          <ul>
+            <li>One Markdown file per session</li>
+            <li>Multi-select support — export many at once with <kbd>Space</kbd> + <kbd>X</kbd></li>
+            <li>Status bar confirmation shows the exported file path</li>
+            <li>Also available via the command palette (<kbd>:</kbd>)</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Export creates self-contained Markdown suitable for archiving, sharing, or
+            feeding into other tools. Secrets are redacted if redaction is enabled.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Git Workspace Badges -->
+    <section class="section" id="git-badges">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Git Workspace Badges</h2>
+          <p>
+            Colored status indicators appear next to each session based on the Git
+            state of its working directory. Dispatch runs <code>git status</code> in
+            the background and updates badges as results arrive.
+          </p>
+          <ul>
+            <li><strong>Dirty</strong> (yellow ●) — tracked files have uncommitted changes</li>
+            <li><strong>Untracked</strong> (blue +) — new untracked files present</li>
+            <li><strong>Ahead</strong> (green ↑) — local branch ahead of upstream</li>
+            <li><strong>Behind</strong> (cyan ↓) — local branch behind upstream</li>
+            <li><strong>Missing</strong> (red ✗) — session directory no longer exists</li>
+            <li>Filter with <kbd>!</kbd> → "Git changes" to show only dirty/untracked/ahead/behind sessions</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/git-badges.png" alt="Session list with colored git workspace status badges" caption="Git workspace status badges" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Search Tokens -->
+    <section class="section" id="search-tokens">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Search Tokens</h2>
+          <p>
+            Type structured filters directly in the search bar for precise results.
+            Tokens are parsed as you type and applied alongside free-text search.
+          </p>
+          <ul>
+            <li><code>repo:name</code> — filter by Git repository</li>
+            <li><code>branch:name</code> — filter by Git branch</li>
+            <li><code>folder:path</code> — filter by working directory</li>
+            <li><code>host:name</code> — filter by machine hostname</li>
+            <li><code>status:waiting</code> — filter by attention status</li>
+            <li><code>has:plan</code> — only sessions with a plan.md file</li>
+            <li><code>is:favorite</code> — only starred sessions</li>
+            <li><code>is:hidden</code> — show hidden sessions</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/search-tokens.png" alt="Search bar with structured token filters" caption="Search with structured tokens" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Secret Redaction -->
+    <section class="section" id="redaction">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Preview Secret Redaction</h2>
+          <p>
+            Automatically masks sensitive values in the preview pane. Toggle via the
+            "Redact Secrets" option in the settings panel (<kbd>,</kbd>). Redacted
+            content is never modified on disk — only the display is masked.
+          </p>
+          <ul>
+            <li>Bearer tokens → <code>Bearer ••••••••</code></li>
+            <li>GitHub PATs (<code>ghp_</code>, <code>gho_</code>, etc.) → <code>ghp_••••••••</code></li>
+            <li>Azure connection strings → <code>AccountKey=••••••••</code></li>
+            <li>.env secrets → <code>API_KEY=••••••••</code></li>
+            <li>20-character minimum for Bearer tokens to reduce false positives</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/preview-redacted.png" alt="Preview pane with redacted secrets showing masked tokens" caption="Secrets automatically masked in preview" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Session Notes -->
+    <section class="section" id="notes">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Session Notes</h2>
+          <p>
+            Press <kbd>m</kbd> to attach a personal note to any session. Notes appear
+            as a styled indicator in the session list and are displayed at the top of
+            the preview pane. Stored locally in your config — never sent to the cloud.
+          </p>
+          <ul>
+            <li><kbd>m</kbd> to add or edit a note (up to 200 characters)</li>
+            <li>Note indicator (📝) in session list for annotated sessions</li>
+            <li>Full note text shown at the top of the preview pane</li>
+            <li><kbd>Enter</kbd> to save, <kbd>Esc</kbd> to cancel</li>
+            <li>Clear a note by saving an empty value</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/session-notes.png" alt="Session list with note indicators and preview showing note text" caption="Session with attached note" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Named Views -->
+    <section class="section" id="named-views">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Named Views</h2>
+          <p>
+            Save your current filter configuration as a named preset and switch between
+            presets with <kbd>V</kbd>. Each view stores the time range, sort field,
+            sort order, pivot mode, and directory exclusions.
+          </p>
+          <ul>
+            <li><kbd>V</kbd> to open the view picker</li>
+            <li>Select a view to instantly apply its filters</li>
+            <li>"Default" view always available (resets all filters)</li>
+            <li>Views persist in config and survive restarts</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/view-picker.png" alt="Named view picker overlay with preset filter options" caption="Named view picker" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Open Touched Files -->
+    <section class="section" id="open-files">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Open Touched Files</h2>
+          <p>
+            Press <kbd>F</kbd> to open a file picker showing all files the selected
+            session interacted with (edits, creates, views). Select a file to open it
+            in your system editor.
+          </p>
+          <ul>
+            <li>Files listed with their operation type (edit, create, view)</li>
+            <li>Navigate with <kbd>↑</kbd>/<kbd>↓</kbd>, open with <kbd>Enter</kbd></li>
+            <li>Warning shown if a file no longer exists on disk</li>
+            <li><kbd>Esc</kbd> to close without opening</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/file-picker.png" alt="File picker overlay listing session-touched files" caption="File picker overlay" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Activity Timeline -->
+    <section class="section" id="timeline">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Activity Timeline</h2>
+          <p>
+            Press <kbd>T</kbd> to toggle a chronological view of all session events
+            in the preview pane. The timeline merges turns, checkpoints, file operations,
+            and external references into a single ordered stream.
+          </p>
+          <ul>
+            <li>Turns show timestamps and message previews</li>
+            <li>Checkpoints displayed with their titles</li>
+            <li>File operations with tool type (edit/create/view)</li>
+            <li>External references: commits, PRs, issues</li>
+            <li>Scrollable with <kbd>PgUp</kbd>/<kbd>PgDn</kbd> and mouse wheel</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/activity-timeline.png" alt="Preview pane showing chronological activity timeline" caption="Activity timeline in preview" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Compare Sessions -->
+    <section class="section" id="compare">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Compare Sessions</h2>
+          <p>
+            Select two sessions (use <kbd>Space</kbd> to select) then press <kbd>D</kbd>
+            to see them side-by-side. The comparison shows metadata differences,
+            file diffs, and reference variations with diff highlighting.
+          </p>
+          <ul>
+            <li>Metadata comparison: directory, branch, timestamps, turn counts</li>
+            <li>File diff: shows files unique to each session</li>
+            <li>Reference diff: commits, PRs, issues unique to each side</li>
+            <li>Scrollable with <kbd>↑</kbd>/<kbd>↓</kbd></li>
+            <li><kbd>Esc</kbd> to close</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/compare-sessions.png" alt="Side-by-side session comparison overlay with diff highlighting" caption="Compare two sessions side-by-side" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Command Palette -->
+    <section class="section" id="cmd-palette">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Command Palette</h2>
+          <p>
+            Press <kbd>:</kbd> (colon) to open a filterable overlay listing every
+            available command with its keyboard shortcut. Type to filter, then press
+            <kbd>Enter</kbd> to execute.
+          </p>
+          <ul>
+            <li>All commands accessible from one place</li>
+            <li>Fuzzy filter by command name or description</li>
+            <li>Shows keyboard shortcut for each command</li>
+            <li>Disabled commands are dimmed (e.g., no session selected)</li>
+            <li><kbd>Esc</kbd> to close without executing</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/cmd-palette.png" alt="Command palette overlay with filterable list of all commands" caption="Command palette" />
+        </div>
+      </div>
+    </section>
+
     <!-- Demo Mode -->
     <section class="section" id="demo">
       <div class="feature-section">
@@ -653,28 +919,6 @@ import Carousel from '../components/Carousel.astro';
           <p class="text-only-note">
             A background update check runs on every launch and notifies you when a new version is available. All commands run non-interactively and exit immediately. Unknown flags print an error with usage help and exit with code 1.
           </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Loading & Empty States -->
-    <section class="section" id="states">
-      <div class="feature-section">
-        <div class="feature-text">
-          <h2>Loading &amp; Empty States</h2>
-          <p>
-            A loading spinner is shown while sessions are fetched from the
-            database. An empty state message appears when no sessions match
-            the current search query or active filters.
-          </p>
-          <ul>
-            <li>Spinner visible on startup during initial database read</li>
-            <li>Empty state differentiates "no results" from "no sessions"</li>
-          </ul>
-        </div>
-        <div class="feature-screenshots">
-          <Screenshot src="one-half-light/loading-state.png" alt="Loading spinner displayed during startup" caption="Loading spinner on startup" />
-          <Screenshot src="one-half-light/empty-state.png" alt="Empty state message when no sessions match filters" caption="Empty state with no matching sessions" />
         </div>
       </div>
     </section>

@@ -139,6 +139,10 @@ dispatch completion zsh
 dispatch completion powershell
 ```
 
+### Diagnostics
+
+Run `dispatch doctor` to print setup checks for the config file, session store, session-state directory, and Copilot CLI binary.
+
 ### Key Bindings
 
 #### Navigation

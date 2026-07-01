@@ -42,6 +42,9 @@ func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) { //nolint:u
 	m.width = msg.Width
 	m.height = msg.Height
 	m.recalcLayout()
+	if m.state == stateCompareView {
+		m.compareView.SetSize(m.width, m.height)
+	}
 	return m, nil
 }
 
@@ -130,6 +133,18 @@ func (m Model) handleClearStatus() (Model, tea.Cmd) { //nolint:unparam
 	return m, nil
 }
 
+// ----- File opened result --------------------------------------------------
+
+func (m Model) handleFileOpened(msg fileOpenedMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.filePicker.SetWarning(msg.err.Error())
+		return m, nil
+	}
+	m.filePicker.ClearWarning()
+	m.statusInfo = "Opened " + msg.path
+	return m, clearStatusAfter(2 * time.Second)
+}
+
 // ----- Pending click fire (single-click debounce) --------------------------
 
 func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) {
@@ -178,7 +193,7 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
 }
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
@@ -202,7 +217,7 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd())
+	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
 }
 
 func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
@@ -216,6 +231,12 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	}
 	m.detail = msg.detail
 	m.preview.SetDetail(m.detail)
+	// Set the user note for this session (if any).
+	if m.cfg.SessionNotes != nil {
+		m.preview.SetNote(m.cfg.SessionNotes[m.detail.Session.ID])
+	} else {
+		m.preview.SetNote("")
+	}
 	m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
 	m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 	if result, ok := m.workStatus.workStatusMap[m.detail.Session.ID]; ok {
@@ -264,7 +285,7 @@ func (m Model) handleAttentionScanned(msg attentionScannedMsg) (Model, tea.Cmd) 
 	// is active, also reload sessions so the list reflects updated
 	// statuses. The reload no longer fires another scan (that was an
 	// infinite loop), so the tick is the sole driver of periodic scans.
-	cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd()}
+	cmds := []tea.Cmd{m.scheduleAttentionTick(), m.scanPlansCmd(), m.scanGitStatesCmd()}
 	if len(m.attentionFilter) > 0 {
 		cmds = append(cmds, m.loadSessionsCmd())
 	}
@@ -454,6 +475,19 @@ func (m Model) handleContinuationPlanCreated(msg continuationPlanCreatedMsg) (Mo
 		m.statusInfo = fmt.Sprintf("Updated %d plan(s) with remaining work — press v on a session to view", msg.updated)
 	}
 	return m, m.completeWorkStatusScan()
+}
+
+// ----- Git workspace state scanning ----------------------------------------
+
+func (m Model) handleGitStateScanned(msg gitStateScannedMsg) (Model, tea.Cmd) {
+	m.gitStateMap = msg.states
+	m.sessionList.SetGitStates(m.gitStateMap)
+	// When the git-dirty filter is active, reload sessions so the list
+	// reflects the detected states.
+	if m.filterGitDirty {
+		return m, m.loadSessionsCmd()
+	}
+	return m, nil
 }
 
 // ----- Deep search ---------------------------------------------------------

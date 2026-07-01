@@ -144,6 +144,49 @@ func TestHandleArgs_CompletionMissingShell(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "session-store.db")
+	if err := os.WriteFile(db, []byte("sqlite"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	t.Setenv("DISPATCH_DB", db)
+	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	var buf bytes.Buffer
+	runDoctor(&buf)
+	out := buf.String()
+	for _, want := range []string{
+		"Dispatch doctor",
+		"Version:",
+		"OS:",
+		"Config:",
+		"Session store: found",
+		"Session state: found",
+		"Copilot CLI:",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("doctor output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestHandleArgs_Doctor(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+	ch <- nil
+
+	done, cleanup, err := handleArgs([]string{"doctor"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !done {
+		t.Error("expected done=true for doctor")
+	}
+	if cleanup != nil {
+		t.Error("expected cleanup=nil for doctor")
+	}
+}
+
 func TestHandleArgs_UnknownFlag(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 

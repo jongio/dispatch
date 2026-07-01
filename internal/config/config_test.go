@@ -1340,3 +1340,188 @@ func TestLoad_SkipsMigrationWhenCurrent(t *testing.T) {
 		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// NamedView tests
+// ---------------------------------------------------------------------------
+
+func TestNamedView_Validate_Valid(t *testing.T) {
+	t.Parallel()
+	v := NamedView{
+		Name:      "Work",
+		TimeRange: "7d",
+		Sort:      "created",
+		SortOrder: "asc",
+		Pivot:     "repo",
+	}
+	if err := v.Validate(); err != nil {
+		t.Errorf("Validate() = %v, want nil", err)
+	}
+}
+
+func TestNamedView_Validate_EmptyName(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: ""}
+	if err := v.Validate(); err == nil {
+		t.Error("Validate() should fail for empty name")
+	}
+}
+
+func TestNamedView_Validate_InvalidTimeRange(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: "Bad", TimeRange: "99d"}
+	if err := v.Validate(); err == nil {
+		t.Error("Validate() should fail for invalid time_range")
+	}
+}
+
+func TestNamedView_Validate_InvalidSort(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: "Bad", Sort: "unknown"}
+	if err := v.Validate(); err == nil {
+		t.Error("Validate() should fail for invalid sort")
+	}
+}
+
+func TestNamedView_Validate_InvalidSortOrder(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: "Bad", SortOrder: "random"}
+	if err := v.Validate(); err == nil {
+		t.Error("Validate() should fail for invalid sort_order")
+	}
+}
+
+func TestNamedView_Validate_InvalidPivot(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: "Bad", Pivot: "color"}
+	if err := v.Validate(); err == nil {
+		t.Error("Validate() should fail for invalid pivot")
+	}
+}
+
+func TestNamedView_Validate_MinimalValid(t *testing.T) {
+	t.Parallel()
+	v := NamedView{Name: "Minimal"}
+	if err := v.Validate(); err != nil {
+		t.Errorf("Validate() = %v, want nil for minimal valid view", err)
+	}
+}
+
+func TestConfig_FindView(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		Views: []NamedView{
+			{Name: "Work", TimeRange: "7d"},
+			{Name: "Personal", TimeRange: "all"},
+		},
+	}
+	v := cfg.FindView("Work")
+	if v == nil {
+		t.Fatal("FindView(Work) = nil, want non-nil")
+	}
+	if v.TimeRange != "7d" {
+		t.Errorf("FindView(Work).TimeRange = %q, want %q", v.TimeRange, "7d")
+	}
+
+	if cfg.FindView("Missing") != nil {
+		t.Error("FindView(Missing) should return nil")
+	}
+}
+
+func TestConfig_ValidViews(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		Views: []NamedView{
+			{Name: "Good", TimeRange: "1d"},
+			{Name: "", TimeRange: "1d"},     // invalid: empty name
+			{Name: "Bad", TimeRange: "99d"}, // invalid: bad time range
+			{Name: "AlsoGood", Sort: "turns"},
+		},
+	}
+	valid := cfg.ValidViews()
+	if len(valid) != 2 {
+		t.Fatalf("ValidViews() len = %d, want 2", len(valid))
+	}
+	if valid[0].Name != "Good" {
+		t.Errorf("ValidViews()[0].Name = %q, want %q", valid[0].Name, "Good")
+	}
+	if valid[1].Name != "AlsoGood" {
+		t.Errorf("ValidViews()[1].Name = %q, want %q", valid[1].Name, "AlsoGood")
+	}
+}
+
+func TestNamedView_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	cfg := &Config{
+		Views: []NamedView{
+			{
+				Name:          "Work",
+				Search:        "project-x",
+				TimeRange:     "7d",
+				Sort:          "created",
+				SortOrder:     "asc",
+				Pivot:         "repo",
+				FavoritesOnly: true,
+				ShowHidden:    false,
+				ExcludedDirs:  []string{"/tmp"},
+			},
+		},
+		ActiveView: "Work",
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var restored Config
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	if len(restored.Views) != 1 {
+		t.Fatalf("Views len = %d, want 1", len(restored.Views))
+	}
+	v := restored.Views[0]
+	if v.Name != "Work" {
+		t.Errorf("Name = %q, want %q", v.Name, "Work")
+	}
+	if v.Search != "project-x" {
+		t.Errorf("Search = %q, want %q", v.Search, "project-x")
+	}
+	if v.TimeRange != "7d" {
+		t.Errorf("TimeRange = %q, want %q", v.TimeRange, "7d")
+	}
+	if v.Sort != "created" {
+		t.Errorf("Sort = %q, want %q", v.Sort, "created")
+	}
+	if v.SortOrder != "asc" {
+		t.Errorf("SortOrder = %q, want %q", v.SortOrder, "asc")
+	}
+	if v.Pivot != "repo" {
+		t.Errorf("Pivot = %q, want %q", v.Pivot, "repo")
+	}
+	if !v.FavoritesOnly {
+		t.Error("FavoritesOnly should be true")
+	}
+	if v.ShowHidden {
+		t.Error("ShowHidden should be false")
+	}
+	if len(v.ExcludedDirs) != 1 || v.ExcludedDirs[0] != "/tmp" {
+		t.Errorf("ExcludedDirs = %v, want [/tmp]", v.ExcludedDirs)
+	}
+	if restored.ActiveView != "Work" {
+		t.Errorf("ActiveView = %q, want %q", restored.ActiveView, "Work")
+	}
+}
+
+func TestNamedView_EmptyConfig_NoViews(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if len(cfg.Views) != 0 {
+		t.Errorf("Default Views = %v, want empty", cfg.Views)
+	}
+	if cfg.ActiveView != "" {
+		t.Errorf("Default ActiveView = %q, want empty", cfg.ActiveView)
+	}
+}

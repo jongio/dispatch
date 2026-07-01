@@ -91,6 +91,7 @@ Commands:
   help                    Show this help message
   version                 Print the version
   completion <shell>      Print shell completion (bash, zsh, powershell)
+  doctor                  Print environment diagnostics
   update                  Update dispatch to the latest release
 
 Flags:

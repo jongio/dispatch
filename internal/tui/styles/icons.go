@@ -62,6 +62,7 @@ const (
 	// Host type icons — distinguish session origin (GitHub, Azure DevOps).
 	nfGitHub = "\uf09b" //  nf-fa-github
 	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
+	nfPencil = "\uf040" //  nf-fa-pencil
 )
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ const (
 
 	fbGitHub = "⊙"
 	fbADO    = "☁"
+	fbPencil = "✎"
 )
 
 // ---------------------------------------------------------------------------
@@ -204,6 +206,9 @@ func IconCollapseAll() string { return "⊟" }
 // IconPlan returns a filled dot for sessions that have a plan.md file.
 func IconPlan() string { return icon(nfBullet, fbAttentionDot) }
 
+// IconNote returns a pencil icon for sessions that have a user note.
+func IconNote() string { return icon(nfPencil, fbPencil) }
+
 // IconWorkComplete returns a check icon for sessions with all planned work complete.
 func IconWorkComplete() string { return icon(nfCheck, fbCheck) }
 
@@ -225,6 +230,25 @@ func IconHostType(hostType string) string {
 		return ""
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Git workspace state icons
+// ---------------------------------------------------------------------------
+
+// IconGitDirty returns a modified icon for dirty git workspaces.
+func IconGitDirty() string { return icon("\uf069", "✱") } // nf-fa-asterisk
+
+// IconGitUntracked returns a plus icon for workspaces with untracked files.
+func IconGitUntracked() string { return icon("\uf067", "+") } // nf-fa-plus
+
+// IconGitAhead returns an up-arrow icon for branches ahead of upstream.
+func IconGitAhead() string { return icon("\uf062", "↑") } // nf-fa-arrow_up
+
+// IconGitBehind returns a down-arrow icon for branches behind upstream.
+func IconGitBehind() string { return icon("\uf063", "↓") } // nf-fa-arrow_down
+
+// IconGitMissing returns a cross icon for missing session directories.
+func IconGitMissing() string { return icon("\uf00d", "✗") } // nf-fa-times
 
 // PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
 // The pivot string matches data.PivotField values ("cwd", "repository",
