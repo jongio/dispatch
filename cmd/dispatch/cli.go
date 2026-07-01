@@ -52,6 +52,18 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, nil
 
+		case "completion":
+			if len(args) < 2 {
+				err := errors.New("completion requires a shell: bash, zsh, or powershell")
+				fmt.Fprintf(os.Stderr, "completion: %v\n", err)
+				return true, cleanup, err
+			}
+			if cErr := runCompletion(os.Stdout, args[1]); cErr != nil {
+				fmt.Fprintf(os.Stderr, "completion: %v\n", cErr)
+				return true, cleanup, cErr
+			}
+			return true, cleanup, nil
+
 		case "doctor":
 			runDoctor(os.Stdout)
 			showUpdateNotification(origStderr, updateCh)
@@ -105,6 +117,81 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 	}
 	return false, cleanup, nil
 }
+
+func runCompletion(w io.Writer, shell string) error {
+	if w == nil {
+		w = io.Discard
+	}
+	switch strings.ToLower(shell) {
+	case "bash":
+		fmt.Fprint(w, bashCompletionScript)
+	case "zsh":
+		fmt.Fprint(w, zshCompletionScript)
+	case "powershell", "pwsh":
+		fmt.Fprint(w, powershellCompletionScript)
+	default:
+		return fmt.Errorf("unsupported shell %q (want bash, zsh, or powershell)", shell)
+	}
+	return nil
+}
+
+const bashCompletionScript = `# bash completion for dispatch
+_dispatch_completion() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local commands="help version update completion"
+  local flags="-h --help -v --version --demo --clear-cache --reindex"
+
+  if [[ "${COMP_CWORD}" -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "${commands} ${flags}" -- "${cur}") )
+    return 0
+  fi
+
+  if [[ "${COMP_WORDS[1]}" == "completion" ]]; then
+    COMPREPLY=( $(compgen -W "bash zsh powershell" -- "${cur}") )
+    return 0
+  fi
+}
+complete -F _dispatch_completion dispatch disp
+`
+
+const zshCompletionScript = `#compdef dispatch disp
+_dispatch_completion() {
+  local -a commands shells flags
+  commands=(help version update completion)
+  shells=(bash zsh powershell)
+  flags=(-h --help -v --version --demo --clear-cache --reindex)
+
+  if (( CURRENT == 2 )); then
+    _describe -t commands 'dispatch command' commands || _describe -t flags 'dispatch flag' flags
+    return
+  fi
+
+  if [[ ${words[2]} == completion ]]; then
+    _describe -t shells 'shell' shells
+    return
+  fi
+}
+_dispatch_completion "$@"
+`
+
+const powershellCompletionScript = `# PowerShell completion for dispatch
+$script:DispatchCommands = @('help', 'version', 'update', 'completion')
+$script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
+$script:DispatchShells = @('bash', 'zsh', 'powershell')
+
+Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $tokens = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })
+    $values = if ($tokens.Count -ge 2 -and $tokens[1] -eq 'completion') {
+        $script:DispatchShells
+    } else {
+        $script:DispatchCommands + $script:DispatchFlags
+    }
+    $values |
+        Where-Object { $_ -like "$wordToComplete*" } |
+        ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+}
+`
 
 func runDoctor(w io.Writer) {
 	if w == nil {

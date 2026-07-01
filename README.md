@@ -129,6 +129,16 @@ dispatch
 7. Press `s` to cycle sort fields, `S` to flip direction
 8. Press `,` to open settings — change theme, launch mode, model, and more
 
+### Shell Completion
+
+Print completion scripts for supported shells:
+
+```sh
+dispatch completion bash
+dispatch completion zsh
+dispatch completion powershell
+```
+
 ### Diagnostics
 
 Run `dispatch doctor` to print setup checks for the config file, session store, session-state directory, and Copilot CLI binary.
