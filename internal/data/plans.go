@@ -118,6 +118,13 @@ func PlanFilePath(sessionID string) (string, error) {
 	return path, nil
 }
 
+// SessionStatePath returns the resolved Copilot CLI session-state directory
+// used for plan and attention scans. It returns an empty string when the
+// directory cannot be resolved.
+func SessionStatePath() string {
+	return sessionStatePath()
+}
+
 // ---------------------------------------------------------------------------
 // Continuation plan writing
 // ---------------------------------------------------------------------------

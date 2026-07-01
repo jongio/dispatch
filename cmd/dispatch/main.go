@@ -90,6 +90,7 @@ Usage:
 Commands:
   help                    Show this help message
   version                 Print the version
+  doctor                  Print environment diagnostics
   update                  Update dispatch to the latest release
 
 Flags:

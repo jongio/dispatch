@@ -129,6 +129,10 @@ dispatch
 7. Press `s` to cycle sort fields, `S` to flip direction
 8. Press `,` to open settings — change theme, launch mode, model, and more
 
+### Diagnostics
+
+Run `dispatch doctor` to print setup checks for the config file, session store, session-state directory, and Copilot CLI binary.
+
 ### Key Bindings
 
 #### Navigation
