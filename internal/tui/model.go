@@ -3338,10 +3338,41 @@ func (m Model) scanGitStatesCmd() tea.Cmd {
 	if len(sessionDirs) == 0 {
 		return nil
 	}
+
+	// In demo mode, return synthetic git states so all badge types are visible
+	// without requiring real git repos on disk.
+	if os.Getenv("DISPATCH_DEMO_GIT_STATES") != "" {
+		return func() tea.Msg {
+			states := demoGitStates(sessionDirs)
+			return gitStateScannedMsg{states: states}
+		}
+	}
+
 	return func() tea.Msg {
 		states := platform.ScanGitStates(sessionDirs)
 		return gitStateScannedMsg{states: states}
 	}
+}
+
+// demoGitStates assigns a rotating set of git states to sessions so all
+// badge types are visible in demo mode. The order cycles through dirty,
+// ahead, untracked, behind, clean, and missing.
+func demoGitStates(sessionDirs map[string]string) map[string]platform.GitState {
+	cycle := []platform.GitState{
+		platform.GitStateDirty,
+		platform.GitStateAhead,
+		platform.GitStateUntracked,
+		platform.GitStateBehind,
+		platform.GitStateClean,
+		platform.GitStateMissing,
+	}
+	states := make(map[string]platform.GitState, len(sessionDirs))
+	i := 0
+	for id := range sessionDirs {
+		states[id] = cycle[i%len(cycle)]
+		i++
+	}
+	return states
 }
 
 // loadPlanContentCmd reads the plan.md content for a specific session.

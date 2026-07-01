@@ -509,6 +509,143 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		add("empty-state", m)
 	}
 
+	// ── Git workspace badges ─────────────────────────────────────────
+	{
+		m := newBase()
+		m.showPreview = false
+		gitStates := map[string]platform.GitState{
+			"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": platform.GitStateDirty,
+			"ses-026":                              platform.GitStateAhead,
+			"ses-002":                              platform.GitStateUntracked,
+			"ses-003":                              platform.GitStateClean,
+			"ses-004":                              platform.GitStateBehind,
+			"ses-005":                              platform.GitStateMissing,
+		}
+		m.sessionList.SetGitStates(gitStates)
+		m.recalcLayout()
+		add("git-badges", m)
+	}
+
+	// ── Search tokens ────────────────────────────────────────────────
+	{
+		m := newBase()
+		m.searchBar.SetValue("repo:dispatch is:favorite")
+		m.searchBar.Focus()
+		m.searchBar.SetResultCount(3)
+		add("search-tokens", m, Highlight{Row: 0, Col: 0, Rows: 1, Cols: 120})
+	}
+
+	// ── Secret redaction ─────────────────────────────────────────────
+	{
+		m := newBase()
+		m.showPreview = true
+		m.detail = c.detail
+		m.preview.SetDetail(c.detail)
+		m.preview.SetRedactSecrets(true)
+		m.recalcLayout()
+		add("preview-redacted", m)
+	}
+
+	// ── Session notes ────────────────────────────────────────────────
+	{
+		m := newBase()
+		notesSet := map[string]struct{}{
+			"fa800b7b-3a24-4e3b-9f2d-a414198b27ab": {},
+			"ses-026":                              {},
+			"ses-004":                              {},
+		}
+		m.notesSet = notesSet
+		m.sessionList.SetNoteSessions(notesSet)
+		m.showPreview = true
+		m.detail = c.detail
+		m.preview.SetDetail(c.detail)
+		m.preview.SetNote("Follow up on auth refactor — check token expiry edge cases")
+		m.recalcLayout()
+		add("session-notes", m)
+	}
+
+	// ── Named views ──────────────────────────────────────────────────
+	{
+		m := newBase()
+		m.state = stateViewPicker
+		m.viewPicker.SetViews([]config.NamedView{
+			{Name: "Work"},
+			{Name: "Personal"},
+			{Name: "Open Source"},
+		})
+		m.viewPicker.SetActiveView("Work")
+		m.viewPicker.SetSize(m.width, m.height)
+		m.recalcLayout()
+		addOverlay("view-picker", m)
+	}
+
+	// ── Open touched files ───────────────────────────────────────────
+	{
+		m := newBase()
+		m.state = stateFilePicker
+		m.filePicker.SetFiles([]data.SessionFile{
+			{FilePath: "internal/tui/model.go", ToolName: "edit"},
+			{FilePath: "internal/tui/handlers.go", ToolName: "edit"},
+			{FilePath: "internal/config/config.go", ToolName: "edit"},
+			{FilePath: "internal/data/store.go", ToolName: "view"},
+			{FilePath: "cmd/dispatch/main.go", ToolName: "view"},
+		})
+		m.filePicker.SetSize(m.width, m.height)
+		m.recalcLayout()
+		addOverlay("file-picker", m)
+	}
+
+	// ── Activity timeline ────────────────────────────────────────────
+	{
+		m := newBase()
+		m.showPreview = true
+		m.detail = c.detail
+		m.preview.SetDetail(c.detail)
+		m.preview.ToggleTimeline()
+		m.recalcLayout()
+		add("activity-timeline", m)
+	}
+
+	// ── Compare sessions ─────────────────────────────────────────────
+	{
+		m := newBase()
+		m.state = stateCompareView
+		var leftDetail, rightDetail *data.SessionDetail
+		detailCount := 0
+		for _, g := range c.folderGroups {
+			for _, s := range g.Sessions {
+				if d, err := c.store.GetSession(context.Background(), s.ID); err == nil {
+					if detailCount == 0 {
+						leftDetail = d
+					} else if detailCount == 1 {
+						rightDetail = d
+					}
+					detailCount++
+				}
+				if detailCount >= 2 {
+					break
+				}
+			}
+			if detailCount >= 2 {
+				break
+			}
+		}
+		if leftDetail != nil && rightDetail != nil {
+			m.compareView.SetSessions(leftDetail, rightDetail)
+		}
+		m.compareView.SetSize(m.width, m.height)
+		m.recalcLayout()
+		addOverlay("compare-sessions", m)
+	}
+
+	// ── Command palette ──────────────────────────────────────────────
+	{
+		m := newBase()
+		m.openCmdPalette()
+		m.recalcLayout()
+		addOverlay("cmd-palette", m)
+	}
+
 	return shots
 }
 
