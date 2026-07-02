@@ -91,7 +91,7 @@ Commands:
   help                    Show this help message
   version                 Print the version
   completion <shell>      Print shell completion (bash, zsh, powershell)
-  doctor                  Print environment diagnostics
+  doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   update                  Update dispatch to the latest release
 
 Flags:
