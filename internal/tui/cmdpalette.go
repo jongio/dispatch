@@ -20,6 +20,12 @@ func (m *Model) openCmdPalette() {
 	hasPreview := func() bool {
 		return m.showPreview && m.detail != nil
 	}
+	hasPath := func() bool {
+		if _, ok := m.sessionList.Selected(); ok {
+			return true
+		}
+		return m.sessionList.SelectedFolderCwd() != ""
+	}
 	alwaysEnabled := func() bool { return true }
 
 	cmds := []components.Command{
@@ -28,6 +34,7 @@ func (m *Model) openCmdPalette() {
 		{Name: "Open in Tab", Shortcut: "t", Description: "new tab", Action: "launch-tab", Enabled: hasSelection},
 		{Name: "Open in Pane", Shortcut: "e", Description: "new pane", Action: "launch-pane", Enabled: hasSelection},
 		{Name: "Copy Session ID", Shortcut: "c", Description: "copy to clipboard", Action: "copy-id", Enabled: hasSelection},
+		{Name: "Copy Path", Shortcut: "C", Description: "copy working dir", Action: "copy-path", Enabled: hasPath},
 		{Name: "Copy Preview", Shortcut: "y", Description: "copy preview text", Action: "copy-preview", Enabled: hasPreview},
 		{Name: "Search", Shortcut: "/", Description: "filter sessions", Action: "search", Enabled: alwaysEnabled},
 		{Name: "Filter Panel", Shortcut: "f", Description: "directory filter", Action: "filter", Enabled: alwaysEnabled},
@@ -77,6 +84,9 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 
 	case "copy-id":
 		return m.handleCopyID()
+
+	case "copy-path":
+		return m.handleCopyPath()
 
 	case "copy-preview":
 		return m.handleCopyPreview()

@@ -55,6 +55,10 @@ const (
 	// copied to the clipboard.
 	statusCopiedID = "Copied session ID ✓"
 
+	// statusCopiedPath is the status message shown when a session or folder
+	// working directory path is copied to the clipboard.
+	statusCopiedPath = "Copied path ✓"
+
 	// statusCopiedPreview is the status message shown when preview content
 	// is copied to the clipboard via the y key.
 	statusCopiedPreview = "Copied to clipboard ✓"
@@ -1259,6 +1263,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.CopyID):
 		return m.handleCopyID()
 
+	case key.Matches(msg, keys.CopyPath):
+		return m.handleCopyPath()
+
 	case key.Matches(msg, keys.CopyPreview):
 		return m.handleCopyPreview()
 
@@ -1426,6 +1433,28 @@ func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
 		return m, clearStatusAfter(2 * time.Second)
 	}
 	m.statusInfo = statusCopiedID
+	return m, clearStatusAfter(2 * time.Second)
+}
+
+// handleCopyPath copies the selected session's working directory to the
+// system clipboard. When a folder row is selected under a folder or repo
+// pivot, the folder's path is copied instead.
+func (m Model) handleCopyPath() (tea.Model, tea.Cmd) {
+	path := ""
+	if sess, ok := m.sessionList.Selected(); ok {
+		path = sess.Cwd
+	} else {
+		path = m.sessionList.SelectedFolderCwd()
+	}
+	if path == "" {
+		m.statusInfo = "No path to copy"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	if err := clipboardWrite(path); err != nil {
+		m.statusErr = "clipboard: " + err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.statusInfo = statusCopiedPath
 	return m, clearStatusAfter(2 * time.Second)
 }
 
