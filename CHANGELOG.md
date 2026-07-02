@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Bulk hide and favorite** — with sessions marked via `Space`, `h` and `*` now apply to the whole selection instead of just the cursor session
+
 ## [v0.13.0] — 2026-06-30
 
 ### Added

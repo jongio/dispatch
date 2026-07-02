@@ -1713,6 +1713,136 @@ func TestHandleHideSession_Unhide(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// handleHideSession / handleToggleFavorite: bulk (multi-selection)
+// ---------------------------------------------------------------------------
+
+func TestHandleBulkHide_HidesAllSelected(t *testing.T) {
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{
+		{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}, {ID: "s3", Cwd: "/c"},
+	})
+	m.sessionList.SelectAll()
+
+	result, cmd := m.handleHideSession()
+	rm := result.(Model)
+	for _, id := range []string{"s1", "s2", "s3"} {
+		if _, ok := rm.hiddenSet[id]; !ok {
+			t.Errorf("%s should be hidden", id)
+		}
+	}
+	if rm.sessionList.SelectionCount() != 0 {
+		t.Errorf("selection should be cleared after bulk hide, got %d", rm.sessionList.SelectionCount())
+	}
+	if cmd == nil {
+		t.Error("should return reload cmd")
+	}
+}
+
+func TestHandleBulkHide_UnhidesWhenAllHidden(t *testing.T) {
+	m := newTestModel()
+	m.hiddenSet["s1"] = struct{}{}
+	m.hiddenSet["s2"] = struct{}{}
+	m.showHidden = true // so hidden sessions are visible and selectable
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, _ := m.handleHideSession()
+	rm := result.(Model)
+	for _, id := range []string{"s1", "s2"} {
+		if _, ok := rm.hiddenSet[id]; ok {
+			t.Errorf("%s should be unhidden", id)
+		}
+	}
+}
+
+func TestHandleBulkHide_MixedVisibilityHidesAll(t *testing.T) {
+	m := newTestModel()
+	m.hiddenSet["s1"] = struct{}{}
+	m.showHidden = true
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, _ := m.handleHideSession()
+	rm := result.(Model)
+	// s2 was visible, so the whole set is hidden.
+	for _, id := range []string{"s1", "s2"} {
+		if _, ok := rm.hiddenSet[id]; !ok {
+			t.Errorf("%s should be hidden", id)
+		}
+	}
+}
+
+func TestHandleBulkHide_RemovesFavorites(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.favoritedSet["s1"] = struct{}{}
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, _ := m.handleHideSession()
+	rm := result.(Model)
+	if _, ok := rm.hiddenSet["s1"]; !ok {
+		t.Error("s1 should be hidden")
+	}
+	if _, ok := rm.favoritedSet["s1"]; ok {
+		t.Error("s1 should no longer be a favorite after bulk hide")
+	}
+}
+
+func TestHandleBulkFavorite_FavoritesAllSelected(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, cmd := m.handleToggleFavorite()
+	rm := result.(Model)
+	for _, id := range []string{"s1", "s2"} {
+		if _, ok := rm.favoritedSet[id]; !ok {
+			t.Errorf("%s should be favorited", id)
+		}
+	}
+	if cmd == nil {
+		t.Error("should return reload cmd")
+	}
+}
+
+func TestHandleBulkFavorite_UnfavoritesWhenAllFav(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.favoritedSet["s1"] = struct{}{}
+	m.favoritedSet["s2"] = struct{}{}
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, _ := m.handleToggleFavorite()
+	rm := result.(Model)
+	for _, id := range []string{"s1", "s2"} {
+		if _, ok := rm.favoritedSet[id]; ok {
+			t.Errorf("%s should be unfavorited", id)
+		}
+	}
+}
+
+func TestHandleBulkFavorite_SkipsHidden(t *testing.T) {
+	m := newTestModel()
+	m.favoritedSet = make(map[string]struct{})
+	m.hiddenSet["s1"] = struct{}{}
+	m.showHidden = true
+	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/a"}, {ID: "s2", Cwd: "/b"}})
+	m.sessionList.SelectAll()
+
+	result, _ := m.handleToggleFavorite()
+	rm := result.(Model)
+	if _, ok := rm.favoritedSet["s1"]; ok {
+		t.Error("hidden session s1 should not be favorited")
+	}
+	if _, ok := rm.favoritedSet["s2"]; !ok {
+		t.Error("visible session s2 should be favorited")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // handleKey: shift+arrow range selection
 // ---------------------------------------------------------------------------
 

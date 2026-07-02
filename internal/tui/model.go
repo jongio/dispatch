@@ -1343,6 +1343,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // handleHideSession toggles the hidden state of the currently selected session.
 func (m Model) handleHideSession() (tea.Model, tea.Cmd) {
+	// When one or more sessions are marked with Space, act on the whole set.
+	if m.sessionList.SelectionCount() > 0 {
+		return m.handleBulkHide(m.sessionList.SelectedSessions())
+	}
+
 	sess, ok := m.sessionList.Selected()
 	if !ok {
 		return m, nil
@@ -1374,8 +1379,53 @@ func (m Model) handleHideSession() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handleBulkHide hides or unhides every session in sessions with a single
+// deterministic target state: if any session is currently visible, the whole
+// set is hidden; otherwise the whole set is unhidden. Config is written once.
+func (m Model) handleBulkHide(sessions []data.Session) (tea.Model, tea.Cmd) {
+	if len(sessions) == 0 {
+		return m, nil
+	}
+
+	// If any selected session is visible (not hidden), hide the set.
+	hide := false
+	for _, sess := range sessions {
+		if _, hidden := m.hiddenSet[sess.ID]; !hidden {
+			hide = true
+			break
+		}
+	}
+
+	for _, sess := range sessions {
+		if hide {
+			m.hiddenSet[sess.ID] = struct{}{}
+			// Hiding a favorited session also removes it from favorites.
+			delete(m.favoritedSet, sess.ID)
+		} else {
+			delete(m.hiddenSet, sess.ID)
+		}
+	}
+
+	m.cfg.HiddenSessions = sortedKeys(m.hiddenSet)
+	m.cfg.FavoriteSessions = sortedKeys(m.favoritedSet)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusErr = "config save: " + err.Error()
+	}
+
+	m.sessionList.DeselectAll()
+	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	cmd := m.loadSessionsCmd()
+	return m, cmd
+}
+
 // handleToggleFavorite toggles the favorited state of the currently selected session.
 func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
+	// When one or more sessions are marked with Space, act on the whole set.
+	if m.sessionList.SelectionCount() > 0 {
+		return m.handleBulkFavorite(m.sessionList.SelectedSessions())
+	}
+
 	sess, ok := m.sessionList.Selected()
 	if !ok {
 		return m, nil
@@ -1389,6 +1439,50 @@ func (m Model) handleToggleFavorite() (tea.Model, tea.Cmd) {
 		delete(m.favoritedSet, sess.ID)
 	} else {
 		m.favoritedSet[sess.ID] = struct{}{}
+	}
+
+	m.cfg.FavoriteSessions = sortedKeys(m.favoritedSet)
+	if err := config.Save(m.cfg); err != nil {
+		m.statusErr = "config save: " + err.Error()
+	}
+
+	m.sessionList.SetFavoritedSessions(m.favoritedSet)
+	cmd := m.loadSessionsCmd()
+	return m, cmd
+}
+
+// handleBulkFavorite favorites or unfavorites every eligible session in
+// sessions with a single deterministic target state: if any non-hidden
+// session is not yet a favorite, the whole eligible set is favorited;
+// otherwise it is unfavorited. Hidden sessions are skipped (they cannot be
+// favorited). Config is written once.
+func (m Model) handleBulkFavorite(sessions []data.Session) (tea.Model, tea.Cmd) {
+	// Only non-hidden sessions are eligible to be favorited.
+	eligible := make([]data.Session, 0, len(sessions))
+	for _, sess := range sessions {
+		if _, hidden := m.hiddenSet[sess.ID]; !hidden {
+			eligible = append(eligible, sess)
+		}
+	}
+	if len(eligible) == 0 {
+		return m, nil
+	}
+
+	// If any eligible session is not a favorite, favorite the whole set.
+	favorite := false
+	for _, sess := range eligible {
+		if _, fav := m.favoritedSet[sess.ID]; !fav {
+			favorite = true
+			break
+		}
+	}
+
+	for _, sess := range eligible {
+		if favorite {
+			m.favoritedSet[sess.ID] = struct{}{}
+		} else {
+			delete(m.favoritedSet, sess.ID)
+		}
 	}
 
 	m.cfg.FavoriteSessions = sortedKeys(m.favoritedSet)
