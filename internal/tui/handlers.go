@@ -61,8 +61,16 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (Model, tea.Cmd) {
 func (m Model) handleStoreOpened(msg storeOpenedMsg) (Model, tea.Cmd) {
 	m.store = msg.store
 	m.state = stateSessionList
+	// Apply a command-line search query before building the load command so
+	// the first load is already filtered.
+	var extra []tea.Cmd
+	if m.initialQuery != "" {
+		extra = m.applyInitialQuery(m.initialQuery)
+		m.initialQuery = ""
+	}
 	// Quick scan first (lock files only), then full scan follows.
-	return m, tea.Batch(m.loadSessionsCmd(), m.scanAttentionQuickCmd())
+	cmds := append([]tea.Cmd{m.loadSessionsCmd(), m.scanAttentionQuickCmd()}, extra...)
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) handleStoreError(msg storeErrorMsg) (Model, tea.Cmd) { //nolint:unparam

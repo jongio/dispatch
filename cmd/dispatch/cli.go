@@ -19,10 +19,13 @@ import (
 
 // handleArgs processes CLI arguments and executes early-exit subcommands
 // (help, version, update, clear-cache, reindex). It returns done=true when
-// the caller should exit without starting the TUI. When --demo is among
-// the arguments, cleanup is non-nil and the caller must defer it. Errors
-// indicate a failing subcommand; the error message is already printed to
-// stderr.
+// the caller should exit without starting the TUI. A single leading token
+// that is not a known subcommand and does not start with "-" (or several such
+// tokens) is treated as an initial search query and returned in query; the
+// caller seeds the TUI search bar with it. When --demo is among the
+// arguments, cleanup is non-nil and the caller must defer it. Errors indicate
+// a failing subcommand or an unknown flag; the error message is already
+// printed to stderr.
 //
 // Function variables (below) allow test substitution of external calls.
 var (
@@ -32,58 +35,59 @@ var (
 	configResetFn      = config.Reset
 )
 
-func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), err error) {
+func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), query string, err error) {
+	var queryParts []string
 	for _, arg := range args {
 		switch arg {
 		case "--help", "-h", "help":
 			printUsage()
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "--version", "-v", "version":
 			fmt.Println(version.Version)
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "update":
 			if uErr := runUpdateFn(context.Background(), version.Version); uErr != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", uErr)
-				return true, cleanup, uErr
+				return true, cleanup, "", uErr
 			}
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "completion":
 			if len(args) < 2 {
 				err := errors.New("completion requires a shell: bash, zsh, or powershell")
 				fmt.Fprintf(os.Stderr, "completion: %v\n", err)
-				return true, cleanup, err
+				return true, cleanup, "", err
 			}
 			if cErr := runCompletion(os.Stdout, args[1]); cErr != nil {
 				fmt.Fprintf(os.Stderr, "completion: %v\n", cErr)
-				return true, cleanup, cErr
+				return true, cleanup, "", cErr
 			}
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "doctor":
 			runDoctor(os.Stdout)
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
 				fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
-				return true, cleanup, demoErr
+				return true, cleanup, "", demoErr
 			}
 			cleanup = c
 
 		case "--clear-cache":
 			if cErr := configResetFn(); cErr != nil {
 				fmt.Fprintf(os.Stderr, "clear-cache: %v\n", cErr)
-				return true, cleanup, cErr
+				return true, cleanup, "", cErr
 			}
 			fmt.Println("Config reset to defaults.")
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		case "--reindex":
 			fmt.Println("Reindexing session store via Copilot CLI…")
@@ -95,11 +99,11 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 					fmt.Println("Copilot CLI not found, running index maintenance…")
 					if mErr := maintainFn(context.Background()); mErr != nil {
 						fmt.Fprintf(os.Stderr, "reindex: %v\n", mErr)
-						return true, cleanup, mErr
+						return true, cleanup, "", mErr
 					}
 				} else {
 					fmt.Fprintf(os.Stderr, "reindex: %v\n", rErr)
-					return true, cleanup, rErr
+					return true, cleanup, "", rErr
 				}
 			}
 			// Post-reindex maintenance (WAL checkpoint + FTS5 optimize).
@@ -107,15 +111,23 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 				fmt.Fprintf(os.Stderr, "warning: post-reindex maintenance: %v\n", mErr)
 			}
 			fmt.Println("Done.")
-			return true, cleanup, nil
+			return true, cleanup, "", nil
 
 		default:
-			fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
-			printUsage()
-			return true, cleanup, fmt.Errorf("unknown flag: %s", arg)
+			// A leading "-" marks an unknown flag, which is still an error.
+			// Anything else is collected as part of an initial search query.
+			if strings.HasPrefix(arg, "-") {
+				fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
+				printUsage()
+				return true, cleanup, "", fmt.Errorf("unknown flag: %s", arg)
+			}
+			queryParts = append(queryParts, arg)
 		}
 	}
-	return false, cleanup, nil
+	if len(queryParts) > 0 {
+		query = strings.Join(queryParts, " ")
+	}
+	return false, cleanup, query, nil
 }
 
 func runCompletion(w io.Writer, shell string) error {
