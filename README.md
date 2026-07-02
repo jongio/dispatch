@@ -30,7 +30,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Shift+↑/↓ for range selection, Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: working (blue, executing tools), thinking (cyan, generating response), compacting (magenta, context compaction), waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
 - **Host type icons** — sessions display an icon indicating their origin: CLI (desktop), Cloud (cloud), or Actions (gear)
-- **Incremental auto-refresh** — the session list auto-refreshes within 2 seconds when the Copilot CLI writes new data (WAL file polling when focused). No manual reindex needed for normal use
+- **Incremental auto-refresh** — the session list auto-refreshes within 2 seconds when the Copilot CLI writes new data (WAL file polling when focused). No manual reindex needed for normal use. Tune the interval or turn it off with `auto_refresh_seconds`
 - **Plan indicator** (`v`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane. Filter sessions with plans via the `!` status picker
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
@@ -290,6 +290,7 @@ Configuration is stored in the platform-specific config directory:
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
+| `auto_refresh_seconds` | int | *(unset)* | Session-list poll interval in seconds. Unset uses the default (2s); `0` disables polling; a positive value sets the interval (minimum 1s). Applies on next launch |
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
 | `workspace_recovery` | bool | `true` | Detect sessions interrupted by crash/reboot |
 | `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
