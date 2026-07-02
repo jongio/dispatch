@@ -269,6 +269,9 @@ const (
 	PivotByBranch PivotField = "branch"
 	// PivotByDate groups sessions by date (YYYY-MM-DD).
 	PivotByDate PivotField = "date"
+	// PivotByHost groups sessions by host type (the provider that created
+	// the session, e.g. "github" or "ado").
+	PivotByHost PivotField = "host_type"
 )
 
 // SessionGroup holds a set of sessions that share a common pivot label.

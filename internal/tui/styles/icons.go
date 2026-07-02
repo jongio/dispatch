@@ -62,6 +62,7 @@ const (
 	// Host type icons — distinguish session origin (GitHub, Azure DevOps).
 	nfGitHub = "\uf09b" //  nf-fa-github
 	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
+	nfHost   = "\uf233" //  nf-fa-server (host type pivot group)
 	nfPencil = "\uf040" //  nf-fa-pencil
 )
 
@@ -93,6 +94,7 @@ const (
 
 	fbGitHub = "⊙"
 	fbADO    = "☁"
+	fbHost   = "⛁"
 	fbPencil = "✎"
 )
 
@@ -163,6 +165,12 @@ func IconBranch() string { return icon(nfGitBranch+" ", fbBranch) }
 
 // IconBranchOpen returns the expanded git branch icon ("" or "⎇").
 func IconBranchOpen() string { return icon(nfGitBranch+" ", fbBranch) }
+
+// IconHost returns the collapsed host type icon ("" or "⛁").
+func IconHost() string { return icon(nfHost+" ", fbHost) }
+
+// IconHostOpen returns the expanded host type icon ("" or "⛁").
+func IconHostOpen() string { return icon(nfHost+" ", fbHost) }
 
 // ---------------------------------------------------------------------------
 // Attention status dot icons
@@ -252,7 +260,8 @@ func IconGitMissing() string { return icon("\uf00d", "✗") } // nf-fa-times
 
 // PivotGroupIcons returns the (collapsed, expanded) icons for a pivot field.
 // The pivot string matches data.PivotField values ("cwd", "repository",
-// "branch", "date") or the TUI pivot mode constants ("folder", "repo", etc).
+// "branch", "date", "host_type") or the TUI pivot mode constants ("folder",
+// "repo", "host", etc).
 func PivotGroupIcons(pivot string) (collapsed, expanded string) {
 	switch pivot {
 	case "repository", "repo":
@@ -261,6 +270,8 @@ func PivotGroupIcons(pivot string) (collapsed, expanded string) {
 		return IconBranch(), IconBranchOpen()
 	case "date":
 		return IconCalendar(), IconCalendarOpen()
+	case "host", "host_type":
+		return IconHost(), IconHostOpen()
 	default: // "cwd", "folder", or anything else
 		return IconFolder(), IconFolderOpen()
 	}

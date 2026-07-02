@@ -1675,6 +1675,7 @@ func TestPivotExpr(t *testing.T) {
 		{PivotByRepo, "COALESCE(s.repository, '')"},
 		{PivotByBranch, "COALESCE(s.branch, '')"},
 		{PivotByDate, lastActiveExpr},
+		{PivotByHost, "COALESCE(s.host_type, '')"},
 		{PivotField("unknown"), "COALESCE(s.cwd, '')"}, // defaults to folder
 	}
 	for _, tt := range tests {

@@ -431,6 +431,8 @@ func pivotExpr(p PivotField) string {
 		return "COALESCE(s.branch, '')"
 	case PivotByDate:
 		return lastActiveExpr
+	case PivotByHost:
+		return "COALESCE(s.host_type, '')"
 	default: // PivotByFolder and any unknown value
 		return coalesceCwd
 	}
@@ -1004,6 +1006,11 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
+	// Older schemas (pre-v3) have no host_type column. Fall back to a single
+	// empty-label group rather than issuing a query that would error.
+	if pivot == PivotByHost && !s.hasHostType {
+		expr = "''"
+	}
 	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s%s ORDER BY pivot_label, %s %s",
 		expr, s.sessionColumns(), countJoins, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 

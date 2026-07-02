@@ -304,6 +304,7 @@ func TestCovPivotExpr_AllFields(t *testing.T) {
 		{PivotByRepo, "COALESCE(s.repository, '')"},
 		{PivotByBranch, "COALESCE(s.branch, '')"},
 		{PivotByDate, lastActiveExpr},
+		{PivotByHost, "COALESCE(s.host_type, '')"},
 		{PivotByFolder, "COALESCE(s.cwd, '')"},
 		{"unknown", "COALESCE(s.cwd, '')"},
 	}
@@ -372,7 +373,7 @@ func TestCovGroupSessions_AllPivots(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
 
-	pivots := []PivotField{PivotByFolder, PivotByRepo, PivotByBranch, PivotByDate}
+	pivots := []PivotField{PivotByFolder, PivotByRepo, PivotByBranch, PivotByDate, PivotByHost}
 	for _, p := range pivots {
 		t.Run(string(p), func(t *testing.T) {
 			groups, err := s.GroupSessions(context.Background(), p, FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 100)
