@@ -483,6 +483,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileOpenedMsg:
 		return m.handleFileOpened(msg)
 
+	case dirOpenedMsg:
+		return m.handleDirOpened(msg)
+
 	case compareDetailMsg:
 		return m.handleCompareDetail(msg)
 
@@ -1299,6 +1302,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.state = stateFilePicker
 		}
 		return m, nil
+
+	case key.Matches(msg, keys.OpenDir):
+		cwd := m.selectedSessionCwd()
+		if cwd == "" {
+			m.statusErr = "No working directory for this session"
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, m.openDirCmd(cwd)
 
 	case key.Matches(msg, keys.Space):
 		m.sessionList.ToggleSelected()
@@ -3878,6 +3889,15 @@ func (m Model) openFileCmd(path string) tea.Cmd {
 		}
 		err := platform.OpenFile(path)
 		return fileOpenedMsg{path: path, err: err}
+	}
+}
+
+// openDirCmd opens a directory in the platform file manager. Validation of the
+// path lives in platform.OpenDir so the failure message is consistent.
+func (m Model) openDirCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		err := platform.OpenDir(path)
+		return dirOpenedMsg{path: path, err: err}
 	}
 }
 

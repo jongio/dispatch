@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer, Finder, or the Linux file manager)
+
 ## [v0.13.0] — 2026-06-30
 
 ### Added

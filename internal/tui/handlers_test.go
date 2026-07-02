@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -8,6 +9,42 @@ import (
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui/components"
 )
+
+var errTestOpenDir = errors.New("directory not found: /tmp/work")
+
+// ---------------------------------------------------------------------------
+// handleDirOpened
+// ---------------------------------------------------------------------------
+
+func TestHandleDirOpened_Success(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m2, cmd := m.handleDirOpened(dirOpenedMsg{path: "/tmp/work"})
+
+	if m2.statusErr != "" {
+		t.Errorf("statusErr should be empty on success, got %q", m2.statusErr)
+	}
+	if m2.statusInfo != "Opened /tmp/work" {
+		t.Errorf("statusInfo = %q, want %q", m2.statusInfo, "Opened /tmp/work")
+	}
+	if cmd == nil {
+		t.Error("expected a clear-status command")
+	}
+}
+
+func TestHandleDirOpened_Error(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m2, cmd := m.handleDirOpened(dirOpenedMsg{path: "/tmp/work", err: errTestOpenDir})
+
+	if m2.statusInfo != "" {
+		t.Errorf("statusInfo should be empty on error, got %q", m2.statusInfo)
+	}
+	if m2.statusErr != errTestOpenDir.Error() {
+		t.Errorf("statusErr = %q, want %q", m2.statusErr, errTestOpenDir.Error())
+	}
+	if cmd == nil {
+		t.Error("expected a clear-status command")
+	}
+}
 
 // ---------------------------------------------------------------------------
 // handleBackgroundColor

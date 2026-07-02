@@ -187,6 +187,12 @@ type fileOpenedMsg struct {
 	err  error
 }
 
+// dirOpenedMsg reports the result of opening a directory in the file manager.
+type dirOpenedMsg struct {
+	path string
+	err  error
+}
+
 // compareDetailMsg delivers two session details for side-by-side comparison.
 type compareDetailMsg struct {
 	left  *data.SessionDetail

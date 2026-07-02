@@ -26,6 +26,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
+- **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer on Windows, Finder on macOS, the default file manager on Linux)
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
 - **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Shift+↑/↓ for range selection, Ctrl+click and Shift+click for mouse selection
 - **Attention indicators** — colored dots showing real-time session status: working (blue, executing tools), thinking (cyan, generating response), compacting (magenta, context compaction), waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
@@ -206,6 +207,7 @@ Run `dispatch doctor` to print setup checks for the config file, session store, 
 | `v` | View plan in preview pane |
 | `o` | Toggle conversation sort order (oldest/newest first) |
 | `c` | Copy session ID to clipboard |
+| `O` | Open session working directory in file manager |
 | `PgUp` / `PgDn` | Scroll preview |
 | `r` | Refresh session store |
 | `,` | Open settings panel |
