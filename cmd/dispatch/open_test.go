@@ -174,7 +174,7 @@ func TestHandleArgs_OpenMissingID(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 	// parseOpenArgs fails before touching config or the store, so this is safe.
-	done, _, err := handleArgs([]string{"open"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"open"}, io.Discard, ch)
 	if !done {
 		t.Error("expected done=true for open")
 	}

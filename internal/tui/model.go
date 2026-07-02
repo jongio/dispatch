@@ -344,6 +344,10 @@ type Model struct {
 	workStatus   workStatusState
 	searchFilter SearchFilter // structured tokens parsed from search bar input
 
+	// initialQuery is a search string passed on the command line. It is
+	// applied once, when the session store first opens, then cleared.
+	initialQuery string
+
 	// Launch mode requested when showing the shell picker.
 	pendingLaunchMode string
 
@@ -497,8 +501,34 @@ func NewModel() Model {
 	return m
 }
 
-// resolveTheme applies a user-chosen color scheme.
-//
+// NewModelWithQuery creates the root Model and seeds an initial search query
+// that is applied once the session store opens. An empty query behaves
+// exactly like NewModel.
+func NewModelWithQuery(query string) Model {
+	m := NewModel()
+	m.initialQuery = query
+	return m
+}
+
+// applyInitialQuery seeds the search bar with a command-line query and puts
+// the model into the same search state as if the user had typed it: the
+// search bar is focused and populated, structured tokens are parsed, and a
+// quick search runs immediately with a deep search scheduled to follow. It
+// returns the commands the caller should run (focus blink and the deep-search
+// timer).
+func (m *Model) applyInitialQuery(query string) []tea.Cmd {
+	focusCmd := m.searchBar.Focus()
+	m.searchBar.SetValue(query)
+	m.search.lastRawInput = query
+	m.searchFilter = ParseSearchTokens(query)
+	m.applySearchTokens()
+	m.filter.DeepSearch = false
+	m.search.deepSearchVersion++
+	m.search.deepSearchPending = true
+	m.searchBar.SetSearching(true)
+	return []tea.Cmd{focusCmd, m.scheduleDeepSearch(m.search.deepSearchVersion)}
+}
+
 // When the config field is empty or "auto" we keep the legacy
 // defaults from styles.init().  The correct light/dark variant
 // is applied later when tea.BackgroundColorMsg is received
