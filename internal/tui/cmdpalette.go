@@ -140,6 +140,7 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
 			RedactSecrets:     m.cfg.RedactPreviewSecrets,
 			ExcludedWords:     joinExcludedWords(m.cfg.ExcludedWords),
+			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
 		})
 		m.state = stateConfigPanel
 		return m, nil
