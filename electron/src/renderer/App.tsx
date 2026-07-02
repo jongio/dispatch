@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Filter } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
+import { FilterChips } from './components/FilterChips';
 import { SessionTable } from './components/SessionTable';
 import { PreviewPanel } from './components/PreviewPanel';
 import { StatusBar } from './components/StatusBar';
@@ -25,6 +26,11 @@ export function App() {
     loadSessions();
     loadAttention();
 
+    // Check if running in demo mode
+    window.dispatch.app.isDemoMode().then((demo) => {
+      useSessionStore.setState({ isDemoMode: demo });
+    });
+
     const unsubSessions = window.dispatch.on('sessions-changed', () => {
       loadSessions();
     });
@@ -38,6 +44,15 @@ export function App() {
 
   return (
     <div className="grid h-full w-full grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr] bg-background text-foreground">
+      {/* Skip navigation link for keyboard/screen reader users */}
+      <a
+        href="#session-list"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-3 focus:py-2 focus:rounded"
+        style={{ top: 0, left: 0 }}
+      >
+        Skip to session list
+      </a>
+
       {/* Row 1: TitleBar spans all columns */}
       <div className="col-span-2">
         <TitleBar />
@@ -69,8 +84,11 @@ export function App() {
         <div className="flex-1 min-h-0 overflow-hidden">
           {previewPosition === 'right' ? (
             <div className="flex h-full">
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <SessionTable />
+              <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+                <FilterChips />
+                <div className="flex-1 min-h-0 overflow-hidden" id="session-list">
+                  <SessionTable />
+                </div>
               </div>
               {showPreview && (
                 <>
@@ -86,8 +104,11 @@ export function App() {
             </div>
           ) : (
             <div className="flex flex-col h-full">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <SessionTable />
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <FilterChips />
+                <div className="flex-1 min-h-0 overflow-hidden" id="session-list-bottom">
+                  <SessionTable />
+                </div>
               </div>
               {showPreview && (
                 <>

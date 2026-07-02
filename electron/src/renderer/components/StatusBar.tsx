@@ -3,6 +3,61 @@ import { Search, Star, Sun, Moon, Settings } from 'lucide-react';
 import { useSessionStore } from '../stores/sessionStore';
 import { cn } from '../lib/utils';
 
+/** Hint definitions for each context state */
+interface HintDef {
+  key: string;
+  label: string;
+}
+
+const HINTS_NO_SESSION: HintDef[] = [
+  { key: '↑↓', label: 'navigate' },
+  { key: '/', label: 'search' },
+  { key: '?', label: 'help' },
+];
+
+const HINTS_SESSION_SELECTED: HintDef[] = [
+  { key: '\u23ce', label: 'launch' },
+  { key: 'p', label: 'preview' },
+  { key: 'h', label: 'hide' },
+  { key: '*', label: 'star' },
+];
+
+const HINTS_MULTI_SELECTED: HintDef[] = [
+  { key: 'L', label: 'launch all' },
+  { key: 'd', label: 'deselect' },
+  { key: '\u23ce', label: 'launch' },
+];
+
+const HINTS_SEARCH_ACTIVE: HintDef[] = [
+  { key: 'Esc', label: 'clear' },
+];
+
+function KeyboardHints() {
+  const { sessions, cursorIndex, selectedIds, searchQuery } = useSessionStore();
+
+  let hints: HintDef[];
+  if (searchQuery) {
+    hints = HINTS_SEARCH_ACTIVE;
+  } else if (selectedIds.size > 0) {
+    hints = HINTS_MULTI_SELECTED;
+  } else if (sessions.length > 0 && sessions[cursorIndex]) {
+    hints = HINTS_SESSION_SELECTED;
+  } else {
+    hints = HINTS_NO_SESSION;
+  }
+
+  return (
+    <>
+      {hints.map((hint) => (
+        <span key={hint.key} className="flex items-center gap-1">
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">{hint.key}</kbd>
+          {hint.label}
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** Temporary status messages that fade after 2s */
 let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -45,8 +100,12 @@ export function StatusBar() {
   };
 
   return (
-    <div className="flex items-center h-7 px-3 border-t border-border bg-card text-[11px] text-muted-foreground">
-      {/* Left: item count + selection */}
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Status bar"
+      className="flex items-center h-7 px-3 border-t border-border bg-card text-[11px] text-muted-foreground"
+    >  {/* Left: item count + selection */}
       <div className="flex items-center gap-3">
         <span>{sessions.length} sessions</span>
         {selectedIds.size > 0 && (
@@ -60,28 +119,9 @@ export function StatusBar() {
         )}
       </div>
 
-      {/* Center: keyboard hints */}
+      {/* Center: context-sensitive keyboard hints */}
       <div className="flex-1 flex items-center justify-center gap-3 font-mono">
-        <span className="flex items-center gap-1">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">{'\u23ce'}</kbd>
-          open
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">/</kbd>
-          search
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">p</kbd>
-          preview
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">,</kbd>
-          settings
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">?</kbd>
-          help
-        </span>
+        <KeyboardHints />
       </div>
 
       {/* Right: metadata + theme toggle */}

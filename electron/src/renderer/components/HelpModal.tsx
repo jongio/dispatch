@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { SHORTCUT_GROUPS } from '../hooks/useKeyboard';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 /**
  * HelpModal renders a centred overlay showing all keyboard shortcuts
@@ -9,6 +10,18 @@ import { SHORTCUT_GROUPS } from '../hooks/useKeyboard';
 export function HelpModal() {
   const { showHelp, toggleHelp } = useSessionStore();
   const overlayRef = useRef<HTMLDivElement>(null);
+  const trapRef = useFocusTrap(showHelp);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Store the element that had focus before modal opened
+  useEffect(() => {
+    if (showHelp) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [showHelp]);
 
   // Close on click outside the panel
   useEffect(() => {
@@ -31,15 +44,22 @@ export function HelpModal() {
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
     >
-      <div className="w-full max-w-lg mx-4 rounded-lg border border-border bg-card shadow-2xl overflow-hidden">
+      <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+        className="w-full max-w-lg mx-4 rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted">
-          <h2 className="text-sm font-semibold text-primary">
+          <h2 id="help-modal-title" className="text-sm font-semibold text-primary">
             Keyboard Shortcuts
           </h2>
           <button
             onClick={toggleHelp}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Close keyboard shortcuts"
           >
             Esc to close
           </button>

@@ -175,6 +175,11 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
   return (
     <>
       <div
+        role="treeitem"
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        aria-checked={!isExcluded}
+        aria-level={depth + 1}
+        aria-label={`${node.name}, ${node.sessionCount} sessions${isExcluded ? ', excluded' : ''}`}
         className={`
           flex items-center gap-1 py-0.5 px-1 rounded cursor-pointer text-xs
           hover:bg-muted/30 transition-colors duration-75
@@ -185,6 +190,7 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
         {/* Expand/collapse arrow */}
         <button
           onClick={() => hasChildren && onToggleExpand(node.path)}
+          aria-label={hasChildren ? (isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`) : undefined}
           className={`
             w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground
             ${hasChildren ? 'hover:text-foreground' : 'invisible'}
@@ -200,6 +206,7 @@ function TreeNodeRow({ node, depth, isExcluded, expandedPaths, onToggleExpand, o
         {/* Checkbox icon */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExclude(node.path, isExcluded); }}
+          aria-label={isExcluded ? `Include ${node.name}` : `Exclude ${node.name}`}
           className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors duration-75"
         >
           {isExcluded ? (
@@ -354,12 +361,13 @@ export function DirectoryTree() {
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
           placeholder="Filter dirs..."
+          aria-label="Filter directories"
           className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 
       {/* Tree nodes */}
-      <div className="max-h-[300px] overflow-y-auto">
+      <div className="max-h-[300px] overflow-y-auto" role="tree" aria-label="Directory filter tree">
         {filteredTree.length === 0 ? (
           <div className="text-xs text-muted-foreground px-2 py-1">
             {searchFilter ? 'No matching directories' : 'No directories'}

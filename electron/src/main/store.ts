@@ -201,7 +201,45 @@ export class SessionStore {
       LIMIT 100
     `;
 
-    return this.db.prepare(sql).all(pattern, pattern, pattern, pattern) as Session[];
+    const results = this.db.prepare(sql).all(pattern, pattern, pattern, pattern) as Session[];
+
+    // Numeric/ref matching: if query looks like a ref (e.g. "42", "#42", "PR42", "PR #42")
+    const refMatch = query.trim().match(/^(?:PR\s*#?|#)?(\d+)$/i);
+    if (refMatch) {
+      const refPattern = `%${refMatch[1]}%`;
+      try {
+        const refSql = `
+          SELECT DISTINCT r.session_id
+          FROM session_refs r
+          WHERE r.ref_value LIKE ?
+        `;
+        const refSessionIds = this.db.prepare(refSql).all(refPattern) as Array<{ session_id: string }>;
+        const existingIds = new Set(results.map((s) => s.id));
+        const missingIds = refSessionIds
+          .map((r) => r.session_id)
+          .filter((id) => !existingIds.has(id));
+
+        if (missingIds.length > 0) {
+          const placeholders = missingIds.map(() => '?').join(',');
+          const fillSql = `
+            SELECT s.id, COALESCE(s.cwd, '') as cwd, COALESCE(s.repository, '') as repository,
+                   COALESCE(s.branch, '') as branch, COALESCE(s.summary, '') as summary,
+                   s.created_at, s.updated_at${hostTypeCol},
+                   s.updated_at as last_active_at,
+                   0 as turn_count, 0 as file_count
+            FROM sessions s
+            WHERE s.id IN (${placeholders})
+            ORDER BY s.updated_at DESC
+          `;
+          const refSessions = this.db.prepare(fillSql).all(...missingIds) as Session[];
+          results.push(...refSessions);
+        }
+      } catch {
+        // session_refs table may not exist; silently skip
+      }
+    }
+
+    return results;
   }
 
   searchDeep(query: string): SearchResult[] {

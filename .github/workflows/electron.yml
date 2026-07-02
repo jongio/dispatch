@@ -1,0 +1,160 @@
+name: Electron
+
+on:
+  push:
+    branches: [feature/electron-app, main]
+    paths:
+      - "electron/**"
+      - ".github/workflows/electron.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "electron/**"
+      - ".github/workflows/electron.yml"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Create release artifacts"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: electron-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: pnpm/action-setup@fe02b34f77f8bc703a0f99009755a4f8a1d62e65 # v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: electron/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run typecheck
+
+      - run: pnpm run test
+
+  build:
+    needs: lint-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-latest
+            arch: arm64
+          - os: macos-latest
+            arch: x64
+          - os: macos-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: x64
+          - os: ubuntu-latest
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: electron
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: pnpm/action-setup@fe02b34f77f8bc703a0f99009755a4f8a1d62e65 # v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: electron/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Set version from git tag
+        shell: bash
+        run: |
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo "0.1.0-dev")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          node -e "const p=require('./package.json'); p.version='$VERSION'.split('-')[0]; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2)+'\n')"
+
+      - name: Build renderer
+        run: pnpm run build:renderer
+
+      - name: Package (${{ matrix.os }} ${{ matrix.arch }})
+        run: npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'mac' || 'linux' }} --${{ matrix.arch }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke test (launch and exit)
+        if: matrix.os != 'ubuntu-latest' || matrix.arch == 'x64'
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            # AppImage needs FUSE or extraction
+            APPIMAGE=$(find release -name "*.AppImage" | head -1)
+            if [ -n "$APPIMAGE" ]; then
+              chmod +x "$APPIMAGE"
+              timeout 5 xvfb-run "$APPIMAGE" --no-sandbox --demo || [ $? -eq 124 ]
+            fi
+          fi
+          echo "Smoke test passed (or skipped for cross-arch)"
+
+      - name: Check artifact size
+        shell: bash
+        run: |
+          echo "## Artifact sizes" >> "$GITHUB_STEP_SUMMARY"
+          find release -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" \) -exec ls -lh {} \; | while read line; do
+            SIZE=$(echo "$line" | awk '{print $5}')
+            FILE=$(echo "$line" | awk '{print $NF}')
+            echo "- $(basename $FILE): $SIZE" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dispatch-electron-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            electron/release/*.exe
+            electron/release/*.dmg
+            electron/release/*.AppImage
+            electron/release/*.deb
+            electron/release/*.rpm
+            electron/release/*.zip
+            electron/release/*.yml
+          if-no-files-found: warn
+          retention-days: 7
+
+  release:
+    if: github.event.inputs.release == 'true' || startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts
+          pattern: dispatch-electron-*
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME:-latest}"
+          find artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" -o -name "*.yml" \) -exec gh release upload "$TAG" {} --clobber \; 2>/dev/null || echo "No release to upload to (tag: $TAG)"

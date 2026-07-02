@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Copy,
   Check,
@@ -22,8 +22,93 @@ import {
   Cog,
   MessageSquare,
 } from 'lucide-react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useSessionStore } from '../stores/sessionStore';
 import { FileText } from 'lucide-react';
+
+/** Shared markdown component overrides for styled rendering. */
+const markdownComponents: Components = {
+  code({ className, children, ...props }) {
+    const isBlock = className?.startsWith('language-');
+    if (isBlock) {
+      return (
+        <pre className="bg-muted p-2 rounded overflow-x-auto text-xs my-2">
+          <code className={`font-mono ${className ?? ''}`} {...props}>
+            {children}
+          </code>
+        </pre>
+      );
+    }
+    return (
+      <code className="bg-muted font-mono text-xs p-0.5 rounded" {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre({ children }) {
+    // The code block handler above wraps in its own <pre>, so just pass through
+    return <>{children}</>;
+  },
+  p({ children }) {
+    return <p className="mb-2 last:mb-0">{children}</p>;
+  },
+  a({ href, children }) {
+    return (
+      <a href={href} className="text-primary underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  },
+  ul({ children }) {
+    return <ul className="pl-4 list-disc mb-2">{children}</ul>;
+  },
+  ol({ children }) {
+    return <ol className="pl-4 list-decimal mb-2">{children}</ol>;
+  },
+  h1({ children }) {
+    return <h1 className="text-lg font-bold mb-2">{children}</h1>;
+  },
+  h2({ children }) {
+    return <h2 className="text-base font-bold mb-2">{children}</h2>;
+  },
+  h3({ children }) {
+    return <h3 className="text-sm font-bold mb-1">{children}</h3>;
+  },
+  h4({ children }) {
+    return <h4 className="text-sm font-semibold mb-1">{children}</h4>;
+  },
+  h5({ children }) {
+    return <h5 className="text-xs font-semibold mb-1">{children}</h5>;
+  },
+  h6({ children }) {
+    return <h6 className="text-xs font-semibold mb-1 text-muted-foreground">{children}</h6>;
+  },
+  blockquote({ children }) {
+    return (
+      <blockquote className="border-l-2 border-border pl-2 italic text-muted-foreground mb-2">
+        {children}
+      </blockquote>
+    );
+  },
+  table({ children }) {
+    return (
+      <div className="overflow-x-auto my-2">
+        <table className="text-xs border-collapse w-full">{children}</table>
+      </div>
+    );
+  },
+  th({ children }) {
+    return (
+      <th className="border border-border px-2 py-1 bg-muted text-left font-semibold">
+        {children}
+      </th>
+    );
+  },
+  td({ children }) {
+    return <td className="border border-border px-2 py-1">{children}</td>;
+  },
+};
 
 /** Minimum panel width in px. */
 const MIN_WIDTH = 280;
@@ -154,9 +239,10 @@ function TurnBubble({
             : 'bg-muted'
         }`}
       >
-        <div className="whitespace-pre-wrap break-words text-foreground">
-          {displayText}
-          {needsTruncation && !expanded && '\u2026'}
+        <div className="break-words text-foreground prose-sm max-w-none">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {displayText + (needsTruncation && !expanded ? '\u2026' : '')}
+          </ReactMarkdown>
         </div>
         {needsTruncation && (
           <button
@@ -172,6 +258,47 @@ function TurnBubble({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Scrollable container with top/bottom fade indicators. */
+function ScrollContainer({ children }: { children: React.ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showTopFade, setShowTopFade] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+
+  const updateFades = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowTopFade(el.scrollTop > 0);
+    setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
+
+  useEffect(() => {
+    updateFades();
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(updateFades);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateFades]);
+
+  return (
+    <div className="relative flex-1 min-h-0">
+      {showTopFade && (
+        <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+      )}
+      <div
+        ref={scrollRef}
+        onScroll={updateFades}
+        className="h-full overflow-y-auto p-3 space-y-1 preview-selectable"
+      >
+        {children}
+      </div>
+      {showBottomFade && (
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
+      )}
     </div>
   );
 }
@@ -207,10 +334,10 @@ export function PreviewPanel() {
   const { session, turns, checkpoints, files, refs } = selectedSession;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden" role="region" aria-label="Session details">
       {/* Sticky metadata header */}
       <div className="shrink-0 p-3 border-b border-border bg-card">
-        <h2 className="text-sm font-semibold text-foreground truncate">
+        <h2 id="preview-panel-heading" className="text-sm font-semibold text-foreground truncate">
           {session.summary || 'Untitled session'}
         </h2>
 
@@ -307,8 +434,12 @@ export function PreviewPanel() {
       </div>
 
       {/* Tab bar */}
-      <div className="shrink-0 flex border-b border-border bg-card">
+      <div className="shrink-0 flex border-b border-border bg-card" role="tablist" aria-label="Session content views">
         <button
+          id="tab-conversation"
+          role="tab"
+          aria-selected={previewTab === 'conversation'}
+          aria-controls="tabpanel-conversation"
           onClick={() => handleTabChange('conversation')}
           className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
             previewTab === 'conversation'
@@ -319,6 +450,10 @@ export function PreviewPanel() {
           Conversation
         </button>
         <button
+          id="tab-plan"
+          role="tab"
+          aria-selected={previewTab === 'plan'}
+          aria-controls="tabpanel-plan"
           onClick={() => handleTabChange('plan')}
           className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
             previewTab === 'plan'
@@ -330,20 +465,22 @@ export function PreviewPanel() {
         </button>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1 preview-selectable">
+      {/* Scrollable content with fade indicators */}
+      <ScrollContainer>
         {previewTab === 'plan' ? (
-          <div className="space-y-2">
+          <div id="tabpanel-plan" role="tabpanel" aria-labelledby="tab-plan" className="space-y-2">
             {planContent ? (
-              <pre className="whitespace-pre-wrap break-words text-xs text-foreground font-mono leading-relaxed">
+          <div className="text-xs text-foreground leading-relaxed prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {planContent}
-              </pre>
+              </ReactMarkdown>
+            </div>
             ) : (
               <p className="text-xs text-muted-foreground italic">No plan.md found for this session.</p>
             )}
           </div>
         ) : (
-        <>
+        <div id="tabpanel-conversation" role="tabpanel" aria-labelledby="tab-conversation">
         {/* Conversation section */}
         <SectionHeader
           icon={<MessagesSquare size={14} className="inline-block" />}
@@ -467,9 +604,9 @@ export function PreviewPanel() {
             </div>
           </>
         )}
-        </>
+        </div>
         )}
-      </div>
+      </ScrollContainer>
     </div>
   );
 }

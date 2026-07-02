@@ -1,44 +1,35 @@
 @import "tailwindcss";
 
-:root,
-:root[data-theme="dark"] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.72 0 0);
-  --border: oklch(0.3 0 0);
-  --input: oklch(0.3 0 0);
-  --ring: oklch(0.72 0.18 250);
-  --primary: oklch(0.72 0.18 250);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.28 0.02 250);
-  --secondary-foreground: oklch(0.985 0 0);
-  --accent: oklch(0.7 0.15 160);
-  --accent-foreground: oklch(0.145 0 0);
-  --destructive: oklch(0.65 0.25 27);
-  --destructive-foreground: oklch(0.985 0 0);
+/*
+ * Theme CSS custom properties are set programmatically by applyTheme().
+ * The :root block below provides fallback defaults (Dispatch Dark) that
+ * apply before the JS theme-init runs, preventing a flash of unstyled content.
+ */
+:root {
+  --background: #111111;
+  --foreground: #E4E4E7;
+  --card: #1b1b1b;
+  --card-foreground: #E4E4E7;
+  --muted: #252525;
+  --muted-foreground: #A1A1AA;
+  --border: #333333;
+  --input: #333333;
+  --ring: #5A56E0;
+  --primary: #5A56E0;
+  --primary-foreground: #FFFFFF;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #E4E4E7;
+  --accent: #3A96DD;
+  --accent-foreground: #FFFFFF;
+  --destructive: #E54D2E;
+  --destructive-foreground: #FFFFFF;
+
+  /* Smooth theme transitions (overridden by prefers-reduced-motion below) */
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-:root[data-theme="light"] {
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.95 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.88 0 0);
-  --ring: oklch(0.55 0.2 250);
-  --primary: oklch(0.55 0.2 250);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.92 0.02 250);
-  --secondary-foreground: oklch(0.145 0 0);
-  --accent: oklch(0.55 0.15 160);
-  --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.55 0.25 27);
-  --destructive-foreground: oklch(0.99 0 0);
+* {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 @theme inline {
@@ -94,6 +85,7 @@ body {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+    transition: none !important;
   }
 }
 
@@ -103,4 +95,26 @@ body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Screen-reader-only utility: visually hidden but accessible to AT */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* High-contrast / forced-colors mode support */
+@media (forced-colors: active) {
+  :root {
+    --border: CanvasText;
+    --ring: Highlight;
+    --primary: Highlight;
+  }
 }

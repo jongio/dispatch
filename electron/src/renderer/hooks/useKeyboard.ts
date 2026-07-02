@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import { tinykeys } from 'tinykeys';
 import { useSessionStore } from '../stores/sessionStore';
+import type { AttentionStatus } from '../stores/attentionStore';
+
+/** Attention statuses for cycling with the ! key */
+const ATTENTION_CYCLE: (AttentionStatus | null)[] = [
+  null, 'working', 'thinking', 'waiting', 'interrupted', 'active', 'idle', 'stale',
+];
 
 /**
  * Shortcut definition used for both registration and help display.
@@ -271,21 +277,29 @@ export function useKeyboard(): void {
       }),
       'Shift+1': guard((e) => {
         e.preventDefault();
-        // Attention filter - placeholder for future implementation
+        const { attentionFilter, setAttentionFilter } = store.getState();
+        const idx = ATTENTION_CYCLE.indexOf(attentionFilter);
+        const next = ATTENTION_CYCLE[(idx + 1) % ATTENTION_CYCLE.length];
+        setAttentionFilter(next);
       }),
 
       // Actions
       'h': guard((e) => {
         e.preventDefault();
-        // Hide session - placeholder for future implementation
+        const { sessions, cursorIndex, toggleHide } = store.getState();
+        const session = sessions[cursorIndex];
+        if (session) toggleHide(session.id);
       }),
       'Shift+h': guard((e) => {
         e.preventDefault();
-        // Toggle hidden - placeholder for future implementation
+        const { showHidden, setShowHidden } = store.getState();
+        setShowHidden(!showHidden);
       }),
       'Shift+8': guard((e) => {
         e.preventDefault();
-        // Star/favorite - placeholder for future implementation
+        const { sessions, cursorIndex, toggleFavorite } = store.getState();
+        const session = sessions[cursorIndex];
+        if (session) toggleFavorite(session.id);
       }),
       'c': guard((e) => {
         e.preventDefault();

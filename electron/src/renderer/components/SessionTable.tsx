@@ -31,6 +31,7 @@ import {
 import { useSessionStore, type Session } from '../stores/sessionStore';
 import { useAttentionStore } from '../stores/attentionStore';
 import { AttentionDot } from './AttentionDot';
+import { highlightMatches } from '../lib/highlight';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -147,6 +148,7 @@ function buildColumns(
   hidden: Set<string>,
   toggleFavorite: (id: string) => void,
   toggleHide: (id: string) => void,
+  searchQuery: string,
 ): ColumnDef<Session, unknown>[] {
   return [
     // Status (AttentionDot)
@@ -188,7 +190,9 @@ function buildColumns(
       header: 'Summary',
       cell: ({ getValue }) => (
         <span className="text-[11px] font-semibold truncate text-foreground block">
-          {getValue() || 'Untitled session'}
+          {searchQuery
+            ? highlightMatches(getValue() || 'Untitled session', searchQuery)
+            : (getValue() || 'Untitled session')}
         </span>
       ),
     }),
@@ -342,6 +346,7 @@ export function SessionTable() {
     hidden,
     showHidden,
     isLoading,
+    searchQuery,
     selectSession,
     toggleSelection,
     toggleGroup,
@@ -370,8 +375,8 @@ export function SessionTable() {
   // -------------------------------------------------------------------------
 
   const columns = useMemo(
-    () => buildColumns(statuses as Map<string, string>, favorites, hidden, toggleFavorite, toggleHide),
-    [statuses, favorites, hidden, toggleFavorite, toggleHide],
+    () => buildColumns(statuses as Map<string, string>, favorites, hidden, toggleFavorite, toggleHide, searchQuery),
+    [statuses, favorites, hidden, toggleFavorite, toggleHide, searchQuery],
   );
 
   // Derive grouping state from pivot
@@ -590,15 +595,24 @@ export function SessionTable() {
       onContextMenu={handleContextMenu}
       tabIndex={0}
       role="grid"
-      aria-label="Sessions"
+      aria-label={`Session list, ${visibleSessions.length} sessions`}
     >
+      {/* Live region for selection announcements */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {selectedIds.size > 0
+          ? `${selectedIds.size} sessions selected`
+          : selectedSession
+            ? `${selectedSession.session.summary || 'Untitled session'} selected`
+            : ''}
+      </div>
+
       {/* Sticky header */}
       <div
         className="flex-shrink-0 border-b border-border bg-card"
         style={{ height: HEADER_HEIGHT, ...columnSizeVars } as React.CSSProperties}
       >
         {headerGroups.map((headerGroup) => (
-          <div key={headerGroup.id} className="flex items-center h-full">
+          <div key={headerGroup.id} className="flex items-center h-full" role="row">
             {/* Expand/collapse all toggle when grouped */}
             {grouping.length > 0 && (
               <button
@@ -612,6 +626,7 @@ export function SessionTable() {
                 }}
                 className="flex items-center justify-center w-6 h-full text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
                 title={collapsedGroups.size > 0 ? 'Expand all (x)' : 'Collapse all (x)'}
+                aria-label={collapsedGroups.size > 0 ? 'Expand all groups' : 'Collapse all groups'}
               >
                 {collapsedGroups.size > 0 ? (
                   <ChevronRight size={12} />
@@ -628,6 +643,8 @@ export function SessionTable() {
               return (
                 <div
                   key={header.id}
+                  role="columnheader"
+                  aria-sort={sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : undefined}
                   className={`
                     group/header relative flex items-center px-1.5 h-full select-none
                     ${canSort ? 'cursor-pointer hover:bg-muted/30' : ''}
@@ -692,6 +709,8 @@ export function SessionTable() {
               return (
                 <div
                   key={`group-${groupKey}`}
+                  role="row"
+                  aria-expanded={!isCollapsed}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -708,7 +727,7 @@ export function SessionTable() {
                   ) : (
                     <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
                   )}
-                  <span className="text-[11px] font-medium text-foreground truncate flex-1">
+                  <span role="columnheader" className="text-[11px] font-medium text-foreground truncate flex-1">
                     {displayKey}
                   </span>
                   <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded px-1 py-px flex-shrink-0">
@@ -728,6 +747,9 @@ export function SessionTable() {
             return (
               <div
                 key={session.id}
+                role="row"
+                aria-selected={isSelected || isMultiSelected}
+                aria-current={isCursor ? 'true' : undefined}
                 style={{
                   position: 'absolute',
                   top: 0,

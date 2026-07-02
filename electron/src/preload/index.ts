@@ -16,6 +16,11 @@ export interface Config {
   custom_command: string;
   theme: string;
   workspace_recovery: boolean;
+  global_hotkey: string;
+  auto_launch: boolean;
+  auto_update: boolean;
+  notifications_enabled: boolean;
+  minimize_to_tray: boolean;
 }
 
 export interface ShellInfo {
@@ -66,11 +71,20 @@ export interface DispatchAPI {
     set(config: Config): Promise<void>;
     getPath(): Promise<string>;
     openInExplorer(): Promise<void>;
+    getDetectedTheme(): Promise<string | null>;
   };
   platform: {
     copyToClipboard(text: string): Promise<void>;
     getShells(): Promise<ShellInfo[]>;
     getTerminals(): Promise<TerminalInfo[]>;
+  };
+  update: {
+    check(): Promise<void>;
+    download(): Promise<void>;
+    install(): Promise<void>;
+  };
+  app: {
+    isDemoMode(): Promise<boolean>;
   };
   window: {
     minimize(): void;
@@ -80,7 +94,15 @@ export interface DispatchAPI {
   on(event: string, callback: (...args: unknown[]) => void): () => void;
 }
 
-const ALLOWED_EVENTS = new Set(['sessions-changed', 'attention-update']);
+const ALLOWED_EVENTS = new Set([
+  'sessions-changed',
+  'attention-update',
+  'navigate-to-session',
+  'update-available',
+  'update-progress',
+  'update-downloaded',
+  'update-status',
+]);
 
 const api: DispatchAPI = {
   sessions: {
@@ -101,11 +123,20 @@ const api: DispatchAPI = {
     set: (config) => ipcRenderer.invoke('config:set', config),
     getPath: () => ipcRenderer.invoke('config:getPath'),
     openInExplorer: () => ipcRenderer.invoke('config:openInExplorer'),
+    getDetectedTheme: () => ipcRenderer.invoke('config:getDetectedTheme'),
   },
   platform: {
     copyToClipboard: (text) => ipcRenderer.invoke('platform:copyToClipboard', text),
     getShells: () => ipcRenderer.invoke('platform:getShells'),
     getTerminals: () => ipcRenderer.invoke('platform:getTerminals'),
+  },
+  update: {
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+  },
+  app: {
+    isDemoMode: () => ipcRenderer.invoke('app:isDemoMode'),
   },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),

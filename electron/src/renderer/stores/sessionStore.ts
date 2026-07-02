@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import type { AttentionStatus } from './attentionStore';
+import { useAttentionStore } from './attentionStore';
 
 export interface Session {
   id: string;
@@ -45,6 +47,13 @@ interface SessionDetail {
   }>;
 }
 
+interface SearchResult {
+  content: string;
+  session_id: string;
+  source_type: string;
+  rank: number;
+}
+
 interface SessionState {
   sessions: Session[];
   selectedSession: SessionDetail | null;
@@ -59,6 +68,8 @@ interface SessionState {
   showPlanView: boolean;
   planContent: string | null;
   isLoading: boolean;
+  isDeepSearching: boolean;
+  deepSearchResults: SearchResult[];
   sort: string;
   sortOrder: 'asc' | 'desc';
   pivot: string;
@@ -75,6 +86,15 @@ interface SessionState {
 
   // Directory filter state
   excludedDirs: string[];
+
+  // Attention filter state
+  attentionFilter: AttentionStatus | null;
+
+  // Demo mode indicator
+  isDemoMode: boolean;
+
+  // Total session count (before client-side filtering)
+  totalSessionCount: number;
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -93,6 +113,8 @@ interface SessionState {
   setPivot: (mode: string) => void;
   setTimeRange: (range: string) => void;
   setExcludedDirs: (dirs: string[]) => void;
+  setAttentionFilter: (status: AttentionStatus | null) => void;
+  clearAllFilters: () => void;
   moveCursor: (delta: number) => void;
   selectAll: () => void;
   deselectAll: () => void;
@@ -124,6 +146,8 @@ export const useSessionStore = create<SessionState>()(
   showPlanView: false,
   planContent: null,
   isLoading: false,
+  isDeepSearching: false,
+  deepSearchResults: [],
   sort: 'updated',
   sortOrder: 'desc',
   pivot: 'repository',
@@ -141,22 +165,77 @@ export const useSessionStore = create<SessionState>()(
   // Directory filter state
   excludedDirs: [],
 
+  // Attention filter state
+  attentionFilter: null,
+
+  // Demo mode indicator
+  isDemoMode: false,
+
+  // Total session count
+  totalSessionCount: 0,
+
   loadSessions: async () => {
     set({ isLoading: true });
     try {
-      const { sort, sortOrder, searchQuery, timeRange } = get();
+      const { sort, sortOrder, searchQuery, timeRange, attentionFilter } = get();
       let sessions: Session[];
 
       if (searchQuery) {
+        // Tier 1: quick search (immediate)
         sessions = (await window.dispatch.sessions.search(searchQuery)) as Session[];
+        set({ totalSessionCount: sessions.length });
+
+        // Apply attention filter client-side
+        if (attentionFilter) {
+          const statuses = useAttentionStore.getState().statuses;
+          sessions = sessions.filter((s) => statuses.get(s.id) === attentionFilter);
+        }
+
+        set({ sessions, isLoading: false });
+
+        // Tier 2: deep search (FTS5, fires after quick results are showing)
+        set({ isDeepSearching: true });
+        try {
+          const deepResults = (await window.dispatch.sessions.searchDeep(searchQuery)) as SearchResult[];
+          set({ deepSearchResults: deepResults });
+
+          // Merge deep result session IDs that aren't already in quick results
+          if (deepResults.length > 0) {
+            const existingIds = new Set(get().sessions.map((s) => s.id));
+            const newIds = [...new Set(deepResults.map((r) => r.session_id))]
+              .filter((id) => !existingIds.has(id));
+
+            if (newIds.length > 0) {
+              // Fetch full session objects for newly found IDs
+              const allSessions = (await window.dispatch.sessions.list({ sort, sortOrder, timeRange })) as Session[];
+              let newSessions = allSessions.filter((s) => newIds.includes(s.id));
+
+              if (attentionFilter) {
+                const statuses = useAttentionStore.getState().statuses;
+                newSessions = newSessions.filter((s) => statuses.get(s.id) === attentionFilter);
+              }
+
+              set({ sessions: [...get().sessions, ...newSessions] });
+            }
+          }
+        } finally {
+          set({ isDeepSearching: false });
+        }
       } else {
         sessions = (await window.dispatch.sessions.list({ sort, sortOrder, timeRange })) as Session[];
-      }
+        const totalSessionCount = sessions.length;
 
-      set({ sessions, isLoading: false });
+        // Apply attention filter client-side
+        if (attentionFilter) {
+          const statuses = useAttentionStore.getState().statuses;
+          sessions = sessions.filter((s) => statuses.get(s.id) === attentionFilter);
+        }
+
+        set({ sessions, totalSessionCount, isLoading: false, deepSearchResults: [], isDeepSearching: false });
+      }
     } catch (error) {
       console.error('Failed to load sessions:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, isDeepSearching: false });
     }
   },
 
@@ -224,6 +303,16 @@ export const useSessionStore = create<SessionState>()(
 
   setExcludedDirs: (dirs: string[]) => {
     set({ excludedDirs: dirs });
+    get().loadSessions();
+  },
+
+  setAttentionFilter: (status: AttentionStatus | null) => {
+    set({ attentionFilter: status });
+    get().loadSessions();
+  },
+
+  clearAllFilters: () => {
+    set({ timeRange: 'all', attentionFilter: null, excludedDirs: [] });
     get().loadSessions();
   },
 
@@ -333,6 +422,7 @@ export const useSessionStore = create<SessionState>()(
         sortOrder: state.sortOrder,
         pivot: state.pivot,
         timeRange: state.timeRange,
+        attentionFilter: state.attentionFilter,
         favorites: Array.from(state.favorites),
         hidden: Array.from(state.hidden),
         showHidden: state.showHidden,
@@ -350,6 +440,7 @@ export const useSessionStore = create<SessionState>()(
           sortOrder: p.sortOrder === 'asc' || p.sortOrder === 'desc' ? p.sortOrder : current.sortOrder,
           pivot: typeof p.pivot === 'string' ? p.pivot : current.pivot,
           timeRange: typeof p.timeRange === 'string' ? p.timeRange : current.timeRange,
+          attentionFilter: (p.attentionFilter as AttentionStatus | null) ?? current.attentionFilter,
           favorites: new Set(Array.isArray(p.favorites) ? p.favorites as string[] : []),
           hidden: new Set(Array.isArray(p.hidden) ? p.hidden as string[] : []),
           showHidden: typeof p.showHidden === 'boolean' ? p.showHidden : current.showHidden,

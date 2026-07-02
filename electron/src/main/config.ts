@@ -20,9 +20,17 @@ export interface Config {
   custom_command: string;
   theme: string;
   workspace_recovery: boolean;
+  global_hotkey: string;
+  auto_launch: boolean;
+  auto_update: boolean;
+  notifications_enabled: boolean;
+  minimize_to_tray: boolean;
 }
 
 const MAX_MAX_SESSIONS = 10_000;
+
+/** Known Windows Terminal scheme names that map to built-in themes. */
+const KNOWN_WT_SCHEMES = new Set(['campbell', 'one half dark', 'one half light']);
 
 function getConfigDir(): string {
   switch (process.platform) {
@@ -56,6 +64,11 @@ export function getDefault(): Config {
     custom_command: '',
     theme: '',
     workspace_recovery: true,
+    global_hotkey: 'CommandOrControl+Shift+D',
+    auto_launch: false,
+    auto_update: true,
+    notifications_enabled: true,
+    minimize_to_tray: true,
   };
 }
 
@@ -109,4 +122,55 @@ export function save(config: Config): void {
 export function openConfigDirectory(): void {
   const dir = getConfigDir();
   shell.openPath(dir);
+}
+
+/**
+ * Detect the active color scheme from Windows Terminal settings.
+ * Returns the scheme name (lowercased) if it matches a known built-in theme,
+ * or null if undetectable or unrecognized.
+ */
+export function detectWindowsTerminalTheme(): string | null {
+  if (process.platform !== 'win32') return null;
+
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) return null;
+
+  // Windows Terminal (Store) settings path
+  const wtSettingsPath = join(
+    localAppData,
+    'Packages',
+    'Microsoft.WindowsTerminal_8wekyb3d8bbwe',
+    'LocalState',
+    'settings.json',
+  );
+
+  // Also check Windows Terminal Preview and unpackaged installations
+  const candidates = [
+    wtSettingsPath,
+    join(localAppData, 'Packages', 'Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe', 'LocalState', 'settings.json'),
+    join(localAppData, 'Microsoft', 'Windows Terminal', 'settings.json'),
+  ];
+
+  for (const settingsPath of candidates) {
+    if (!existsSync(settingsPath)) continue;
+
+    try {
+      const raw = readFileSync(settingsPath, 'utf-8');
+      // Windows Terminal settings can contain comments; strip single-line comments
+      const cleaned = raw.replace(/^\s*\/\/.*$/gm, '');
+      const settings = JSON.parse(cleaned) as {
+        profiles?: { defaults?: { colorScheme?: string } };
+      };
+
+      const schemeName = settings?.profiles?.defaults?.colorScheme;
+      if (schemeName && KNOWN_WT_SCHEMES.has(schemeName.toLowerCase())) {
+        return schemeName.toLowerCase();
+      }
+    } catch {
+      // Ignore parse errors; settings.json may have trailing commas or comments
+      continue;
+    }
+  }
+
+  return null;
 }
