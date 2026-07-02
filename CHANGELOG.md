@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 - **Configurable auto-refresh** — set `auto_refresh_seconds` (also in the settings panel) to tune the session-list poll interval, or set it to `0` to turn polling off and refresh only with `r` or reindex
+- **Machine-readable doctor output** — `dispatch doctor --json` prints diagnostics as a single JSON object so scripts and CI can parse them instead of scraping text
 
 ## [v0.13.0] — 2026-06-30
 

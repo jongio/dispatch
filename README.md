@@ -143,6 +143,8 @@ dispatch completion powershell
 
 Run `dispatch doctor` to print setup checks for the config file, session store, session-state directory, and Copilot CLI binary.
 
+Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSON object for scripts and CI.
+
 ### Key Bindings
 
 #### Navigation

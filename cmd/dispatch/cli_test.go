@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -168,6 +169,74 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRunDoctorJSON_Shape(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "session-store.db")
+	if err := os.WriteFile(db, []byte("sqlite"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	t.Setenv("DISPATCH_DB", db)
+	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	var buf bytes.Buffer
+	if err := runDoctorJSON(&buf); err != nil {
+		t.Fatalf("runDoctorJSON: %v", err)
+	}
+
+	var r doctorReport
+	if err := json.Unmarshal(buf.Bytes(), &r); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if r.Version == "" {
+		t.Error("version should be set")
+	}
+	if r.OS == "" {
+		t.Error("os should be set")
+	}
+	if r.SessionStore.Status != statusFound {
+		t.Errorf("session_store status = %q, want %q", r.SessionStore.Status, statusFound)
+	}
+	if r.SessionState.Status != statusFound {
+		t.Errorf("session_state status = %q, want %q", r.SessionState.Status, statusFound)
+	}
+	if !strings.HasSuffix(buf.String(), "}\n") {
+		t.Errorf("JSON output should end with a single newline, got:\n%q", buf.String())
+	}
+}
+
+func TestPathStatus_Cases(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := pathStatus(file, false); got != statusFound {
+		t.Errorf("file wantDir=false: got %q, want %q", got, statusFound)
+	}
+	if got := pathStatus(dir, true); got != statusFound {
+		t.Errorf("dir wantDir=true: got %q, want %q", got, statusFound)
+	}
+	if got := pathStatus(filepath.Join(dir, "nope"), false); got != statusMissing {
+		t.Errorf("missing: got %q, want %q", got, statusMissing)
+	}
+	if got := pathStatus(file, true); got != statusWrongType {
+		t.Errorf("file wantDir=true: got %q, want %q", got, statusWrongType)
+	}
+	if got := pathStatus(dir, false); got != statusWrongType {
+		t.Errorf("dir wantDir=false: got %q, want %q", got, statusWrongType)
+	}
+}
+
+func TestHandleArgs_DoctorJSON(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+	ch <- nil
+
+	done, _, err := handleArgs([]string{"doctor", "--json"}, io.Discard, ch)
+	if err != nil || !done {
+		t.Errorf("expected done=true, no error for doctor --json; got done=%v, err=%v", done, err)
 	}
 }
 
