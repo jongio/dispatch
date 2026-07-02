@@ -69,6 +69,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, nil
 
+		case "stats":
+			if sErr := runStats(os.Stdout, args); sErr != nil {
+				fmt.Fprintf(os.Stderr, "stats: %v\n", sErr)
+				return true, cleanup, sErr
+			}
+			return true, cleanup, nil
+
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -138,7 +145,7 @@ func runCompletion(w io.Writer, shell string) error {
 const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="help version update completion"
+  local commands="help version update completion doctor stats"
   local flags="-h --help -v --version --demo --clear-cache --reindex"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -157,7 +164,7 @@ complete -F _dispatch_completion dispatch disp
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands shells flags
-  commands=(help version update completion)
+  commands=(help version update completion doctor stats)
   shells=(bash zsh powershell)
   flags=(-h --help -v --version --demo --clear-cache --reindex)
 
@@ -175,7 +182,7 @@ _dispatch_completion "$@"
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'update', 'completion')
+$script:DispatchCommands = @('help', 'version', 'update', 'completion', 'doctor', 'stats')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
 $script:DispatchShells = @('bash', 'zsh', 'powershell')
 
