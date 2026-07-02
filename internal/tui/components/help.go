@@ -90,6 +90,8 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("/", "Search", "Esc", "Clear"))
 	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("↑/↓", "Search history", "", ""))
+	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("f", "Filter dirs", "Space", "Toggle item"))
 
 	// Multi-Select

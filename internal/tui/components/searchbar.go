@@ -64,6 +64,11 @@ func (s *SearchBar) SetValue(v string) {
 	s.input.SetValue(v)
 }
 
+// CursorEnd moves the input cursor to the end of the current value.
+func (s *SearchBar) CursorEnd() {
+	s.input.CursorEnd()
+}
+
 // SetResultCount updates the displayed result count.
 func (s *SearchBar) SetResultCount(n int) {
 	s.resultCount = n
