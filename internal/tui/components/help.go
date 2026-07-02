@@ -120,6 +120,8 @@ func (h HelpOverlay) View() string {
 	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("c", "Copy session ID", "y", "Copy preview"))
 	sb.WriteByte('\n')
+	sb.WriteString(shortcutRow("C", "Copy path", "", ""))
+	sb.WriteByte('\n')
 	sb.WriteString(shortcutRow("r", "Rebuild Index", "", ""))
 
 	// Time Range
