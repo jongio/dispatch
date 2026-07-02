@@ -145,6 +145,17 @@ func (m Model) handleFileOpened(msg fileOpenedMsg) (Model, tea.Cmd) {
 	return m, clearStatusAfter(2 * time.Second)
 }
 
+// ----- Directory opened result ---------------------------------------------
+
+func (m Model) handleDirOpened(msg dirOpenedMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = msg.err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.statusInfo = "Opened " + msg.path
+	return m, clearStatusAfter(2 * time.Second)
+}
+
 // ----- Pending click fire (single-click debounce) --------------------------
 
 func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) {
