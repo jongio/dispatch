@@ -46,6 +46,65 @@ func enterKeyMsg() tea.KeyPressMsg {
 
 // --- Tests -------------------------------------------------------------------
 
+func TestApplyInitialQuerySeedsSearchState(t *testing.T) {
+	m := newTestModel()
+
+	cmds := m.applyInitialQuery("repo:dispatch auth")
+
+	if got := m.searchBar.Value(); got != "repo:dispatch auth" {
+		t.Errorf("search bar value = %q, want %q", got, "repo:dispatch auth")
+	}
+	if !m.searchBar.Focused() {
+		t.Error("search bar should be focused after applying an initial query")
+	}
+	if m.filter.Query != "auth" {
+		t.Errorf("filter.Query = %q, want %q", m.filter.Query, "auth")
+	}
+	if m.filter.Repository != "dispatch" {
+		t.Errorf("filter.Repository = %q, want %q", m.filter.Repository, "dispatch")
+	}
+	if !m.search.deepSearchPending {
+		t.Error("deep search should be pending after applying an initial query")
+	}
+	if len(cmds) == 0 {
+		t.Error("applyInitialQuery should return commands (focus + deep-search timer)")
+	}
+}
+
+func TestNewModelWithQuerySetsInitialQuery(t *testing.T) {
+	m := NewModelWithQuery("hello world")
+	defer m.closeStore()
+
+	if m.initialQuery != "hello world" {
+		t.Errorf("initialQuery = %q, want %q", m.initialQuery, "hello world")
+	}
+}
+
+func TestStoreOpenedAppliesInitialQuery(t *testing.T) {
+	m := newTestModel()
+	m.state = stateLoading
+	m.initialQuery = "seattle"
+
+	result, cmd := m.Update(storeOpenedMsg{store: nil})
+	rm := result.(Model)
+
+	if rm.state != stateSessionList {
+		t.Errorf("state = %v, want stateSessionList", rm.state)
+	}
+	if rm.filter.Query != "seattle" {
+		t.Errorf("filter.Query = %q, want %q", rm.filter.Query, "seattle")
+	}
+	if rm.initialQuery != "" {
+		t.Errorf("initialQuery should be cleared after applying, got %q", rm.initialQuery)
+	}
+	if !rm.searchBar.Focused() {
+		t.Error("search bar should be focused after an initial query is applied")
+	}
+	if cmd == nil {
+		t.Error("storeOpenedMsg with an initial query should return commands")
+	}
+}
+
 func TestEscapeFromSearchPreservesQuery(t *testing.T) {
 	m := newTestModel()
 

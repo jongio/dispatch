@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Search query argument** — pass a search string on the command line (`dispatch auth` or `dispatch fix auth bug`) to launch the TUI with the search box pre-filled and the list already filtered
+
 ## [v0.13.0] — 2026-06-30
 
 ### Added

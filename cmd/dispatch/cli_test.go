@@ -22,7 +22,7 @@ func TestHandleArgs_Help(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil // no update available
 
-	done, cleanup, err := handleArgs([]string{"--help"}, io.Discard, ch)
+	done, cleanup, _, err := handleArgs([]string{"--help"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestHandleArgs_HelpShort(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, _, err := handleArgs([]string{"-h"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"-h"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for -h; got done=%v, err=%v", done, err)
 	}
@@ -48,7 +48,7 @@ func TestHandleArgs_HelpCommand(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, _, err := handleArgs([]string{"help"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"help"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for help; got done=%v, err=%v", done, err)
 	}
@@ -58,7 +58,7 @@ func TestHandleArgs_Version(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, _, err := handleArgs([]string{"--version"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--version"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for --version; got done=%v, err=%v", done, err)
 	}
@@ -68,7 +68,7 @@ func TestHandleArgs_VersionShort(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, _, err := handleArgs([]string{"-v"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"-v"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for -v; got done=%v, err=%v", done, err)
 	}
@@ -78,7 +78,7 @@ func TestHandleArgs_VersionCommand(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, _, err := handleArgs([]string{"version"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"version"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for version; got done=%v, err=%v", done, err)
 	}
@@ -120,7 +120,7 @@ func TestRunCompletion_UnsupportedShell(t *testing.T) {
 func TestHandleArgs_Completion(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, cleanup, err := handleArgs([]string{"completion", "bash"}, io.Discard, ch)
+	done, cleanup, _, err := handleArgs([]string{"completion", "bash"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestHandleArgs_Completion(t *testing.T) {
 func TestHandleArgs_CompletionMissingShell(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"completion"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"completion"}, io.Discard, ch)
 	if err == nil {
 		t.Fatal("expected error for missing shell")
 	}
@@ -175,7 +175,7 @@ func TestHandleArgs_Doctor(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
 
-	done, cleanup, err := handleArgs([]string{"doctor"}, io.Discard, ch)
+	done, cleanup, _, err := handleArgs([]string{"doctor"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestHandleArgs_Doctor(t *testing.T) {
 func TestHandleArgs_UnknownFlag(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--unknown"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--unknown"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error for unknown flag")
 	}
@@ -205,7 +205,7 @@ func TestHandleArgs_UnknownFlag(t *testing.T) {
 func TestHandleArgs_NoArgs(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, cleanup, err := handleArgs(nil, io.Discard, ch)
+	done, cleanup, _, err := handleArgs(nil, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,10 +217,58 @@ func TestHandleArgs_NoArgs(t *testing.T) {
 	}
 }
 
+func TestHandleArgs_SingleQuery(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, cleanup, query, err := handleArgs([]string{"auth"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if done {
+		t.Error("expected done=false for a search query")
+	}
+	if cleanup != nil {
+		t.Error("expected cleanup=nil for a search query")
+	}
+	if query != "auth" {
+		t.Errorf("query = %q, want %q", query, "auth")
+	}
+}
+
+func TestHandleArgs_MultiWordQuery(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, _, query, err := handleArgs([]string{"fix", "auth", "bug"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if done {
+		t.Error("expected done=false for a multi-word query")
+	}
+	if query != "fix auth bug" {
+		t.Errorf("query = %q, want %q", query, "fix auth bug")
+	}
+}
+
+func TestHandleArgs_QueryDoesNotShadowSubcommands(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+	ch <- nil
+
+	// A known subcommand must still short-circuit even though it is a bare
+	// non-flag token that could otherwise look like a query.
+	done, _, query, err := handleArgs([]string{"version"}, io.Discard, ch)
+	if err != nil || !done {
+		t.Errorf("expected done=true, no error for version; got done=%v, err=%v", done, err)
+	}
+	if query != "" {
+		t.Errorf("query should be empty for a subcommand, got %q", query)
+	}
+}
+
 func TestHandleArgs_ClearCache(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--clear-cache"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--clear-cache"}, io.Discard, ch)
 	// config.Reset may succeed or fail depending on environment.
 	// Either way, done should be true.
 	if !done {
@@ -253,7 +301,7 @@ func TestHandleArgs_DemoFromRepoRoot(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, cleanup, err := handleArgs([]string{"--demo"}, io.Discard, ch)
+	done, cleanup, _, err := handleArgs([]string{"--demo"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("--demo from repo root should succeed: %v", err)
 	}
@@ -275,7 +323,7 @@ func TestHandleArgs_DemoNotFound(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--demo"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--demo"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error when demo DB not found")
 	}
@@ -291,7 +339,7 @@ func TestHandleArgs_HelpWithUpdate(t *testing.T) {
 		LatestVersion:  "2.0.0",
 	}
 
-	done, _, err := handleArgs([]string{"--help"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--help"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -307,7 +355,7 @@ func TestHandleArgs_VersionWithUpdate(t *testing.T) {
 		LatestVersion:  "2.0.0",
 	}
 
-	done, _, err := handleArgs([]string{"--version"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--version"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -331,7 +379,7 @@ func TestHandleArgs_Reindex_CopilotNotFound(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -350,7 +398,7 @@ func TestHandleArgs_Reindex_OtherError(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error for non-CopilotNotFound reindex failure")
 	}
@@ -374,7 +422,7 @@ func TestHandleArgs_Reindex_MaintainError(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error when maintain fails")
 	}
@@ -399,7 +447,7 @@ func TestHandleArgs_Reindex_Success(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -415,7 +463,7 @@ func TestHandleArgs_UpdateSuccess(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"update"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"update"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -431,7 +479,7 @@ func TestHandleArgs_UpdateError(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"update"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"update"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error for failed update")
 	}
@@ -447,7 +495,7 @@ func TestHandleArgs_ClearCacheError(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--clear-cache"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--clear-cache"}, io.Discard, ch)
 	if err == nil {
 		t.Error("expected error for failed config reset")
 	}
@@ -481,7 +529,7 @@ func TestHandleArgs_Reindex_PostMaintainWarning(t *testing.T) {
 
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
+	done, _, _, err := handleArgs([]string{"--reindex"}, io.Discard, ch)
 	// The post-reindex maintain warning is non-fatal, so handleArgs should
 	// still succeed.
 	if err != nil {
