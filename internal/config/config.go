@@ -52,7 +52,7 @@ type NamedView struct {
 	// SortOrder is the sort direction ("asc" or "desc").
 	SortOrder string `json:"sort_order,omitempty"`
 
-	// Pivot is the grouping mode (e.g. "none", "folder", "repo", "branch", "date").
+	// Pivot is the grouping mode (e.g. "none", "folder", "repo", "branch", "date", "host").
 	Pivot string `json:"pivot,omitempty"`
 
 	// FavoritesOnly restricts the list to favorited sessions.
@@ -93,7 +93,7 @@ func (v *NamedView) Validate() error {
 	}
 	if v.Pivot != "" {
 		switch v.Pivot {
-		case PivotNone, PivotFolder, PivotRepo, PivotBranch, PivotDate:
+		case PivotNone, PivotFolder, PivotRepo, PivotBranch, PivotDate, PivotHost:
 		default:
 			return fmt.Errorf("named view %q: invalid pivot %q", v.Name, v.Pivot)
 		}
@@ -128,7 +128,7 @@ type Config struct {
 	DefaultSortOrder string `json:"default_sort_order,omitempty"`
 
 	// DefaultPivot is the default grouping applied to session lists.
-	// Valid values: "none", "folder", "repo", "branch", "date".
+	// Valid values: "none", "folder", "repo", "branch", "date", "host".
 	DefaultPivot string `json:"default_pivot"`
 
 	// ShowPreview controls whether the detail/preview panel is visible.
@@ -331,6 +331,7 @@ const (
 	PivotRepo   = "repo"
 	PivotBranch = "branch"
 	PivotDate   = "date"
+	PivotHost   = "host"
 )
 
 // EffectivePaneDirection returns the configured pane direction, defaulting

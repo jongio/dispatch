@@ -56,6 +56,7 @@ func TestPivotFieldFromString(t *testing.T) {
 		{"repo", data.PivotByRepo},
 		{"branch", data.PivotByBranch},
 		{"date", data.PivotByDate},
+		{"host", data.PivotByHost},
 		{"none", data.PivotByFolder}, // unknown → folder
 		{"", data.PivotByFolder},
 		{"unknown", data.PivotByFolder},
@@ -755,7 +756,7 @@ func TestCyclePivot(t *testing.T) {
 	m := newTestModel()
 	m.pivot = pivotNone
 
-	expected := []string{pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotNone}
+	expected := []string{pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotHost, pivotNone}
 	for _, exp := range expected {
 		m.cyclePivot()
 		if m.pivot != exp {
