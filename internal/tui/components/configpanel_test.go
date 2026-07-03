@@ -161,6 +161,21 @@ func TestConfigPanel_HandleEnter_WorkspaceRecoveryToggle(t *testing.T) {
 	}
 }
 
+func TestConfigPanel_HandleEnter_NotifyOnWaitingToggle(t *testing.T) {
+	t.Parallel()
+	cp := NewConfigPanel()
+	cp.SetValues(ConfigValues{NotifyOnWaiting: true})
+	cp.cursor = cfgNotifyOnWaiting
+	cp.HandleEnter()
+	if cp.Values().NotifyOnWaiting {
+		t.Error("HandleEnter on notifyOnWaiting should toggle to false")
+	}
+	cp.HandleEnter()
+	if !cp.Values().NotifyOnWaiting {
+		t.Error("second HandleEnter on notifyOnWaiting should toggle back to true")
+	}
+}
+
 func TestConfigPanel_HandleEnter_PreviewPositionCycle(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()

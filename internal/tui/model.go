@@ -370,6 +370,14 @@ type Model struct {
 	attentionMap    map[string]data.AttentionStatus
 	attentionFilter map[data.AttentionStatus]struct{} // when non-empty, only show sessions with matching status
 
+	// Waiting notification tracking. waitingNotified holds the IDs of
+	// sessions currently in the waiting state that have already triggered a
+	// bell, so re-entering waiting notifies again but a steady waiting state
+	// does not. attentionScanned becomes true after the first scan so the
+	// initial population never rings the bell.
+	waitingNotified  map[string]struct{}
+	attentionScanned bool
+
 	// Plan status tracking — scanned from session-state directories.
 	planMap     map[string]bool
 	filterPlans bool // when true, only show sessions with a plan.md file
@@ -412,6 +420,7 @@ func NewModel() Model {
 		RedactSecrets:     cfg.RedactPreviewSecrets,
 		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
 		AutoRefresh:       autoRefreshFieldValue(cfg.AutoRefreshSeconds),
+		NotifyOnWaiting:   cfg.NotifyOnWaiting,
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -469,6 +478,7 @@ func NewModel() Model {
 		compareView:     components.NewCompareView(),
 		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
+		waitingNotified: make(map[string]struct{}),
 		dbWatchCh:       make(chan struct{}, 1),
 	}
 
@@ -1174,6 +1184,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			RedactSecrets:     m.cfg.RedactPreviewSecrets,
 			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
 			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
+			NotifyOnWaiting:   m.cfg.NotifyOnWaiting,
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -1956,6 +1967,7 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.ExcludedWords = parseExcludedWords(v.ExcludedWords)
 	m.filter.ExcludedWords = m.cfg.ExcludedWords
 	m.cfg.AutoRefreshSeconds = parseAutoRefresh(v.AutoRefresh)
+	m.cfg.NotifyOnWaiting = v.NotifyOnWaiting
 	resolveTheme(m.cfg)
 	// If the user switched back to "auto", re-apply with the detected
 	// terminal brightness so colours adapt immediately.

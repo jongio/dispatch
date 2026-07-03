@@ -37,7 +37,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
-- **Settings panel** (`,`) — 12 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Excluded Words
+- **Settings panel** (`,`) — 15 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
 - **Help overlay** (`?`) — two-column grouped keyboard shortcuts
@@ -303,6 +303,7 @@ Configuration is stored in the platform-specific config directory:
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
+| `notify_on_waiting` | bool | `false` | Ring the terminal bell and show a footer message when a session enters the waiting state |
 | `auto_refresh_seconds` | int | *(unset)* | Session-list poll interval in seconds. Unset uses the default (2s); `0` disables polling; a positive value sets the interval (minimum 1s). Applies on next launch |
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
 | `workspace_recovery` | bool | `true` | Detect sessions interrupted by crash/reboot |
@@ -345,6 +346,7 @@ When `launch_mode` is `"pane"`, the `pane_direction` value maps to Windows Termi
   "excluded_dirs": [],
   "theme": "auto",
   "workspace_recovery": true,
+  "notify_on_waiting": false,
   "ai_search": false,
   "hiddenSessions": [],
   "favoriteSessions": []

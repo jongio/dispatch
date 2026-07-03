@@ -212,6 +212,12 @@ type Config struct {
 	// instead of "waiting" or "active". Default is "15m".
 	AttentionThreshold string `json:"attention_threshold,omitempty"`
 
+	// NotifyOnWaiting rings the terminal bell and shows a footer message when
+	// a session enters the waiting state (the AI has responded and is waiting
+	// for user input). The bell fires once per transition into waiting, not on
+	// every scan and not for sessions already waiting when dispatch starts.
+	NotifyOnWaiting bool `json:"notify_on_waiting,omitempty"`
+
 	// Theme is the active color scheme name.  "auto" (or empty) means
 	// detect from the terminal; any other value is looked up in Schemes
 	// and then the built-in scheme list.
