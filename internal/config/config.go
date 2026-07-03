@@ -218,6 +218,13 @@ type Config struct {
 	// every scan and not for sessions already waiting when dispatch starts.
 	NotifyOnWaiting bool `json:"notify_on_waiting,omitempty"`
 
+	// Keybindings remaps keyboard shortcuts. Keys are action names (see the
+	// README for the full list, e.g. "search", "quit", "preview") and values
+	// are comma-separated key lists (e.g. "/,ctrl+f"). Listed actions replace
+	// their default keys; unlisted actions keep their defaults. Unknown action
+	// names and keys that collide with another action are ignored.
+	Keybindings map[string]string `json:"keybindings,omitempty"`
+
 	// Theme is the active color scheme name.  "auto" (or empty) means
 	// detect from the terminal; any other value is looked up in Schemes
 	// and then the built-in scheme list.

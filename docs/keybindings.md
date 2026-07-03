@@ -2,6 +2,12 @@
 # Dispatch TUI (Bubble Tea v2 Go Application)
 # Directory: internal\tui
 
+> **Customizing keybindings:** The keys below are the defaults. You can remap any
+> of them with the `keybindings` object in `config.json`. Each entry maps an
+> action name to a comma-separated key list, for example `"search": "/,ctrl+f"`.
+> See the "Customizing Keybindings" section of the README for the full list of
+> action names and the rules for conflict handling.
+
 ## KEYBOARD SHORTCUTS - GLOBAL (Always Available)
 
 ### Force Quit (Works in All States)
