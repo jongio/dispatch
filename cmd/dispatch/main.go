@@ -92,7 +92,7 @@ Commands:
   version                 Print the version
   open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
   completion <shell>      Print shell completion (bash, zsh, powershell)
-  doctor                  Print environment diagnostics
+  doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   update                  Update dispatch to the latest release
 

@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/jongio/dispatch/internal/config"
@@ -65,7 +67,14 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, nil
 
 		case "doctor":
-			runDoctor(os.Stdout)
+			if slices.Contains(args, "--json") {
+				if jErr := runDoctorJSON(os.Stdout); jErr != nil {
+					fmt.Fprintf(os.Stderr, "doctor: %v\n", jErr)
+					return true, cleanup, jErr
+				}
+			} else {
+				runDoctor(os.Stdout)
+			}
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, nil
 
@@ -207,56 +216,136 @@ Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
 }
 `
 
+// doctorStatus values describe the result of a single diagnostic path check.
+const (
+	statusFound     = "found"
+	statusMissing   = "missing"
+	statusWrongType = "wrong_type"
+	statusError     = "error"
+)
+
+// doctorEntry is the diagnostic result for one path. The err field is used
+// only by the text renderer and is not serialized to JSON.
+type doctorEntry struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+	err    error
+}
+
+// doctorReport is the full set of diagnostics gathered by the doctor command.
+// Both the text and JSON renderers consume this struct so their outputs stay
+// in sync.
+type doctorReport struct {
+	Version      string      `json:"version"`
+	OS           string      `json:"os"`
+	Config       doctorEntry `json:"config"`
+	SessionStore doctorEntry `json:"session_store"`
+	SessionState doctorEntry `json:"session_state"`
+	CopilotCLI   doctorEntry `json:"copilot_cli"`
+}
+
+// collectDoctorReport gathers the environment diagnostics once so they can be
+// rendered as text or JSON without drifting apart.
+func collectDoctorReport() doctorReport {
+	r := doctorReport{
+		Version: version.Version,
+		OS:      runtime.GOOS + "/" + runtime.GOARCH,
+	}
+
+	if p, err := config.ConfigPath(); err != nil {
+		r.Config = doctorEntry{Status: statusError, err: err}
+	} else {
+		r.Config = doctorEntry{Path: p, Status: pathStatus(p, false)}
+	}
+
+	if p, err := platform.SessionStorePath(); err != nil {
+		r.SessionStore = doctorEntry{Status: statusError, err: err}
+	} else {
+		r.SessionStore = doctorEntry{Path: p, Status: pathStatus(p, false)}
+	}
+
+	if p := data.SessionStatePath(); p == "" {
+		r.SessionState = doctorEntry{Status: statusMissing}
+	} else {
+		r.SessionState = doctorEntry{Path: p, Status: pathStatus(p, true)}
+	}
+
+	if p := platform.FindCLIBinary(); p == "" {
+		r.CopilotCLI = doctorEntry{Status: statusMissing}
+	} else {
+		r.CopilotCLI = doctorEntry{Path: p, Status: statusFound}
+	}
+
+	return r
+}
+
+// pathStatus stats a path and reports whether it is found, missing, or the
+// wrong type (a file where a directory is expected, or vice versa).
+func pathStatus(path string, wantDir bool) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return statusMissing
+	}
+	if wantDir != info.IsDir() {
+		return statusWrongType
+	}
+	return statusFound
+}
+
 func runDoctor(w io.Writer) {
 	if w == nil {
 		w = io.Discard
 	}
 
+	r := collectDoctorReport()
+
 	fmt.Fprintf(w, "Dispatch doctor\n")
-	fmt.Fprintf(w, "Version: %s\n", version.Version)
-	fmt.Fprintf(w, "OS: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(w, "Version: %s\n", r.Version)
+	fmt.Fprintf(w, "OS: %s\n", r.OS)
 	fmt.Fprintf(w, "\n")
 
-	if p, err := config.ConfigPath(); err != nil {
-		fmt.Fprintf(w, "Config: error: %v\n", err)
-	} else {
-		printPathStatus(w, "Config", p, false)
-	}
-
-	if p, err := platform.SessionStorePath(); err != nil {
-		fmt.Fprintf(w, "Session store: error: %v\n", err)
-	} else {
-		printPathStatus(w, "Session store", p, false)
-	}
-
-	if p := data.SessionStatePath(); p == "" {
-		fmt.Fprintf(w, "Session state: missing\n")
-	} else {
-		printPathStatus(w, "Session state", p, true)
-	}
-
-	if p := platform.FindCLIBinary(); p == "" {
-		fmt.Fprintf(w, "Copilot CLI: missing\n")
-	} else {
-		fmt.Fprintf(w, "Copilot CLI: found (%s)\n", p)
-	}
+	writeDoctorLine(w, "Config", r.Config, false)
+	writeDoctorLine(w, "Session store", r.SessionStore, false)
+	writeDoctorLine(w, "Session state", r.SessionState, true)
+	writeDoctorLine(w, "Copilot CLI", r.CopilotCLI, false)
 }
 
-func printPathStatus(w io.Writer, label, path string, wantDir bool) {
-	info, err := os.Stat(path)
+// runDoctorJSON writes the diagnostics as a single JSON object followed by a
+// newline.
+func runDoctorJSON(w io.Writer) error {
+	if w == nil {
+		w = io.Discard
+	}
+	b, err := json.MarshalIndent(collectDoctorReport(), "", "  ")
 	if err != nil {
-		fmt.Fprintf(w, "%s: missing (%s)\n", label, path)
+		return err
+	}
+	fmt.Fprintf(w, "%s\n", b)
+	return nil
+}
+
+// writeDoctorLine renders one diagnostic entry as human-readable text.
+func writeDoctorLine(w io.Writer, label string, e doctorEntry, wantDir bool) {
+	if e.err != nil {
+		fmt.Fprintf(w, "%s: error: %v\n", label, e.err)
 		return
 	}
-	if wantDir && !info.IsDir() {
-		fmt.Fprintf(w, "%s: wrong type, expected directory (%s)\n", label, path)
-		return
+	switch e.Status {
+	case statusMissing:
+		if e.Path == "" {
+			fmt.Fprintf(w, "%s: missing\n", label)
+		} else {
+			fmt.Fprintf(w, "%s: missing (%s)\n", label, e.Path)
+		}
+	case statusWrongType:
+		if wantDir {
+			fmt.Fprintf(w, "%s: wrong type, expected directory (%s)\n", label, e.Path)
+		} else {
+			fmt.Fprintf(w, "%s: wrong type, expected file (%s)\n", label, e.Path)
+		}
+	default:
+		fmt.Fprintf(w, "%s: found (%s)\n", label, e.Path)
 	}
-	if !wantDir && info.IsDir() {
-		fmt.Fprintf(w, "%s: wrong type, expected file (%s)\n", label, path)
-		return
-	}
-	fmt.Fprintf(w, "%s: found (%s)\n", label, path)
 }
 
 // setupLogRedirect opens the log file (if configured via DISPATCH_LOG) and
