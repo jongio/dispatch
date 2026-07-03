@@ -141,6 +141,21 @@ dispatch fix auth bug
 7. Press `s` to cycle sort fields, `S` to flip direction
 8. Press `,` to open settings — change theme, launch mode, model, and more
 
+### Resume a session
+
+Resume a session without opening the TUI:
+
+```sh
+dispatch open <session-id>       # resume a specific session by ID
+dispatch open --last             # resume the most recently active session
+```
+
+Both accept `--mode` to override the launch mode for that one resume (`inplace`, `tab`, `window`, `pane`):
+
+```sh
+dispatch open --last --mode window
+```
+
 ### Shell Completion
 
 Print completion scripts for supported shells:
