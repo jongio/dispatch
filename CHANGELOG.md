@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Machine-readable doctor output** — `dispatch doctor --json` prints diagnostics as a single JSON object so scripts and CI can parse them instead of scraping text
 - **Search query argument** — pass a search string on the command line (`dispatch auth` or `dispatch fix auth bug`) to launch the TUI with the search box pre-filled and the list already filtered
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer, Finder, or the Linux file manager)
+- **Bulk hide and favorite** — with sessions marked via `Space`, `h` and `*` now apply to the whole selection instead of just the cursor session
 
 ## [v0.13.0] — 2026-06-30
 
