@@ -118,6 +118,13 @@ The installer also creates a `disp` alias automatically.
 dispatch
 ```
 
+Pass a search term to open with the search box pre-filled and the list already filtered:
+
+```sh
+dispatch auth
+dispatch fix auth bug
+```
+
 ### Example Workflow
 
 1. Run `dispatch` (or `disp`) in your terminal

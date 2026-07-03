@@ -33,7 +33,7 @@ func main() {
 		defer origStderr.Close() //nolint:errcheck // best-effort cleanup
 	}
 
-	done, demoCleanup, err := handleArgs(os.Args[1:], origStderr, updateCh)
+	done, demoCleanup, initialQuery, err := handleArgs(os.Args[1:], origStderr, updateCh)
 	if demoCleanup != nil {
 		defer demoCleanup()
 	}
@@ -67,7 +67,7 @@ func main() {
 	}
 
 	p := tea.NewProgram(
-		tui.NewModel(),
+		tui.NewModelWithQuery(initialQuery),
 	)
 
 	if _, err := p.Run(); err != nil {
@@ -85,6 +85,7 @@ func printUsage() {
 
 Usage:
   dispatch                Launch the interactive TUI
+  dispatch [query]        Launch the TUI with the search box pre-filled
   dispatch [command]
 
 Commands:

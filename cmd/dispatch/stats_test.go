@@ -209,7 +209,7 @@ func TestHandleArgsStats(t *testing.T) {
 	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
 		return sampleSessions(), nil
 	})
-	done, _, err := handleArgs([]string{"stats", "--json"}, &bytes.Buffer{}, nil)
+	done, _, _, err := handleArgs([]string{"stats", "--json"}, &bytes.Buffer{}, nil)
 	if !done {
 		t.Error("expected done=true for stats")
 	}
