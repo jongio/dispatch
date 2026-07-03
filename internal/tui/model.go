@@ -153,6 +153,98 @@ type searchState struct {
 	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
 	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
 	lastRawInput         string              // last raw search bar text (for change detection)
+	history              []string            // committed search queries, oldest last (for up/down recall)
+	historyIdx           int                 // recall cursor into history; == len(history) means not navigating
+}
+
+// maxSearchHistory caps how many recent queries are retained for up/down recall.
+const maxSearchHistory = 20
+
+// pushHistory records a committed query for later recall. Blank queries are
+// ignored. Duplicates are collapsed so the same query never appears twice, and
+// the most recent entry is kept at the end. The recall cursor is reset to the
+// end (not navigating) after every push.
+func (s *searchState) pushHistory(q string) {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		s.historyIdx = len(s.history)
+		return
+	}
+	// Drop any earlier identical entry so recall order stays useful.
+	for i, h := range s.history {
+		if h == q {
+			s.history = append(s.history[:i], s.history[i+1:]...)
+			break
+		}
+	}
+	s.history = append(s.history, q)
+	if len(s.history) > maxSearchHistory {
+		s.history = s.history[len(s.history)-maxSearchHistory:]
+	}
+	s.historyIdx = len(s.history)
+}
+
+// recallPrev steps to the previous (older) history entry and returns it. The
+// bool is false when there is no history to recall.
+func (s *searchState) recallPrev() (string, bool) {
+	if len(s.history) == 0 {
+		return "", false
+	}
+	if s.historyIdx > 0 {
+		s.historyIdx--
+	}
+	return s.history[s.historyIdx], true
+}
+
+// recallNext steps to the next (newer) history entry and returns it. When the
+// cursor moves past the newest entry it returns an empty string so the caller
+// can clear the input. The bool is false when there is no history to recall.
+func (s *searchState) recallNext() (string, bool) {
+	if len(s.history) == 0 {
+		return "", false
+	}
+	if s.historyIdx < len(s.history) {
+		s.historyIdx++
+	}
+	if s.historyIdx >= len(s.history) {
+		return "", true
+	}
+	return s.history[s.historyIdx], true
+}
+
+// triggerSearch reacts to a new search bar value: it records the raw input,
+// parses structured tokens, kicks off the quick reload, and schedules the
+// debounced deep and Copilot SDK searches. inputCmd, when non-nil, is the
+// command returned by the text input update and is batched in first.
+func (m *Model) triggerSearch(inputCmd tea.Cmd) tea.Cmd {
+	newQuery := m.searchBar.Value()
+	m.search.lastRawInput = newQuery
+	// Parse structured tokens from the input.
+	m.searchFilter = ParseSearchTokens(newQuery)
+	m.applySearchTokens()
+	m.filter.DeepSearch = false
+	// Quick search fires immediately; schedule deep search.
+	m.search.deepSearchVersion++
+	m.search.deepSearchPending = true
+	m.searchBar.SetSearching(true)
+
+	cmds := make([]tea.Cmd, 0, 4)
+	if inputCmd != nil {
+		cmds = append(cmds, inputCmd)
+	}
+	cmds = append(cmds, m.loadSessionsCmd(), m.scheduleDeepSearch(m.search.deepSearchVersion))
+
+	// Copilot SDK search is gated by config flag.
+	if m.cfg.AISearch {
+		m.search.copilotSearchVersion++
+		m.searchBar.SetAISearching(false) // reset until tick fires
+		m.searchBar.SetAIResults(0)       // clear stale count
+		m.search.aiSessionIDs = nil
+		m.sessionList.SetAISessions(nil)
+		cmds = append(cmds, m.scheduleCopilotSearch(m.search.copilotSearchVersion))
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // workStatusState groups fields related to work status scanning.
@@ -927,12 +1019,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			// sort, pivot) continue to honour the search term. To clear the
 			// search, press Escape again from the session list.
 			if m.filter.Query != "" || m.searchFilter.HasTokens() {
+				m.search.pushHistory(m.searchBar.Value())
 				m.filter.DeepSearch = true
 				return m, m.loadSessionsCmd()
 			}
 			return m, nil
 		case key.Matches(msg, keys.Enter):
 			m.searchBar.Blur()
+			m.search.pushHistory(m.searchBar.Value())
 			// If deep search hasn't run yet, trigger it now.
 			if m.search.deepSearchPending && (m.filter.Query != "" || m.searchFilter.HasTokens()) {
 				m.search.deepSearchPending = false
@@ -945,6 +1039,24 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.filter.DeepSearch = true
 			}
 			return m, nil
+		case msg.String() == "up":
+			// Recall an older query. Only the literal arrow key triggers
+			// history; the k alias for Up is left to be typed normally.
+			if q, ok := m.search.recallPrev(); ok {
+				m.searchBar.SetValue(q)
+				m.searchBar.CursorEnd()
+				return m, m.triggerSearch(nil)
+			}
+			return m, nil
+		case msg.String() == "down":
+			// Recall a newer query, clearing the input when moving past the
+			// most recent entry. The j alias for Down is left to typing.
+			if q, ok := m.search.recallNext(); ok {
+				m.searchBar.SetValue(q)
+				m.searchBar.CursorEnd()
+				return m, m.triggerSearch(nil)
+			}
+			return m, nil
 		default:
 			// All other keys (including j/k which alias Up/Down) are
 			// forwarded to the search text input so they appear as typed
@@ -955,29 +1067,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.searchBar = sb
 			newQuery := m.searchBar.Value()
 			if newQuery != m.search.lastRawInput {
-				m.search.lastRawInput = newQuery
-				// Parse structured tokens from the input.
-				m.searchFilter = ParseSearchTokens(newQuery)
-				m.applySearchTokens()
-				m.filter.DeepSearch = false
-				// Quick search fires immediately; schedule deep search.
-				m.search.deepSearchVersion++
-				m.search.deepSearchPending = true
-				m.searchBar.SetSearching(true)
-
-				cmds := []tea.Cmd{cmd, m.loadSessionsCmd(), m.scheduleDeepSearch(m.search.deepSearchVersion)}
-
-				// Copilot SDK search is gated by config flag.
-				if m.cfg.AISearch {
-					m.search.copilotSearchVersion++
-					m.searchBar.SetAISearching(false) // reset until tick fires
-					m.searchBar.SetAIResults(0)       // clear stale count
-					m.search.aiSessionIDs = nil
-					m.sessionList.SetAISessions(nil)
-					cmds = append(cmds, m.scheduleCopilotSearch(m.search.copilotSearchVersion))
-				}
-
-				return m, tea.Batch(cmds...)
+				return m, m.triggerSearch(cmd)
 			}
 			return m, cmd
 		}
@@ -1006,6 +1096,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.filter.DeepSearch = false
 			m.searchFilter = SearchFilter{}
 			m.search.lastRawInput = ""
+			m.search.historyIdx = len(m.search.history)
 			m.clearSearchTokenFilters()
 			m.searchBar.SetValue("")
 			m.searchBar.SetSearching(false)
