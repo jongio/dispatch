@@ -10,12 +10,12 @@
     "test": "astro check && astro build"
   },
   "dependencies": {
-    "astro": "^7.0.4",
+    "astro": "^7.0.6",
     "marked": "^18.0.5"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.0",
     "typescript": "^6.0.3"
   },
   "overrides": {
