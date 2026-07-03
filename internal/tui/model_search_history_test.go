@@ -83,25 +83,6 @@ func TestSearchStateHistoryDedupAndCap(t *testing.T) {
 	}
 }
 
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	neg := i < 0
-	if neg {
-		i = -i
-	}
-	var b []byte
-	for i > 0 {
-		b = append([]byte{byte('0' + i%10)}, b...)
-		i /= 10
-	}
-	if neg {
-		b = append([]byte{'-'}, b...)
-	}
-	return string(b)
-}
-
 func TestSearchHistoryRecallViaKeys(t *testing.T) {
 	m := newTestModel()
 
