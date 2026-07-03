@@ -103,23 +103,23 @@ func TestLaunchStyleForOpenMode(t *testing.T) {
 // withOpenStubs swaps the package test seams and returns a restore func.
 func withOpenStubs(t *testing.T, cfg *config.Config, sess *data.Session, getErr error) *openCapture {
 	t.Helper()
-	cap := &openCapture{}
+	capture := &openCapture{}
 	origCfg, origGet, origLaunch := openLoadConfigFn, openGetSessionFn, openLaunchFn
 	openLoadConfigFn = func() (*config.Config, error) { return cfg, nil }
 	openGetSessionFn = func(id string) (*data.Session, error) {
-		cap.gotID = id
+		capture.gotID = id
 		return sess, getErr
 	}
 	openLaunchFn = func(_ io.Writer, c *config.Config, s *data.Session, mode string) error {
-		cap.launched = true
-		cap.mode = mode
-		cap.session = s
+		capture.launched = true
+		capture.mode = mode
+		capture.session = s
 		return nil
 	}
 	t.Cleanup(func() {
 		openLoadConfigFn, openGetSessionFn, openLaunchFn = origCfg, origGet, origLaunch
 	})
-	return cap
+	return capture
 }
 
 type openCapture struct {
@@ -133,19 +133,19 @@ func TestRunOpen_HappyPath(t *testing.T) {
 	cfg := config.Default()
 	cfg.LaunchMode = config.LaunchModeTab
 	sess := &data.Session{ID: "sess-1", Cwd: "/tmp/project"}
-	cap := withOpenStubs(t, cfg, sess, nil)
+	capture := withOpenStubs(t, cfg, sess, nil)
 
 	if err := runOpen(io.Discard, []string{"open", "sess-1", "--mode", "window"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cap.gotID != "sess-1" {
-		t.Errorf("looked up id %q, want sess-1", cap.gotID)
+	if capture.gotID != "sess-1" {
+		t.Errorf("looked up id %q, want sess-1", capture.gotID)
 	}
-	if !cap.launched {
+	if !capture.launched {
 		t.Fatal("expected launch to be invoked")
 	}
-	if cap.mode != config.LaunchModeWindow {
-		t.Errorf("launched mode = %q, want %q", cap.mode, config.LaunchModeWindow)
+	if capture.mode != config.LaunchModeWindow {
+		t.Errorf("launched mode = %q, want %q", capture.mode, config.LaunchModeWindow)
 	}
 }
 
