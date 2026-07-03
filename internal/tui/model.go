@@ -137,6 +137,7 @@ const (
 	pivotRepo   = "repo"
 	pivotBranch = "branch"
 	pivotDate   = "date"
+	pivotHost   = "host"
 )
 
 // ---------------------------------------------------------------------------
@@ -199,7 +200,7 @@ type Model struct {
 	filter     data.FilterOptions
 	sort       data.SortOptions
 	timeRange  string         // "1h", "1d", "7d", "all"
-	pivot      string         // "none", "folder", "repo", "branch", "date"
+	pivot      string         // "none", "folder", "repo", "branch", "date", "host"
 	pivotOrder data.SortOrder // group header sort direction
 
 	// Loaded data.
@@ -2858,7 +2859,7 @@ func (m *Model) toggleSortOrder() {
 	m.saveConfig()
 }
 
-var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate}
+var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotHost}
 
 func (m *Model) cyclePivot() {
 	for i, p := range pivotModes {
@@ -4012,6 +4013,8 @@ func pivotFieldFromString(s string) data.PivotField {
 		return data.PivotByBranch
 	case pivotDate:
 		return data.PivotByDate
+	case pivotHost:
+		return data.PivotByHost
 	default:
 		return data.PivotByFolder
 	}

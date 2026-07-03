@@ -497,8 +497,8 @@ func TestCovCyclePivotFullCycle(t *testing.T) {
 	m := newTestModel()
 	m.pivot = pivotNone
 
-	// pivotModes = [none, folder, repo, branch, date]
-	expected := []string{pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotNone}
+	// pivotModes = [none, folder, repo, branch, date, host]
+	expected := []string{pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotHost, pivotNone}
 	for _, exp := range expected {
 		m.cyclePivot()
 		if m.pivot != exp {

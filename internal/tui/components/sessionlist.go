@@ -107,7 +107,7 @@ func (s *SessionList) SetGroups(groups []data.SessionGroup) {
 }
 
 // SetPivotField stores the current pivot mode so that group header icons
-// reflect the active grouping dimension (folder, repo, branch, date).
+// reflect the active grouping dimension (folder, repo, branch, date, host).
 func (s *SessionList) SetPivotField(pivot string) {
 	s.pivotField = pivot
 }
@@ -697,6 +697,9 @@ func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
 	}
 
 	folder := AbbrevHome(item.folderPath)
+	if s.pivotField == "host" {
+		folder = hostGroupLabel(item.folderPath)
+	}
 	count := strconv.Itoa(item.count)
 
 	prefix := " " + arrow + " "
@@ -714,6 +717,21 @@ func (s SessionList) renderFolderRow(item displayItem, selected bool) string {
 		return styles.SelectedStyle.Render(PadToWidth(line, s.width))
 	}
 	return styles.GroupHeaderStyle.Render(PadToWidth(line, s.width))
+}
+
+// hostGroupLabel maps a raw host type value to a readable group label for the
+// host pivot. Empty values fall into a single clearly named group.
+func hostGroupLabel(hostType string) string {
+	switch hostType {
+	case "github":
+		return "GitHub"
+	case "ado":
+		return "Azure DevOps"
+	case "":
+		return "No host"
+	default:
+		return hostType
+	}
 }
 
 func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, aiFound bool, favorited bool) string {
