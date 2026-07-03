@@ -340,6 +340,20 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
+### From the command line
+
+Read and change settings without opening the TUI or editing JSON by hand:
+
+```bash
+dispatch config list            # print every setting and its value
+dispatch config list --json     # same, as a single JSON object
+dispatch config get launch_mode # print one value
+dispatch config set launch_mode window
+dispatch config path            # print the config file path
+```
+
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset.
+
 ### Options
 
 | Key | Type | Default | Description |
