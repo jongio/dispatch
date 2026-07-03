@@ -47,6 +47,7 @@ type keyMap struct {
 	ViewPlan          key.Binding
 	CopyID            key.Binding
 	CopyPath          key.Binding
+	CopyResumeCommand key.Binding
 	CopyPreview       key.Binding
 	ExpandCollapseAll key.Binding
 	ScanWorkStatus    key.Binding
@@ -64,7 +65,7 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.CopyID, k.CopyPath, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -74,7 +75,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
+		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.CmdPalette, k.Quit},
@@ -124,6 +125,7 @@ var keys = keyMap{
 	ViewPlan:          key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view plan")),
 	CopyID:            key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID")),
 	CopyPath:          key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "copy path")),
+	CopyResumeCommand: key.NewBinding(key.WithKeys("Y"), key.WithHelp("Y", "copy resume cmd")),
 	CopyPreview:       key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy preview")),
 	ExpandCollapseAll: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "expand/collapse all")),
 	ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
