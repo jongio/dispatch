@@ -167,18 +167,14 @@ func TestApplyKeybindingOverrides_DoesNotMutateBase(t *testing.T) {
 }
 
 func TestKeybindingActionNames(t *testing.T) {
-	names := keybindingActionNames()
 	km := defaultKeyMap()
-	want := len(keybindingEntries(&km))
-	if len(names) != want {
-		t.Errorf("action name count = %d, want %d", len(names), want)
-	}
+	entries := keybindingEntries(&km)
 	seen := make(map[string]struct{})
-	for _, n := range names {
-		if _, dup := seen[n]; dup {
-			t.Errorf("duplicate action name %q", n)
+	for _, e := range entries {
+		if _, dup := seen[e.name]; dup {
+			t.Errorf("duplicate action name %q", e.name)
 		}
-		seen[n] = struct{}{}
+		seen[e.name] = struct{}{}
 	}
 	for _, required := range []string{"search", "quit", "preview", "filter"} {
 		if _, ok := seen[required]; !ok {

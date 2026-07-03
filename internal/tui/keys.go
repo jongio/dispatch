@@ -224,17 +224,6 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 	}
 }
 
-// keybindingActionNames returns the remappable action names in display order.
-func keybindingActionNames() []string {
-	km := defaultKeyMap()
-	entries := keybindingEntries(&km)
-	names := make([]string, len(entries))
-	for i, e := range entries {
-		names[i] = e.name
-	}
-	return names
-}
-
 // parseKeyList splits a comma-separated key list into trimmed, de-duplicated
 // key strings, dropping empty entries while preserving order.
 func parseKeyList(csv string) []string {
