@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Configurable auto-refresh** — set `auto_refresh_seconds` (also in the settings panel) to tune the session-list poll interval, or set it to `0` to turn polling off and refresh only with `r` or reindex
 - **Machine-readable doctor output** — `dispatch doctor --json` prints diagnostics as a single JSON object so scripts and CI can parse them instead of scraping text
 - **Search query argument** — pass a search string on the command line (`dispatch auth` or `dispatch fix auth bug`) to launch the TUI with the search box pre-filled and the list already filtered
+- **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer, Finder, or the Linux file manager)
 
 ## [v0.13.0] — 2026-06-30
 
