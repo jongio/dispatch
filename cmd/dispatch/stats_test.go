@@ -1,0 +1,219 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/jongio/dispatch/internal/data"
+)
+
+func withStatsList(t *testing.T, fn func(data.FilterOptions) ([]data.Session, error)) {
+	t.Helper()
+	prev := statsListSessionsFn
+	statsListSessionsFn = fn
+	t.Cleanup(func() { statsListSessionsFn = prev })
+}
+
+func sampleSessions() []data.Session {
+	return []data.Session{
+		{
+			ID:           "a",
+			Repository:   "jongio/dispatch",
+			Branch:       "main",
+			HostType:     "github",
+			CreatedAt:    "2026-01-05T10:00:00Z",
+			LastActiveAt: "2026-01-06T10:00:00Z",
+			TurnCount:    5,
+			FileCount:    3,
+		},
+		{
+			ID:           "b",
+			Repository:   "jongio/dispatch",
+			Branch:       "feature",
+			HostType:     "github",
+			CreatedAt:    "2026-02-01T10:00:00Z",
+			LastActiveAt: "2026-07-01T10:00:00Z",
+			TurnCount:    10,
+			FileCount:    2,
+		},
+		{
+			ID:         "c",
+			Repository: "",
+			Branch:     "",
+			HostType:   "",
+			CreatedAt:  "2026-03-01T10:00:00Z",
+			UpdatedAt:  "2026-03-02T10:00:00Z",
+			TurnCount:  1,
+			FileCount:  0,
+		},
+	}
+}
+
+func TestBuildStatsReportTotals(t *testing.T) {
+	report := buildStatsReport(sampleSessions())
+
+	if report.TotalSessions != 3 {
+		t.Errorf("TotalSessions = %d, want 3", report.TotalSessions)
+	}
+	if report.TotalTurns != 16 {
+		t.Errorf("TotalTurns = %d, want 16", report.TotalTurns)
+	}
+	if report.TotalFiles != 5 {
+		t.Errorf("TotalFiles = %d, want 5", report.TotalFiles)
+	}
+	if report.Earliest != "2026-01-05" {
+		t.Errorf("Earliest = %q, want 2026-01-05", report.Earliest)
+	}
+	if report.Latest != "2026-07-01" {
+		t.Errorf("Latest = %q, want 2026-07-01", report.Latest)
+	}
+}
+
+func TestBuildStatsReportGrouping(t *testing.T) {
+	report := buildStatsReport(sampleSessions())
+
+	if len(report.ByRepository) != 2 {
+		t.Fatalf("ByRepository len = %d, want 2", len(report.ByRepository))
+	}
+	// Highest count first.
+	if report.ByRepository[0].Label != "jongio/dispatch" || report.ByRepository[0].Count != 2 {
+		t.Errorf("ByRepository[0] = %+v, want jongio/dispatch=2", report.ByRepository[0])
+	}
+	if report.ByRepository[1].Label != "(none)" || report.ByRepository[1].Count != 1 {
+		t.Errorf("ByRepository[1] = %+v, want (none)=1", report.ByRepository[1])
+	}
+
+	var host string
+	for _, e := range report.ByHostType {
+		if e.Label == "(unknown)" {
+			host = e.Label
+		}
+	}
+	if host == "" {
+		t.Errorf("expected an (unknown) host type bucket, got %+v", report.ByHostType)
+	}
+}
+
+func TestBuildStatsReportEmpty(t *testing.T) {
+	report := buildStatsReport(nil)
+	if report.TotalSessions != 0 {
+		t.Errorf("TotalSessions = %d, want 0", report.TotalSessions)
+	}
+	if report.Earliest != "" || report.Latest != "" {
+		t.Errorf("expected empty range, got %q..%q", report.Earliest, report.Latest)
+	}
+	if report.ByRepository == nil || report.ByBranch == nil || report.ByHostType == nil {
+		t.Errorf("group slices should be non-nil for JSON output")
+	}
+}
+
+func TestParseStatsArgs(t *testing.T) {
+	opts, err := parseStatsArgs([]string{"stats", "--json", "--repo", "jongio/dispatch", "--branch=main", "--since", "2026-01-01", "--until=2026-07-01"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !opts.json {
+		t.Error("expected json=true")
+	}
+	if opts.filter.Repository != "jongio/dispatch" {
+		t.Errorf("Repository = %q", opts.filter.Repository)
+	}
+	if opts.filter.Branch != "main" {
+		t.Errorf("Branch = %q", opts.filter.Branch)
+	}
+	if opts.filter.Since == nil || opts.filter.Until == nil {
+		t.Fatal("expected Since and Until to be set")
+	}
+	if opts.filter.Since.Format("2006-01-02") != "2026-01-01" {
+		t.Errorf("Since = %v", opts.filter.Since)
+	}
+}
+
+func TestParseStatsArgsErrors(t *testing.T) {
+	cases := [][]string{
+		{"stats", "--repo"},              // missing value
+		{"stats", "--since", "not-date"}, // bad date
+		{"stats", "--bogus"},             // unknown flag
+		{"stats", "extra"},               // positional
+	}
+	for _, args := range cases {
+		if _, err := parseStatsArgs(args); err == nil {
+			t.Errorf("parseStatsArgs(%v) expected error, got nil", args)
+		}
+	}
+}
+
+func TestRunStatsText(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Sessions: 3", "Turns:    16", "Files:    5", "By repository", "jongio/dispatch", "By host type"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestRunStatsJSON(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--json"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	var report statsReport
+	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if report.TotalSessions != 3 || report.TotalTurns != 16 {
+		t.Errorf("unexpected report: %+v", report)
+	}
+}
+
+func TestRunStatsPassesFilter(t *testing.T) {
+	var got data.FilterOptions
+	withStatsList(t, func(f data.FilterOptions) ([]data.Session, error) {
+		got = f
+		return nil, nil
+	})
+
+	if err := runStats(&bytes.Buffer{}, []string{"stats", "--repo", "jongio/dispatch"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	if got.Repository != "jongio/dispatch" {
+		t.Errorf("filter.Repository = %q, want jongio/dispatch", got.Repository)
+	}
+}
+
+func TestRunStatsListError(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return nil, errors.New("boom")
+	})
+	if err := runStats(&bytes.Buffer{}, []string{"stats"}); err == nil {
+		t.Error("expected error from list failure")
+	}
+}
+
+func TestHandleArgsStats(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+	done, _, err := handleArgs([]string{"stats", "--json"}, &bytes.Buffer{}, nil)
+	if !done {
+		t.Error("expected done=true for stats")
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
