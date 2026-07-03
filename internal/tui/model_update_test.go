@@ -2344,6 +2344,47 @@ func TestHandleKey_CopyResumeCommand_ClipboardError(t *testing.T) {
 	}
 }
 
+func TestHandleKey_CopyResumeCommand_MultiSelect(t *testing.T) {
+	var copied string
+	orig := clipboardWrite
+	clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = orig })
+
+	m := newTestModel()
+	m.cfg.CustomCommand = "copilot --resume {sessionId}"
+	m.sessionList.SetSessions([]data.Session{
+		{ID: "s1", Cwd: "/a"},
+		{ID: "s2", Cwd: "/b"},
+		{ID: "s3", Cwd: "/c"},
+	})
+
+	// Mark the first and third sessions with Space.
+	m.sessionList.ToggleSelected()
+	m.sessionList.MoveDown()
+	m.sessionList.MoveDown()
+	m.sessionList.ToggleSelected()
+
+	result, cmd := m.Update(runeKeyMsg('Y'))
+	rm := result.(Model)
+
+	want := "copilot --resume s1\ncopilot --resume s3"
+	if copied != want {
+		t.Errorf("clipboard text = %q, want %q", copied, want)
+	}
+	if rm.statusInfo != "Copied 2 resume commands ✓" {
+		t.Errorf("statusInfo = %q, want %q", rm.statusInfo, "Copied 2 resume commands ✓")
+	}
+	if rm.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty", rm.statusErr)
+	}
+	if cmd == nil {
+		t.Error("CopyResumeCommand multi-select should return clearStatusAfter cmd")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // CopyPreview (y key)
 // ---------------------------------------------------------------------------
