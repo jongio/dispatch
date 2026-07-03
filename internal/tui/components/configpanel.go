@@ -33,6 +33,7 @@ const (
 	cfgPreviewPosition
 	cfgRedactSecrets
 	cfgExcludedWords
+	cfgAutoRefresh
 	cfgFieldCount
 )
 
@@ -56,6 +57,7 @@ type ConfigPanel struct {
 	previewPosition   string // "right", "bottom", "left", "top"
 	redactSecrets     bool
 	excludedWords     string // comma-separated list of filter words
+	autoRefresh       string // session-list auto-refresh seconds ("" default, "0" off)
 
 	// Available options for cycling.
 	terminals  []string
@@ -101,6 +103,7 @@ type ConfigValues struct {
 	PreviewPosition   string
 	RedactSecrets     bool
 	ExcludedWords     string // comma-separated filter words
+	AutoRefresh       string // auto-refresh seconds ("" default, "0" off)
 }
 
 // SetValues loads the config panel state from external values.
@@ -118,6 +121,7 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.previewPosition = v.PreviewPosition
 	c.redactSecrets = v.RedactSecrets
 	c.excludedWords = v.ExcludedWords
+	c.autoRefresh = v.AutoRefresh
 }
 
 // Values returns the current state of all editable fields.
@@ -136,6 +140,7 @@ func (c *ConfigPanel) Values() ConfigValues {
 		PreviewPosition:   c.previewPosition,
 		RedactSecrets:     c.redactSecrets,
 		ExcludedWords:     c.excludedWords,
+		AutoRefresh:       c.autoRefresh,
 	}
 }
 
@@ -225,6 +230,11 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.textInput.SetValue(c.excludedWords)
 		c.textInput.CharLimit = 512
 		return c.textInput.Focus()
+	case cfgAutoRefresh:
+		c.editing = true
+		c.textInput.SetValue(c.autoRefresh)
+		c.textInput.CharLimit = 8
+		return c.textInput.Focus()
 	case cfgTheme:
 		c.theme = c.cycleTheme(c.theme)
 	case cfgWorkspaceRecovery:
@@ -254,6 +264,8 @@ func (c *ConfigPanel) ConfirmEdit() {
 		c.customCommand = val
 	case cfgExcludedWords:
 		c.excludedWords = val
+	case cfgAutoRefresh:
+		c.autoRefresh = val
 	default:
 		// Non-editable fields are ignored.
 	}
@@ -309,6 +321,7 @@ func (c ConfigPanel) View() string {
 		{"Preview Position", previewPositionDisplay(c.previewPosition), false},
 		{"Redact Secrets", boolDisplay(c.redactSecrets), false},
 		{"Excluded Words", stringDisplay(c.excludedWords), false},
+		{"Auto Refresh", autoRefreshDisplay(c.autoRefresh), false},
 	}
 
 	var body strings.Builder
@@ -355,6 +368,14 @@ func (c ConfigPanel) View() string {
 		body.WriteString(styles.DimmedStyle.Render("  Comma-separated words to filter out sessions.") + "\n")
 		body.WriteString(styles.DimmedStyle.Render("  Matches against session name and turn content.") + "\n")
 		body.WriteString(styles.DimmedStyle.Render("  Example: MANDATORY, internal, secret") + "\n")
+	}
+
+	// Contextual help when the Auto Refresh field is focused.
+	if c.cursor == cfgAutoRefresh {
+		body.WriteString("\n")
+		body.WriteString(styles.DimmedStyle.Render("  Session-list auto-refresh interval, in seconds.") + "\n")
+		body.WriteString(styles.DimmedStyle.Render("  Empty uses the default; 0 turns polling off.") + "\n")
+		body.WriteString(styles.DimmedStyle.Render("  Takes effect on next launch.") + "\n")
 	}
 
 	body.WriteString("\n")
@@ -413,6 +434,20 @@ func stringDisplay(v string) string {
 		return styles.ConfigDimmedValue.Render("(none)")
 	}
 	return styles.ConfigValueStyle.Render(v)
+}
+
+// autoRefreshDisplay renders the auto-refresh setting as a friendly label.
+// An empty value means the built-in default, "0" means polling is off, and
+// any other value is shown as a seconds interval.
+func autoRefreshDisplay(v string) string {
+	switch strings.TrimSpace(v) {
+	case "":
+		return styles.ConfigDimmedValue.Render("Default")
+	case "0":
+		return styles.ConfigDimmedValue.Render("Off")
+	default:
+		return styles.ConfigValueStyle.Render(v + "s")
+	}
 }
 
 // cycleLaunchMode cycles through the four launch modes.

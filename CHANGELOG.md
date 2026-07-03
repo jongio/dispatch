@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Configurable auto-refresh** — set `auto_refresh_seconds` (also in the settings panel) to tune the session-list poll interval, or set it to `0` to turn polling off and refresh only with `r` or reindex
+
 ## [v0.13.0] — 2026-06-30
 
 ### Added

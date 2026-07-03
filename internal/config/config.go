@@ -249,6 +249,14 @@ type Config struct {
 	// session data is never modified.
 	RedactPreviewSecrets bool `json:"redact_preview_secrets,omitempty"`
 
+	// AutoRefreshSeconds controls the session-list auto-refresh poll
+	// interval, in seconds. When unset (nil), the built-in default interval
+	// is used. A value of 0 disables polling entirely, so the list refreshes
+	// only on explicit reload or reindex. A positive value sets the interval
+	// (clamped to a one-second minimum); negative values are ignored and fall
+	// back to the default. A pointer is used so "unset" and "0" are distinct.
+	AutoRefreshSeconds *int `json:"auto_refresh_seconds,omitempty"`
+
 	// Views is a list of named views, each storing a combination of
 	// filter/sort/pivot settings that can be applied together.
 	Views []NamedView `json:"views,omitempty"`
@@ -399,6 +407,39 @@ func (c *Config) EffectiveAttentionThreshold() time.Duration {
 		return defaultAttentionThreshold
 	}
 	return d
+}
+
+// defaultAutoRefreshInterval is the built-in session-list poll interval used
+// when AutoRefreshSeconds is unset.
+const defaultAutoRefreshInterval = 2 * time.Second
+
+// minAutoRefreshInterval is the smallest allowed poll interval. Positive
+// AutoRefreshSeconds values below this are clamped up to avoid a busy loop.
+const minAutoRefreshInterval = 1 * time.Second
+
+// EffectiveAutoRefreshInterval returns the session-list auto-refresh poll
+// interval and whether polling is enabled. The rules are:
+//   - unset (nil): the default interval, enabled.
+//   - 0: disabled (no polling).
+//   - negative: the default interval, enabled (the invalid value is ignored).
+//   - positive: that many seconds, clamped to a one-second minimum, enabled.
+func (c *Config) EffectiveAutoRefreshInterval() (interval time.Duration, enabled bool) {
+	if c.AutoRefreshSeconds == nil {
+		return defaultAutoRefreshInterval, true
+	}
+	secs := *c.AutoRefreshSeconds
+	switch {
+	case secs == 0:
+		return 0, false
+	case secs < 0:
+		return defaultAutoRefreshInterval, true
+	default:
+		d := time.Duration(secs) * time.Second
+		if d < minAutoRefreshInterval {
+			d = minAutoRefreshInterval
+		}
+		return d, true
+	}
 }
 
 // EffectiveLaunchMode returns the active launch mode, resolving the
