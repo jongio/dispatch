@@ -355,4 +355,3 @@ func applyKeybindingOverrides(base keyMap, overrides map[string]string) (keyMap,
 
 	return km, warnings
 }
-
