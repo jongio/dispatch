@@ -1440,7 +1440,7 @@ func (m Model) handleCopyID() (tea.Model, tea.Cmd) {
 // system clipboard. When a folder row is selected under a folder or repo
 // pivot, the folder's path is copied instead.
 func (m Model) handleCopyPath() (tea.Model, tea.Cmd) {
-	path := ""
+	var path string
 	if sess, ok := m.sessionList.Selected(); ok {
 		path = sess.Cwd
 	} else {
