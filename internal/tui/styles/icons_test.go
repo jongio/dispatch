@@ -254,6 +254,8 @@ func TestPivotGroupIcons(t *testing.T) {
 		{"repository", IconRepo(), IconRepoOpen()},
 		{"branch", IconBranch(), IconBranchOpen()},
 		{"date", IconCalendar(), IconCalendarOpen()},
+		{"host", IconHost(), IconHostOpen()},
+		{"host_type", IconHost(), IconHostOpen()},
 		{"unknown", IconFolder(), IconFolderOpen()},
 		{"", IconFolder(), IconFolderOpen()},
 	}

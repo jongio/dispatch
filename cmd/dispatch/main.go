@@ -93,7 +93,16 @@ Commands:
   open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
   completion <shell>      Print shell completion (bash, zsh, powershell)
   doctor                  Print environment diagnostics
+  stats [flags]           Print session totals and breakdowns
   update                  Update dispatch to the latest release
+
+Stats flags:
+  --json                  Print the summary as JSON
+  --repo <name>           Only count sessions for a repository
+  --branch <name>         Only count sessions on a branch
+  --folder <path>         Only count sessions under a folder
+  --since <date>          Only count sessions created on or after a date
+  --until <date>          Only count sessions created on or before a date
 
 Flags:
   -h, --help              Show this help message

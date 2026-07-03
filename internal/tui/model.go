@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -136,6 +137,7 @@ const (
 	pivotRepo   = "repo"
 	pivotBranch = "branch"
 	pivotDate   = "date"
+	pivotHost   = "host"
 )
 
 // ---------------------------------------------------------------------------
@@ -198,7 +200,7 @@ type Model struct {
 	filter     data.FilterOptions
 	sort       data.SortOptions
 	timeRange  string         // "1h", "1d", "7d", "all"
-	pivot      string         // "none", "folder", "repo", "branch", "date"
+	pivot      string         // "none", "folder", "repo", "branch", "date", "host"
 	pivotOrder data.SortOrder // group header sort direction
 
 	// Loaded data.
@@ -305,6 +307,7 @@ func NewModel() Model {
 		PreviewPosition:   cfg.EffectivePreviewPosition(),
 		RedactSecrets:     cfg.RedactPreviewSecrets,
 		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
+		AutoRefresh:       autoRefreshFieldValue(cfg.AutoRefreshSeconds),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -372,7 +375,13 @@ func NewModel() Model {
 		default:
 		}
 	})
-	m.dbWatcher.SetActive(true)
+	// Honour the configured auto-refresh interval. When disabled (0), the
+	// watcher is never activated so no polling happens; the list still
+	// refreshes on explicit reload and after reindex.
+	if interval, enabled := cfg.EffectiveAutoRefreshInterval(); enabled {
+		m.dbWatcher.SetInterval(interval)
+		m.dbWatcher.SetActive(true)
+	}
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
@@ -1032,6 +1041,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
 			RedactSecrets:     m.cfg.RedactPreviewSecrets,
 			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
+			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -1643,6 +1653,7 @@ func (m *Model) saveConfigFromPanel() {
 	m.preview.SetRedactSecrets(v.RedactSecrets)
 	m.cfg.ExcludedWords = parseExcludedWords(v.ExcludedWords)
 	m.filter.ExcludedWords = m.cfg.ExcludedWords
+	m.cfg.AutoRefreshSeconds = parseAutoRefresh(v.AutoRefresh)
 	resolveTheme(m.cfg)
 	// If the user switched back to "auto", re-apply with the detected
 	// terminal brightness so colours adapt immediately.
@@ -1673,6 +1684,31 @@ func parseExcludedWords(s string) []string {
 		return nil
 	}
 	return words
+}
+
+// autoRefreshFieldValue renders the config's AutoRefreshSeconds as the string
+// the settings panel edits: empty for unset (default), or the integer seconds.
+func autoRefreshFieldValue(secs *int) string {
+	if secs == nil {
+		return ""
+	}
+	return strconv.Itoa(*secs)
+}
+
+// parseAutoRefresh converts the settings-panel auto-refresh string back into a
+// config value. An empty or unparseable string means unset (nil), so the
+// default interval is used; otherwise the parsed integer is stored (including
+// 0 to disable polling). Range handling is applied by EffectiveAutoRefreshInterval.
+func parseAutoRefresh(s string) *int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return &n
 }
 
 // ---------------------------------------------------------------------------
@@ -2823,7 +2859,7 @@ func (m *Model) toggleSortOrder() {
 	m.saveConfig()
 }
 
-var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate}
+var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotHost}
 
 func (m *Model) cyclePivot() {
 	for i, p := range pivotModes {
@@ -3977,6 +4013,8 @@ func pivotFieldFromString(s string) data.PivotField {
 		return data.PivotByBranch
 	case pivotDate:
 		return data.PivotByDate
+	case pivotHost:
+		return data.PivotByHost
 	default:
 		return data.PivotByFolder
 	}

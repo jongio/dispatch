@@ -403,3 +403,54 @@ func TestStop_ClosesDB(t *testing.T) {
 		t.Fatal("expected watcher DB to be nil after Stop")
 	}
 }
+
+func TestSetInterval_BeforeStart(t *testing.T) {
+	w := NewDBWatcher(func() {})
+	defer w.Stop()
+
+	w.SetInterval(30 * time.Second)
+
+	w.mu.Lock()
+	got := w.interval
+	w.mu.Unlock()
+
+	if got != 30*time.Second {
+		t.Fatalf("interval = %v, want %v", got, 30*time.Second)
+	}
+}
+
+func TestSetInterval_IgnoresNonPositive(t *testing.T) {
+	w := NewDBWatcher(func() {})
+	defer w.Stop()
+
+	w.mu.Lock()
+	original := w.interval
+	w.mu.Unlock()
+
+	w.SetInterval(0)
+	w.SetInterval(-5 * time.Second)
+
+	w.mu.Lock()
+	got := w.interval
+	w.mu.Unlock()
+
+	if got != original {
+		t.Fatalf("interval = %v, want unchanged %v", got, original)
+	}
+}
+
+func TestSetInterval_IgnoredAfterStart(t *testing.T) {
+	w := NewDBWatcher(func() {})
+	defer w.Stop()
+
+	w.SetActive(true) // starts the loop, fixing the interval
+	w.SetInterval(45 * time.Second)
+
+	w.mu.Lock()
+	got := w.interval
+	w.mu.Unlock()
+
+	if got == 45*time.Second {
+		t.Fatal("interval should not change once the loop has started")
+	}
+}

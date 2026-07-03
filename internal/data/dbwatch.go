@@ -50,6 +50,20 @@ func NewDBWatcher(onChange func()) *DBWatcher {
 	}
 }
 
+// SetInterval sets the polling interval. It must be called before the first
+// SetActive(true); once the loop is running the interval is fixed. A
+// non-positive interval is ignored so the built-in default is preserved.
+func (w *DBWatcher) SetInterval(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.started {
+		w.interval = d
+	}
+}
+
 // SetActive enables or disables polling. When active is false, no file
 // system operations are performed (near-zero CPU).
 func (w *DBWatcher) SetActive(active bool) {
