@@ -68,3 +68,26 @@ func TestOpenDir_FileNotDir(t *testing.T) {
 		t.Error("expected error when path is a file, not a directory")
 	}
 }
+
+func TestOpenURL_RejectsInvalid(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"empty", ""},
+		{"no scheme", "github.com/owner/repo"},
+		{"file scheme", "file:///etc/passwd"},
+		{"javascript scheme", "javascript:alert(1)"},
+		{"no host", "https://"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if err := OpenURL(tt.url); err == nil {
+				t.Errorf("OpenURL(%q) = nil, want error", tt.url)
+			}
+		})
+	}
+}

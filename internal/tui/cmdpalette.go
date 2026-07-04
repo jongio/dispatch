@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jongio/dispatch/internal/config"
+	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui/components"
 )
 
@@ -19,6 +20,13 @@ func (m *Model) openCmdPalette() {
 	}
 	hasPreview := func() bool {
 		return m.showPreview && m.detail != nil
+	}
+	hasRef := func() bool {
+		if m.detail == nil {
+			return false
+		}
+		_, ok := data.BestRef(m.detail.Refs)
+		return ok
 	}
 	hasPath := func() bool {
 		if _, ok := m.sessionList.Selected(); ok {
@@ -43,6 +51,7 @@ func (m *Model) openCmdPalette() {
 		{Name: "Toggle Favorite", Shortcut: "*", Description: "star session", Action: "star", Enabled: hasSelection},
 		{Name: "Hide Session", Shortcut: "h", Description: "hide from list", Action: "hide", Enabled: hasSelection},
 		{Name: "Export Markdown", Shortcut: "X", Description: "export session", Action: "export", Enabled: hasSelection},
+		{Name: "Open Reference", Shortcut: "b", Description: "open PR/issue/commit", Action: "open-ref", Enabled: hasRef},
 		{Name: "Rebuild Index", Shortcut: "r", Description: "reindex sessions", Action: "reindex", Enabled: func() bool { return !m.reindexing }},
 		{Name: "Settings", Shortcut: ",", Description: "open config", Action: "settings", Enabled: alwaysEnabled},
 		{Name: "Help", Shortcut: "?", Description: "keyboard shortcuts", Action: "help", Enabled: alwaysEnabled},
@@ -122,6 +131,9 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 
 	case "export":
 		return m.handleExport()
+
+	case "open-ref":
+		return m.handleOpenRef()
 
 	case "reindex":
 		if !m.reindexing {

@@ -224,6 +224,13 @@
      - Behavior: Expands the preview to fill the entire content area and hides the session list so a long conversation is easier to read. Press z again or Esc to restore the split layout. PgUp/PgDn scrolling still works, and toggling on shows the preview even when the split preview is hidden.
      - Condition: In session list view
 
+20g. **b** → Open Linked Reference in Browser
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "open PR/issue/commit"))
+     - Handler: internal\tui\handlers.go (handleOpenRef)
+     - Behavior: Opens the selected session's linked reference on github.com in the default browser. Chooses the pull request first, then the issue, then the commit. Only http/https URLs are opened.
+     - Condition: Only when the selected session has a repository and at least one PR, issue, or commit reference
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))

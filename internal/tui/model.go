@@ -663,6 +663,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dirOpenedMsg:
 		return m.handleDirOpened(msg)
 
+	case refOpenedMsg:
+		return m.handleRefOpened(msg)
+
 	case compareDetailMsg:
 		return m.handleCompareDetail(msg)
 
@@ -1601,6 +1604,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, clearStatusAfter(2 * time.Second)
 		}
 		return m, m.openDirCmd(cwd)
+
+	case key.Matches(msg, keys.OpenRef):
+		return m.handleOpenRef()
 
 	case key.Matches(msg, keys.Space):
 		m.sessionList.ToggleSelected()
@@ -4499,6 +4505,15 @@ func (m Model) openDirCmd(path string) tea.Cmd {
 	return func() tea.Msg {
 		err := platform.OpenDir(path)
 		return dirOpenedMsg{path: path, err: err}
+	}
+}
+
+// openRefCmd opens a session's linked reference URL in the browser. The label
+// is carried through so the status line can name what was opened.
+func (m Model) openRefCmd(url, label string) tea.Cmd {
+	return func() tea.Msg {
+		err := platform.OpenURL(url)
+		return refOpenedMsg{label: label, err: err}
 	}
 }
 

@@ -47,6 +47,91 @@ func TestHandleDirOpened_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// handleOpenRef / handleRefOpened
+// ---------------------------------------------------------------------------
+
+func TestHandleOpenRef_NoDetail(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.detail = nil
+	m2, cmd := m.handleOpenRef()
+	if m2.statusErr == "" {
+		t.Error("expected statusErr when no session is selected")
+	}
+	if cmd == nil {
+		t.Error("expected a clear-status command")
+	}
+}
+
+func TestHandleOpenRef_NoRefs(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "s1", Repository: "owner/repo"},
+	}
+	m2, _ := m.handleOpenRef()
+	if m2.statusErr == "" {
+		t.Error("expected statusErr when session has no linked refs")
+	}
+}
+
+func TestHandleOpenRef_NoRepository(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "s1"},
+		Refs:    []data.SessionRef{{RefType: "pr", RefValue: "42"}},
+	}
+	m2, _ := m.handleOpenRef()
+	if m2.statusErr == "" {
+		t.Error("expected statusErr when session has no repository")
+	}
+}
+
+func TestHandleOpenRef_Success(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.detail = &data.SessionDetail{
+		Session: data.Session{ID: "s1", Repository: "owner/repo"},
+		Refs: []data.SessionRef{
+			{RefType: "commit", RefValue: "abc123"},
+			{RefType: "pr", RefValue: "42"},
+		},
+	}
+	m2, cmd := m.handleOpenRef()
+	if m2.statusErr != "" {
+		t.Errorf("statusErr should be empty on success, got %q", m2.statusErr)
+	}
+	if cmd == nil {
+		t.Error("expected an open-ref command")
+	}
+}
+
+func TestHandleRefOpened_Success(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m2, cmd := m.handleRefOpened(refOpenedMsg{label: "pr 42"})
+	if m2.statusErr != "" {
+		t.Errorf("statusErr should be empty on success, got %q", m2.statusErr)
+	}
+	if m2.statusInfo != "Opened pr 42" {
+		t.Errorf("statusInfo = %q, want %q", m2.statusInfo, "Opened pr 42")
+	}
+	if cmd == nil {
+		t.Error("expected a clear-status command")
+	}
+}
+
+func TestHandleRefOpened_Error(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m2, cmd := m.handleRefOpened(refOpenedMsg{label: "pr 42", err: errTestOpenDir})
+	if m2.statusInfo != "" {
+		t.Errorf("statusInfo should be empty on error, got %q", m2.statusInfo)
+	}
+	if m2.statusErr != errTestOpenDir.Error() {
+		t.Errorf("statusErr = %q, want %q", m2.statusErr, errTestOpenDir.Error())
+	}
+	if cmd == nil {
+		t.Error("expected a clear-status command")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // handleBackgroundColor
 // ---------------------------------------------------------------------------
 

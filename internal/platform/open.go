@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -44,4 +45,24 @@ func OpenDir(path string) error {
 		return fmt.Errorf("not a directory: %s", path)
 	}
 	return openCommand(context.Background(), path).Start()
+}
+
+// OpenURL opens the given URL in the platform default browser. Only absolute
+// http and https URLs are allowed, so a malformed or non-web value cannot be
+// handed to the OS opener (which could otherwise launch an unexpected handler).
+func OpenURL(rawURL string) error {
+	if rawURL == "" {
+		return fmt.Errorf("no URL to open")
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %s", rawURL)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("refusing to open non-http URL: %s", rawURL)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("invalid URL: %s", rawURL)
+	}
+	return openCommand(context.Background(), rawURL).Start()
 }
