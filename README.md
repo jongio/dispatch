@@ -156,6 +156,18 @@ Both accept `--mode` to override the launch mode for that one resume (`inplace`,
 dispatch open --last --mode window
 ```
 
+### Start a New Session
+
+Start a brand-new Copilot session from the command line without opening the TUI:
+
+```sh
+dispatch new              # start in the current directory
+dispatch new ~/code/app   # start in a specific directory
+dispatch new --mode tab   # override the launch mode (inplace, tab, window, pane)
+```
+
+The session uses the same agent, model, and launch settings as the TUI. When no directory is given, the current working directory is used.
+
 ### Shell Completion
 
 Print completion scripts for supported shells:
