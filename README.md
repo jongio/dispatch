@@ -189,6 +189,19 @@ Flags:
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
 
+### Export
+
+Save a full session (metadata and the complete conversation) to a file with `dispatch export <id>`:
+
+```sh
+dispatch export 0a1b2c3d
+dispatch export 0a1b2c3d --format json
+dispatch export 0a1b2c3d --stdout
+dispatch export 0a1b2c3d --out ./exports
+```
+
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
+
 ### Key Bindings
 
 #### Navigation
