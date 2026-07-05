@@ -37,7 +37,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
-- **Session tags** (`g`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
+- **Session tags** (`#`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
 - **Session aliases** (`A`) — give a session a short, memorable alias and resume it from the CLI with `dispatch open <alias>` instead of the full session ID
 - **Settings panel** (`,`) — 19 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting, and column toggles for Repo, Folder, Turns, and Host
 - **Configurable list columns** (`,` settings) — choose which optional columns (repo, folder, turns, host) appear in the session list. Defaults show every column, and the session name and attention indicator are always visible
@@ -165,6 +165,8 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 |---|---|
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
+| `g` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
 | `←` | Collapse group |
 | `→` | Expand group |
 
@@ -199,7 +201,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `h` | Hide/unhide current session |
 | `H` | Toggle visibility of hidden sessions |
 | `*` | Toggle favorite on current session |
-| `g` | Add or edit tags on current session |
+| `#` | Add or edit tags on current session |
 | `A` | Set or clear a short alias on current session |
 
 #### Search & Filter

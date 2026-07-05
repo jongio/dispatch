@@ -234,6 +234,16 @@ func (s *SessionList) MoveTo(idx int) {
 	}
 }
 
+// JumpToTop moves the cursor to the first visible item.
+func (s *SessionList) JumpToTop() {
+	s.MoveTo(0)
+}
+
+// JumpToBottom moves the cursor to the last visible item.
+func (s *SessionList) JumpToBottom() {
+	s.MoveTo(len(s.visItems) - 1)
+}
+
 // ScrollBy adjusts the scroll offset by delta lines (positive = down).
 func (s *SessionList) ScrollBy(delta int) {
 	maxOffset := len(s.visItems) - s.height

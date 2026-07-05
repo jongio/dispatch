@@ -13,6 +13,8 @@ import (
 type keyMap struct {
 	Up                key.Binding
 	Down              key.Binding
+	JumpTop           key.Binding
+	JumpBottom        key.Binding
 	Left              key.Binding
 	Right             key.Binding
 	Enter             key.Binding
@@ -80,7 +82,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 // FullHelp returns grouped key bindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
+		{k.Up, k.Down, k.JumpTop, k.JumpBottom, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
@@ -99,6 +101,8 @@ func defaultKeyMap() keyMap {
 	return keyMap{
 		Up:                key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 		Down:              key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
+		JumpTop:           key.NewBinding(key.WithKeys("g", "home"), key.WithHelp("g/home", "jump to top")),
+		JumpBottom:        key.NewBinding(key.WithKeys("G", "end"), key.WithHelp("G/end", "jump to bottom")),
 		Left:              key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "collapse")),
 		Right:             key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "expand")),
 		Enter:             key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "launch/toggle")),
@@ -146,7 +150,7 @@ func defaultKeyMap() keyMap {
 		ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
 		Export:            key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "export markdown")),
 		Note:              key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "edit note")),
-		Tags:              key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "edit tags")),
+		Tags:              key.NewBinding(key.WithKeys("#"), key.WithHelp("#", "edit tags")),
 		Alias:             key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "edit alias")),
 		ShiftUp:           key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("shift+\u2191", "extend select up")),
 		ShiftDown:         key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+\u2193", "extend select down")),
@@ -173,6 +177,8 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 	return []keybindingEntry{
 		{"up", &km.Up},
 		{"down", &km.Down},
+		{"jump_top", &km.JumpTop},
+		{"jump_bottom", &km.JumpBottom},
 		{"left", &km.Left},
 		{"right", &km.Right},
 		{"enter", &km.Enter},

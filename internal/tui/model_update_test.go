@@ -1215,6 +1215,60 @@ func TestSelectedSessionCwd_WithSelection(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Jump navigation: g / G / Home / End
+// ---------------------------------------------------------------------------
+
+func jumpNavSessions(n int) []data.Session {
+	sessions := make([]data.Session, n)
+	for i := range sessions {
+		sessions[i] = data.Session{ID: "s" + strconv.Itoa(i), Cwd: "/x"}
+	}
+	return sessions
+}
+
+func TestHandleKey_JumpTop_g(t *testing.T) {
+	m := newTestModelWithSize(120, 40)
+	m.sessionList.SetSessions(jumpNavSessions(10))
+	m.sessionList.MoveTo(5)
+
+	result, _ := m.Update(runeKeyMsg('g'))
+	rm := result.(Model)
+	if got := rm.sessionList.Cursor(); got != 0 {
+		t.Errorf("after 'g' cursor = %d, want 0", got)
+	}
+}
+
+func TestHandleKey_JumpBottom_G(t *testing.T) {
+	m := newTestModelWithSize(120, 40)
+	m.sessionList.SetSessions(jumpNavSessions(10))
+	m.sessionList.MoveTo(0)
+
+	result, _ := m.Update(runeKeyMsg('G'))
+	rm := result.(Model)
+	if got := rm.sessionList.Cursor(); got != 9 {
+		t.Errorf("after 'G' cursor = %d, want 9", got)
+	}
+}
+
+func TestHandleKey_JumpHomeEnd(t *testing.T) {
+	m := newTestModelWithSize(120, 40)
+	m.sessionList.SetSessions(jumpNavSessions(10))
+	m.sessionList.MoveTo(4)
+
+	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
+	rm := result.(Model)
+	if got := rm.sessionList.Cursor(); got != 9 {
+		t.Errorf("after End cursor = %d, want 9", got)
+	}
+
+	result, _ = rm.Update(tea.KeyPressMsg{Code: tea.KeyHome})
+	rm = result.(Model)
+	if got := rm.sessionList.Cursor(); got != 0 {
+		t.Errorf("after Home cursor = %d, want 0", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // closeStore
 // ---------------------------------------------------------------------------
 
