@@ -2,6 +2,7 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -278,5 +279,129 @@ func TestParseSearchTokens_StatusValues(t *testing.T) {
 		if sf.Status != s {
 			t.Errorf("status:%s: Status = %q, want %q", s, sf.Status, s)
 		}
+	}
+}
+
+func TestParseSearchTokens_DateTokens(t *testing.T) {
+	sf := ParseSearchTokens("after:2024-01-15 before:2024-03-01 hello")
+	if sf.After == nil {
+		t.Fatal("After should be set")
+	}
+	if got := sf.After.Format("2006-01-02"); got != "2024-01-15" {
+		t.Errorf("After = %q, want 2024-01-15", got)
+	}
+	if sf.AfterText != "2024-01-15" {
+		t.Errorf("AfterText = %q, want 2024-01-15", sf.AfterText)
+	}
+	if sf.Before == nil {
+		t.Fatal("Before should be set")
+	}
+	if got := sf.Before.Format("2006-01-02"); got != "2024-03-01" {
+		t.Errorf("Before = %q, want 2024-03-01", got)
+	}
+	if sf.FreeText != "hello" {
+		t.Errorf("FreeText = %q, want %q", sf.FreeText, "hello")
+	}
+	if !sf.HasTokens() {
+		t.Error("expected HasTokens = true")
+	}
+}
+
+func TestParseSearchTokens_DateTokenRFC3339(t *testing.T) {
+	sf := ParseSearchTokens("after:2024-01-15T09:30:00Z")
+	if sf.After == nil {
+		t.Fatal("After should be set for an RFC3339 value")
+	}
+	if sf.After.Hour() != 9 || sf.After.Minute() != 30 {
+		t.Errorf("After time = %v, want 09:30", sf.After)
+	}
+}
+
+func TestParseSearchTokens_MalformedDateIsFreeText(t *testing.T) {
+	sf := ParseSearchTokens("after:notadate before:2024-13-99")
+	if sf.After != nil {
+		t.Errorf("After should be nil for a malformed value, got %v", sf.After)
+	}
+	if sf.Before != nil {
+		t.Errorf("Before should be nil for a malformed value, got %v", sf.Before)
+	}
+	if sf.FreeText != "after:notadate before:2024-13-99" {
+		t.Errorf("FreeText = %q, want the malformed tokens kept as free text", sf.FreeText)
+	}
+}
+
+func TestSearchFilter_TokenSummaryWithDates(t *testing.T) {
+	sf := ParseSearchTokens("after:2024-01-15 before:2024-03-01")
+	got := sf.TokenSummary()
+	want := "after:2024-01-15 before:2024-03-01"
+	if got != want {
+		t.Errorf("TokenSummary() = %q, want %q", got, want)
+	}
+}
+
+func TestApplySearchTokens_DateTokensSetSinceUntil(t *testing.T) {
+	m := newTestModel()
+	m.searchFilter = ParseSearchTokens("after:2024-01-15 before:2024-03-01")
+	m.applySearchTokens()
+
+	if m.filter.Since == nil {
+		t.Fatal("filter.Since should be set from after: token")
+	}
+	if got := m.filter.Since.Format("2006-01-02"); got != "2024-01-15" {
+		t.Errorf("filter.Since = %q, want 2024-01-15", got)
+	}
+	if m.filter.Until == nil {
+		t.Fatal("filter.Until should be set from before: token")
+	}
+	if got := m.filter.Until.Format("2006-01-02"); got != "2024-03-01" {
+		t.Errorf("filter.Until = %q, want 2024-03-01", got)
+	}
+}
+
+func TestApplySearchTokens_AfterTokenOverridesTimeRange(t *testing.T) {
+	m := newTestModel()
+	m.timeRange = "1h"
+	m.searchFilter = ParseSearchTokens("after:2020-01-01")
+	m.applySearchTokens()
+
+	if m.filter.Since == nil {
+		t.Fatal("filter.Since should be set")
+	}
+	// The after: token (2020) must win over the 1h time range.
+	if got := m.filter.Since.Year(); got != 2020 {
+		t.Errorf("filter.Since year = %d, want 2020 (after: token should override time range)", got)
+	}
+}
+
+func TestApplySearchTokens_NoDateTokenFallsBackToTimeRange(t *testing.T) {
+	m := newTestModel()
+	m.timeRange = "all"
+	m.searchFilter = ParseSearchTokens("repo:dispatch")
+	m.applySearchTokens()
+
+	// "all" maps to a nil Since; no upper bound either.
+	if m.filter.Since != nil {
+		t.Errorf("filter.Since = %v, want nil for the 'all' range", m.filter.Since)
+	}
+	if m.filter.Until != nil {
+		t.Errorf("filter.Until = %v, want nil when no before: token is present", m.filter.Until)
+	}
+}
+
+func TestClearSearchTokenFilters_ResetsDateBounds(t *testing.T) {
+	m := newTestModel()
+	m.timeRange = "all"
+	now := time.Now()
+	m.filter.Since = &now
+	m.filter.Until = &now
+
+	m.clearSearchTokenFilters()
+
+	if m.filter.Until != nil {
+		t.Errorf("filter.Until should be nil after clear, got %v", m.filter.Until)
+	}
+	// Since falls back to the time-range selector ("all" -> nil).
+	if m.filter.Since != nil {
+		t.Errorf("filter.Since should fall back to the 'all' range (nil), got %v", m.filter.Since)
 	}
 }

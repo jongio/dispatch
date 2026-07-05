@@ -1,6 +1,9 @@
 package tui
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // SearchFilter holds structured filter tokens extracted from the search bar input.
 // Each field corresponds to a supported token prefix (e.g., "repo:dispatch").
@@ -15,6 +18,15 @@ type SearchFilter struct {
 	IsFav    bool   // is:favorite
 	IsHidden bool   // is:hidden
 	Tag      string // tag:<value>
+
+	// After and Before bound the session's last-active time. They are parsed
+	// from after:<date> and before:<date> tokens. AfterText and BeforeText
+	// keep the raw value as typed so the badge row can echo it back.
+	After      *time.Time
+	Before     *time.Time
+	AfterText  string
+	BeforeText string
+
 	FreeText string // remaining non-token words
 }
 
@@ -28,7 +40,9 @@ func (sf SearchFilter) HasTokens() bool {
 		sf.HasPlan ||
 		sf.IsFav ||
 		sf.IsHidden ||
-		sf.Tag != ""
+		sf.Tag != "" ||
+		sf.After != nil ||
+		sf.Before != nil
 }
 
 // TokenSummary returns a short description of active tokens suitable for
@@ -61,6 +75,12 @@ func (sf SearchFilter) TokenSummary() string {
 	}
 	if sf.Tag != "" {
 		parts = append(parts, "tag:"+sf.Tag)
+	}
+	if sf.After != nil {
+		parts = append(parts, "after:"+sf.AfterText)
+	}
+	if sf.Before != nil {
+		parts = append(parts, "before:"+sf.BeforeText)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -97,6 +117,21 @@ func ParseSearchTokens(input string) SearchFilter {
 			sf.Status = value
 		case "tag":
 			sf.Tag = value
+		case "after":
+			if t, ok := parseSearchDate(value); ok {
+				sf.After = &t
+				sf.AfterText = value
+			} else {
+				// Malformed date; keep the token as free text.
+				freeWords = append(freeWords, w)
+			}
+		case "before":
+			if t, ok := parseSearchDate(value); ok {
+				sf.Before = &t
+				sf.BeforeText = value
+			} else {
+				freeWords = append(freeWords, w)
+			}
 		case "has":
 			if value == "plan" {
 				sf.HasPlan = true
@@ -121,6 +156,24 @@ func ParseSearchTokens(input string) SearchFilter {
 
 	sf.FreeText = strings.Join(freeWords, " ")
 	return sf
+}
+
+// parseSearchDate parses a date token value in RFC3339 or common date-only
+// forms. It mirrors the CLI stats parser so after:/before: behave the same as
+// --since/--until. Returns false when the value is not a recognized date.
+func parseSearchDate(s string) (time.Time, bool) {
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // tokenize splits input into words, respecting quoted values attached to

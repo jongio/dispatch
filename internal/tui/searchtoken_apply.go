@@ -36,6 +36,17 @@ func (m *Model) applySearchTokens() {
 	m.filterPlans = sf.HasPlan
 	m.showFavorited = sf.IsFav
 	m.showHidden = sf.IsHidden
+
+	// Date tokens bound the last-active window and take precedence over the
+	// time-range selector. When no after: token is present, fall back to the
+	// selector's window. before: has no selector equivalent, so it is cleared
+	// whenever the token is absent.
+	if sf.After != nil {
+		m.filter.Since = sf.After
+	} else {
+		m.filter.Since = timeRangeToSince(m.timeRange)
+	}
+	m.filter.Until = sf.Before
 }
 
 // clearSearchTokenFilters resets the filter fields that may have been set
@@ -50,6 +61,10 @@ func (m *Model) clearSearchTokenFilters() {
 	m.filterPlans = false
 	m.showFavorited = false
 	m.showHidden = false
+	// Date tokens override the time-range selector while active; restore the
+	// selector's window and drop the upper bound when the tokens are cleared.
+	m.filter.Since = timeRangeToSince(m.timeRange)
+	m.filter.Until = nil
 }
 
 // parseAttentionStatus converts a status token value string to a

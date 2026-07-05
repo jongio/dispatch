@@ -212,6 +212,27 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `Esc` | Clear search / close overlay |
 | `f` | Open filter panel |
 
+Search tokens narrow results without opening the filter panel. Type them in the
+search bar alongside free text:
+
+| Token | Matches |
+|---|---|
+| `repo:<name>` | Sessions in a repository (use quotes for names with spaces: `repo:"my repo"`) |
+| `branch:<name>` | Sessions on a branch |
+| `folder:<path>` | Sessions under a working directory |
+| `host:<type>` | Sessions by host type (cli, cloud, actions) |
+| `status:<state>` | Sessions by attention state (waiting, active, stale, idle, interrupted, working, thinking, compacting) |
+| `has:plan` | Sessions that have a plan |
+| `is:favorite` | Favorited sessions |
+| `is:hidden` | Hidden sessions |
+| `after:<date>` | Sessions active on or after a date |
+| `before:<date>` | Sessions active on or before a date |
+
+Dates accept `YYYY-MM-DD` or full RFC3339 timestamps (e.g. `after:2024-01-15` or
+`before:2024-03-01T12:00:00Z`), matching the `--since` / `--until` flags on
+`dispatch stats`. While an `after:` token is active it takes precedence over the
+`1`-`4` time-range shortcuts. Clearing the search restores the selected range.
+
 #### View & Sorting
 
 | Key | Action |

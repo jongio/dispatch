@@ -3473,7 +3473,11 @@ func (m *Model) setTimeRange(tr string) tea.Cmd {
 	m.timeRange = tr
 	m.cfg.DefaultTimeRange = tr
 	m.saveConfig()
-	m.filter.Since = timeRangeToSince(tr)
+	// An after: date token in the search bar takes precedence over the
+	// time-range selector; only apply the selector when no token is active.
+	if m.searchFilter.After == nil {
+		m.filter.Since = timeRangeToSince(tr)
+	}
 	return m.loadSessionsCmd()
 }
 
