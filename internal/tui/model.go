@@ -436,6 +436,10 @@ func NewModel() Model {
 		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
 		AutoRefresh:       autoRefreshFieldValue(cfg.AutoRefreshSeconds),
 		NotifyOnWaiting:   cfg.NotifyOnWaiting,
+		ShowRepoColumn:    cfg.ColumnVisible(config.ColumnRepo),
+		ShowFolderColumn:  cfg.ColumnVisible(config.ColumnFolder),
+		ShowTurnsColumn:   cfg.ColumnVisible(config.ColumnTurns),
+		ShowHostColumn:    cfg.ColumnVisible(config.ColumnHost),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -524,6 +528,7 @@ func NewModel() Model {
 	m.filter.ExcludedDirs = cfg.ExcludedDirs
 	m.filter.ExcludedWords = cfg.ExcludedWords
 	m.preview.SetConversationSort(cfg.ConversationNewestFirst)
+	m.sessionList.SetHiddenColumns(cfg.HiddenColumns)
 	m.preview.SetRedactSecrets(cfg.RedactPreviewSecrets)
 
 	// Named views: populate picker and apply the persisted active view.
@@ -1285,6 +1290,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
 			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
 			NotifyOnWaiting:   m.cfg.NotifyOnWaiting,
+			ShowRepoColumn:    m.cfg.ColumnVisible(config.ColumnRepo),
+			ShowFolderColumn:  m.cfg.ColumnVisible(config.ColumnFolder),
+			ShowTurnsColumn:   m.cfg.ColumnVisible(config.ColumnTurns),
+			ShowHostColumn:    m.cfg.ColumnVisible(config.ColumnHost),
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -2104,6 +2113,8 @@ func (m *Model) saveConfigFromPanel() {
 	m.filter.ExcludedWords = m.cfg.ExcludedWords
 	m.cfg.AutoRefreshSeconds = parseAutoRefresh(v.AutoRefresh)
 	m.cfg.NotifyOnWaiting = v.NotifyOnWaiting
+	m.cfg.HiddenColumns = hiddenColumnsFromPanel(v)
+	m.sessionList.SetHiddenColumns(m.cfg.HiddenColumns)
 	resolveTheme(m.cfg)
 	// If the user switched back to "auto", re-apply with the detected
 	// terminal brightness so colours adapt immediately.
@@ -2115,6 +2126,26 @@ func (m *Model) saveConfigFromPanel() {
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
+}
+
+// hiddenColumnsFromPanel builds the config's HiddenColumns list from the
+// settings panel's per-column visibility flags. Only disabled columns are
+// recorded, so the default (all columns shown) is an empty list.
+func hiddenColumnsFromPanel(v components.ConfigValues) []string {
+	var hidden []string
+	if !v.ShowRepoColumn {
+		hidden = append(hidden, config.ColumnRepo)
+	}
+	if !v.ShowFolderColumn {
+		hidden = append(hidden, config.ColumnFolder)
+	}
+	if !v.ShowTurnsColumn {
+		hidden = append(hidden, config.ColumnTurns)
+	}
+	if !v.ShowHostColumn {
+		hidden = append(hidden, config.ColumnHost)
+	}
+	return hidden
 }
 
 // parseExcludedWords splits a comma-separated string into trimmed, non-empty words.

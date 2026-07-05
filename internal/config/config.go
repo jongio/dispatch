@@ -216,6 +216,11 @@ type Config struct {
 	// Aliases are unique and let "dispatch open <alias>" resume a session
 	// without typing the full ID.
 	SessionAliases map[string]string `json:"sessionAliases,omitempty"`
+	// HiddenColumns lists optional session-list columns the user has chosen
+	// to hide (for example "repo", "folder", "turns", "host"). When empty
+	// (the default), every column is shown. The session name and attention
+	// indicator are always visible and cannot be hidden.
+	HiddenColumns []string `json:"hidden_columns,omitempty"`
 
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
@@ -482,6 +487,32 @@ func (c *Config) EffectiveLaunchMode() string {
 		return LaunchModeInPlace
 	}
 	return LaunchModeTab
+}
+
+// Session-list column keys used by HiddenColumns to control which optional
+// columns appear in the session list.
+const (
+	ColumnRepo   = "repo"
+	ColumnFolder = "folder"
+	ColumnTurns  = "turns"
+	ColumnHost   = "host"
+)
+
+// ToggleableColumns lists the optional session-list columns that can be
+// shown or hidden. The session name and attention indicator are always
+// shown and are not included here.
+var ToggleableColumns = []string{ColumnRepo, ColumnFolder, ColumnTurns, ColumnHost}
+
+// ColumnVisible reports whether the given session-list column should be
+// shown. A column is visible unless its key is present in HiddenColumns, so
+// the default (empty HiddenColumns) shows every column.
+func (c *Config) ColumnVisible(key string) bool {
+	for _, h := range c.HiddenColumns {
+		if h == key {
+			return false
+		}
+	}
+	return true
 }
 
 // Default returns a Config populated with sensible default values.

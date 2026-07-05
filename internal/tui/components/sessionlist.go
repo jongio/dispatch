@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/styles"
@@ -40,6 +41,7 @@ type SessionList struct {
 	gitStateMap    map[string]platform.GitState     // session ID → git workspace state
 	notesSet       map[string]struct{}              // session ID → has a user note
 	tagsSet        map[string]struct{}              // session ID → has tags
+	hiddenColumns  map[string]bool                  // optional column key → hidden
 	selected       map[string]struct{}              // session ID → selected for multi-open
 	treeMode       bool                             // true when showing grouped/tree view
 	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
@@ -135,6 +137,25 @@ func (s *SessionList) SetNoteSessions(set map[string]struct{}) {
 // used to render those sessions with a tag marker.
 func (s *SessionList) SetTagSessions(set map[string]struct{}) {
 	s.tagsSet = set
+}
+
+// SetHiddenColumns records which optional session-list columns should be
+// hidden. An empty or nil slice shows every column.
+func (s *SessionList) SetHiddenColumns(keys []string) {
+	if len(keys) == 0 {
+		s.hiddenColumns = nil
+		return
+	}
+	hs := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		hs[k] = true
+	}
+	s.hiddenColumns = hs
+}
+
+// columnHidden reports whether the given optional column key is hidden.
+func (s SessionList) columnHidden(key string) bool {
+	return s.hiddenColumns[key]
 }
 
 // SetAISessions updates the set of AI-found session IDs, used to
@@ -786,11 +807,15 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	// Status dots — each is a fixed 2 chars (icon + space) for alignment.
 	attDot := s.attentionDot(sess.ID, selected)
 
+	showHost := !s.columnHidden(config.ColumnHost)
 	hostDot := styles.IconHostType(sess.HostType)
 	if hostDot != "" {
 		hostDot += " "
 	} else {
 		hostDot = "  "
+	}
+	if !showHost {
+		hostDot = ""
 	}
 
 	plnDot := s.planDot(sess.ID, selected)
@@ -808,15 +833,23 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	const selectorW = 2
 	const dotW = 2     // attention dot + space
-	const hostDotW = 2 // host icon + space (always reserved)
 	const planDotW = 2 // plan dot + space
 	const noteDotW = 2 // note dot + space
 	const tagDotW = 2  // tag dot + space
 	const wrkDotW = 2  // work status dot + space
 	const gitDotW = 2  // git state dot + space
 	const timeW = 9
-	const turnsW = 5
 	const spacing = 2
+
+	hostDotW := 2 // host icon + space
+	if !showHost {
+		hostDotW = 0
+	}
+	showTurns := !s.columnHidden(config.ColumnTurns)
+	turnsW := 5
+	if !showTurns {
+		turnsW = 0
+	}
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
@@ -825,16 +858,27 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		return s.applyRowStyle(line, selected, hidden, favorited)
 	}
 
-	// Show folder/repo columns at wider terminals.
+	// Show folder/repo columns at wider terminals, honouring column visibility.
+	showFolder := !s.columnHidden(config.ColumnFolder)
+	showRepo := !s.columnHidden(config.ColumnRepo)
 	var folderW, repoW int
 	if w >= 120 {
-		folderW = 22
-		repoW = 18
+		if showFolder {
+			folderW = 22
+		}
+		if showRepo {
+			repoW = 18
+		}
 	} else if w >= 90 {
-		folderW = 18
+		if showFolder {
+			folderW = 18
+		}
 	}
 
-	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - tagDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - tagDotW - wrkDotW - gitDotW - timeW - spacing
+	if showTurns {
+		summaryW -= turnsW + spacing
+	}
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -870,8 +914,10 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	}
 	b.WriteString("  ")
 	b.WriteString(PadLeft(relTime, timeW))
-	b.WriteString("  ")
-	b.WriteString(PadLeft(turns, turnsW))
+	if showTurns {
+		b.WriteString("  ")
+		b.WriteString(PadLeft(turns, turnsW))
+	}
 
 	return s.applyRowStyle(b.String(), selected, hidden, favorited)
 }
