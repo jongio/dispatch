@@ -184,9 +184,9 @@ func TestKeybindingActionNames(t *testing.T) {
 }
 
 func TestApplyKeybindingOverrides_MatchesRemappedKey(t *testing.T) {
-	km, _ := applyKeybindingOverrides(defaultKeyMap(), map[string]string{"search": "z"})
-	if !key.Matches(tea.KeyPressMsg{Code: 'z'}, km.Search) {
-		t.Error("remapped search binding should match 'z'")
+	km, _ := applyKeybindingOverrides(defaultKeyMap(), map[string]string{"search": "u"})
+	if !key.Matches(tea.KeyPressMsg{Code: 'u'}, km.Search) {
+		t.Error("remapped search binding should match 'u'")
 	}
 	if key.Matches(tea.KeyPressMsg{Code: '/'}, km.Search) {
 		t.Error("search should no longer match its old '/' key")

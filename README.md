@@ -24,7 +24,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, created, turns) with toggleable direction
 - **Grouping (pivot) modes** (`Tab`) — flat, folder, repo, branch, date — displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
-- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Click the session ID row to copy it to clipboard
+- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Copy resume command** (`Y`) — copy the selected session's full resume command to the system clipboard. With a multi-select active, copies one resume command per selected session, one per line
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer on Windows, Finder on macOS, the default file manager on Linux)
@@ -218,6 +218,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `Tab` | Cycle grouping mode |
 | `p` | Toggle preview panel |
 | `P` | Cycle preview position (right → bottom → left → top) |
+| `z` | Toggle fullscreen preview |
 | `v` | View plan in preview pane |
 | `o` | Toggle conversation sort order (oldest/newest first) |
 | `c` | Copy session ID to clipboard |

@@ -43,7 +43,12 @@ func (m *Model) recalcLayout() {
 	isHorizontal := pos == config.PreviewPositionRight || pos == config.PreviewPositionLeft
 	isVertical := pos == config.PreviewPositionTop || pos == config.PreviewPositionBottom
 
-	if m.showPreview {
+	if m.previewFullscreen {
+		previewW = m.width
+		previewH = contentH
+		listW = 0
+		listH = 0
+	} else if m.showPreview {
 		if isHorizontal && m.width >= styles.PreviewMinWidth {
 			previewW = int(float64(m.width) * styles.PreviewWidthRatio)
 			previewH = contentH

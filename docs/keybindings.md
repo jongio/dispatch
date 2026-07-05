@@ -203,6 +203,13 @@
      - Behavior: Copies the selected session's resume command to the system clipboard using the same launch settings as Dispatch.
      - Condition: Only when a session is selected
 
+20f. **z** → Toggle Fullscreen Preview
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "fullscreen preview"))
+     - Handler: internal\tui\model.go (previewFullscreen toggle), internal\tui\layout.go (recalcLayout)
+     - Behavior: Expands the preview to fill the entire content area and hides the session list so a long conversation is easier to read. Press z again or Esc to restore the split layout. PgUp/PgDn scrolling still works, and toggling on shows the preview even when the split preview is hidden.
+     - Condition: In session list view
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))

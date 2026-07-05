@@ -27,6 +27,7 @@ type keyMap struct {
 	Pivot             key.Binding
 	PivotOrder        key.Binding
 	Preview           key.Binding
+	PreviewFullscreen key.Binding
 	Reindex           key.Binding
 	Help              key.Binding
 	Config            key.Binding
@@ -73,7 +74,7 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.PreviewFullscreen, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -83,7 +84,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
+		{k.Preview, k.PreviewFullscreen, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.Tags, k.Alias, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.CmdPalette, k.Quit},
@@ -112,6 +113,7 @@ func defaultKeyMap() keyMap {
 		Pivot:             key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "cycle pivot")),
 		PivotOrder:        key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "reverse pivot order")),
 		Preview:           key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "toggle preview")),
+		PreviewFullscreen: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "fullscreen preview")),
 		Reindex:           key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rebuild index")),
 		Help:              key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Config:            key.NewBinding(key.WithKeys(","), key.WithHelp(",", "settings")),
@@ -185,6 +187,7 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 		{"pivot", &km.Pivot},
 		{"pivot_order", &km.PivotOrder},
 		{"preview", &km.Preview},
+		{"preview_fullscreen", &km.PreviewFullscreen},
 		{"reindex", &km.Reindex},
 		{"help", &km.Help},
 		{"config", &km.Config},
