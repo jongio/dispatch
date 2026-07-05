@@ -207,6 +207,11 @@ type Config struct {
 	// and recently ahead of ones they rarely open.
 	SessionLaunches map[string]SessionLaunch `json:"sessionLaunches,omitempty"`
 
+	// SessionTags maps session IDs to a list of user-defined tags. Tags group
+	// related sessions for quick filtering with the tag: search token and are
+	// indicated by a marker in the session list.
+	SessionTags map[string][]string `json:"sessionTags,omitempty"`
+
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
 	// query the Copilot backend for semantically relevant sessions.

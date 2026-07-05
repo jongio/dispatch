@@ -37,6 +37,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
+- **Session tags** (`g`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
 - **Settings panel** (`,`) — 15 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -196,6 +197,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `h` | Hide/unhide current session |
 | `H` | Toggle visibility of hidden sessions |
 | `*` | Toggle favorite on current session |
+| `g` | Add or edit tags on current session |
 
 #### Search & Filter
 
@@ -311,6 +313,7 @@ Configuration is stored in the platform-specific config directory:
 | `hiddenSessions` | array | `[]` | Session IDs hidden from the main list |
 | `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
 | `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
+| `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
 
 #### Pane Direction Semantics
 

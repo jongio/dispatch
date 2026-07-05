@@ -59,6 +59,7 @@ type keyMap struct {
 	ScanWorkStatus    key.Binding
 	Export            key.Binding
 	Note              key.Binding
+	Tags              key.Binding
 	ShiftUp           key.Binding
 	ShiftDown         key.Binding
 	ViewSwitch        key.Binding
@@ -71,7 +72,7 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.Tags, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -82,7 +83,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
 		{k.Preview, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
-		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
+		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.Tags, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.CmdPalette, k.Quit},
 	}
@@ -142,6 +143,7 @@ func defaultKeyMap() keyMap {
 		ScanWorkStatus:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "scan work status")),
 		Export:            key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "export markdown")),
 		Note:              key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "edit note")),
+		Tags:              key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "edit tags")),
 		ShiftUp:           key.NewBinding(key.WithKeys("shift+up"), key.WithHelp("shift+\u2191", "extend select up")),
 		ShiftDown:         key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+\u2193", "extend select down")),
 		ViewSwitch:        key.NewBinding(key.WithKeys("V"), key.WithHelp("V", "switch view")),
@@ -213,6 +215,7 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 		{"scan_work_status", &km.ScanWorkStatus},
 		{"export", &km.Export},
 		{"note", &km.Note},
+		{"tags", &km.Tags},
 		{"shift_up", &km.ShiftUp},
 		{"shift_down", &km.ShiftDown},
 		{"view_switch", &km.ViewSwitch},

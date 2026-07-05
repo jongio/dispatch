@@ -96,6 +96,9 @@ type Theme struct {
 	// Note indicator style.
 	NoteIndicatorStyle lipgloss.Style
 
+	// Tag indicator style.
+	TagIndicatorStyle lipgloss.Style
+
 	// Work status indicator styles.
 	WorkCompleteStyle   lipgloss.Style
 	WorkIncompleteStyle lipgloss.Style
@@ -261,6 +264,9 @@ func (t *Theme) buildStyles() {
 
 	// Note indicator — BrightYellow from the ANSI palette.
 	t.NoteIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[11])).Bold(true)
+
+	// Tag indicator — BrightMagenta from the ANSI palette.
+	t.TagIndicatorStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[13])).Bold(true)
 
 	// Work status indicators — green (complete), yellow (incomplete), magenta (analyzing).
 	t.WorkCompleteStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[10])).Bold(true)   // BrightGreen

@@ -316,6 +316,7 @@ type Model struct {
 	sessionList     components.SessionList
 	searchBar       components.SearchBar
 	noteInput       components.NoteInput
+	tagInput        components.TagInput
 	filterPanel     components.FilterPanel
 	preview         components.PreviewPanel
 	help            components.HelpOverlay
@@ -335,6 +336,7 @@ type Model struct {
 	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
 	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
 	notesSet        map[string]struct{} // session ID → struct{} for fast note-existence lookup
+	tagsSet         map[string]struct{}
 	showFavorited   bool
 	activeView      string // name of the active named view (empty means Default)
 	reindexing      bool
@@ -347,6 +349,7 @@ type Model struct {
 	search       searchState
 	workStatus   workStatusState
 	searchFilter SearchFilter // structured tokens parsed from search bar input
+	tagFilter    string       // active tag: token; when set only show sessions carrying the tag
 
 	// initialQuery is a search string passed on the command line. It is
 	// applied once, when the session store first opens, then cleared.
@@ -457,6 +460,11 @@ func NewModel() Model {
 		notesSet[id] = struct{}{}
 	}
 
+	tagsSet := make(map[string]struct{}, len(cfg.SessionTags))
+	for id := range cfg.SessionTags {
+		tagsSet[id] = struct{}{}
+	}
+
 	m := Model{
 		state: stateLoading,
 		cfg:   cfg,
@@ -472,10 +480,12 @@ func NewModel() Model {
 		hiddenSet:       hiddenSet,
 		favoritedSet:    favoritedSet,
 		notesSet:        notesSet,
+		tagsSet:         tagsSet,
 
 		sessionList:     components.NewSessionList(),
 		searchBar:       components.NewSearchBar(),
 		noteInput:       components.NewNoteInput(),
+		tagInput:        components.NewTagInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
 		help:            components.NewHelpOverlay(),
@@ -1061,6 +1071,40 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// ---------- Tag input focused -------------------------------------------
+	if m.tagInput.Focused() {
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.tagInput.Blur()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			sessionID := m.tagInput.SessionID()
+			tags := config.ParseTags(m.tagInput.Value())
+			m.tagInput.Blur()
+
+			m.cfg.SetTags(sessionID, tags)
+			if len(tags) == 0 {
+				delete(m.tagsSet, sessionID)
+			} else {
+				m.tagsSet[sessionID] = struct{}{}
+			}
+
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+			}
+
+			m.sessionList.SetTagSessions(m.tagsSet)
+			m.statusInfo = "Tags saved"
+			return m, clearStatusAfter(2 * time.Second)
+		default:
+			var cmd tea.Cmd
+			ti := m.tagInput
+			ti, cmd = ti.Update(msg)
+			m.tagInput = ti
+			return m, cmd
+		}
+	}
+
 	// ---------- Search bar focused ----------------------------------------
 	if m.searchBar.Focused() {
 		switch {
@@ -1419,6 +1463,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Note):
 		return m.handleEditNote()
 
+	case key.Matches(msg, keys.Tags):
+		return m.handleEditTags()
+
 	case key.Matches(msg, keys.CopyID):
 		return m.handleCopyID()
 
@@ -1683,6 +1730,17 @@ func (m Model) handleEditNote() (tea.Model, tea.Cmd) {
 		currentNote = m.cfg.SessionNotes[sess.ID]
 	}
 	cmd := m.noteInput.Focus(sess.ID, currentNote)
+	return m, cmd
+}
+
+// handleEditTags opens the inline tag input for the currently selected session.
+func (m Model) handleEditTags() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	current := strings.Join(m.cfg.TagsFor(sess.ID), ", ")
+	cmd := m.tagInput.Focus(sess.ID, current)
 	return m, cmd
 }
 
@@ -2652,6 +2710,12 @@ func (m Model) renderFooter() string {
 		return m.noteInput.View()
 	}
 
+	// When tag input is active, show it instead of the normal footer.
+	if m.tagInput.Focused() {
+		m.tagInput.SetWidth(m.width)
+		return m.tagInput.View()
+	}
+
 	count := m.sessionList.SessionCount()
 
 	// Left: session count + active filter summary.
@@ -2890,6 +2954,7 @@ func (m *Model) syncSessionListStatuses() {
 	m.sessionList.SetHiddenSessions(m.visibleHiddenSet())
 	m.sessionList.SetFavoritedSessions(m.favoritedSet)
 	m.sessionList.SetNoteSessions(m.notesSet)
+	m.sessionList.SetTagSessions(m.tagsSet)
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 	m.sessionList.SetPlanStatuses(m.planMap)
 	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
@@ -2915,6 +2980,7 @@ func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
 	sessions = m.filterPlanSessions(sessions)
 	sessions = m.filterWorkStatusSessions(sessions)
 	sessions = m.filterGitDirtySessions(sessions)
+	sessions = m.filterTaggedSessions(sessions)
 	return sessions
 }
 
@@ -2927,7 +2993,34 @@ func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGrou
 	groups = m.filterPlanGroups(groups)
 	groups = m.filterWorkStatusGroups(groups)
 	groups = m.filterGitDirtyGroups(groups)
+	groups = m.filterTaggedGroups(groups)
 	return groups
+}
+
+// ---------------------------------------------------------------------------
+// Tag filtering
+// ---------------------------------------------------------------------------
+
+// filterTaggedSessions keeps only sessions carrying the active tag filter.
+// When no tag filter is set the input is returned unchanged.
+func (m *Model) filterTaggedSessions(sessions []data.Session) []data.Session {
+	if m.tagFilter == "" {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		return m.cfg.HasTag(s.ID, m.tagFilter)
+	})
+}
+
+// filterTaggedGroups keeps only sessions carrying the active tag filter
+// within each group. When no tag filter is set the input is returned unchanged.
+func (m *Model) filterTaggedGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if m.tagFilter == "" {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		return m.cfg.HasTag(s.ID, m.tagFilter)
+	})
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ func (m *Model) applySearchTokens() {
 	m.filter.Branch = sf.Branch
 	m.filter.Folder = sf.Folder
 	m.filter.HostType = sf.Host
+	m.tagFilter = sf.Tag
 
 	// Status token maps to the attention filter.
 	if sf.Status != "" {
@@ -44,6 +45,7 @@ func (m *Model) clearSearchTokenFilters() {
 	m.filter.Branch = ""
 	m.filter.Folder = ""
 	m.filter.HostType = ""
+	m.tagFilter = ""
 	m.attentionFilter = make(map[data.AttentionStatus]struct{})
 	m.filterPlans = false
 	m.showFavorited = false
