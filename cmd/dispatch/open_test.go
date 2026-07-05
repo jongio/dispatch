@@ -1,23 +1,27 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/update"
 )
 
 func TestParseOpenArgs(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		wantID   string
-		wantMode string
-		wantLast bool
-		wantErr  bool
+		name      string
+		args      []string
+		wantID    string
+		wantMode  string
+		wantLast  bool
+		wantPrint bool
+		wantErr   bool
 	}{
 		{name: "id only", args: []string{"open", "abc123"}, wantID: "abc123"},
 		{name: "mode space", args: []string{"open", "abc", "--mode", "window"}, wantID: "abc", wantMode: "window"},
@@ -27,6 +31,9 @@ func TestParseOpenArgs(t *testing.T) {
 		{name: "last", args: []string{"open", "--last"}, wantLast: true},
 		{name: "last short", args: []string{"open", "-l"}, wantLast: true},
 		{name: "last with mode", args: []string{"open", "--last", "--mode", "window"}, wantLast: true, wantMode: "window"},
+		{name: "print flag", args: []string{"open", "abc", "--print"}, wantID: "abc", wantPrint: true},
+		{name: "print before id", args: []string{"open", "--print", "abc"}, wantID: "abc", wantPrint: true},
+		{name: "print with mode", args: []string{"open", "abc", "--print", "--mode", "tab"}, wantID: "abc", wantMode: "tab", wantPrint: true},
 		{name: "missing id", args: []string{"open"}, wantErr: true},
 		{name: "missing id with mode", args: []string{"open", "--mode", "tab"}, wantErr: true},
 		{name: "two ids", args: []string{"open", "a", "b"}, wantErr: true},
@@ -37,7 +44,7 @@ func TestParseOpenArgs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, last, err := parseOpenArgs(tc.args)
+			id, mode, last, printCmd, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got id=%q mode=%q last=%v", id, mode, last)
@@ -55,6 +62,9 @@ func TestParseOpenArgs(t *testing.T) {
 			}
 			if last != tc.wantLast {
 				t.Errorf("last = %v, want %v", last, tc.wantLast)
+			}
+			if printCmd != tc.wantPrint {
+				t.Errorf("print = %v, want %v", printCmd, tc.wantPrint)
 			}
 		})
 	}
@@ -185,6 +195,43 @@ func TestRunOpen_UnknownAliasFallsBackToID(t *testing.T) {
 	}
 	if capture.gotID != "raw-id" {
 		t.Errorf("id = %q, want raw-id (fallback)", capture.gotID)
+	}
+}
+
+func TestRunOpen_Print(t *testing.T) {
+	cfg := config.Default()
+	sess := &data.Session{ID: "sess-1", Cwd: "/tmp/project"}
+	capture := withOpenStubs(t, cfg, sess, nil)
+
+	origResume := openResumeCmdFn
+	openResumeCmdFn = func(id string, _ platform.ResumeConfig) (string, error) {
+		return "copilot --resume " + id, nil
+	}
+	t.Cleanup(func() { openResumeCmdFn = origResume })
+
+	var buf bytes.Buffer
+	if err := runOpen(&buf, []string{"open", "sess-1", "--print"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capture.launched {
+		t.Error("expected --print to skip launching")
+	}
+	if got := strings.TrimSpace(buf.String()); got != "copilot --resume sess-1" {
+		t.Errorf("output = %q, want %q", got, "copilot --resume sess-1")
+	}
+}
+
+func TestRunOpen_PrintError(t *testing.T) {
+	withOpenStubs(t, config.Default(), &data.Session{ID: "s"}, nil)
+
+	origResume := openResumeCmdFn
+	openResumeCmdFn = func(string, platform.ResumeConfig) (string, error) {
+		return "", errors.New("no cli")
+	}
+	t.Cleanup(func() { openResumeCmdFn = origResume })
+
+	if err := runOpen(io.Discard, []string{"open", "s", "--print"}); err == nil {
+		t.Fatal("expected resume command error to propagate")
 	}
 }
 
