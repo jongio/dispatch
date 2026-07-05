@@ -239,6 +239,10 @@ const (
 	// (Waiting > Active > Stale > Idle). This is applied post-load
 	// in the TUI layer since attention status is computed at runtime.
 	SortByAttention SortField = "attention"
+	// SortByFrecency ranks sessions by how often and how recently the user
+	// has launched them. Like attention, it is applied post-load in the TUI
+	// layer because launch statistics live in the user config, not the store.
+	SortByFrecency SortField = "frecency"
 )
 
 // SortOrder indicates ascending or descending sort direction.

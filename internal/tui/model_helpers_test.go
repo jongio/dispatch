@@ -717,8 +717,13 @@ func TestCycleSort(t *testing.T) {
 	}
 
 	m.cycleSort()
+	if m.sort.Field != data.SortByFrecency {
+		t.Errorf("after fourth cycle: %v, want SortByFrecency", m.sort.Field)
+	}
+
+	m.cycleSort()
 	if m.sort.Field != data.SortByUpdated {
-		t.Errorf("after fourth cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
+		t.Errorf("after fifth cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
 	}
 }
 
