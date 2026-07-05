@@ -22,6 +22,7 @@ require (
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dlclark/regexp2/v2 v2.2.2 // indirect
 	golang.org/x/tools v0.47.0 // indirect
+	modernc.org/ccgo/v4 v4.34.6 // indirect
 	modernc.org/gc/v3 v3.1.5 // indirect
 )
 
@@ -36,8 +37,8 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260703014108-f5a850f9c2b7 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
-	github.com/charmbracelet/x/exp/golden v0.0.0-20260629091435-9c70f75e26a4 // indirect
-	github.com/charmbracelet/x/exp/slice v0.0.0-20260629091435-9c70f75e26a4 // indirect
+	github.com/charmbracelet/x/exp/golden v0.0.0-20260705004817-2cc9a8fe1146 // indirect
+	github.com/charmbracelet/x/exp/slice v0.0.0-20260705004817-2cc9a8fe1146 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
