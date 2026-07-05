@@ -92,6 +92,7 @@ func TestRunCompletion_SupportedShells(t *testing.T) {
 	}{
 		{"bash", "complete -F _dispatch_completion dispatch disp"},
 		{"zsh", "#compdef dispatch disp"},
+		{"fish", "complete -c $bin"},
 		{"powershell", "Register-ArgumentCompleter"},
 		{"pwsh", "Register-ArgumentCompleter"},
 	} {
@@ -109,7 +110,7 @@ func TestRunCompletion_SupportedShells(t *testing.T) {
 
 func TestRunCompletion_UnsupportedShell(t *testing.T) {
 	var buf bytes.Buffer
-	err := runCompletion(&buf, "fish")
+	err := runCompletion(&buf, "tcsh")
 	if err == nil {
 		t.Fatal("expected error for unsupported shell")
 	}

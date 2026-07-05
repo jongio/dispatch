@@ -68,7 +68,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 
 		case "completion":
 			if len(args) < 2 {
-				err := errors.New("completion requires a shell: bash, zsh, or powershell")
+				err := errors.New("completion requires a shell: bash, zsh, fish, or powershell")
 				fmt.Fprintf(os.Stderr, "completion: %v\n", err)
 				return true, cleanup, "", err
 			}
@@ -191,10 +191,12 @@ func runCompletion(w io.Writer, shell string) error {
 		fmt.Fprint(w, bashCompletionScript)
 	case "zsh":
 		fmt.Fprint(w, zshCompletionScript)
+	case "fish":
+		fmt.Fprint(w, fishCompletionScript)
 	case "powershell", "pwsh":
 		fmt.Fprint(w, powershellCompletionScript)
 	default:
-		return fmt.Errorf("unsupported shell %q (want bash, zsh, or powershell)", shell)
+		return fmt.Errorf("unsupported shell %q (want bash, zsh, fish, or powershell)", shell)
 	}
 	return nil
 }
@@ -211,7 +213,7 @@ _dispatch_completion() {
   fi
 
   if [[ "${COMP_WORDS[1]}" == "completion" ]]; then
-    COMPREPLY=( $(compgen -W "bash zsh powershell" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "${cur}") )
     return 0
   fi
 
@@ -227,7 +229,7 @@ const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands shells flags configsubs
   commands=(help version open new doctor update completion stats config export)
-  shells=(bash zsh powershell)
+  shells=(bash zsh fish powershell)
   configsubs=(list get set path)
   flags=(-h --help -v --version --demo --clear-cache --reindex)
 
@@ -249,10 +251,29 @@ _dispatch_completion() {
 _dispatch_completion "$@"
 `
 
+const fishCompletionScript = `# fish completion for dispatch and disp
+function __dispatch_needs_command
+  set -l cmd (commandline -opc)
+  test (count $cmd) -eq 1
+end
+
+function __dispatch_using_completion
+  set -l cmd (commandline -opc)
+  test (count $cmd) -ge 2; and test $cmd[2] = completion
+end
+
+for bin in dispatch disp
+  complete -c $bin -f
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats config export'
+  complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex'
+  complete -c $bin -n '__dispatch_using_completion' -a 'bash zsh fish powershell'
+end
+`
+
 const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'config', 'export')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
-$script:DispatchShells = @('bash', 'zsh', 'powershell')
+$script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'path')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {

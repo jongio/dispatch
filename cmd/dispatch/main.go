@@ -95,7 +95,7 @@ Commands:
                           --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
   new [dir] [--mode M]    Start a new session in a directory (default: current)
-  completion <shell>      Print shell completion (bash, zsh, powershell)
+  completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   config [get|set|list|path]

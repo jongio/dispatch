@@ -182,6 +182,7 @@ Print completion scripts for supported shells:
 ```sh
 dispatch completion bash
 dispatch completion zsh
+dispatch completion fish
 dispatch completion powershell
 ```
 
