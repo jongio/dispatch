@@ -149,6 +149,37 @@ func TestRunOpen_HappyPath(t *testing.T) {
 	}
 }
 
+func TestRunOpen_ResolvesAlias(t *testing.T) {
+	cfg := config.Default()
+	cfg.SessionAliases = map[string]string{"sess-1": "authfix"}
+	sess := &data.Session{ID: "sess-1", Cwd: "/tmp/project"}
+	capture := withOpenStubs(t, cfg, sess, nil)
+
+	if err := runOpen(io.Discard, []string{"open", "authfix"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capture.gotID != "sess-1" {
+		t.Errorf("resolved id = %q, want sess-1", capture.gotID)
+	}
+	if !capture.launched {
+		t.Fatal("expected launch to be invoked")
+	}
+}
+
+func TestRunOpen_UnknownAliasFallsBackToID(t *testing.T) {
+	cfg := config.Default()
+	cfg.SessionAliases = map[string]string{"sess-1": "authfix"}
+	sess := &data.Session{ID: "raw-id", Cwd: "/tmp/p"}
+	capture := withOpenStubs(t, cfg, sess, nil)
+
+	if err := runOpen(io.Discard, []string{"open", "raw-id"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capture.gotID != "raw-id" {
+		t.Errorf("id = %q, want raw-id (fallback)", capture.gotID)
+	}
+}
+
 func TestRunOpen_NotFound(t *testing.T) {
 	withOpenStubs(t, config.Default(), nil, nil)
 	err := runOpen(io.Discard, []string{"open", "missing"})

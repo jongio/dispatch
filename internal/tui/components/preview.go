@@ -18,6 +18,7 @@ type PreviewPanel struct {
 	detail          *data.SessionDetail
 	attentionStatus data.AttentionStatus
 	note            string // user note for the current session
+	alias           string // user-chosen alias for the current session
 	width           int
 	height          int
 	scroll          int
@@ -89,6 +90,12 @@ func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 // SetNote updates the user note shown at the top of the preview.
 func (p *PreviewPanel) SetNote(note string) {
 	p.note = note
+	p.updateTotalLines()
+}
+
+// SetAlias updates the alias shown at the top of the preview.
+func (p *PreviewPanel) SetAlias(alias string) {
+	p.alias = alias
 	p.updateTotalLines()
 }
 
@@ -583,6 +590,12 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 	}
 
 	// ── Note ──
+	if p.alias != "" {
+		aliasLabel := styles.PreviewLabelStyle.Render(styles.IconAlias() + " Alias: ")
+		aliasValue := styles.NoteIndicatorStyle.Render(p.alias)
+		b.WriteString(aliasLabel + aliasValue + "\n\n")
+	}
+
 	if p.note != "" {
 		noteLabel := styles.PreviewLabelStyle.Render(styles.IconNote() + " Note: ")
 		noteValue := styles.NoteIndicatorStyle.Render(wordWrap(p.note, max(1, contentW-lipgloss.Width(noteLabel))))

@@ -259,6 +259,7 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	} else {
 		m.preview.SetNote("")
 	}
+	m.preview.SetAlias(m.cfg.AliasFor(m.detail.Session.ID))
 	m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
 	m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 	if result, ok := m.workStatus.workStatusMap[m.detail.Session.ID]; ok {

@@ -212,6 +212,11 @@ type Config struct {
 	// indicated by a marker in the session list.
 	SessionTags map[string][]string `json:"sessionTags,omitempty"`
 
+	// SessionAliases maps session IDs to a single short, user-chosen alias.
+	// Aliases are unique and let "dispatch open <alias>" resume a session
+	// without typing the full ID.
+	SessionAliases map[string]string `json:"sessionAliases,omitempty"`
+
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
 	// query the Copilot backend for semantically relevant sessions.
