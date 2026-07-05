@@ -154,6 +154,11 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 	t.Setenv("DISPATCH_DB", db)
 	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
+	origCount, origVer := doctorSessionCountFn, doctorCopilotVersionFn
+	doctorSessionCountFn = func() int { return 7 }
+	doctorCopilotVersionFn = func(string) string { return "1.2.3" }
+	t.Cleanup(func() { doctorSessionCountFn, doctorCopilotVersionFn = origCount, origVer })
+
 	var buf bytes.Buffer
 	runDoctor(&buf)
 	out := buf.String()
@@ -165,6 +170,7 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 		"Session store: found",
 		"Session state: found",
 		"Copilot CLI:",
+		"Stored sessions: 7",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output missing %q:\n%s", want, out)
@@ -180,6 +186,10 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("DISPATCH_DB", db)
 	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
+
+	origCount := doctorSessionCountFn
+	doctorSessionCountFn = func() int { return 3 }
+	t.Cleanup(func() { doctorSessionCountFn = origCount })
 
 	var buf bytes.Buffer
 	if err := runDoctorJSON(&buf); err != nil {
@@ -202,8 +212,17 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	if r.SessionState.Status != statusFound {
 		t.Errorf("session_state status = %q, want %q", r.SessionState.Status, statusFound)
 	}
+	if r.SessionCount != 3 {
+		t.Errorf("session_count = %d, want 3", r.SessionCount)
+	}
 	if !strings.HasSuffix(buf.String(), "}\n") {
 		t.Errorf("JSON output should end with a single newline, got:\n%q", buf.String())
+	}
+}
+
+func TestDefaultCopilotVersion_EmptyBinary(t *testing.T) {
+	if got := defaultCopilotVersion(""); got != "" {
+		t.Errorf("defaultCopilotVersion(\"\") = %q, want empty", got)
 	}
 }
 

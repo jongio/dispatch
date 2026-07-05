@@ -999,6 +999,15 @@ func (s *Store) ListBranches(ctx context.Context, repository string) ([]string, 
 	return s.distinctStrings(ctx, "SELECT DISTINCT branch FROM sessions WHERE branch IS NOT NULL AND branch != '' ORDER BY branch")
 }
 
+// CountSessions returns the total number of sessions stored.
+func (s *Store) CountSessions(ctx context.Context) (int, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sessions").Scan(&n); err != nil {
+		return 0, fmt.Errorf("counting sessions: %w", err)
+	}
+	return n, nil
+}
+
 // GroupSessions groups sessions by the specified pivot field, applying the
 // given filter and sort order within each group.
 func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {

@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
@@ -35,6 +37,12 @@ var (
 	maintainFn         = data.Maintain
 	runUpdateFn        = update.RunUpdate
 	configResetFn      = config.Reset
+
+	// doctorCopilotVersionFn resolves the Copilot CLI version string for the
+	// doctor report; doctorSessionCountFn counts stored sessions. Both are
+	// seams so tests can substitute them without touching the environment.
+	doctorCopilotVersionFn = defaultCopilotVersion
+	doctorSessionCountFn   = defaultSessionCount
 )
 
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), query string, err error) {
@@ -248,12 +256,14 @@ type doctorEntry struct {
 // Both the text and JSON renderers consume this struct so their outputs stay
 // in sync.
 type doctorReport struct {
-	Version      string      `json:"version"`
-	OS           string      `json:"os"`
-	Config       doctorEntry `json:"config"`
-	SessionStore doctorEntry `json:"session_store"`
-	SessionState doctorEntry `json:"session_state"`
-	CopilotCLI   doctorEntry `json:"copilot_cli"`
+	Version        string      `json:"version"`
+	OS             string      `json:"os"`
+	Config         doctorEntry `json:"config"`
+	SessionStore   doctorEntry `json:"session_store"`
+	SessionState   doctorEntry `json:"session_state"`
+	CopilotCLI     doctorEntry `json:"copilot_cli"`
+	CopilotVersion string      `json:"copilot_version"`
+	SessionCount   int         `json:"session_count"`
 }
 
 // collectDoctorReport gathers the environment diagnostics once so they can be
@@ -286,9 +296,52 @@ func collectDoctorReport() doctorReport {
 		r.CopilotCLI = doctorEntry{Status: statusMissing}
 	} else {
 		r.CopilotCLI = doctorEntry{Path: p, Status: statusFound}
+		r.CopilotVersion = doctorCopilotVersionFn(p)
 	}
 
+	r.SessionCount = doctorSessionCountFn()
+
 	return r
+}
+
+// defaultCopilotVersion runs the Copilot CLI binary with --version and returns
+// the first line of its output. It returns "unknown" when the binary cannot be
+// run, keeping the doctor command non-fatal when the CLI misbehaves.
+func defaultCopilotVersion(binary string) string {
+	if binary == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "--version").Output()
+	if err != nil {
+		return "unknown"
+	}
+	line := strings.TrimSpace(string(out))
+	if i := strings.IndexByte(line, '\n'); i >= 0 {
+		line = strings.TrimSpace(line[:i])
+	}
+	if line == "" {
+		return "unknown"
+	}
+	return line
+}
+
+// defaultSessionCount returns the number of stored sessions, degrading to 0
+// when the store cannot be opened or queried so the doctor command stays
+// non-fatal.
+func defaultSessionCount() int {
+	store, err := data.Open()
+	if err != nil {
+		return 0
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	n, err := store.CountSessions(context.Background())
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // pathStatus stats a path and reports whether it is found, missing, or the
@@ -320,6 +373,13 @@ func runDoctor(w io.Writer) {
 	writeDoctorLine(w, "Session store", r.SessionStore, false)
 	writeDoctorLine(w, "Session state", r.SessionState, true)
 	writeDoctorLine(w, "Copilot CLI", r.CopilotCLI, false)
+
+	if r.CopilotVersion != "" {
+		fmt.Fprintf(w, "Copilot CLI version: %s\n", r.CopilotVersion)
+	} else {
+		fmt.Fprintf(w, "Copilot CLI version: not detected\n")
+	}
+	fmt.Fprintf(w, "Stored sessions: %d\n", r.SessionCount)
 }
 
 // runDoctorJSON writes the diagnostics as a single JSON object followed by a

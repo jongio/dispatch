@@ -2845,3 +2845,25 @@ func TestLastActive_StaleTurnsVisibleInDayFilter(t *testing.T) {
 		t.Errorf("expected s1, got %s", sessions[0].ID)
 	}
 }
+
+func TestCountSessions(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	if n, err := s.CountSessions(context.Background()); err != nil {
+		t.Fatalf("CountSessions on empty store: %v", err)
+	} else if n != 0 {
+		t.Fatalf("empty store count = %d, want 0", n)
+	}
+
+	seedSession(t, s.db, "c1", "/tmp/a", "owner/repo", "main", "one", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z")
+	seedSession(t, s.db, "c2", "/tmp/b", "owner/repo", "main", "two", "2024-01-02T00:00:00Z", "2024-01-02T00:00:00Z")
+
+	n, err := s.CountSessions(context.Background())
+	if err != nil {
+		t.Fatalf("CountSessions: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("count = %d, want 2", n)
+	}
+}
