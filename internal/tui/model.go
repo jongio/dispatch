@@ -3148,6 +3148,25 @@ func attentionPriority(status data.AttentionStatus) int {
 	}
 }
 
+// sortByFrecency re-sorts the session slice by frecency when the current
+// sort field is SortByFrecency. Sessions the user launches often and
+// recently sort first; sessions with no launch history keep their incoming
+// (updated-time) order via a stable sort.
+func (m *Model) sortByFrecency(sessions []data.Session) {
+	if m.sort.Field != data.SortByFrecency {
+		return
+	}
+	now := time.Now()
+	slices.SortStableFunc(sessions, func(a, b data.Session) int {
+		sa := config.FrecencyScore(m.cfg.SessionLaunches[a.ID], now)
+		sb := config.FrecencyScore(m.cfg.SessionLaunches[b.ID], now)
+		if m.sort.Order == data.Ascending {
+			return cmp.Compare(sa, sb)
+		}
+		return cmp.Compare(sb, sa)
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Sort / pivot cycling
 // ---------------------------------------------------------------------------
@@ -3157,6 +3176,7 @@ var sortFields = []data.SortField{
 	data.SortByFolder,
 	data.SortByName,
 	data.SortByAttention,
+	data.SortByFrecency,
 }
 
 func (m *Model) cycleSort() {
@@ -3254,6 +3274,8 @@ func sortDisplayLabel(f data.SortField) string {
 		return "name"
 	case data.SortByAttention:
 		return "attention"
+	case data.SortByFrecency:
+		return "frecency"
 	default:
 		return "updated"
 	}
@@ -3439,6 +3461,7 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 // runs the Copilot CLI session resume in the current terminal, and quits
 // the TUI when the session ends.
 func (m *Model) launchInPlace(sessionID, cwd string) tea.Cmd {
+	m.recordLaunch(sessionID)
 	cfg := m.resumeConfigForSession(cwd)
 	cmd, err := platform.NewResumeCmd(sessionID, cfg)
 	if err != nil {
@@ -3464,6 +3487,7 @@ func launchStyleForMode(mode string) string {
 
 // launchExternal opens the session in a new tab, window, or pane depending on launchStyle.
 func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchStyle string) tea.Cmd {
+	m.recordLaunch(sessionID)
 	cfg := m.resumeConfigForSession(cwd)
 	cfg.LaunchStyle = launchStyle
 	return func() tea.Msg {
@@ -3486,6 +3510,17 @@ func (m Model) resumeConfigForSession(cwd string) platform.ResumeConfig {
 		Cwd:           cwd,
 		PaneDirection: m.cfg.EffectivePaneDirection(),
 	}
+}
+
+// recordLaunch stamps a session launch in the config so the frecency sort
+// can rank frequently and recently launched sessions first. Empty IDs (new
+// sessions started from a folder) are ignored.
+func (m *Model) recordLaunch(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	m.cfg.RecordLaunch(sessionID, time.Now())
+	m.saveConfig()
 }
 
 func (m Model) selectedSessionID() string {
@@ -4300,6 +4335,8 @@ func sortFieldFromConfig(s string) data.SortField {
 		return data.SortByName
 	case pivotFolder, "cwd":
 		return data.SortByFolder
+	case "frecency":
+		return data.SortByFrecency
 	default:
 		return data.SortByUpdated
 	}
@@ -4315,6 +4352,8 @@ func sortFieldToConfig(f data.SortField) string {
 		return "name"
 	case data.SortByFolder:
 		return "folder"
+	case data.SortByFrecency:
+		return "frecency"
 	default:
 		return "updated"
 	}

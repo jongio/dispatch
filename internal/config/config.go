@@ -79,7 +79,7 @@ func (v *NamedView) Validate() error {
 	}
 	if v.Sort != "" {
 		switch v.Sort {
-		case SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder:
+		case SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder, SortFieldFrecency:
 		default:
 			return fmt.Errorf("named view %q: invalid sort %q", v.Name, v.Sort)
 		}
@@ -201,6 +201,11 @@ type Config struct {
 	// is needed. They are displayed in the preview panel and indicated
 	// by a marker in the session list.
 	SessionNotes map[string]string `json:"sessionNotes,omitempty"`
+
+	// SessionLaunches maps session IDs to their launch statistics. It is
+	// used by the frecency sort to rank sessions the user launches often
+	// and recently ahead of ones they rarely open.
+	SessionLaunches map[string]SessionLaunch `json:"sessionLaunches,omitempty"`
 
 	// AISearch enables Copilot SDK-powered AI search. When false (the
 	// default), only the local FTS5 index is used.  Set to true to also
@@ -338,11 +343,12 @@ const (
 
 // Sort field constants for NamedView.Sort and DefaultSort.
 const (
-	SortFieldUpdated = "updated"
-	SortFieldCreated = "created"
-	SortFieldTurns   = "turns"
-	SortFieldName    = "name"
-	SortFieldFolder  = "folder"
+	SortFieldUpdated  = "updated"
+	SortFieldCreated  = "created"
+	SortFieldTurns    = "turns"
+	SortFieldName     = "name"
+	SortFieldFolder   = "folder"
+	SortFieldFrecency = "frecency"
 )
 
 // Pivot mode constants for NamedView.Pivot.
