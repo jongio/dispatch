@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -284,6 +285,20 @@ func (m Model) handleDataError(msg dataErrorMsg) (Model, tea.Cmd) { //nolint:unp
 	return m, nil
 }
 
+// bellFn writes the terminal bell (BEL) character. It is a package variable so
+// tests can swap it out to observe that the bell fired without touching stdout.
+var bellFn = func() {
+	fmt.Fprint(os.Stdout, "\a")
+}
+
+// bellCmd returns a command that rings the terminal bell.
+func bellCmd() tea.Cmd {
+	return func() tea.Msg {
+		bellFn()
+		return nil
+	}
+}
+
 // ----- Attention scanning --------------------------------------------------
 
 func (m Model) handleAttentionQuickScanned(msg attentionQuickScannedMsg) (Model, tea.Cmd) {
@@ -308,7 +323,66 @@ func (m Model) handleAttentionScanned(msg attentionScannedMsg) (Model, tea.Cmd) 
 	if len(m.attentionFilter) > 0 {
 		cmds = append(cmds, m.loadSessionsCmd())
 	}
+	// Ring the bell when a session newly enters the waiting state.
+	if bell := m.notifyWaiting(msg.statuses); bell != nil {
+		cmds = append(cmds, bell)
+	}
 	return m, tea.Batch(cmds...)
+}
+
+// notifyWaiting detects sessions that transitioned into the waiting state
+// since the previous scan and, when the notify_on_waiting setting is enabled,
+// rings the terminal bell once and sets a short footer message. The first scan
+// after startup only records a baseline so sessions already waiting when
+// dispatch launches do not trigger the bell. It returns a tea.Cmd that rings
+// the bell (and clears the footer), or nil when nothing should be signalled.
+func (m *Model) notifyWaiting(statuses map[string]data.AttentionStatus) tea.Cmd {
+	newly := m.recordWaitingTransitions(statuses)
+
+	// The first scan just establishes the baseline; never notify on it.
+	if !m.attentionScanned {
+		m.attentionScanned = true
+		return nil
+	}
+	if newly == 0 || !m.cfg.NotifyOnWaiting {
+		return nil
+	}
+
+	waiting := len(m.waitingNotified)
+	if waiting == 1 {
+		m.statusInfo = "1 session is waiting"
+	} else {
+		m.statusInfo = fmt.Sprintf("%d sessions are waiting", waiting)
+	}
+	return tea.Batch(bellCmd(), clearStatusAfter(4*time.Second))
+}
+
+// recordWaitingTransitions updates the set of sessions that have already
+// triggered a waiting notification and returns how many sessions newly entered
+// the waiting state. Sessions that leave the waiting state (or disappear) are
+// dropped so a later re-entry notifies again.
+func (m *Model) recordWaitingTransitions(statuses map[string]data.AttentionStatus) int {
+	if m.waitingNotified == nil {
+		m.waitingNotified = make(map[string]struct{})
+	}
+	newly := 0
+	for id, st := range statuses {
+		if st == data.AttentionWaiting {
+			if _, seen := m.waitingNotified[id]; !seen {
+				m.waitingNotified[id] = struct{}{}
+				newly++
+			}
+		} else {
+			delete(m.waitingNotified, id)
+		}
+	}
+	// Forget sessions that are no longer reported at all.
+	for id := range m.waitingNotified {
+		if _, ok := statuses[id]; !ok {
+			delete(m.waitingNotified, id)
+		}
+	}
+	return newly
 }
 
 func (m Model) handleAttentionTick() (Model, tea.Cmd) {

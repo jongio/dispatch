@@ -34,6 +34,7 @@ const (
 	cfgRedactSecrets
 	cfgExcludedWords
 	cfgAutoRefresh
+	cfgNotifyOnWaiting
 	cfgFieldCount
 )
 
@@ -58,6 +59,7 @@ type ConfigPanel struct {
 	redactSecrets     bool
 	excludedWords     string // comma-separated list of filter words
 	autoRefresh       string // session-list auto-refresh seconds ("" default, "0" off)
+	notifyOnWaiting   bool
 
 	// Available options for cycling.
 	terminals  []string
@@ -104,6 +106,7 @@ type ConfigValues struct {
 	RedactSecrets     bool
 	ExcludedWords     string // comma-separated filter words
 	AutoRefresh       string // auto-refresh seconds ("" default, "0" off)
+	NotifyOnWaiting   bool
 }
 
 // SetValues loads the config panel state from external values.
@@ -122,6 +125,7 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.redactSecrets = v.RedactSecrets
 	c.excludedWords = v.ExcludedWords
 	c.autoRefresh = v.AutoRefresh
+	c.notifyOnWaiting = v.NotifyOnWaiting
 }
 
 // Values returns the current state of all editable fields.
@@ -141,6 +145,7 @@ func (c *ConfigPanel) Values() ConfigValues {
 		RedactSecrets:     c.redactSecrets,
 		ExcludedWords:     c.excludedWords,
 		AutoRefresh:       c.autoRefresh,
+		NotifyOnWaiting:   c.notifyOnWaiting,
 	}
 }
 
@@ -243,6 +248,8 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.previewPosition = cyclePreviewPosition(c.previewPosition)
 	case cfgRedactSecrets:
 		c.redactSecrets = !c.redactSecrets
+	case cfgNotifyOnWaiting:
+		c.notifyOnWaiting = !c.notifyOnWaiting
 	default:
 		// cfgFieldCount is a sentinel; no action needed.
 	}
@@ -322,6 +329,7 @@ func (c ConfigPanel) View() string {
 		{"Redact Secrets", boolDisplay(c.redactSecrets), false},
 		{"Excluded Words", stringDisplay(c.excludedWords), false},
 		{"Auto Refresh", autoRefreshDisplay(c.autoRefresh), false},
+		{"Notify On Waiting", boolDisplay(c.notifyOnWaiting), false},
 	}
 
 	var body strings.Builder
