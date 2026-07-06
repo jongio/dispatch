@@ -460,6 +460,14 @@ var platformLaunchSessionFn = platformLaunchSession
 
 // platformLaunchSession is the default implementation of platformLaunchSessionFn.
 func platformLaunchSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {
+	// Inside tmux, pane mode splits the current tmux window instead of
+	// spawning a new terminal emulator. This makes pane mode work on macOS
+	// and Linux for users who live in tmux, matching the Windows Terminal
+	// split-pane behavior.
+	if launchStyle == LaunchStylePane && insideTmux() {
+		return launchTmuxPane(shell, resumeCmd, cwd, paneDirection)
+	}
+
 	switch runtime.GOOS {
 	case "windows":
 		return launchWindowsSession(shell, resumeCmd, terminal, cwd, launchStyle, paneDirection)
@@ -580,6 +588,54 @@ func appendWTPaneDirFlags(args []string, dir string) []string {
 		// "auto" or empty — let Windows Terminal choose.
 		return args
 	}
+}
+
+// insideTmux reports whether the current process is running inside a tmux
+// session, detected via the TMUX environment variable that tmux sets for
+// every process in a pane.
+func insideTmux() bool {
+	return os.Getenv("TMUX") != ""
+}
+
+// buildTmuxSplitArgs builds the argument list for `tmux split-window` that
+// opens the resume command in a new split of the current tmux window.
+//
+// direction selects the divider orientation:
+//
+//	"right"/"left" → -h  vertical divider, new pane to the right
+//	"down"/"up"    → -v  horizontal divider, new pane below
+//	"auto"/""      → (no flag) tmux uses its default (a pane below)
+//
+// The working directory is set with -c so the split starts where the session
+// lives, and the resume command runs through the user's shell.
+func buildTmuxSplitArgs(shell ShellInfo, resumeCmd, cwd, direction string) []string {
+	args := []string{"split-window"}
+	switch direction {
+	case "right", "left":
+		args = append(args, "-h")
+	case "down", "up":
+		args = append(args, "-v")
+	}
+	if cwd != "" {
+		args = append(args, "-c", cwd)
+	}
+	args = append(args, shell.Path, "-c", resumeCmd)
+	return args
+}
+
+// launchTmuxPane opens the resume command in a split of the current tmux
+// window. It is only used when running inside tmux (see insideTmux).
+func launchTmuxPane(shell ShellInfo, resumeCmd, cwd, paneDirection string) error {
+	tmuxPath, err := exec.LookPath("tmux")
+	if err != nil {
+		return fmt.Errorf("TMUX is set but the tmux binary was not found on PATH: %w", err)
+	}
+	args := buildTmuxSplitArgs(shell, resumeCmd, cwd, paneDirection)
+	cmd := exec.CommandContext(context.Background(), tmuxPath, args...)
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+	return startAndWaitBriefly(cmd)
 }
 
 func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {

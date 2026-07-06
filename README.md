@@ -28,7 +28,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Copy resume command** (`Y`) — copy the selected session's full resume command to the system clipboard. With a multi-select active, copies one resume command per selected session, one per line
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer on Windows, Finder on macOS, the default file manager on Linux)
-- **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal) with per-session overrides
+- **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal, or tmux when running inside a tmux session) with per-session overrides
 - **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Shift+↑/↓ for range selection, Ctrl+click and Shift+click for mouse selection. With a selection active, `h` (hide), `*` (favorite), and `Y` (copy resume command) apply to every selected session at once
 - **Attention indicators** — colored dots showing real-time session status: working (blue, executing tools), thinking (cyan, generating response), compacting (magenta, context compaction), waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
 - **Host type icons** — sessions display an icon indicating their origin: CLI (desktop), Cloud (cloud), or Actions (gear)
@@ -177,7 +177,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `Enter` | Launch selected session (or toggle folder) |
 | `w` | Launch in new window |
 | `t` | Launch in new tab |
-| `e` | Launch in split pane (Windows Terminal) |
+| `e` | Launch in split pane (Windows Terminal, or tmux inside a tmux session) |
 
 #### Multi-Select
 
@@ -357,6 +357,18 @@ When `launch_mode` is `"pane"`, the `pane_direction` value maps to Windows Termi
 | `auto` | *(none)* | Windows Terminal decides automatically |
 
 > **Note:** `-H` and `-V` control split *orientation* only (the direction the divider runs). Windows Terminal decides actual pane placement based on available space.
+
+#### tmux Support (macOS and Linux)
+
+When you run dispatch inside a tmux session (the `TMUX` environment variable is set), pane mode splits the current tmux window with `tmux split-window` instead of opening a new terminal emulator. The `pane_direction` value maps to tmux flags:
+
+| Direction | tmux Flag | Meaning |
+|-----------|-----------|---------|
+| `right` / `left` | `-h` | Vertical divider — new pane to the right |
+| `down` / `up` | `-v` | Horizontal divider — new pane below |
+| `auto` | *(none)* | tmux uses its default (a pane below) |
+
+The split starts in the session's working directory (`-c`) and runs the resume command in your shell. Outside tmux, pane mode behaves as before.
 
 ### Example config.json
 
