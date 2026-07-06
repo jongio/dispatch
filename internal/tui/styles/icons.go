@@ -64,6 +64,7 @@ const (
 	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
 	nfHost   = "\uf233" //  nf-fa-server (host type pivot group)
 	nfPencil = "\uf040" //  nf-fa-pencil
+	nfTag    = "\uf02b" //  nf-fa-tag
 )
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,7 @@ const (
 	fbADO    = "☁"
 	fbHost   = "⛁"
 	fbPencil = "✎"
+	fbTag    = "#"
 )
 
 // ---------------------------------------------------------------------------
@@ -216,6 +218,9 @@ func IconPlan() string { return icon(nfBullet, fbAttentionDot) }
 
 // IconNote returns a pencil icon for sessions that have a user note.
 func IconNote() string { return icon(nfPencil, fbPencil) }
+
+// IconTag returns a tag icon for sessions that carry user tags.
+func IconTag() string { return icon(nfTag, fbTag) }
 
 // IconWorkComplete returns a check icon for sessions with all planned work complete.
 func IconWorkComplete() string { return icon(nfCheck, fbCheck) }

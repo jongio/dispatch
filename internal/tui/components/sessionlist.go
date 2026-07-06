@@ -39,6 +39,7 @@ type SessionList struct {
 	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
 	gitStateMap    map[string]platform.GitState     // session ID → git workspace state
 	notesSet       map[string]struct{}              // session ID → has a user note
+	tagsSet        map[string]struct{}              // session ID → has tags
 	selected       map[string]struct{}              // session ID → selected for multi-open
 	treeMode       bool                             // true when showing grouped/tree view
 	pivotField     string                           // current pivot mode (e.g. "folder", "repo")
@@ -128,6 +129,12 @@ func (s *SessionList) SetFavoritedSessions(set map[string]struct{}) {
 // used to render those sessions with a pencil marker.
 func (s *SessionList) SetNoteSessions(set map[string]struct{}) {
 	s.notesSet = set
+}
+
+// SetTagSessions updates the set of session IDs that carry user tags,
+// used to render those sessions with a tag marker.
+func (s *SessionList) SetTagSessions(set map[string]struct{}) {
+	s.tagsSet = set
 }
 
 // SetAISessions updates the set of AI-found session IDs, used to
@@ -788,6 +795,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	plnDot := s.planDot(sess.ID, selected)
 	ntDot := s.noteDot(sess.ID, selected)
+	tgDot := s.tagDot(sess.ID, selected)
 	wrkDot := s.workStatusDot(sess.ID, selected)
 	gitDot := s.gitStateDot(sess.ID, selected)
 
@@ -803,6 +811,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	const hostDotW = 2 // host icon + space (always reserved)
 	const planDotW = 2 // plan dot + space
 	const noteDotW = 2 // note dot + space
+	const tagDotW = 2  // tag dot + space
 	const wrkDotW = 2  // work status dot + space
 	const gitDotW = 2  // git state dot + space
 	const timeW = 9
@@ -811,8 +820,8 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
-		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-noteDotW-wrkDotW-gitDotW-timeW-spacing)
-		line := indent + selector + attDot + hostDot + plnDot + ntDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
+		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-noteDotW-tagDotW-wrkDotW-gitDotW-timeW-spacing)
+		line := indent + selector + attDot + hostDot + plnDot + ntDot + tgDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
 		return s.applyRowStyle(line, selected, hidden, favorited)
 	}
 
@@ -825,7 +834,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		folderW = 18
 	}
 
-	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - tagDotW - wrkDotW - gitDotW - timeW - turnsW - 2*spacing
 	if folderW > 0 {
 		summaryW -= folderW + spacing
 	}
@@ -843,6 +852,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(hostDot)
 	b.WriteString(plnDot)
 	b.WriteString(ntDot)
+	b.WriteString(tgDot)
 	b.WriteString(wrkDot)
 	b.WriteString(gitDot)
 	b.WriteString(PadRight(summary, summaryW))
@@ -961,6 +971,18 @@ func (s SessionList) noteDot(sessionID string, selected bool) string {
 		return "  "
 	}
 	return renderDot(styles.IconNote(), styles.NoteIndicatorStyle, selected)
+}
+
+// tagDot returns a styled 2-character string (tag icon + space) for sessions
+// that carry user tags, or two spaces if none exist.
+func (s SessionList) tagDot(sessionID string, selected bool) string {
+	if s.tagsSet == nil {
+		return "  "
+	}
+	if _, ok := s.tagsSet[sessionID]; !ok {
+		return "  "
+	}
+	return renderDot(styles.IconTag(), styles.TagIndicatorStyle, selected)
 }
 
 // workStatusDot returns a styled 2-character string (icon + space) representing

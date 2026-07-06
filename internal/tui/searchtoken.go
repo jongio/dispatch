@@ -14,6 +14,7 @@ type SearchFilter struct {
 	HasPlan  bool   // has:plan
 	IsFav    bool   // is:favorite
 	IsHidden bool   // is:hidden
+	Tag      string // tag:<value>
 	FreeText string // remaining non-token words
 }
 
@@ -26,7 +27,8 @@ func (sf SearchFilter) HasTokens() bool {
 		sf.Status != "" ||
 		sf.HasPlan ||
 		sf.IsFav ||
-		sf.IsHidden
+		sf.IsHidden ||
+		sf.Tag != ""
 }
 
 // TokenSummary returns a short description of active tokens suitable for
@@ -56,6 +58,9 @@ func (sf SearchFilter) TokenSummary() string {
 	}
 	if sf.IsHidden {
 		parts = append(parts, "is:hidden")
+	}
+	if sf.Tag != "" {
+		parts = append(parts, "tag:"+sf.Tag)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -90,6 +95,8 @@ func ParseSearchTokens(input string) SearchFilter {
 			sf.Host = value
 		case "status":
 			sf.Status = value
+		case "tag":
+			sf.Tag = value
 		case "has":
 			if value == "plan" {
 				sf.HasPlan = true

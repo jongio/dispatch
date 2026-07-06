@@ -255,6 +255,13 @@
 
     Note: Favorites filter was previously on `F` — now toggled via the `!` status picker "Favorites only" row.
 
+26b. **g** — Add or Edit Tags on Current Session
+    - File: internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "edit tags"))
+    - Handler: internal\tui\model.go (handleEditTags)
+    - Behavior: Opens an inline input to edit comma-separated tags (persisted to config as sessionTags); filter with the tag: search token
+    - Condition: Only when a session is selected (not a folder)
+
 27b. **c** → Copy Session ID to Clipboard
      - File: internal\tui\keys.go
      - Code: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID"))
