@@ -35,6 +35,20 @@
    - Behavior: Moves selection down, loads detail for selected item
    - Condition: Only in session list view
 
+3a. **g** or **Home** → Jump to Top of List
+   - File: internal\tui\keys.go (JumpTop binding)
+   - Code: key.NewBinding(key.WithKeys("g", "home"))
+   - Handler: internal\tui\model.go (JumpTop case in the list key switch)
+   - Behavior: Moves selection to the first item and loads its detail. Resets any active shift-selection.
+   - Condition: Only in session list view, when the search bar is not focused
+
+3b. **G** or **End** → Jump to Bottom of List
+   - File: internal\tui\keys.go (JumpBottom binding)
+   - Code: key.NewBinding(key.WithKeys("G", "end"))
+   - Handler: internal\tui\model.go (JumpBottom case in the list key switch)
+   - Behavior: Moves selection to the last item and loads its detail. Resets any active shift-selection.
+   - Condition: Only in session list view, when the search bar is not focused
+
 4. **← (Left Arrow)** → Collapse Folder (if selected item is a folder)
    - File: internal\tui\keys.go (line 60)
    - Code: key.NewBinding(key.WithKeys("left"))
@@ -262,9 +276,9 @@
 
     Note: Favorites filter was previously on `F` — now toggled via the `!` status picker "Favorites only" row.
 
-26b. **g** — Add or Edit Tags on Current Session
+26b. **#** — Add or Edit Tags on Current Session
     - File: internal\tui\keys.go
-    - Code: key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "edit tags"))
+    - Code: key.NewBinding(key.WithKeys("#"), key.WithHelp("#", "edit tags"))
     - Handler: internal\tui\model.go (handleEditTags)
     - Behavior: Opens an inline input to edit comma-separated tags (persisted to config as sessionTags); filter with the tag: search token
     - Condition: Only when a session is selected (not a folder)

@@ -1330,6 +1330,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.detailVersion++
 		return m, m.loadSelectedDetailCmd()
 
+	case key.Matches(msg, keys.JumpTop):
+		m.sessionList.ResetShift()
+		m.sessionList.JumpToTop()
+		m.detailVersion++
+		return m, m.loadSelectedDetailCmd()
+
+	case key.Matches(msg, keys.JumpBottom):
+		m.sessionList.ResetShift()
+		m.sessionList.JumpToBottom()
+		m.detailVersion++
+		return m, m.loadSelectedDetailCmd()
+
 	case key.Matches(msg, keys.Enter):
 		if m.sessionList.IsFolderSelected() {
 			cmd := m.launchNewInFolder(m.cfg.EffectiveLaunchMode())

@@ -409,6 +409,37 @@ func TestSelectionCount(t *testing.T) {
 	}
 }
 
+func TestJumpToTopBottom(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.SetSessions(makeSessions(10))
+	sl.SetSize(80, 5)
+
+	sl.MoveTo(4)
+	sl.JumpToTop()
+	if sl.cursor != 0 {
+		t.Errorf("after JumpToTop cursor = %d, want 0", sl.cursor)
+	}
+	if sl.scrollOffset != 0 {
+		t.Errorf("after JumpToTop scrollOffset = %d, want 0", sl.scrollOffset)
+	}
+
+	sl.JumpToBottom()
+	if want := sl.VisibleCount() - 1; sl.cursor != want {
+		t.Errorf("after JumpToBottom cursor = %d, want %d", sl.cursor, want)
+	}
+}
+
+func TestJumpToTopBottom_EmptyList(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sl.JumpToTop()
+	sl.JumpToBottom()
+	if sl.cursor != 0 {
+		t.Errorf("empty list cursor = %d, want 0", sl.cursor)
+	}
+}
+
 func TestFolderSessions(t *testing.T) {
 	t.Parallel()
 	sl := NewSessionList()
