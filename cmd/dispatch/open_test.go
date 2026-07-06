@@ -16,6 +16,7 @@ func TestParseOpenArgs(t *testing.T) {
 		args     []string
 		wantID   string
 		wantMode string
+		wantLast bool
 		wantErr  bool
 	}{
 		{name: "id only", args: []string{"open", "abc123"}, wantID: "abc123"},
@@ -23,19 +24,23 @@ func TestParseOpenArgs(t *testing.T) {
 		{name: "mode equals", args: []string{"open", "abc", "--mode=pane"}, wantID: "abc", wantMode: "pane"},
 		{name: "short mode", args: []string{"open", "-m", "tab", "abc"}, wantID: "abc", wantMode: "tab"},
 		{name: "mode before id", args: []string{"open", "--mode", "inplace", "xyz"}, wantID: "xyz", wantMode: "inplace"},
+		{name: "last", args: []string{"open", "--last"}, wantLast: true},
+		{name: "last short", args: []string{"open", "-l"}, wantLast: true},
+		{name: "last with mode", args: []string{"open", "--last", "--mode", "window"}, wantLast: true, wantMode: "window"},
 		{name: "missing id", args: []string{"open"}, wantErr: true},
 		{name: "missing id with mode", args: []string{"open", "--mode", "tab"}, wantErr: true},
 		{name: "two ids", args: []string{"open", "a", "b"}, wantErr: true},
+		{name: "last with id", args: []string{"open", "--last", "abc"}, wantErr: true},
 		{name: "unknown flag", args: []string{"open", "--nope", "a"}, wantErr: true},
 		{name: "mode without value", args: []string{"open", "a", "--mode"}, wantErr: true},
 		{name: "invalid mode", args: []string{"open", "a", "--mode", "sideways"}, wantErr: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, err := parseOpenArgs(tc.args)
+			id, mode, last, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatalf("expected error, got id=%q mode=%q", id, mode)
+					t.Fatalf("expected error, got id=%q mode=%q last=%v", id, mode, last)
 				}
 				return
 			}
@@ -47,6 +52,9 @@ func TestParseOpenArgs(t *testing.T) {
 			}
 			if mode != tc.wantMode {
 				t.Errorf("mode = %q, want %q", mode, tc.wantMode)
+			}
+			if last != tc.wantLast {
+				t.Errorf("last = %v, want %v", last, tc.wantLast)
 			}
 		})
 	}
@@ -198,6 +206,48 @@ func TestRunOpen_LookupError(t *testing.T) {
 func TestRunOpen_BadArgs(t *testing.T) {
 	if err := runOpen(io.Discard, []string{"open"}); err == nil {
 		t.Fatal("expected error for missing id")
+	}
+}
+
+// withOpenLastStub swaps openGetLastSessionFn (and the config/launch seams via
+// withOpenStubs) so --last paths can be exercised without a real store.
+func withOpenLastStub(t *testing.T, cfg *config.Config, sess *data.Session, getErr error) *openCapture {
+	t.Helper()
+	capture := withOpenStubs(t, cfg, sess, nil)
+	origLast := openGetLastSessionFn
+	openGetLastSessionFn = func() (*data.Session, error) { return sess, getErr }
+	t.Cleanup(func() { openGetLastSessionFn = origLast })
+	return capture
+}
+
+func TestRunOpen_Last(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeTab
+	sess := &data.Session{ID: "recent-1", Cwd: "/tmp/project"}
+	capture := withOpenLastStub(t, cfg, sess, nil)
+
+	if err := runOpen(io.Discard, []string{"open", "--last"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !capture.launched {
+		t.Fatal("expected launch to be invoked")
+	}
+	if capture.session == nil || capture.session.ID != "recent-1" {
+		t.Errorf("launched session = %+v, want recent-1", capture.session)
+	}
+}
+
+func TestRunOpen_LastEmptyStore(t *testing.T) {
+	withOpenLastStub(t, config.Default(), nil, nil)
+	if err := runOpen(io.Discard, []string{"open", "--last"}); err == nil {
+		t.Fatal("expected error when no sessions to resume")
+	}
+}
+
+func TestRunOpen_LastLookupError(t *testing.T) {
+	withOpenLastStub(t, config.Default(), nil, errors.New("boom"))
+	if err := runOpen(io.Discard, []string{"open", "--last"}); err == nil {
+		t.Fatal("expected lookup error to propagate")
 	}
 }
 

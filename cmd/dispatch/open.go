@@ -17,19 +17,21 @@ import (
 // Function variables allow test substitution of external calls, matching the
 // pattern used elsewhere in this package (see cli.go).
 var (
-	openLoadConfigFn = config.Load
-	openGetSessionFn = defaultOpenGetSession
-	openLaunchFn     = defaultOpenLaunch
+	openLoadConfigFn     = config.Load
+	openGetSessionFn     = defaultOpenGetSession
+	openGetLastSessionFn = defaultOpenGetLastSession
+	openLaunchFn         = defaultOpenLaunch
 )
 
-// runOpen resumes the session with the given ID using the same launch path
-// the TUI uses. args is the full argument slice with args[0] == "open".
+// runOpen resumes a session using the same launch path the TUI uses. It
+// resumes the session named by ID, or the most recently active session when
+// --last is passed. args is the full argument slice with args[0] == "open".
 func runOpen(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
 	}
 
-	id, modeFlag, err := parseOpenArgs(args)
+	id, modeFlag, last, err := parseOpenArgs(args)
 	if err != nil {
 		return err
 	}
@@ -41,26 +43,36 @@ func runOpen(w io.Writer, args []string) error {
 
 	mode := resolveOpenMode(modeFlag, cfg)
 
-	// Resolve the argument as an alias first; fall back to treating it as a
-	// session ID when no alias matches.
-	if resolved := cfg.SessionIDForAlias(id); resolved != "" {
-		id = resolved
-	}
-
-	sess, err := openGetSessionFn(id)
-	if err != nil {
-		return err
-	}
-	if sess == nil {
-		return fmt.Errorf("session %q not found", id)
+	var sess *data.Session
+	if last {
+		sess, err = openGetLastSessionFn()
+		if err != nil {
+			return err
+		}
+		if sess == nil {
+			return errors.New("no sessions to resume")
+		}
+	} else {
+		// Resolve the argument as an alias first; fall back to treating it as a
+		// session ID when no alias matches.
+		if resolved := cfg.SessionIDForAlias(id); resolved != "" {
+			id = resolved
+		}
+		sess, err = openGetSessionFn(id)
+		if err != nil {
+			return err
+		}
+		if sess == nil {
+			return fmt.Errorf("session %q not found", id)
+		}
 	}
 
 	return openLaunchFn(w, cfg, sess, mode)
 }
 
-// parseOpenArgs extracts the session ID and optional launch mode from the
-// "open" subcommand arguments. args[0] is expected to be "open".
-func parseOpenArgs(args []string) (id, mode string, err error) {
+// parseOpenArgs extracts the session ID, optional launch mode, and the --last
+// flag from the "open" subcommand arguments. args[0] is expected to be "open".
+func parseOpenArgs(args []string) (id, mode string, last bool, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "open" token
@@ -70,36 +82,44 @@ func parseOpenArgs(args []string) (id, mode string, err error) {
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
 		switch {
+		case arg == "--last" || arg == "-l":
+			last = true
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-				return "", "", errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", false, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
 		case strings.HasPrefix(arg, "--mode="):
 			mode = strings.TrimPrefix(arg, "--mode=")
 		case strings.HasPrefix(arg, "-"):
-			return "", "", fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
 	}
 
-	switch len(positionals) {
-	case 0:
-		return "", "", errors.New("open requires a session ID")
-	case 1:
-		id = positionals[0]
-	default:
-		return "", "", fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
+	if last {
+		if len(positionals) > 0 {
+			return "", "", false, errors.New("open --last does not take a session ID")
+		}
+	} else {
+		switch len(positionals) {
+		case 0:
+			return "", "", false, errors.New("open requires a session ID (or use --last)")
+		case 1:
+			id = positionals[0]
+		default:
+			return "", "", false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
+		}
 	}
 
 	if mode != "" {
 		if _, mErr := normalizeLaunchMode(mode); mErr != nil {
-			return "", "", mErr
+			return "", "", false, mErr
 		}
 	}
-	return id, mode, nil
+	return id, mode, last, nil
 }
 
 // normalizeLaunchMode maps a user-facing mode string to a config launch mode.
@@ -148,6 +168,28 @@ func defaultOpenGetSession(id string) (*data.Session, error) {
 		return nil, nil
 	}
 	return &detail.Session, nil
+}
+
+// defaultOpenGetLastSession loads the most recently active session from the
+// default session store, ordering by last active time (the same ordering the
+// TUI uses for its default "updated" sort). It returns (nil, nil) when the
+// store holds no sessions.
+func defaultOpenGetLastSession() (*data.Session, error) {
+	store, err := data.Open()
+	if err != nil {
+		return nil, fmt.Errorf("opening session store: %w", err)
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	sortOpts := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+	sessions, err := store.ListSessions(context.Background(), data.FilterOptions{}, sortOpts, 1)
+	if err != nil {
+		return nil, fmt.Errorf("listing sessions: %w", err)
+	}
+	if len(sessions) == 0 {
+		return nil, nil
+	}
+	return &sessions[0], nil
 }
 
 // defaultOpenLaunch resumes the session using the resolved launch mode. For
