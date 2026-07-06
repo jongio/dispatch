@@ -1701,24 +1701,43 @@ func (m Model) handleCopyPath() (tea.Model, tea.Cmd) {
 	return m, clearStatusAfter(2 * time.Second)
 }
 
-// handleCopyResumeCommand copies the selected session's resume command to the
-// system clipboard. It mirrors the same launch options used by Dispatch when
-// opening sessions so copied commands match the configured workflow.
+// handleCopyResumeCommand copies the resume command(s) to the system clipboard.
+// When multi-select is active, one resume command per selected session is
+// copied, joined by newlines and ordered to match the list. Otherwise only the
+// current session's command is copied. Copied commands mirror the same launch
+// options Dispatch uses when opening sessions so they match the configured
+// workflow.
 func (m Model) handleCopyResumeCommand() (tea.Model, tea.Cmd) {
-	sess, ok := m.sessionList.Selected()
-	if !ok {
+	var sessions []data.Session
+	if sel := m.sessionList.SelectedSessions(); len(sel) > 0 {
+		sessions = sel
+	} else if sess, ok := m.sessionList.Selected(); ok {
+		sessions = []data.Session{sess}
+	}
+	if len(sessions) == 0 {
 		return m, nil
 	}
-	cmd, err := platform.BuildResumeCommandString(sess.ID, m.resumeConfigForSession(sess.Cwd))
-	if err != nil {
-		m.statusErr = "resume command: " + err.Error()
-		return m, clearStatusAfter(2 * time.Second)
+
+	cmds := make([]string, 0, len(sessions))
+	for _, sess := range sessions {
+		cmd, err := platform.BuildResumeCommandString(sess.ID, m.resumeConfigForSession(sess.Cwd))
+		if err != nil {
+			m.statusErr = "resume command: " + err.Error()
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		cmds = append(cmds, cmd)
 	}
-	if err := clipboardWrite(cmd); err != nil {
+
+	if err := clipboardWrite(strings.Join(cmds, "\n")); err != nil {
 		m.statusErr = "clipboard: " + err.Error()
 		return m, clearStatusAfter(2 * time.Second)
 	}
-	m.statusInfo = statusCopiedResumeCommand
+
+	if len(cmds) == 1 {
+		m.statusInfo = statusCopiedResumeCommand
+	} else {
+		m.statusInfo = fmt.Sprintf("Copied %d resume commands ✓", len(cmds))
+	}
 	return m, clearStatusAfter(2 * time.Second)
 }
 
