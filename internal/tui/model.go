@@ -331,19 +331,20 @@ type Model struct {
 	spinner         spinner.Model
 
 	// UI toggles.
-	showPreview     bool
-	previewPosition string // "right", "bottom", "left", "top"
-	showHidden      bool
-	hiddenSet       map[string]struct{} // session ID → struct{} for fast hidden-session lookup
-	favoritedSet    map[string]struct{} // session ID → struct{} for fast favorited-session lookup
-	notesSet        map[string]struct{} // session ID → struct{} for fast note-existence lookup
-	tagsSet         map[string]struct{}
-	showFavorited   bool
-	activeView      string // name of the active named view (empty means Default)
-	reindexing      bool
-	reindexLog      []string                  // log lines streamed from chronicle reindex
-	reindexVP       viewport.Model            // scrollable viewport for reindex overlay
-	reindexCancel   *components.ReindexHandle // cancel handle for running reindex
+	showPreview       bool
+	previewFullscreen bool
+	previewPosition   string // "right", "bottom", "left", "top"
+	showHidden        bool
+	hiddenSet         map[string]struct{} // session ID → struct{} for fast hidden-session lookup
+	favoritedSet      map[string]struct{} // session ID → struct{} for fast favorited-session lookup
+	notesSet          map[string]struct{} // session ID → struct{} for fast note-existence lookup
+	tagsSet           map[string]struct{}
+	showFavorited     bool
+	activeView        string // name of the active named view (empty means Default)
+	reindexing        bool
+	reindexLog        []string                  // log lines streamed from chronicle reindex
+	reindexVP         viewport.Model            // scrollable viewport for reindex overlay
+	reindexCancel     *components.ReindexHandle // cancel handle for running reindex
 
 	// Focused sub-models.
 	click        clickState
@@ -1234,6 +1235,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.preview.ExitPlanView()
 			return m, nil
 		}
+		// Exit fullscreen preview back to the split layout.
+		if m.previewFullscreen {
+			m.previewFullscreen = false
+			m.recalcLayout()
+			return m, nil
+		}
 		// Clear active search query when Escape is pressed in the session list.
 		if m.filter.Query != "" || m.searchFilter.HasTokens() {
 			m.filter.Query = ""
@@ -1405,6 +1412,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.PreviewFullscreen):
+		m.previewFullscreen = !m.previewFullscreen
+		m.recalcLayout()
+		if m.previewFullscreen {
+			m.detailVersion++
+			return m, m.loadSelectedDetailCmd()
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.PreviewPosition):
 		m.cyclePreviewPosition()
 		m.recalcLayout()
@@ -1419,7 +1435,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.PreviewScrollUp):
-		if m.showPreview {
+		if m.showPreview || m.previewFullscreen {
 			before := m.preview.ScrollOffset()
 			m.preview.PageUp()
 			slog.Debug("preview scroll up", "before", before, "after", m.preview.ScrollOffset())
@@ -1427,7 +1443,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.PreviewScrollDown):
-		if m.showPreview {
+		if m.showPreview || m.previewFullscreen {
 			before := m.preview.ScrollOffset()
 			m.preview.PageDown()
 			slog.Debug("preview scroll down", "before", before, "after", m.preview.ScrollOffset())
@@ -2586,6 +2602,11 @@ func (m Model) renderMainView() string {
 	// Use pre-computed layout dimensions from recalcLayout() so that
 	// rendering and hit-testing always agree on panel positions/sizes.
 	l := m.layout
+
+	// Fullscreen preview fills the entire content area; the list is hidden.
+	if m.previewFullscreen {
+		return strings.Join([]string{header, badges, sep, m.preview.View(), footer}, "\n")
+	}
 
 	var content string
 	hasPreview := l.previewWidth > 0 && l.previewHeight > 0
