@@ -310,6 +310,7 @@ Configuration is stored in the platform-specific config directory:
 | `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
 | `hiddenSessions` | array | `[]` | Session IDs hidden from the main list |
 | `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
+| `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
 
 #### Pane Direction Semantics
 
@@ -349,7 +350,8 @@ When `launch_mode` is `"pane"`, the `pane_direction` value maps to Windows Termi
   "notify_on_waiting": false,
   "ai_search": false,
   "hiddenSessions": [],
-  "favoriteSessions": []
+  "favoriteSessions": [],
+  "keybindings": {}
 }
 ```
 
@@ -360,6 +362,40 @@ Set `custom_command` to replace the default Copilot CLI launch entirely. Use `{s
 ```json
 "custom_command": "my-tool resume {sessionId}"
 ```
+
+### Customizing Keybindings
+
+Set `keybindings` in `config.json` to remap keyboard shortcuts. Each key is an
+action name and each value is a comma-separated list of keys that trigger it.
+Listed actions replace their default keys; any action you do not list keeps its
+default. Unknown action names are ignored, and if a remap collides with a key
+another action already uses, that remap is dropped and the default is kept.
+
+```json
+"keybindings": {
+  "search": "/,ctrl+f",
+  "cmd_palette": "ctrl+k",
+  "quit": "q"
+}
+```
+
+Key names follow Bubble Tea conventions: single characters (`a`, `/`, `?`),
+named keys (`up`, `down`, `left`, `right`, `enter`, `esc`, `tab`, `space`,
+`pgup`, `pgdown`), and modifier combinations (`ctrl+f`, `alt+left`, `shift+tab`).
+
+Available action names:
+
+`up`, `down`, `left`, `right`, `enter`, `space`, `quit`, `force_quit`,
+`search`, `escape`, `filter`, `sort`, `sort_order`, `pivot`, `pivot_order`,
+`preview`, `reindex`, `help`, `config`, `time_range_1`, `time_range_2`,
+`time_range_3`, `time_range_4`, `hide`, `toggle_hidden`, `star`,
+`launch_window`, `launch_tab`, `launch_pane`, `preview_scroll_up`,
+`preview_scroll_down`, `jump_next_attention`, `filter_attention`, `launch_all`,
+`select_all`, `deselect_all`, `conversation_sort`, `preview_position`,
+`resume_interrupted`, `view_plan`, `copy_id`, `copy_path`,
+`copy_resume_command`, `copy_preview`, `expand_collapse_all`,
+`scan_work_status`, `export`, `note`, `shift_up`, `shift_down`, `view_switch`,
+`open_file`, `open_dir`, `timeline`, `compare`, `cmd_palette`.
 
 ## Themes
 

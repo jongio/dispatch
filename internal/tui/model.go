@@ -401,6 +401,16 @@ func NewModel() Model {
 	// ── Theme resolution ────────────────────────────────────────────
 	resolveTheme(cfg)
 
+	// ── Keybinding overrides ────────────────────────────────────────
+	// Apply user remaps to the global key map before the UI reads it.
+	if len(cfg.Keybindings) > 0 {
+		remapped, warnings := applyKeybindingOverrides(defaultKeyMap(), cfg.Keybindings)
+		keys = remapped
+		for _, w := range warnings {
+			slog.Warn(w)
+		}
+	}
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = styles.SpinnerStyle
