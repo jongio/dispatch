@@ -165,6 +165,43 @@ func (m Model) handleDirOpened(msg dirOpenedMsg) (Model, tea.Cmd) {
 	return m, clearStatusAfter(2 * time.Second)
 }
 
+// ----- Reference opened result ---------------------------------------------
+
+// handleOpenRef opens the current session's most relevant linked reference (a
+// pull request, then an issue, then a commit) in the browser.
+func (m Model) handleOpenRef() (Model, tea.Cmd) {
+	if m.detail == nil {
+		m.statusErr = "No session selected"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	ref, ok := data.BestRef(m.detail.Refs)
+	if !ok {
+		m.statusErr = "No linked PR, issue, or commit for this session"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	repo := m.detail.Session.Repository
+	if repo == "" {
+		m.statusErr = "No repository recorded for this session"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	url, ok := data.RefURL(repo, ref.RefType, ref.RefValue)
+	if !ok {
+		m.statusErr = "Cannot build a URL for " + ref.RefType + " " + ref.RefValue
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	label := ref.RefType + " " + ref.RefValue
+	return m, m.openRefCmd(url, label)
+}
+
+func (m Model) handleRefOpened(msg refOpenedMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = msg.err.Error()
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.statusInfo = "Opened " + msg.label
+	return m, clearStatusAfter(2 * time.Second)
+}
+
 // ----- Pending click fire (single-click debounce) --------------------------
 
 func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) {

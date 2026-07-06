@@ -28,6 +28,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Copy resume command** (`Y`) — copy the selected session's full resume command to the system clipboard. With a multi-select active, copies one resume command per selected session, one per line
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer on Windows, Finder on macOS, the default file manager on Linux)
+- **Open linked reference** (`b`) — open the selected session's linked pull request, issue, or commit on github.com in your browser. Picks the pull request first, then the issue, then the commit
 - **Four launch modes** (`Enter` / `t` / `w` / `e`) — in-place, new tab, new window, split pane (Windows Terminal, or tmux when running inside a tmux session) with per-session overrides
 - **Multi-session open** (`Space` / `L` / `a` / `d`) — select multiple sessions with Space, launch all at once with L, select/deselect all with a/d. Shift+↑/↓ for range selection, Ctrl+click and Shift+click for mouse selection. With a selection active, `h` (hide), `*` (favorite), and `Y` (copy resume command) apply to every selected session at once
 - **Attention indicators** — colored dots showing real-time session status: working (blue, executing tools), thinking (cyan, generating response), compacting (magenta, context compaction), waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray). Jump to next waiting session with `n`, resume interrupted sessions with `R`, filter by status with `!`
@@ -312,6 +313,7 @@ Dates accept `YYYY-MM-DD` or full RFC3339 timestamps (e.g. `after:2024-01-15` or
 | `o` | Toggle conversation sort order (oldest/newest first) |
 | `c` | Copy session ID to clipboard |
 | `O` | Open session working directory in file manager |
+| `g` | Open linked PR, issue, or commit in browser |
 | `Y` | Copy resume command to clipboard |
 | `PgUp` / `PgDn` | Scroll preview |
 | `r` | Refresh session store |

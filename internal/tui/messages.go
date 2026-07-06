@@ -193,6 +193,13 @@ type dirOpenedMsg struct {
 	err  error
 }
 
+// refOpenedMsg reports the result of opening a session's linked PR, issue, or
+// commit in the browser.
+type refOpenedMsg struct {
+	label string
+	err   error
+}
+
 // compareDetailMsg delivers two session details for side-by-side comparison.
 type compareDetailMsg struct {
 	left  *data.SessionDetail
