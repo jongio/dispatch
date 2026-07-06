@@ -92,6 +92,7 @@ Commands:
   help                    Show this help message
   version                 Print the version
   open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
+                          --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, powershell)

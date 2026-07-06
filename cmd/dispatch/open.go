@@ -21,17 +21,19 @@ var (
 	openGetSessionFn     = defaultOpenGetSession
 	openGetLastSessionFn = defaultOpenGetLastSession
 	openLaunchFn         = defaultOpenLaunch
+	openResumeCmdFn      = platform.BuildResumeCommandString
 )
 
 // runOpen resumes a session using the same launch path the TUI uses. It
 // resumes the session named by ID, or the most recently active session when
-// --last is passed. args is the full argument slice with args[0] == "open".
+// --last is passed. With --print it writes the resolved resume command to w
+// and does not launch. args is the full argument slice with args[0] == "open".
 func runOpen(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
 	}
 
-	id, modeFlag, last, err := parseOpenArgs(args)
+	id, modeFlag, last, printCmd, err := parseOpenArgs(args)
 	if err != nil {
 		return err
 	}
@@ -40,8 +42,6 @@ func runOpen(w io.Writer, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-
-	mode := resolveOpenMode(modeFlag, cfg)
 
 	var sess *data.Session
 	if last {
@@ -67,12 +67,36 @@ func runOpen(w io.Writer, args []string) error {
 		}
 	}
 
+	if printCmd {
+		cmdStr, err := openResumeCmdFn(sess.ID, openResumeConfig(cfg, sess))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(w, cmdStr)
+		return nil
+	}
+
+	mode := resolveOpenMode(modeFlag, cfg)
 	return openLaunchFn(w, cfg, sess, mode)
 }
 
-// parseOpenArgs extracts the session ID, optional launch mode, and the --last
-// flag from the "open" subcommand arguments. args[0] is expected to be "open".
-func parseOpenArgs(args []string) (id, mode string, last bool, err error) {
+// openResumeConfig builds the resume config used to launch or print a
+// session's resume command. Terminal, launch style, and pane direction are
+// omitted because they affect terminal placement, not the copilot invocation.
+func openResumeConfig(cfg *config.Config, sess *data.Session) platform.ResumeConfig {
+	return platform.ResumeConfig{
+		YoloMode:      cfg.YoloMode,
+		Agent:         cfg.Agent,
+		Model:         cfg.Model,
+		CustomCommand: cfg.CustomCommand,
+		Cwd:           sess.Cwd,
+	}
+}
+
+// parseOpenArgs extracts the session ID, optional launch mode, the --last
+// flag, and the --print flag from the "open" subcommand arguments. args[0] is
+// expected to be "open".
+func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "open" token
@@ -86,14 +110,16 @@ func parseOpenArgs(args []string) (id, mode string, last bool, err error) {
 			last = true
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-				return "", "", false, errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", false, false, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
 		case strings.HasPrefix(arg, "--mode="):
 			mode = strings.TrimPrefix(arg, "--mode=")
+		case arg == "--print":
+			printCmd = true
 		case strings.HasPrefix(arg, "-"):
-			return "", "", false, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, false, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
@@ -101,25 +127,25 @@ func parseOpenArgs(args []string) (id, mode string, last bool, err error) {
 
 	if last {
 		if len(positionals) > 0 {
-			return "", "", false, errors.New("open --last does not take a session ID")
+			return "", "", false, false, errors.New("open --last does not take a session ID")
 		}
 	} else {
 		switch len(positionals) {
 		case 0:
-			return "", "", false, errors.New("open requires a session ID (or use --last)")
+			return "", "", false, false, errors.New("open requires a session ID (or use --last)")
 		case 1:
 			id = positionals[0]
 		default:
-			return "", "", false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
+			return "", "", false, false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
 		}
 	}
 
 	if mode != "" {
 		if _, mErr := normalizeLaunchMode(mode); mErr != nil {
-			return "", "", false, mErr
+			return "", "", false, false, mErr
 		}
 	}
-	return id, mode, last, nil
+	return id, mode, last, printCmd, nil
 }
 
 // normalizeLaunchMode maps a user-facing mode string to a config launch mode.
@@ -198,14 +224,7 @@ func defaultOpenGetLastSession() (*data.Session, error) {
 // launcher, matching the behavior of launching from the TUI.
 func defaultOpenLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode string) error {
 	if mode == config.LaunchModeInPlace {
-		rc := platform.ResumeConfig{
-			YoloMode:      cfg.YoloMode,
-			Agent:         cfg.Agent,
-			Model:         cfg.Model,
-			CustomCommand: cfg.CustomCommand,
-			Cwd:           sess.Cwd,
-		}
-		cmd, err := platform.NewResumeCmd(sess.ID, rc)
+		cmd, err := platform.NewResumeCmd(sess.ID, openResumeConfig(cfg, sess))
 		if err != nil {
 			return err
 		}
