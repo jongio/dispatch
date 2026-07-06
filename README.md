@@ -157,6 +157,23 @@ Run `dispatch doctor` to print setup checks for the config file, session store, 
 
 Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSON object for scripts and CI.
 
+### Statistics
+
+Run `dispatch stats` to print session totals and breakdowns by repository, branch, and host type.
+
+```sh
+dispatch stats
+dispatch stats --json
+dispatch stats --calendar
+dispatch stats --repo jongio/dispatch --since 2026-01-01
+```
+
+Flags:
+
+- `--json` prints the summary as a single JSON object.
+- `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
+- `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
+
 ### Key Bindings
 
 #### Navigation

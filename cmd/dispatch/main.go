@@ -99,6 +99,7 @@ Commands:
 
 Stats flags:
   --json                  Print the summary as JSON
+  --calendar              Add a per-day activity heatmap
   --repo <name>           Only count sessions for a repository
   --branch <name>         Only count sessions on a branch
   --folder <path>         Only count sessions under a folder
