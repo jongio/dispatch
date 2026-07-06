@@ -93,6 +93,7 @@ Commands:
   version                 Print the version
   open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
   open --last [--mode M]  Resume the most recently active session
+  new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
