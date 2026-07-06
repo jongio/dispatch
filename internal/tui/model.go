@@ -317,6 +317,7 @@ type Model struct {
 	searchBar       components.SearchBar
 	noteInput       components.NoteInput
 	tagInput        components.TagInput
+	aliasInput      components.AliasInput
 	filterPanel     components.FilterPanel
 	preview         components.PreviewPanel
 	help            components.HelpOverlay
@@ -486,6 +487,7 @@ func NewModel() Model {
 		searchBar:       components.NewSearchBar(),
 		noteInput:       components.NewNoteInput(),
 		tagInput:        components.NewTagInput(),
+		aliasInput:      components.NewAliasInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
 		help:            components.NewHelpOverlay(),
@@ -1105,6 +1107,43 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// ---------- Alias input focused -----------------------------------------
+	if m.aliasInput.Focused() {
+		switch {
+		case key.Matches(msg, keys.Escape):
+			m.aliasInput.Blur()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			sessionID := m.aliasInput.SessionID()
+			aliasText := m.aliasInput.Value()
+			m.aliasInput.Blur()
+
+			if err := m.cfg.SetAlias(sessionID, aliasText); err != nil {
+				m.statusErr = err.Error()
+				return m, clearStatusAfter(3 * time.Second)
+			}
+
+			if err := config.Save(m.cfg); err != nil {
+				m.statusErr = "config save: " + err.Error()
+				return m, clearStatusAfter(3 * time.Second)
+			}
+
+			m.preview.SetAlias(m.cfg.AliasFor(sessionID))
+			if m.cfg.AliasFor(sessionID) == "" {
+				m.statusInfo = "Alias cleared"
+			} else {
+				m.statusInfo = "Alias saved"
+			}
+			return m, clearStatusAfter(2 * time.Second)
+		default:
+			var cmd tea.Cmd
+			ai := m.aliasInput
+			ai, cmd = ai.Update(msg)
+			m.aliasInput = ai
+			return m, cmd
+		}
+	}
+
 	// ---------- Search bar focused ----------------------------------------
 	if m.searchBar.Focused() {
 		switch {
@@ -1465,6 +1504,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Tags):
 		return m.handleEditTags()
+	case key.Matches(msg, keys.Alias):
+		return m.handleEditAlias()
 
 	case key.Matches(msg, keys.CopyID):
 		return m.handleCopyID()
@@ -1741,6 +1782,17 @@ func (m Model) handleEditTags() (tea.Model, tea.Cmd) {
 	}
 	current := strings.Join(m.cfg.TagsFor(sess.ID), ", ")
 	cmd := m.tagInput.Focus(sess.ID, current)
+	return m, cmd
+}
+
+// handleEditAlias opens the inline alias input for the currently selected session.
+func (m Model) handleEditAlias() (tea.Model, tea.Cmd) {
+	sess, ok := m.sessionList.Selected()
+	if !ok {
+		return m, nil
+	}
+	current := m.cfg.AliasFor(sess.ID)
+	cmd := m.aliasInput.Focus(sess.ID, current)
 	return m, cmd
 }
 
@@ -2714,6 +2766,12 @@ func (m Model) renderFooter() string {
 	if m.tagInput.Focused() {
 		m.tagInput.SetWidth(m.width)
 		return m.tagInput.View()
+	}
+
+	// When alias input is active, show it instead of the normal footer.
+	if m.aliasInput.Focused() {
+		m.aliasInput.SetWidth(m.width)
+		return m.aliasInput.View()
 	}
 
 	count := m.sessionList.SessionCount()

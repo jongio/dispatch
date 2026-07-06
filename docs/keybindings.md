@@ -262,6 +262,13 @@
     - Behavior: Opens an inline input to edit comma-separated tags (persisted to config as sessionTags); filter with the tag: search token
     - Condition: Only when a session is selected (not a folder)
 
+26c. **A** — Set or Clear a Short Alias on Current Session
+    - File: internal\tui\keys.go
+    - Code: key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "edit alias"))
+    - Handler: internal\tui\model.go (handleEditAlias)
+    - Behavior: Opens an inline input to set or clear a unique alias (persisted to config as sessionAliases); resume from the CLI with dispatch open <alias>
+    - Condition: Only when a session is selected (not a folder)
+
 27b. **c** → Copy Session ID to Clipboard
      - File: internal\tui\keys.go
      - Code: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy session ID"))

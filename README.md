@@ -38,6 +38,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
 - **Session tags** (`g`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
+- **Session aliases** (`A`) — give a session a short, memorable alias and resume it from the CLI with `dispatch open <alias>` instead of the full session ID
 - **Settings panel** (`,`) — 15 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -198,6 +199,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 | `H` | Toggle visibility of hidden sessions |
 | `*` | Toggle favorite on current session |
 | `g` | Add or edit tags on current session |
+| `A` | Set or clear a short alias on current session |
 
 #### Search & Filter
 
@@ -314,6 +316,7 @@ Configuration is stored in the platform-specific config directory:
 | `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
 | `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
 | `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
+| `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
 
 #### Pane Direction Semantics
 

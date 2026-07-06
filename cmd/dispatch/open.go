@@ -41,6 +41,12 @@ func runOpen(w io.Writer, args []string) error {
 
 	mode := resolveOpenMode(modeFlag, cfg)
 
+	// Resolve the argument as an alias first; fall back to treating it as a
+	// session ID when no alias matches.
+	if resolved := cfg.SessionIDForAlias(id); resolved != "" {
+		id = resolved
+	}
+
 	sess, err := openGetSessionFn(id)
 	if err != nil {
 		return err

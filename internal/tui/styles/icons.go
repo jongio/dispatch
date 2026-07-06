@@ -60,11 +60,12 @@ const (
 	nfList       = "\uf03a" //  nf-fa-list
 
 	// Host type icons — distinguish session origin (GitHub, Azure DevOps).
-	nfGitHub = "\uf09b" //  nf-fa-github
-	nfADO    = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
-	nfHost   = "\uf233" //  nf-fa-server (host type pivot group)
-	nfPencil = "\uf040" //  nf-fa-pencil
-	nfTag    = "\uf02b" //  nf-fa-tag
+	nfGitHub   = "\uf09b" //  nf-fa-github
+	nfADO      = "\uf0c2" //  nf-fa-cloud (Azure DevOps)
+	nfHost     = "\uf233" //  nf-fa-server (host type pivot group)
+	nfPencil   = "\uf040" //  nf-fa-pencil
+	nfTag      = "\uf02b" //  nf-fa-tag
+	nfBookmark = "\uf02e" //  nf-fa-bookmark
 )
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ const (
 	fbHost   = "⛁"
 	fbPencil = "✎"
 	fbTag    = "#"
+	fbAlias  = "@"
 )
 
 // ---------------------------------------------------------------------------
@@ -221,6 +223,9 @@ func IconNote() string { return icon(nfPencil, fbPencil) }
 
 // IconTag returns a tag icon for sessions that carry user tags.
 func IconTag() string { return icon(nfTag, fbTag) }
+
+// IconAlias returns a bookmark icon used when editing or showing a session alias.
+func IconAlias() string { return icon(nfBookmark, fbAlias) }
 
 // IconWorkComplete returns a check icon for sessions with all planned work complete.
 func IconWorkComplete() string { return icon(nfCheck, fbCheck) }
