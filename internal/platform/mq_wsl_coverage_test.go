@@ -4,7 +4,6 @@ package platform
 
 import (
 	"os/exec"
-	"strings"
 	"testing"
 )
 
@@ -126,37 +125,5 @@ func TestEscapeAppleScript_Basic(t *testing.T) {
 				t.Errorf("escapeAppleScript(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-func assertContains(t *testing.T, args []string, want ...string) {
-	t.Helper()
-	joined := strings.Join(args, " ")
-	for _, w := range want {
-		found := false
-		for _, a := range args {
-			if a == w {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("args %v should contain %q (full: %s)", args, w, joined)
-		}
-	}
-}
-
-func assertNotContains(t *testing.T, args []string, excluded ...string) {
-	t.Helper()
-	for _, e := range excluded {
-		for _, a := range args {
-			if a == e {
-				t.Errorf("args %v should NOT contain %q", args, e)
-			}
-		}
 	}
 }
