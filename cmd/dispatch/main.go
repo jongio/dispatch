@@ -96,6 +96,8 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
+  config [get|set|list|path]
+                          Read or change preferences (see Config commands)
   update                  Update dispatch to the latest release
 
 Stats flags:
@@ -106,6 +108,12 @@ Stats flags:
   --folder <path>         Only count sessions under a folder
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
+
+Config commands:
+  config list [--json]    Print every setting and its value
+  config get <key>        Print one setting value
+  config set <key> <val>  Validate and save one setting
+  config path             Print the config file path
 
 Flags:
   -h, --help              Show this help message

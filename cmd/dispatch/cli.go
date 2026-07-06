@@ -104,6 +104,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, "", nil
 
+		case "config":
+			if cErr := runConfig(os.Stdout, args); cErr != nil {
+				fmt.Fprintf(os.Stderr, "config: %v\n", cErr)
+				return true, cleanup, "", cErr
+			}
+			return true, cleanup, "", nil
+
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -181,7 +188,7 @@ func runCompletion(w io.Writer, shell string) error {
 const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="help version open doctor update completion stats"
+  local commands="help version open doctor update completion stats config"
   local flags="-h --help -v --version --demo --clear-cache --reindex"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -193,15 +200,21 @@ _dispatch_completion() {
     COMPREPLY=( $(compgen -W "bash zsh powershell" -- "${cur}") )
     return 0
   fi
+
+  if [[ "${COMP_WORDS[1]}" == "config" ]]; then
+    COMPREPLY=( $(compgen -W "list get set path" -- "${cur}") )
+    return 0
+  fi
 }
 complete -F _dispatch_completion dispatch disp
 `
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands shells flags
-  commands=(help version open doctor update completion stats)
+  local -a commands shells flags configsubs
+  commands=(help version open doctor update completion stats config)
   shells=(bash zsh powershell)
+  configsubs=(list get set path)
   flags=(-h --help -v --version --demo --clear-cache --reindex)
 
   if (( CURRENT == 2 )); then
@@ -213,20 +226,28 @@ _dispatch_completion() {
     _describe -t shells 'shell' shells
     return
   fi
+
+  if [[ ${words[2]} == config ]]; then
+    _describe -t configsubs 'config subcommand' configsubs
+    return
+  fi
 }
 _dispatch_completion "$@"
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'doctor', 'update', 'completion', 'stats')
+$script:DispatchCommands = @('help', 'version', 'open', 'doctor', 'update', 'completion', 'stats', 'config')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
 $script:DispatchShells = @('bash', 'zsh', 'powershell')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'path')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $tokens = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })
     $values = if ($tokens.Count -ge 2 -and $tokens[1] -eq 'completion') {
         $script:DispatchShells
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'config') {
+        $script:DispatchConfigSubcommands
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }
