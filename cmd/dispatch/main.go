@@ -98,6 +98,7 @@ Commands:
   stats [flags]           Print session totals and breakdowns
   config [get|set|list|path]
                           Read or change preferences (see Config commands)
+  export <id> [flags]     Export a session as Markdown or JSON
   update                  Update dispatch to the latest release
 
 Stats flags:
@@ -114,6 +115,11 @@ Config commands:
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
   config path             Print the config file path
+
+Export flags:
+  --format md|json        Output format (default md)
+  --out <dir>             Write to a directory instead of the exports folder
+  --stdout                Print to stdout instead of writing a file
 
 Flags:
   -h, --help              Show this help message

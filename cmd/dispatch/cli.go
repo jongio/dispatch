@@ -111,6 +111,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, "", nil
 
+		case "export":
+			if eErr := runExport(os.Stdout, args); eErr != nil {
+				fmt.Fprintf(os.Stderr, "export: %v\n", eErr)
+				return true, cleanup, "", eErr
+			}
+			return true, cleanup, "", nil
+
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -188,7 +195,7 @@ func runCompletion(w io.Writer, shell string) error {
 const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="help version open doctor update completion stats config"
+  local commands="help version open doctor update completion stats config export"
   local flags="-h --help -v --version --demo --clear-cache --reindex"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -212,7 +219,7 @@ complete -F _dispatch_completion dispatch disp
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands shells flags configsubs
-  commands=(help version open doctor update completion stats config)
+  commands=(help version open doctor update completion stats config export)
   shells=(bash zsh powershell)
   configsubs=(list get set path)
   flags=(-h --help -v --version --demo --clear-cache --reindex)
@@ -236,7 +243,7 @@ _dispatch_completion "$@"
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'doctor', 'update', 'completion', 'stats', 'config')
+$script:DispatchCommands = @('help', 'version', 'open', 'doctor', 'update', 'completion', 'stats', 'config', 'export')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
 $script:DispatchShells = @('bash', 'zsh', 'powershell')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'path')
