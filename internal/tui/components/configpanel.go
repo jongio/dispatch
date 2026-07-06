@@ -35,6 +35,10 @@ const (
 	cfgExcludedWords
 	cfgAutoRefresh
 	cfgNotifyOnWaiting
+	cfgColRepo
+	cfgColFolder
+	cfgColTurns
+	cfgColHost
 	cfgFieldCount
 )
 
@@ -60,6 +64,10 @@ type ConfigPanel struct {
 	excludedWords     string // comma-separated list of filter words
 	autoRefresh       string // session-list auto-refresh seconds ("" default, "0" off)
 	notifyOnWaiting   bool
+	colRepo           bool // show the repository column in the session list
+	colFolder         bool // show the folder column in the session list
+	colTurns          bool // show the turn-count column in the session list
+	colHost           bool // show the host indicator in the session list
 
 	// Available options for cycling.
 	terminals  []string
@@ -107,6 +115,10 @@ type ConfigValues struct {
 	ExcludedWords     string // comma-separated filter words
 	AutoRefresh       string // auto-refresh seconds ("" default, "0" off)
 	NotifyOnWaiting   bool
+	ShowRepoColumn    bool
+	ShowFolderColumn  bool
+	ShowTurnsColumn   bool
+	ShowHostColumn    bool
 }
 
 // SetValues loads the config panel state from external values.
@@ -126,6 +138,10 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.excludedWords = v.ExcludedWords
 	c.autoRefresh = v.AutoRefresh
 	c.notifyOnWaiting = v.NotifyOnWaiting
+	c.colRepo = v.ShowRepoColumn
+	c.colFolder = v.ShowFolderColumn
+	c.colTurns = v.ShowTurnsColumn
+	c.colHost = v.ShowHostColumn
 }
 
 // Values returns the current state of all editable fields.
@@ -146,6 +162,10 @@ func (c *ConfigPanel) Values() ConfigValues {
 		ExcludedWords:     c.excludedWords,
 		AutoRefresh:       c.autoRefresh,
 		NotifyOnWaiting:   c.notifyOnWaiting,
+		ShowRepoColumn:    c.colRepo,
+		ShowFolderColumn:  c.colFolder,
+		ShowTurnsColumn:   c.colTurns,
+		ShowHostColumn:    c.colHost,
 	}
 }
 
@@ -250,6 +270,14 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.redactSecrets = !c.redactSecrets
 	case cfgNotifyOnWaiting:
 		c.notifyOnWaiting = !c.notifyOnWaiting
+	case cfgColRepo:
+		c.colRepo = !c.colRepo
+	case cfgColFolder:
+		c.colFolder = !c.colFolder
+	case cfgColTurns:
+		c.colTurns = !c.colTurns
+	case cfgColHost:
+		c.colHost = !c.colHost
 	default:
 		// cfgFieldCount is a sentinel; no action needed.
 	}
@@ -330,6 +358,10 @@ func (c ConfigPanel) View() string {
 		{"Excluded Words", stringDisplay(c.excludedWords), false},
 		{"Auto Refresh", autoRefreshDisplay(c.autoRefresh), false},
 		{"Notify On Waiting", boolDisplay(c.notifyOnWaiting), false},
+		{"Column: Repo", boolDisplay(c.colRepo), false},
+		{"Column: Folder", boolDisplay(c.colFolder), false},
+		{"Column: Turns", boolDisplay(c.colTurns), false},
+		{"Column: Host", boolDisplay(c.colHost), false},
 	}
 
 	var body strings.Builder
