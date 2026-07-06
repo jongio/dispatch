@@ -36,11 +36,11 @@ type countEntry struct {
 
 // statsReport is the aggregate summary produced by the stats command.
 type statsReport struct {
-	TotalSessions int          `json:"total_sessions"`
-	TotalTurns    int          `json:"total_turns"`
-	TotalFiles    int          `json:"total_files"`
-	Earliest      string       `json:"earliest,omitempty"`
-	Latest        string       `json:"latest,omitempty"`
+	TotalSessions int               `json:"total_sessions"`
+	TotalTurns    int               `json:"total_turns"`
+	TotalFiles    int               `json:"total_files"`
+	Earliest      string            `json:"earliest,omitempty"`
+	Latest        string            `json:"latest,omitempty"`
 	ByRepository  []countEntry      `json:"by_repository"`
 	ByBranch      []countEntry      `json:"by_branch"`
 	ByHostType    []countEntry      `json:"by_host_type"`
@@ -49,7 +49,7 @@ type statsReport struct {
 
 // dayCount is the session count for a single calendar day.
 type dayCount struct {
-	Date      string `json:"date"`  // YYYY-MM-DD (UTC)
+	Date      string `json:"date"` // YYYY-MM-DD (UTC)
 	Count     int    `json:"count"`
 	Intensity int    `json:"intensity"` // 0-4 heatmap bucket
 }
