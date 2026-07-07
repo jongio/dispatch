@@ -99,7 +99,9 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  config [get|set|list|path]
+  search [query] [flags]  Print matching sessions as JSON (no TUI)
+  tags [--json]           List tags in use with per-tag session counts
+  config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
   update                  Update dispatch to the latest release
@@ -113,10 +115,23 @@ Stats flags:
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
 
+Search flags:
+  --json                  Print results as JSON (default and only output)
+  --query <text>          Text to match (also accepted as a positional argument)
+  --deep                  Search turns, checkpoints, files, and refs too
+  --repo <name>           Only include sessions for a repository
+  --branch <name>         Only include sessions on a branch
+  --folder <path>         Only include sessions under a folder
+  --host <type>           Only include sessions by host type (cli, cloud, actions)
+  --since <date>          Only include sessions active on or after a date
+  --until <date>          Only include sessions active on or before a date
+  --limit <n>             Cap the number of results (default 50, 0 for no limit)
+
 Config commands:
   config list [--json]    Print every setting and its value
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
+  config edit             Open the config file in your editor
   config path             Print the config file path
 
 Export flags:

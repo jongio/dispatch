@@ -15,22 +15,23 @@ import (
 
 // PreviewPanel renders a detail panel for the selected session.
 type PreviewPanel struct {
-	detail          *data.SessionDetail
-	attentionStatus data.AttentionStatus
-	note            string // user note for the current session
-	alias           string // user-chosen alias for the current session
-	width           int
-	height          int
-	scroll          int
-	totalLines      int                   // cached line count for scroll clamping
-	newestFirst     bool                  // conversation turn display order
-	redactSecrets   bool                  // mask common secret patterns in turn text
-	convHeaderLine  int                   // content line where "Conversation" label is rendered (-1 = none)
-	idFieldLine     int                   // content line where "ID: ..." is rendered (-1 = none)
-	planContent     string                // plan.md content (empty when no plan)
-	planViewMode    bool                  // when true, render plan instead of session detail
-	hasPlan         bool                  // whether the session has a plan.md file
-	workStatus      data.WorkStatusResult // current session's work status
+	detail           *data.SessionDetail
+	attentionStatus  data.AttentionStatus
+	note             string // user note for the current session
+	alias            string // user-chosen alias for the current session
+	width            int
+	height           int
+	scroll           int
+	totalLines       int                   // cached line count for scroll clamping
+	newestFirst      bool                  // conversation turn display order
+	redactSecrets    bool                  // mask common secret patterns in turn text
+	convHeaderLine   int                   // content line where "Conversation" label is rendered (-1 = none)
+	idFieldLine      int                   // content line where "ID: ..." is rendered (-1 = none)
+	planContent      string                // plan.md content (empty when no plan)
+	planViewMode     bool                  // when true, render plan instead of session detail
+	hasPlan          bool                  // whether the session has a plan.md file
+	workStatus       data.WorkStatusResult // current session's work status
+	workspaceMissing bool                  // true when the session cwd no longer exists on disk
 
 	timelineMode bool // when true, render activity timeline instead of session detail
 
@@ -102,6 +103,13 @@ func (p *PreviewPanel) SetAlias(alias string) {
 // SetAttentionStatus updates the attention status shown in the preview.
 func (p *PreviewPanel) SetAttentionStatus(status data.AttentionStatus) {
 	p.attentionStatus = status
+	p.updateTotalLines()
+}
+
+// SetWorkspaceMissing sets whether the current session's working directory is
+// missing from disk. When true, the preview shows a Missing workspace badge.
+func (p *PreviewPanel) SetWorkspaceMissing(missing bool) {
+	p.workspaceMissing = missing
 	p.updateTotalLines()
 }
 
@@ -613,6 +621,10 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 	idLine := strings.Count(b.String(), "\n")
 	field("ID", s.ID)
 	field("Folder", AbbrevPath(s.Cwd))
+	if p.workspaceMissing {
+		wl := styles.PreviewLabelStyle.Render("Workspace: ")
+		b.WriteString(wl + styles.GitMissingStyle.Render(styles.IconGitMissing()+" Missing") + "\n")
+	}
 
 	if s.Repository != "" {
 		field("Repo", s.Repository)

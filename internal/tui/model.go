@@ -390,6 +390,9 @@ type Model struct {
 	// Git workspace state tracking — scanned from session directories.
 	gitStateMap    map[string]platform.GitState
 	filterGitDirty bool // when true, only show sessions with local git changes
+	// filterMissingWorkspace, when true, shows only sessions whose working
+	// directory no longer exists on disk.
+	filterMissingWorkspace bool
 
 	// DB watcher — monitors session-store.db for external modifications.
 	dbWatcher *data.DBWatcher
@@ -929,6 +932,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.sessionList.SetFavoritedSessions(m.favoritedSet)
 			m.workStatus.filterWorkStatus = m.attentionPicker.WorkStatusFilter()
 			m.filterGitDirty = m.attentionPicker.FilterGitDirty()
+			m.filterMissingWorkspace = m.attentionPicker.FilterMissingWorkspace()
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
 		}
@@ -1578,6 +1582,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
 		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
 		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
+		m.attentionPicker.SetFilterMissingWorkspace(m.filterMissingWorkspace)
+		m.attentionPicker.SetMissingWorkspaceCount(m.missingWorkspaceSessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -2467,6 +2473,8 @@ func (m Model) handleFooterClick(x int) (tea.Model, tea.Cmd) {
 		m.attentionPicker.SetWorkStatusScanned(m.workStatus.workStatusScanned)
 		m.attentionPicker.SetFilterGitDirty(m.filterGitDirty)
 		m.attentionPicker.SetGitDirtyCount(m.gitDirtySessionCount())
+		m.attentionPicker.SetFilterMissingWorkspace(m.filterMissingWorkspace)
+		m.attentionPicker.SetMissingWorkspaceCount(m.missingWorkspaceSessionCount())
 		m.attentionPicker.SetSize(m.width, m.height)
 		m.state = stateAttentionPicker
 		return m, nil
@@ -2879,6 +2887,9 @@ func (m Model) renderFooter() string {
 	if m.filterGitDirty {
 		left += "  " + styles.ActiveBadgeStyle.Render("! git changes")
 	}
+	if m.filterMissingWorkspace {
+		left += "  " + styles.ActiveBadgeStyle.Render("! missing workspace")
+	}
 	if len(m.workStatus.filterWorkStatus) > 0 {
 		var wsNames []string
 		if _, ok := m.workStatus.filterWorkStatus[data.WorkStatusIncomplete]; ok {
@@ -3075,6 +3086,17 @@ func filterGroupsWhere(groups []data.SessionGroup, pred func(data.Session) bool)
 // Session list synchronisation helpers
 // ---------------------------------------------------------------------------
 
+// syncPreviewWorkspaceMissing updates the preview's missing-workspace badge from
+// the currently loaded detail and the most recent git-state scan. Safe to call
+// when no detail is loaded.
+func (m *Model) syncPreviewWorkspaceMissing() {
+	if m.detail == nil {
+		m.preview.SetWorkspaceMissing(false)
+		return
+	}
+	m.preview.SetWorkspaceMissing(m.gitStateMap[m.detail.Session.ID] == platform.GitStateMissing)
+}
+
 // syncSessionListStatuses pushes all current status maps (hidden, favorited,
 // attention, plan, work status) to the sessionList component. Call this after
 // loading or filtering sessions/groups to keep the list's decorations in sync.
@@ -3108,6 +3130,7 @@ func (m *Model) applySessionFilters(sessions []data.Session) []data.Session {
 	sessions = m.filterPlanSessions(sessions)
 	sessions = m.filterWorkStatusSessions(sessions)
 	sessions = m.filterGitDirtySessions(sessions)
+	sessions = m.filterMissingWorkspaceSessions(sessions)
 	sessions = m.filterTaggedSessions(sessions)
 	return sessions
 }
@@ -3121,6 +3144,7 @@ func (m *Model) applyGroupFilters(groups []data.SessionGroup) []data.SessionGrou
 	groups = m.filterPlanGroups(groups)
 	groups = m.filterWorkStatusGroups(groups)
 	groups = m.filterGitDirtyGroups(groups)
+	groups = m.filterMissingWorkspaceGroups(groups)
 	groups = m.filterTaggedGroups(groups)
 	return groups
 }
@@ -3334,6 +3358,29 @@ func (m *Model) filterGitDirtyGroups(groups []data.SessionGroup) []data.SessionG
 	})
 }
 
+// filterMissingWorkspaceSessions keeps only sessions whose working directory no
+// longer exists on disk (GitStateMissing) when filterMissingWorkspace is active.
+func (m *Model) filterMissingWorkspaceSessions(sessions []data.Session) []data.Session {
+	if !m.filterMissingWorkspace || len(m.gitStateMap) == 0 {
+		return sessions
+	}
+	return filterSessionsWhere(sessions, func(s data.Session) bool {
+		return m.gitStateMap[s.ID] == platform.GitStateMissing
+	})
+}
+
+// filterMissingWorkspaceGroups removes sessions whose working directory still
+// exists from grouped results when filterMissingWorkspace is active. Empty
+// groups are dropped.
+func (m *Model) filterMissingWorkspaceGroups(groups []data.SessionGroup) []data.SessionGroup {
+	if !m.filterMissingWorkspace || len(m.gitStateMap) == 0 {
+		return groups
+	}
+	return filterGroupsWhere(groups, func(s data.Session) bool {
+		return m.gitStateMap[s.ID] == platform.GitStateMissing
+	})
+}
+
 // sortByAttention re-sorts the session slice by attention status when the
 // current sort field is SortByAttention. Attention priority is:
 // Waiting (3) > Active (2) > Stale (1) > Idle (0). Sessions with higher
@@ -3514,6 +3561,14 @@ func (m *Model) launchSelected() tea.Cmd {
 	return m.launchWithMode(m.cfg.EffectiveLaunchMode())
 }
 
+// sessionWorkspaceMissing reports whether the given session's working directory
+// was detected as missing on disk by the most recent git-state scan. When no
+// scan has run yet the session is treated as present so launches are not
+// blocked spuriously.
+func (m *Model) sessionWorkspaceMissing(id string) bool {
+	return m.gitStateMap[id] == platform.GitStateMissing
+}
+
 // launchMultiple opens multiple sessions at once. It resolves which sessions
 // to open based on the current state:
 //  1. If sessions are explicitly selected (checkmarked), open those.
@@ -3569,7 +3624,12 @@ func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cm
 		m.statusInfo = fmt.Sprintf("Launching first %d sessions (limit)", maxBatchLaunch)
 	}
 	var cmds []tea.Cmd
+	skipped := 0
 	for _, sess := range sessions {
+		if m.sessionWorkspaceMissing(sess.ID) {
+			skipped++
+			continue
+		}
 		cmd := m.resolveShellAndLaunchDirect(sess.ID, sess.Cwd, mode)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -3578,6 +3638,9 @@ func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cm
 
 	// Keep selections intact after launch — user can deselect with 'd'.
 	m.statusInfo = ""
+	if skipped > 0 {
+		m.statusErr = fmt.Sprintf("Skipped %d session(s): workspace folder no longer exists", skipped)
+	}
 
 	if len(cmds) == 0 {
 		return nil
@@ -3598,6 +3661,10 @@ func (m *Model) updateSelectionStatus() {
 func (m *Model) launchWithMode(mode string) tea.Cmd {
 	sess, ok := m.sessionList.Selected()
 	if !ok {
+		return nil
+	}
+	if m.sessionWorkspaceMissing(sess.ID) {
+		m.statusErr = "Cannot launch: workspace folder no longer exists"
 		return nil
 	}
 	if mode == config.LaunchModeInPlace {
@@ -4323,6 +4390,18 @@ func (m Model) gitDirtySessionCount() int {
 			n++
 		case platform.GitStateUnknown, platform.GitStateClean, platform.GitStateMissing:
 			// Not counted as "dirty".
+		}
+	}
+	return n
+}
+
+// missingWorkspaceSessionCount returns the number of sessions whose working
+// directory no longer exists on disk.
+func (m Model) missingWorkspaceSessionCount() int {
+	n := 0
+	for _, state := range m.gitStateMap {
+		if state == platform.GitStateMissing {
+			n++
 		}
 	}
 	return n

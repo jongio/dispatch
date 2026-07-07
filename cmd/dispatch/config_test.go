@@ -279,6 +279,95 @@ func TestRunConfig_UnknownSubcommand(t *testing.T) {
 	}
 }
 
+// withEditorLauncher substitutes the editor-launch seam for a test.
+func withEditorLauncher(t *testing.T, fn func(string) error) {
+	t.Helper()
+	prev := editorLauncher
+	editorLauncher = fn
+	t.Cleanup(func() { editorLauncher = prev })
+}
+
+func TestRunConfigEdit_Success(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	launched := ""
+	withEditorLauncher(t, func(path string) error {
+		launched = path
+		return nil
+	})
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "edit"}); err != nil {
+		t.Fatalf("runConfig edit: %v", err)
+	}
+	if launched != "/tmp/dispatch/config.json" {
+		t.Errorf("editor launched with %q, want the config path", launched)
+	}
+	if !strings.Contains(buf.String(), "Saved /tmp/dispatch/config.json") {
+		t.Errorf("output missing Saved line: %q", buf.String())
+	}
+}
+
+func TestRunConfigEdit_RejectsArgs(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	withEditorLauncher(t, func(string) error { return nil })
+	err := runConfig(&bytes.Buffer{}, []string{"config", "edit", "extra"})
+	if err == nil || !strings.Contains(err.Error(), "does not take arguments") {
+		t.Fatalf("error = %v, want arguments rejected", err)
+	}
+}
+
+func TestRunConfigEdit_EditorError(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	withEditorLauncher(t, func(string) error { return errors.New("boom") })
+	err := runConfig(&bytes.Buffer{}, []string{"config", "edit"})
+	if err == nil || !strings.Contains(err.Error(), "running editor") {
+		t.Fatalf("error = %v, want running editor error", err)
+	}
+}
+
+func TestRunConfigEdit_InvalidAfterEdit(t *testing.T) {
+	prevLoad, prevSave, prevPath := configLoadFn, configSaveFn, configPathFn
+	calls := 0
+	configLoadFn = func() (*config.Config, error) {
+		calls++
+		if calls >= 2 {
+			return nil, errors.New("parsing config: unexpected end of JSON input")
+		}
+		return config.Default(), nil
+	}
+	configSaveFn = func(*config.Config) error { return nil }
+	configPathFn = func() (string, error) { return "/tmp/dispatch/config.json", nil }
+	t.Cleanup(func() { configLoadFn, configSaveFn, configPathFn = prevLoad, prevSave, prevPath })
+	withEditorLauncher(t, func(string) error { return nil })
+
+	err := runConfig(&bytes.Buffer{}, []string{"config", "edit"})
+	if err == nil || !strings.Contains(err.Error(), "no longer valid") {
+		t.Fatalf("error = %v, want no longer valid error", err)
+	}
+}
+
+func TestResolveEditorArgv(t *testing.T) {
+	// VISUAL wins over EDITOR and is split into command + args.
+	env := map[string]string{"VISUAL": "code --wait", "EDITOR": "nano"}
+	got := resolveEditorArgv(func(k string) string { return env[k] })
+	if len(got) != 2 || got[0] != "code" || got[1] != "--wait" {
+		t.Errorf("VISUAL argv = %v, want [code --wait]", got)
+	}
+
+	// EDITOR is used when VISUAL is unset.
+	env = map[string]string{"EDITOR": "nano"}
+	got = resolveEditorArgv(func(k string) string { return env[k] })
+	if len(got) != 1 || got[0] != "nano" {
+		t.Errorf("EDITOR argv = %v, want [nano]", got)
+	}
+
+	// A platform default is returned when neither is set.
+	got = resolveEditorArgv(func(string) string { return "" })
+	if len(got) == 0 || got[0] == "" {
+		t.Errorf("default argv = %v, want a non-empty editor", got)
+	}
+}
+
 func TestConfigFields_RoundTrip(t *testing.T) {
 	// Every field's get must return a value its own set accepts, so a
 	// list -> set loop never rejects a value dispatch itself produced.
