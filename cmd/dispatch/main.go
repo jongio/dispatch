@@ -99,6 +99,7 @@ Commands:
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON (no TUI)
+  tags [--json]           List tags in use with per-tag session counts
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
