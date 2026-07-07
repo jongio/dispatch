@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +24,10 @@ var (
 	configSaveFn = config.Save
 	configPathFn = config.ConfigPath
 )
+
+// editorLauncher opens the given file in the user's editor and waits for it to
+// exit. It is a package variable so tests can substitute the launch.
+var editorLauncher = launchEditor
 
 // configFieldKind labels the value type of a settable preference so list and
 // JSON output can render it correctly and set can parse the value.
@@ -243,10 +251,12 @@ func runConfig(w io.Writer, args []string) error {
 		return runConfigGet(w, rest)
 	case "set":
 		return runConfigSet(w, rest)
+	case "edit":
+		return runConfigEdit(w, rest)
 	case "path":
 		return runConfigPath(w, rest)
 	default:
-		return fmt.Errorf("unknown config subcommand %q (want list, get, set, or path)", sub)
+		return fmt.Errorf("unknown config subcommand %q (want list, get, set, edit, or path)", sub)
 	}
 }
 
@@ -355,6 +365,71 @@ func runConfigPath(w io.Writer, args []string) error {
 	}
 	fmt.Fprintln(w, path)
 	return nil
+}
+
+// runConfigEdit opens the config file in the user's editor. It writes the
+// current values first so the editor always opens a real file (the file may
+// not exist yet on a fresh install), then re-reads the file after the editor
+// exits so an unparseable edit is reported instead of silently breaking the
+// config.
+func runConfigEdit(w io.Writer, args []string) error {
+	if len(args) > 0 {
+		return fmt.Errorf("config edit does not take arguments, got %q", args[0])
+	}
+
+	cfg, err := configLoadFn()
+	if err != nil {
+		return err
+	}
+	if err := configSaveFn(cfg); err != nil {
+		return err
+	}
+
+	path, err := configPathFn()
+	if err != nil {
+		return err
+	}
+
+	if err := editorLauncher(path); err != nil {
+		return fmt.Errorf("running editor: %w", err)
+	}
+
+	if _, err := configLoadFn(); err != nil {
+		return fmt.Errorf("config is no longer valid after editing: %w", err)
+	}
+
+	fmt.Fprintf(w, "Saved %s\n", path)
+	return nil
+}
+
+// resolveEditorArgv returns the editor command and any leading arguments,
+// preferring $VISUAL, then $EDITOR, then a platform default. The value is split
+// on whitespace so entries like "code --wait" keep their flags.
+func resolveEditorArgv(getenv func(string) string) []string {
+	for _, key := range []string{"VISUAL", "EDITOR"} {
+		if v := strings.TrimSpace(getenv(key)); v != "" {
+			return strings.Fields(v)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		return []string{"notepad"}
+	}
+	return []string{"vi"}
+}
+
+// launchEditor runs the resolved editor against path, wired to the current
+// terminal, and waits for it to exit.
+func launchEditor(path string) error {
+	argv := resolveEditorArgv(os.Getenv)
+	cmdArgs := make([]string, 0, len(argv))
+	cmdArgs = append(cmdArgs, argv[1:]...)
+	cmdArgs = append(cmdArgs, path)
+
+	cmd := exec.CommandContext(context.Background(), argv[0], cmdArgs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // fieldJSONValue returns the setting value typed for JSON output: bool as a

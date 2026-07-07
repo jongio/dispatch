@@ -382,6 +382,38 @@ func TestPreviewPanelViewWithDetail(t *testing.T) {
 	}
 }
 
+func TestPreviewPanelViewWorkspaceMissingBadge(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+
+	detail := &data.SessionDetail{
+		Session: data.Session{ID: "abc123", Cwd: "/home/user/gone", TurnCount: 1},
+		Turns:   []data.Turn{{UserMessage: "hi", AssistantResponse: "hello"}},
+	}
+	p.SetDetail(detail)
+
+	// Without the flag, no workspace badge.
+	if strings.Contains(p.View(), "Workspace:") {
+		t.Error("View should not show a Workspace badge before SetWorkspaceMissing(true)")
+	}
+
+	p.SetWorkspaceMissing(true)
+	got := p.View()
+	if !strings.Contains(got, "Workspace:") {
+		t.Error("View should show a Workspace label when the workspace is missing")
+	}
+	if !strings.Contains(got, "Missing") {
+		t.Error("View should show 'Missing' when the workspace is missing")
+	}
+
+	// Clearing the flag removes the badge again.
+	p.SetWorkspaceMissing(false)
+	if strings.Contains(p.View(), "Workspace:") {
+		t.Error("View should not show a Workspace badge after SetWorkspaceMissing(false)")
+	}
+}
+
 func TestPreviewPanelViewShowsAllTurns(t *testing.T) {
 	t.Parallel()
 	p := NewPreviewPanel()

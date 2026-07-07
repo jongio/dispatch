@@ -123,16 +123,27 @@ func TestAttentionPicker_MoveUpDown(t *testing.T) {
 		t.Errorf("after 9th MoveDown cursor = %d, want %d (git dirty)", p.cursor, gitDirtyRowIndex)
 	}
 
+	// Next: missing workspace row.
+	p.MoveDown()
+	if p.cursor != missingWorkspaceRowIndex {
+		t.Errorf("after 10th MoveDown cursor = %d, want %d (missing workspace)", p.cursor, missingWorkspaceRowIndex)
+	}
+
 	// Wrap to top.
 	p.MoveDown()
 	if p.cursor != 0 {
 		t.Errorf("MoveDown should wrap: cursor = %d, want 0", p.cursor)
 	}
 
-	// Wrap to bottom.
+	// Wrap to bottom (missing workspace row).
+	p.MoveUp()
+	if p.cursor != missingWorkspaceRowIndex {
+		t.Errorf("MoveUp should wrap: cursor = %d, want %d", p.cursor, missingWorkspaceRowIndex)
+	}
+
 	p.MoveUp()
 	if p.cursor != gitDirtyRowIndex {
-		t.Errorf("MoveUp should wrap: cursor = %d, want %d", p.cursor, gitDirtyRowIndex)
+		t.Errorf("after MoveUp from missing workspace cursor = %d, want %d", p.cursor, gitDirtyRowIndex)
 	}
 
 	p.MoveUp()
@@ -657,5 +668,100 @@ func TestAttentionPicker_View_ContainsSeparator(t *testing.T) {
 	view := p.View()
 	if !strings.Contains(view, "───") {
 		t.Error("View should contain separator line")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Missing workspace filter row
+// ---------------------------------------------------------------------------
+
+func TestAttentionPicker_FilterMissingWorkspace_DefaultFalse(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.FilterMissingWorkspace() {
+		t.Error("FilterMissingWorkspace should default to false")
+	}
+}
+
+func TestAttentionPicker_SetFilterMissingWorkspace(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetFilterMissingWorkspace(true)
+	if !p.FilterMissingWorkspace() {
+		t.Error("FilterMissingWorkspace should be true after SetFilterMissingWorkspace(true)")
+	}
+	p.SetFilterMissingWorkspace(false)
+	if p.FilterMissingWorkspace() {
+		t.Error("FilterMissingWorkspace should be false after SetFilterMissingWorkspace(false)")
+	}
+}
+
+func TestAttentionPicker_ToggleMissingWorkspaceRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	// Move cursor to the missing workspace row.
+	p.cursor = missingWorkspaceRowIndex
+
+	// Toggle on.
+	p.Toggle()
+	if !p.FilterMissingWorkspace() {
+		t.Error("FilterMissingWorkspace should be true after toggling missing workspace row")
+	}
+
+	// Toggle off.
+	p.Toggle()
+	if p.FilterMissingWorkspace() {
+		t.Error("FilterMissingWorkspace should be false after toggling missing workspace row again")
+	}
+}
+
+func TestAttentionPicker_ToggleMissingWorkspaceDoesNotAffectGitDirty(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+
+	p.cursor = missingWorkspaceRowIndex
+	p.Toggle()
+
+	if p.FilterGitDirty() {
+		t.Error("toggling missing workspace should not set the git changes filter")
+	}
+	if !p.FilterMissingWorkspace() {
+		t.Error("missing workspace filter should be set")
+	}
+}
+
+func TestAttentionPicker_HasSelection_IncludesMissingWorkspace(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	if p.HasSelection() {
+		t.Error("empty picker should have no selection")
+	}
+	p.SetFilterMissingWorkspace(true)
+	if !p.HasSelection() {
+		t.Error("HasSelection should be true when filterMissingWorkspace is set")
+	}
+}
+
+func TestAttentionPicker_SetMissingWorkspaceCount(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetMissingWorkspaceCount(3)
+	if p.missingWorkspaceCount != 3 {
+		t.Errorf("missingWorkspaceCount = %d, want 3", p.missingWorkspaceCount)
+	}
+}
+
+func TestAttentionPicker_View_ContainsMissingWorkspaceRow(t *testing.T) {
+	t.Parallel()
+	p := NewAttentionPicker()
+	p.SetSize(80, 40)
+	p.SetMissingWorkspaceCount(2)
+	view := p.View()
+	if !strings.Contains(view, "Missing workspace") {
+		t.Error("View should contain 'Missing workspace' label")
+	}
+	if !strings.Contains(view, "(2)") {
+		t.Error("View should contain missing workspace count (2)")
 	}
 }

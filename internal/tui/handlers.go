@@ -298,6 +298,7 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	}
 	m.preview.SetAlias(m.cfg.AliasFor(m.detail.Session.ID))
 	m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
+	m.syncPreviewWorkspaceMissing()
 	m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 	if result, ok := m.workStatus.workStatusMap[m.detail.Session.ID]; ok {
 		m.preview.SetWorkStatus(result)
@@ -615,9 +616,10 @@ func (m Model) handleContinuationPlanCreated(msg continuationPlanCreatedMsg) (Mo
 func (m Model) handleGitStateScanned(msg gitStateScannedMsg) (Model, tea.Cmd) {
 	m.gitStateMap = msg.states
 	m.sessionList.SetGitStates(m.gitStateMap)
-	// When the git-dirty filter is active, reload sessions so the list
+	m.syncPreviewWorkspaceMissing()
+	// When a git-state filter is active, reload sessions so the list
 	// reflects the detected states.
-	if m.filterGitDirty {
+	if m.filterGitDirty || m.filterMissingWorkspace {
 		return m, m.loadSessionsCmd()
 	}
 	return m, nil

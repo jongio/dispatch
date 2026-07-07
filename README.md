@@ -234,6 +234,26 @@ dispatch export 0a1b2c3d --out ./exports
 
 By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
 
+### Search (JSON)
+
+Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array:
+
+```sh
+dispatch search auth
+dispatch search --query "fix login" --repo jongio/dispatch
+dispatch search --branch main --since 2026-01-01 --limit 20
+dispatch search --deep refactor --json
+```
+
+The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
+
+- `--repo`, `--branch`, `--folder`, `--host` narrow by session metadata.
+- `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
+- `--deep` also searches turns, checkpoints, touched files, and refs.
+- `--limit <n>` caps the result count (default 50, `0` for no limit).
+
+Each result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No matches prints `[]` and exits 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+
 ### Key Bindings
 
 #### Navigation
@@ -395,10 +415,11 @@ dispatch config list            # print every setting and its value
 dispatch config list --json     # same, as a single JSON object
 dispatch config get launch_mode # print one value
 dispatch config set launch_mode window
+dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
 ```
 
-`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset.
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
 
 ### Options
 
