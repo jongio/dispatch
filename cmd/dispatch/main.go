@@ -98,7 +98,7 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  config [get|set|list|path]
+  config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
   update                  Update dispatch to the latest release
@@ -116,6 +116,7 @@ Config commands:
   config list [--json]    Print every setting and its value
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
+  config edit             Open the config file in your editor
   config path             Print the config file path
 
 Export flags:
