@@ -55,18 +55,20 @@ func attentionDotStyle(status data.AttentionStatus) lipgloss.Style {
 	}
 }
 
-// totalRows returns the number of rows in the picker
-// (attention entries + plan row + favorites row + separator + 2 work status rows + git dirty row).
-func totalRows() int { return len(attentionEntries) + 1 + 1 + 1 + 2 + 1 } // +1 plan, +1 favorites, +1 separator, +2 work, +1 git
+// totalRows returns the number of rows in the picker (attention entries + plan
+// row + favorites row + separator + 2 work status rows + git dirty row +
+// missing workspace row).
+func totalRows() int { return len(attentionEntries) + 1 + 1 + 1 + 2 + 1 + 1 } // +1 plan, +1 favorites, +1 separator, +2 work, +1 git, +1 missing
 
 // Row indices for non-attention entries.
 var (
-	planRowIndex          = len(attentionEntries)
-	favoritesRowIndex     = planRowIndex + 1
-	workSeparatorRowIndex = favoritesRowIndex + 1
-	workIncompleteIndex   = workSeparatorRowIndex + 1
-	workCompleteIndex     = workIncompleteIndex + 1
-	gitDirtyRowIndex      = workCompleteIndex + 1
+	planRowIndex             = len(attentionEntries)
+	favoritesRowIndex        = planRowIndex + 1
+	workSeparatorRowIndex    = favoritesRowIndex + 1
+	workIncompleteIndex      = workSeparatorRowIndex + 1
+	workCompleteIndex        = workIncompleteIndex + 1
+	gitDirtyRowIndex         = workCompleteIndex + 1
+	missingWorkspaceRowIndex = gitDirtyRowIndex + 1
 )
 
 // AttentionPicker renders a compact overlay for selecting which attention
@@ -90,6 +92,10 @@ type AttentionPicker struct {
 	// Git workspace state filter row.
 	filterGitDirty bool // "Git changes" row checked
 	gitDirtyCount  int  // sessions with local git changes
+
+	// Missing workspace filter row.
+	filterMissingWorkspace bool // "Missing workspace" row checked
+	missingWorkspaceCount  int  // sessions whose cwd no longer exists
 
 	width  int
 	height int
@@ -158,6 +164,8 @@ func (p *AttentionPicker) Toggle() {
 		}
 	case gitDirtyRowIndex:
 		p.filterGitDirty = !p.filterGitDirty
+	case missingWorkspaceRowIndex:
+		p.filterMissingWorkspace = !p.filterMissingWorkspace
 	default:
 		// Attention status row.
 		if p.cursor < len(attentionEntries) {
@@ -196,7 +204,7 @@ func (p *AttentionPicker) SetCounts(counts map[data.AttentionStatus]int) {
 
 // HasSelection returns true when at least one filter is active.
 func (p *AttentionPicker) HasSelection() bool {
-	return len(p.selected) > 0 || p.filterPlans || p.filterFavorites || len(p.workStatusFilter) > 0 || p.filterGitDirty
+	return len(p.selected) > 0 || p.filterPlans || p.filterFavorites || len(p.workStatusFilter) > 0 || p.filterGitDirty || p.filterMissingWorkspace
 }
 
 // FilterPlans returns whether the "Has plan" row is checked.
@@ -269,6 +277,22 @@ func (p *AttentionPicker) SetFilterGitDirty(v bool) {
 // SetGitDirtyCount sets the session count shown beside the "Git changes" row.
 func (p *AttentionPicker) SetGitDirtyCount(n int) {
 	p.gitDirtyCount = n
+}
+
+// FilterMissingWorkspace returns whether the "Missing workspace" row is checked.
+func (p *AttentionPicker) FilterMissingWorkspace() bool {
+	return p.filterMissingWorkspace
+}
+
+// SetFilterMissingWorkspace sets the "Missing workspace" row state.
+func (p *AttentionPicker) SetFilterMissingWorkspace(v bool) {
+	p.filterMissingWorkspace = v
+}
+
+// SetMissingWorkspaceCount sets the session count shown beside the
+// "Missing workspace" row.
+func (p *AttentionPicker) SetMissingWorkspaceCount(n int) {
+	p.missingWorkspaceCount = n
 }
 
 // View renders the attention picker overlay.
@@ -378,6 +402,20 @@ func (p AttentionPicker) View() string {
 		dot := styles.GitDirtyStyle.Render(styles.IconGitDirty())
 		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Git changes", p.gitDirtyCount)
 		if p.cursor == gitDirtyRowIndex {
+			line = styles.SelectedStyle.Render(line)
+		}
+		body.WriteString(line + "\n")
+	}
+
+	// Git workspace: missing directory.
+	{
+		check := checkboxOff
+		if p.filterMissingWorkspace {
+			check = checkboxOn
+		}
+		dot := styles.GitMissingStyle.Render(styles.IconGitMissing())
+		line := fmt.Sprintf("  %s %s %-16s (%d)", check, dot, "Missing workspace", p.missingWorkspaceCount)
+		if p.cursor == missingWorkspaceRowIndex {
 			line = styles.SelectedStyle.Render(line)
 		}
 		body.WriteString(line + "\n")
