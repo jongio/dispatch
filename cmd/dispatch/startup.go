@@ -22,11 +22,6 @@ type startupOptions struct {
 	Folder     string
 }
 
-// active reports whether any structured startup filter is set.
-func (o startupOptions) active() bool {
-	return o.Repository != "" || o.Branch != "" || o.Folder != ""
-}
-
 // SeedQuery renders the options as a search-bar query string using the same
 // token grammar the TUI parses (repo:, branch:, folder:, plus free text). The
 // caller feeds the result to the model so the filters seed the first query and

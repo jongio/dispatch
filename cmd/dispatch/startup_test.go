@@ -46,18 +46,6 @@ func TestSeedQuery_TokenOrderAndQuoting(t *testing.T) {
 	}
 }
 
-func TestStartupOptions_Active(t *testing.T) {
-	if (startupOptions{Query: "auth"}).active() {
-		t.Error("a free-text query alone should not count as an active filter")
-	}
-	if !(startupOptions{Repository: "owner/repo"}).active() {
-		t.Error("a repository filter should be active")
-	}
-	if !(startupOptions{Folder: "/code"}).active() {
-		t.Error("a folder filter should be active")
-	}
-}
-
 // ---------------------------------------------------------------------------
 // resolveStartupOptions
 // ---------------------------------------------------------------------------
