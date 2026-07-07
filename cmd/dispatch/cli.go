@@ -23,12 +23,13 @@ import (
 
 // handleArgs processes CLI arguments and executes early-exit subcommands
 // (help, version, update, clear-cache, reindex). It returns done=true when
-// the caller should exit without starting the TUI. A single leading token
-// that is not a known subcommand and does not start with "-" (or several such
-// tokens) is treated as an initial search query and returned in query; the
-// caller seeds the TUI search bar with it. When --demo is among the
-// arguments, cleanup is non-nil and the caller must defer it. Errors indicate
-// a failing subcommand or an unknown flag; the error message is already
+// the caller should exit without starting the TUI. Bare tokens that are not a
+// known subcommand and do not start with "-" are treated as an initial search
+// query; the startup filter flags (--current, --cwd, --repo, --branch,
+// --query) seed structured filters. Both are returned in startup so the caller
+// can seed the TUI. When --demo is among the arguments, cleanup is non-nil and
+// the caller must defer it. Errors indicate a failing subcommand, an unknown
+// flag, a bad path, or a non-git directory; the error message is already
 // printed to stderr.
 //
 // Function variables (below) allow test substitution of external calls.
@@ -45,115 +46,116 @@ var (
 	doctorSessionCountFn   = defaultSessionCount
 )
 
-func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), query string, err error) {
-	var queryParts []string
-	for _, arg := range args {
+func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
+	var flags startupFlags
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		switch arg {
 		case "--help", "-h", "help":
 			printUsage()
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "--version", "-v", "version":
 			fmt.Println(version.Version)
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "update":
 			if uErr := runUpdateFn(context.Background(), version.Version); uErr != nil {
 				fmt.Fprintf(os.Stderr, "update: %v\n", uErr)
-				return true, cleanup, "", uErr
+				return true, cleanup, startupOptions{}, uErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "completion":
 			if len(args) < 2 {
 				err := errors.New("completion requires a shell: bash, zsh, fish, or powershell")
 				fmt.Fprintf(os.Stderr, "completion: %v\n", err)
-				return true, cleanup, "", err
+				return true, cleanup, startupOptions{}, err
 			}
 			if cErr := runCompletion(os.Stdout, args[1]); cErr != nil {
 				fmt.Fprintf(os.Stderr, "completion: %v\n", cErr)
-				return true, cleanup, "", cErr
+				return true, cleanup, startupOptions{}, cErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "doctor":
 			if slices.Contains(args, "--json") {
 				if jErr := runDoctorJSON(os.Stdout); jErr != nil {
 					fmt.Fprintf(os.Stderr, "doctor: %v\n", jErr)
-					return true, cleanup, "", jErr
+					return true, cleanup, startupOptions{}, jErr
 				}
 			} else {
 				runDoctor(os.Stdout)
 			}
 			showUpdateNotification(origStderr, updateCh)
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "open":
 			if oErr := runOpen(os.Stdout, args); oErr != nil {
 				fmt.Fprintf(os.Stderr, "open: %v\n", oErr)
-				return true, cleanup, "", oErr
+				return true, cleanup, startupOptions{}, oErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "new":
 			if nErr := runNew(os.Stdout, args); nErr != nil {
 				fmt.Fprintf(os.Stderr, "new: %v\n", nErr)
-				return true, cleanup, "", nErr
+				return true, cleanup, startupOptions{}, nErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "stats":
 			if sErr := runStats(os.Stdout, args); sErr != nil {
 				fmt.Fprintf(os.Stderr, "stats: %v\n", sErr)
-				return true, cleanup, "", sErr
+				return true, cleanup, startupOptions{}, sErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "search":
 			if sErr := runSearch(os.Stdout, args); sErr != nil {
 				fmt.Fprintf(os.Stderr, "search: %v\n", sErr)
-				return true, cleanup, "", sErr
+				return true, cleanup, startupOptions{}, sErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "tags":
 			if tErr := runTags(os.Stdout, args); tErr != nil {
 				fmt.Fprintf(os.Stderr, "tags: %v\n", tErr)
-				return true, cleanup, "", tErr
+				return true, cleanup, startupOptions{}, tErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "config":
 			if cErr := runConfig(os.Stdout, args); cErr != nil {
 				fmt.Fprintf(os.Stderr, "config: %v\n", cErr)
-				return true, cleanup, "", cErr
+				return true, cleanup, startupOptions{}, cErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "export":
 			if eErr := runExport(os.Stdout, args); eErr != nil {
 				fmt.Fprintf(os.Stderr, "export: %v\n", eErr)
-				return true, cleanup, "", eErr
+				return true, cleanup, startupOptions{}, eErr
 			}
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
 				fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
-				return true, cleanup, "", demoErr
+				return true, cleanup, startupOptions{}, demoErr
 			}
 			cleanup = c
 
 		case "--clear-cache":
 			if cErr := configResetFn(); cErr != nil {
 				fmt.Fprintf(os.Stderr, "clear-cache: %v\n", cErr)
-				return true, cleanup, "", cErr
+				return true, cleanup, startupOptions{}, cErr
 			}
 			fmt.Println("Config reset to defaults.")
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
 
 		case "--reindex":
 			fmt.Println("Reindexing session store via Copilot CLI…")
@@ -165,11 +167,11 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 					fmt.Println("Copilot CLI not found, running index maintenance…")
 					if mErr := maintainFn(context.Background()); mErr != nil {
 						fmt.Fprintf(os.Stderr, "reindex: %v\n", mErr)
-						return true, cleanup, "", mErr
+						return true, cleanup, startupOptions{}, mErr
 					}
 				} else {
 					fmt.Fprintf(os.Stderr, "reindex: %v\n", rErr)
-					return true, cleanup, "", rErr
+					return true, cleanup, startupOptions{}, rErr
 				}
 			}
 			// Post-reindex maintenance (WAL checkpoint + FTS5 optimize).
@@ -177,23 +179,91 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 				fmt.Fprintf(os.Stderr, "warning: post-reindex maintenance: %v\n", mErr)
 			}
 			fmt.Println("Done.")
-			return true, cleanup, "", nil
+			return true, cleanup, startupOptions{}, nil
+
+		case "--current":
+			flags.current = true
+
+		case "--repo", "--branch", "--cwd", "--query":
+			value, next, ok := flagValue(args, i, arg)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "%s requires a value\n", arg)
+				printUsage()
+				return true, cleanup, startupOptions{}, fmt.Errorf("%s requires a value", arg)
+			}
+			i = next
+			switch arg {
+			case "--repo":
+				flags.repo = value
+			case "--branch":
+				flags.branch = value
+			case "--cwd":
+				flags.cwd = value
+			case "--query":
+				flags.query = value
+			}
 
 		default:
-			// A leading "-" marks an unknown flag, which is still an error.
-			// Anything else is collected as part of an initial search query.
+			// Handle the inline forms (--repo=foo) and unknown flags.
 			if strings.HasPrefix(arg, "-") {
-				fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
-				printUsage()
-				return true, cleanup, "", fmt.Errorf("unknown flag: %s", arg)
+				if key, value, ok := splitInlineFlag(arg); ok {
+					switch key {
+					case "--repo":
+						flags.repo = value
+					case "--branch":
+						flags.branch = value
+					case "--cwd":
+						flags.cwd = value
+					case "--query":
+						flags.query = value
+					default:
+						return true, cleanup, startupOptions{}, unknownFlag(arg)
+					}
+					continue
+				}
+				return true, cleanup, startupOptions{}, unknownFlag(arg)
 			}
-			queryParts = append(queryParts, arg)
+			flags.queryParts = append(flags.queryParts, arg)
 		}
 	}
-	if len(queryParts) > 0 {
-		query = strings.Join(queryParts, " ")
+
+	startup, err = resolveStartupOptions(flags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return true, cleanup, startupOptions{}, err
 	}
-	return false, cleanup, query, nil
+	return false, cleanup, startup, nil
+}
+
+// unknownFlag prints the usage banner and returns the unknown-flag error. It is
+// shared by the direct and inline flag parsing paths.
+func unknownFlag(arg string) error {
+	fmt.Fprintf(os.Stderr, "unknown flag: %s\n", arg)
+	printUsage()
+	return fmt.Errorf("unknown flag: %s", arg)
+}
+
+// flagValue returns the value for a value-taking flag at index i. It supports
+// both "--flag value" (consuming args[i+1]) and "--flag=value" forms. The
+// returned next index is the position the caller should advance i to.
+func flagValue(args []string, i int, flag string) (value string, next int, ok bool) {
+	if v, found := strings.CutPrefix(args[i], flag+"="); found {
+		return v, i, v != ""
+	}
+	if i+1 < len(args) {
+		return args[i+1], i + 1, true
+	}
+	return "", i, false
+}
+
+// splitInlineFlag splits a "--flag=value" argument into its flag and value.
+// It returns ok=false when the argument has no "=".
+func splitInlineFlag(arg string) (flag, value string, ok bool) {
+	idx := strings.IndexByte(arg, '=')
+	if idx <= 0 {
+		return "", "", false
+	}
+	return arg[:idx], arg[idx+1:], true
 }
 
 func runCompletion(w io.Writer, shell string) error {
@@ -219,7 +289,7 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local commands="help version open new doctor update completion stats search tags config export"
-  local flags="-h --help -v --version --demo --clear-cache --reindex"
+  local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
     COMPREPLY=( $(compgen -W "${commands} ${flags}" -- "${cur}") )
@@ -245,7 +315,7 @@ _dispatch_completion() {
   commands=(help version open new doctor update completion stats search tags config export)
   shells=(bash zsh fish powershell)
   configsubs=(list get set edit path)
-  flags=(-h --help -v --version --demo --clear-cache --reindex)
+  flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
   if (( CURRENT == 2 )); then
     _describe -t commands 'dispatch command' commands || _describe -t flags 'dispatch flag' flags
@@ -279,14 +349,14 @@ end
 for bin in dispatch disp
   complete -c $bin -f
   complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export'
-  complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex'
+  complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_using_completion' -a 'bash zsh fish powershell'
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export')
-$script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
+$script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
 
