@@ -74,6 +74,15 @@ func RefURL(repository, refType, refValue string) (url string, ok bool) {
 	}
 }
 
+// NormalizeRepoSlug reduces a repository identifier to its "owner/repo" form.
+// It accepts a bare slug, an https URL, a scp-style ssh remote, or a
+// github.com-prefixed path, and returns "" when it cannot extract owner/repo.
+// It matches the form stored in the session repository column, so callers can
+// use it to compare a live git remote against stored sessions.
+func NormalizeRepoSlug(repository string) string {
+	return normalizeRepoSlug(repository)
+}
+
 // normalizeRepoSlug reduces a repository identifier to its "owner/repo" form.
 // It accepts a bare slug, an https URL, a scp-style ssh remote, or a
 // github.com-prefixed path, and returns "" when it cannot extract owner/repo.

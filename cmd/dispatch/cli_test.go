@@ -309,7 +309,7 @@ func TestHandleArgs_NoArgs(t *testing.T) {
 func TestHandleArgs_SingleQuery(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, cleanup, query, err := handleArgs([]string{"auth"}, io.Discard, ch)
+	done, cleanup, startup, err := handleArgs([]string{"auth"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,23 +319,23 @@ func TestHandleArgs_SingleQuery(t *testing.T) {
 	if cleanup != nil {
 		t.Error("expected cleanup=nil for a search query")
 	}
-	if query != "auth" {
-		t.Errorf("query = %q, want %q", query, "auth")
+	if startup.Query != "auth" {
+		t.Errorf("query = %q, want %q", startup.Query, "auth")
 	}
 }
 
 func TestHandleArgs_MultiWordQuery(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, query, err := handleArgs([]string{"fix", "auth", "bug"}, io.Discard, ch)
+	done, _, startup, err := handleArgs([]string{"fix", "auth", "bug"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if done {
 		t.Error("expected done=false for a multi-word query")
 	}
-	if query != "fix auth bug" {
-		t.Errorf("query = %q, want %q", query, "fix auth bug")
+	if startup.Query != "fix auth bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "fix auth bug")
 	}
 }
 
@@ -345,12 +345,12 @@ func TestHandleArgs_QueryDoesNotShadowSubcommands(t *testing.T) {
 
 	// A known subcommand must still short-circuit even though it is a bare
 	// non-flag token that could otherwise look like a query.
-	done, _, query, err := handleArgs([]string{"version"}, io.Discard, ch)
+	done, _, startup, err := handleArgs([]string{"version"}, io.Discard, ch)
 	if err != nil || !done {
 		t.Errorf("expected done=true, no error for version; got done=%v, err=%v", done, err)
 	}
-	if query != "" {
-		t.Errorf("query should be empty for a subcommand, got %q", query)
+	if startup.Query != "" {
+		t.Errorf("query should be empty for a subcommand, got %q", startup.Query)
 	}
 }
 

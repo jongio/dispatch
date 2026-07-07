@@ -131,6 +131,26 @@ dispatch auth
 dispatch fix auth bug
 ```
 
+### Startup filters
+
+Launch straight into the sessions for a repo, branch, or folder without typing in the search box. The filters seed the first query and show up in the search header.
+
+```sh
+dispatch --current                 # current git repo and branch (read from the working dir)
+dispatch --repo owner/repo         # one repository (owner/repo form)
+dispatch --branch main             # one branch
+dispatch --cwd ~/code/app          # sessions under a folder
+dispatch --repo owner/repo --branch main --query auth   # combine filters and free text
+```
+
+`--current` reads the git repository and branch from the current directory, or from `--cwd <path>` when given. Explicit `--repo` and `--branch` flags take precedence over the detected values. A non-git directory or a missing `--cwd` path prints an error and does not start the TUI.
+
+Bind `dispatch --current` to a shell alias to jump to the sessions for the repo you are already working in:
+
+```sh
+alias dc='dispatch --current'
+```
+
 ### Example Workflow
 
 1. Run `dispatch` (or `disp`) in your terminal
@@ -556,6 +576,11 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 | `--demo` | Load a demo database with synthetic sessions |
 | `--reindex` | Full chronicle reindex via Copilot CLI (falls back to FTS5 rebuild) |
 | `--clear-cache` | Reset all configuration to defaults |
+| `--current` | Filter the list to the current git repo and branch |
+| `--cwd <path>` | Filter to sessions under a folder (base dir for `--current`) |
+| `--repo <name>` | Filter to a repository (owner/repo) |
+| `--branch <name>` | Filter to a branch |
+| `--query <text>` | Pre-fill the search box with free text |
 
 A background update check runs on every launch and notifies you when a new version is available.
 

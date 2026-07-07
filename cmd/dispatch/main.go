@@ -33,7 +33,7 @@ func main() {
 		defer origStderr.Close() //nolint:errcheck // best-effort cleanup
 	}
 
-	done, demoCleanup, initialQuery, err := handleArgs(os.Args[1:], origStderr, updateCh)
+	done, demoCleanup, startup, err := handleArgs(os.Args[1:], origStderr, updateCh)
 	if demoCleanup != nil {
 		defer demoCleanup()
 	}
@@ -67,7 +67,7 @@ func main() {
 	}
 
 	p := tea.NewProgram(
-		tui.NewModelWithQuery(initialQuery),
+		tui.NewModelWithQuery(startup.SeedQuery()),
 	)
 
 	if _, err := p.Run(); err != nil {
@@ -86,6 +86,7 @@ func printUsage() {
 Usage:
   dispatch                Launch the interactive TUI
   dispatch [query]        Launch the TUI with the search box pre-filled
+  dispatch [filters]      Launch the TUI filtered to a repo, branch, or folder
   dispatch [command]
 
 Commands:
@@ -129,6 +130,13 @@ Flags:
   --demo                  Launch with demo data
   --clear-cache           Reset config to defaults
   --reindex               Rebuild the session store index
+
+Startup filters:
+  --current               Filter to the current git repo and branch (from cwd)
+  --cwd <path>            Filter to sessions under a folder (base dir for --current)
+  --repo <name>           Filter to a repository (owner/repo)
+  --branch <name>         Filter to a branch
+  --query <text>          Pre-fill the search box with free text
 
 Environment:
   DISPATCH_DB             Path to a custom session store database
