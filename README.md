@@ -223,6 +223,26 @@ dispatch export 0a1b2c3d --out ./exports
 
 By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
 
+### Search (JSON)
+
+Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array:
+
+```sh
+dispatch search auth
+dispatch search --query "fix login" --repo jongio/dispatch
+dispatch search --branch main --since 2026-01-01 --limit 20
+dispatch search --deep refactor --json
+```
+
+The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
+
+- `--repo`, `--branch`, `--folder`, `--host` narrow by session metadata.
+- `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
+- `--deep` also searches turns, checkpoints, touched files, and refs.
+- `--limit <n>` caps the result count (default 50, `0` for no limit).
+
+Each result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No matches prints `[]` and exits 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+
 ### Key Bindings
 
 #### Navigation
