@@ -225,7 +225,7 @@ _dispatch_completion() {
   fi
 
   if [[ "${COMP_WORDS[1]}" == "config" ]]; then
-    COMPREPLY=( $(compgen -W "list get set path" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "list get set edit path" -- "${cur}") )
     return 0
   fi
 }
@@ -237,7 +237,7 @@ _dispatch_completion() {
   local -a commands shells flags configsubs
   commands=(help version open new doctor update completion stats search config export)
   shells=(bash zsh fish powershell)
-  configsubs=(list get set path)
+  configsubs=(list get set edit path)
   flags=(-h --help -v --version --demo --clear-cache --reindex)
 
   if (( CURRENT == 2 )); then
@@ -281,7 +281,7 @@ const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'config', 'export')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex')
 $script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
-$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'path')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
