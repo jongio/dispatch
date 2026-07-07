@@ -98,6 +98,7 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
+  tags [--json]           List tags in use with per-tag session counts
   config [get|set|list|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON

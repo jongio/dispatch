@@ -210,6 +210,17 @@ Flags:
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
 
+### Tags
+
+Run `dispatch tags` to list every tag in use with the number of sessions that carry it, ordered by count.
+
+```sh
+dispatch tags
+dispatch tags --json
+```
+
+Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
+
 ### Export
 
 Save a full session (metadata and the complete conversation) to a file with `dispatch export <id>`:
