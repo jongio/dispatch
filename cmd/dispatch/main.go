@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jongio/dispatch/internal/tui"
@@ -16,14 +17,12 @@ import (
 )
 
 const demoDBRel = "internal/data/testdata/fake_sessions.db"
+const noUpdateCheckEnv = "DISPATCH_NO_UPDATE_CHECK"
+
+var checkForUpdateFn = update.CheckForUpdate
 
 func main() {
-	// Start background update check early so it can run concurrently
-	// with argument parsing and TUI startup.
-	updateCh := make(chan *update.UpdateInfo, 1)
-	go func() {
-		updateCh <- update.CheckForUpdate(context.Background(), version.Version)
-	}()
+	updateCh := startUpdateCheck(context.Background(), version.Version)
 
 	origStderr := captureOriginalStderr()
 	if origStderr == nil {
@@ -78,6 +77,28 @@ func main() {
 	// After TUI exits, show update notification if the background
 	// check found a newer release.
 	showUpdateNotification(origStderr, updateCh)
+}
+
+func startUpdateCheck(ctx context.Context, currentVersion string) <-chan *update.UpdateInfo {
+	ch := make(chan *update.UpdateInfo, 1)
+	if updateCheckDisabled() {
+		return ch
+	}
+	// Start background update check early so it can run concurrently with
+	// argument parsing and TUI startup.
+	go func() {
+		ch <- checkForUpdateFn(ctx, currentVersion)
+	}()
+	return ch
+}
+
+func updateCheckDisabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(noUpdateCheckEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func printUsage() {
@@ -157,6 +178,8 @@ Environment:
   DISPATCH_DB             Path to a custom session store database
   DISPATCH_SESSION_STATE  Path to a custom session state directory
   DISPATCH_LOG            Path to a log file (enables debug logging)
+  DISPATCH_NO_UPDATE_CHECK
+                          Skip the background release check when set to 1, true, yes, or on
 `, version.Version)
 }
 

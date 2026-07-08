@@ -82,6 +82,72 @@ func TestShowUpdateNotification_NilWriter(t *testing.T) {
 	showUpdateNotification(nil, ch)
 }
 
+func TestUpdateCheckDisabledTruthyValues(t *testing.T) {
+	for _, value := range []string{"1", "true", "TRUE", "yes", "on", " On "} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(noUpdateCheckEnv, value)
+			if !updateCheckDisabled() {
+				t.Errorf("updateCheckDisabled() = false, want true for %q", value)
+			}
+		})
+	}
+}
+
+func TestUpdateCheckDisabledFalsyValues(t *testing.T) {
+	for _, value := range []string{"", "0", "false", "no", "off", "maybe"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(noUpdateCheckEnv, value)
+			if updateCheckDisabled() {
+				t.Errorf("updateCheckDisabled() = true, want false for %q", value)
+			}
+		})
+	}
+}
+
+func TestStartUpdateCheckDisabledDoesNotCallChecker(t *testing.T) {
+	t.Setenv(noUpdateCheckEnv, "1")
+	called := make(chan struct{}, 1)
+	prev := checkForUpdateFn
+	checkForUpdateFn = func(context.Context, string) *update.UpdateInfo {
+		called <- struct{}{}
+		return nil
+	}
+	t.Cleanup(func() { checkForUpdateFn = prev })
+
+	ch := startUpdateCheck(context.Background(), "1.0.0")
+
+	select {
+	case <-called:
+		t.Fatal("update checker was called while disabled")
+	default:
+	}
+	select {
+	case info := <-ch:
+		t.Fatalf("update channel produced %v while disabled", info)
+	default:
+	}
+}
+
+func TestStartUpdateCheckEnabledCallsChecker(t *testing.T) {
+	t.Setenv(noUpdateCheckEnv, "0")
+	prev := checkForUpdateFn
+	checkForUpdateFn = func(context.Context, string) *update.UpdateInfo {
+		return &update.UpdateInfo{CurrentVersion: "1.0.0", LatestVersion: "1.1.0"}
+	}
+	t.Cleanup(func() { checkForUpdateFn = prev })
+
+	ch := startUpdateCheck(context.Background(), "1.0.0")
+
+	select {
+	case info := <-ch:
+		if info == nil || info.LatestVersion != "1.1.0" {
+			t.Fatalf("update info = %+v, want latest 1.1.0", info)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for update checker")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // findDemoDB
 // ---------------------------------------------------------------------------
