@@ -56,6 +56,9 @@ func TestParseSearchArgsQueryAndFilters(t *testing.T) {
 	if opts.limit != 10 {
 		t.Errorf("limit = %d, want 10", opts.limit)
 	}
+	if opts.format != searchFormatJSON {
+		t.Errorf("format = %q, want json", opts.format)
+	}
 	if opts.filter.Since == nil || !opts.filter.Since.Equal(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("Since = %v, want 2026-01-01", opts.filter.Since)
 	}
@@ -75,6 +78,31 @@ func TestParseSearchArgsDefaultLimit(t *testing.T) {
 	if opts.filter.Query != "" {
 		t.Errorf("Query = %q, want empty", opts.filter.Query)
 	}
+	if opts.format != searchFormatJSON {
+		t.Errorf("format = %q, want json", opts.format)
+	}
+}
+
+func TestParseSearchArgsIDFormats(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{name: "ids shortcut", args: []string{"search", "--ids"}},
+		{name: "format ids separate", args: []string{"search", "--format", "ids"}},
+		{name: "format ids inline", args: []string{"search", "--format=ids"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts, err := parseSearchArgs(tc.args)
+			if err != nil {
+				t.Fatalf("parseSearchArgs returned error: %v", err)
+			}
+			if opts.format != searchFormatIDs {
+				t.Errorf("format = %q, want ids", opts.format)
+			}
+		})
+	}
 }
 
 func TestParseSearchArgsErrors(t *testing.T) {
@@ -84,6 +112,8 @@ func TestParseSearchArgsErrors(t *testing.T) {
 		{"search", "--limit", "-3"},
 		{"search", "--limit", "abc"},
 		{"search", "--repo"},
+		{"search", "--format"},
+		{"search", "--format", "table"},
 	}
 	for _, args := range cases {
 		if _, err := parseSearchArgs(args); err == nil {
@@ -135,6 +165,39 @@ func TestRunSearchJSONOutput(t *testing.T) {
 	}
 	if out[0].ID != "a" || out[0].Summary != "fix auth bug" || out[0].TurnCount != 5 || out[0].FileCount != 3 {
 		t.Errorf("unexpected result: %+v", out[0])
+	}
+}
+
+func TestRunSearchIDsOutput(t *testing.T) {
+	sessions := []data.Session{
+		{ID: "session-a"},
+		{ID: "session-b"},
+	}
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--ids"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	if got, want := buf.String(), "session-a\nsession-b\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunSearchIDsNoMatchesIsEmpty(t *testing.T) {
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return nil, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--format", "ids"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+	if got := buf.String(); got != "" {
+		t.Errorf("output = %q, want empty", got)
 	}
 }
 

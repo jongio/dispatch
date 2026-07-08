@@ -256,13 +256,15 @@ By default the session is written as Markdown to the exports directory. Use `--f
 
 ### Search (JSON)
 
-Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array:
+Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array by default:
 
 ```sh
 dispatch search auth
 dispatch search --query "fix login" --repo jongio/dispatch
 dispatch search --branch main --since 2026-01-01 --limit 20
 dispatch search --deep refactor --json
+dispatch search auth --format ids
+dispatch search auth --ids
 ```
 
 The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
@@ -271,8 +273,9 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
 - `--deep` also searches turns, checkpoints, touched files, and refs.
 - `--limit <n>` caps the result count (default 50, `0` for no limit).
+- `--format json|ids` chooses JSON output or one session ID per line. `--ids` is a shortcut for `--format ids`.
 
-Each result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No matches prints `[]` and exits 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+Each JSON result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. Both exit 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
 
 ### Key Bindings
 

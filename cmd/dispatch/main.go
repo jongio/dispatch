@@ -139,7 +139,9 @@ Stats flags:
   --until <date>          Only count sessions created on or before a date
 
 Search flags:
-  --json                  Print results as JSON (default and only output)
+  --json                  Print results as JSON (default)
+  --ids                   Print one session ID per line
+  --format json|ids       Choose the output format
   --query <text>          Text to match (also accepted as a positional argument)
   --deep                  Search turns, checkpoints, files, and refs too
   --repo <name>           Only include sessions for a repository
