@@ -16,8 +16,10 @@ import (
 	"github.com/jongio/dispatch/internal/version"
 )
 
-const demoDBRel = "internal/data/testdata/fake_sessions.db"
-const noUpdateCheckEnv = "DISPATCH_NO_UPDATE_CHECK"
+const (
+	demoDBRel        = "internal/data/testdata/fake_sessions.db"
+	noUpdateCheckEnv = "DISPATCH_NO_UPDATE_CHECK"
+)
 
 var checkForUpdateFn = update.CheckForUpdate
 
