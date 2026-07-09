@@ -614,7 +614,7 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 | `--branch <name>` | Filter to a branch |
 | `--query <text>` | Pre-fill the search box with free text |
 
-A background update check runs on every launch and notifies you when a new version is available.
+A background update check runs on every launch and notifies you when a new version is available. Set `DISPATCH_NO_UPDATE_CHECK=1` to skip that check.
 
 Unknown flags print an error message with usage help and exit with code 1.
 
@@ -624,6 +624,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 |---|---|
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
+| `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |
 
 ## Shell Aliases
 
