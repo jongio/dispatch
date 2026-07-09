@@ -24,10 +24,18 @@ const searchDefaultLimit = 50
 // (--limit 0), mirroring the ceiling the stats command uses.
 const searchAllLimit = 100_000
 
+type searchOutputFormat string
+
+const (
+	searchFormatJSON searchOutputFormat = "json"
+	searchFormatIDs  searchOutputFormat = "ids"
+)
+
 // searchOptions holds the parsed flags for the search command.
 type searchOptions struct {
 	filter data.FilterOptions
 	limit  int
+	format searchOutputFormat
 }
 
 // searchSession is the machine-readable shape emitted for each matching
@@ -67,6 +75,10 @@ func runSearch(w io.Writer, args []string) error {
 		return err
 	}
 
+	if opts.format == searchFormatIDs {
+		return writeSearchIDs(w, sessions)
+	}
+
 	results := make([]searchSession, 0, len(sessions))
 	for _, s := range sessions {
 		results = append(results, searchSession{
@@ -87,11 +99,20 @@ func runSearch(w io.Writer, args []string) error {
 	return enc.Encode(results)
 }
 
+func writeSearchIDs(w io.Writer, sessions []data.Session) error {
+	for _, s := range sessions {
+		if _, err := fmt.Fprintln(w, s.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // parseSearchArgs reads the search subcommand flags. args[0] is expected to be
 // "search". A single leading token that does not start with "-" is treated as
 // the search query, matching how the TUI seeds its search box.
 func parseSearchArgs(args []string) (searchOptions, error) {
-	opts := searchOptions{limit: searchDefaultLimit}
+	opts := searchOptions{limit: searchDefaultLimit, format: searchFormatJSON}
 
 	rest := args
 	if len(rest) > 0 {
@@ -115,8 +136,20 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 
 		switch {
 		case name == "--json":
-			// Accepted for explicitness and forward compatibility; JSON is
-			// the only output mode this command emits.
+			opts.format = searchFormatJSON
+		case name == "--ids":
+			opts.format = searchFormatIDs
+		case name == "--format":
+			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return searchOptions{}, err
+			}
+			format, err := parseSearchFormat(v)
+			if err != nil {
+				return searchOptions{}, err
+			}
+			opts.format = format
+			i = ni
 		case name == "--deep":
 			opts.filter.DeepSearch = true
 		case name == "--query" || name == "-q":
@@ -199,6 +232,17 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 	}
 
 	return opts, nil
+}
+
+func parseSearchFormat(v string) (searchOutputFormat, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case string(searchFormatJSON):
+		return searchFormatJSON, nil
+	case string(searchFormatIDs):
+		return searchFormatIDs, nil
+	default:
+		return "", fmt.Errorf("invalid --format value %q (want json or ids)", v)
+	}
 }
 
 // parseSearchLimit parses the --limit value. Zero means "no cap"; negative
