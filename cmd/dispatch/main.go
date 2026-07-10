@@ -137,6 +137,7 @@ Stats flags:
   --folder <path>         Only count sessions under a folder
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
+  --top <n>               Limit each breakdown to the top N entries
 
 Search flags:
   --json                  Print results as JSON (default)

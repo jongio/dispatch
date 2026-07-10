@@ -222,6 +222,7 @@ dispatch stats
 dispatch stats --json
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
+dispatch stats --top 5
 ```
 
 Flags:
@@ -229,6 +230,7 @@ Flags:
 - `--json` prints the summary as a single JSON object.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
+- `--top <n>` caps each repository, branch, and host breakdown to the first N entries.
 
 ### Tags
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ type statsOptions struct {
 	filter   data.FilterOptions
 	json     bool
 	calendar bool
+	top      int
 }
 
 // countEntry is one label and count pair in a grouped breakdown.
@@ -83,6 +85,7 @@ func runStats(w io.Writer, args []string) error {
 		cal := buildActivityCalendar(sessions)
 		report.Calendar = &cal
 	}
+	applyStatsTopLimit(&report, opts.top)
 	if opts.json {
 		return writeStatsJSON(w, report)
 	}
@@ -122,6 +125,17 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 			opts.json = true
 		case name == "--calendar":
 			opts.calendar = true
+		case name == "--top":
+			v, ni, err := takeValue(i, "--top", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return statsOptions{}, err
+			}
+			top, err := parseStatsTop(v)
+			if err != nil {
+				return statsOptions{}, err
+			}
+			opts.top = top
+			i = ni
 		case name == "--repo" || name == "--repository":
 			v, ni, err := takeValue(i, "--repo", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -173,6 +187,14 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 	}
 
 	return opts, nil
+}
+
+func parseStatsTop(v string) (int, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid --top value %q (want a positive whole number)", v)
+	}
+	return n, nil
 }
 
 // splitFlag separates a flag token into its name and optional inline value,
@@ -255,6 +277,22 @@ func buildStatsReport(sessions []data.Session) statsReport {
 	report.ByBranch = sortedCounts(branchCounts)
 	report.ByHostType = sortedCounts(hostCounts)
 	return report
+}
+
+func applyStatsTopLimit(report *statsReport, top int) {
+	if report == nil || top <= 0 {
+		return
+	}
+	report.ByRepository = capCountEntries(report.ByRepository, top)
+	report.ByBranch = capCountEntries(report.ByBranch, top)
+	report.ByHostType = capCountEntries(report.ByHostType, top)
+}
+
+func capCountEntries(entries []countEntry, top int) []countEntry {
+	if top <= 0 || len(entries) <= top {
+		return entries
+	}
+	return entries[:top]
 }
 
 // latestTime returns the most recent timestamp for a session, preferring
