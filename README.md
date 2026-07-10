@@ -606,7 +606,7 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 | Flag | Description |
 |---|---|
 | `--help`, `-h`, `help` | Show usage information |
-| `--version`, `-v`, `version` | Print the version and exit |
+| `--version`, `-v`, `version` | Print the version and exit. Add `--json` for script output |
 | `update` | Update dispatch to the latest release |
 | `--demo` | Load a demo database with synthetic sessions |
 | `--reindex` | Full chronicle reindex via Copilot CLI (falls back to FTS5 rebuild) |
