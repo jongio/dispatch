@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -27,8 +28,9 @@ const searchAllLimit = 100_000
 type searchOutputFormat string
 
 const (
-	searchFormatJSON searchOutputFormat = "json"
-	searchFormatIDs  searchOutputFormat = "ids"
+	searchFormatJSON  searchOutputFormat = "json"
+	searchFormatIDs   searchOutputFormat = "ids"
+	searchFormatTable searchOutputFormat = "table"
 )
 
 // searchOptions holds the parsed flags for the search command.
@@ -78,6 +80,9 @@ func runSearch(w io.Writer, args []string) error {
 	if opts.format == searchFormatIDs {
 		return writeSearchIDs(w, sessions)
 	}
+	if opts.format == searchFormatTable {
+		return writeSearchTable(w, sessions)
+	}
 
 	results := make([]searchSession, 0, len(sessions))
 	for _, s := range sessions {
@@ -106,6 +111,53 @@ func writeSearchIDs(w io.Writer, sessions []data.Session) error {
 		}
 	}
 	return nil
+}
+
+func writeSearchTable(w io.Writer, sessions []data.Session) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	if _, err := fmt.Fprintln(tw, "ID\tLAST ACTIVE\tREPO\tBRANCH\tTURNS\tFILES\tSUMMARY"); err != nil {
+		return err
+	}
+	for _, s := range sessions {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
+			shortSearchID(s.ID),
+			searchTableTime(s),
+			searchTableCell(s.Repository),
+			searchTableCell(s.Branch),
+			s.TurnCount,
+			s.FileCount,
+			searchTableCell(s.Summary),
+		); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
+}
+
+func shortSearchID(id string) string {
+	if len(id) <= 12 {
+		return id
+	}
+	return id[:12]
+}
+
+func searchTableTime(s data.Session) string {
+	v := s.LastActiveAt
+	if v == "" {
+		v = s.UpdatedAt
+	}
+	if len(v) >= len("2006-01-02") {
+		return v[:len("2006-01-02")]
+	}
+	return searchTableCell(v)
+}
+
+func searchTableCell(v string) string {
+	v = strings.Join(strings.Fields(v), " ")
+	if v == "" {
+		return "-"
+	}
+	return v
 }
 
 // parseSearchArgs reads the search subcommand flags. args[0] is expected to be
@@ -139,6 +191,8 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 			opts.format = searchFormatJSON
 		case name == "--ids":
 			opts.format = searchFormatIDs
+		case name == "--table":
+			opts.format = searchFormatTable
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -240,8 +294,10 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 		return searchFormatJSON, nil
 	case string(searchFormatIDs):
 		return searchFormatIDs, nil
+	case string(searchFormatTable):
+		return searchFormatTable, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json or ids)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, ids, or table)", v)
 	}
 }
 
