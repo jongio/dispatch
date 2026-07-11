@@ -124,6 +124,7 @@ Commands:
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON (no TUI)
   tags [--json]           List tags in use with per-tag session counts
+  notes [command]          List, get, set, or clear session notes
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
@@ -158,6 +159,12 @@ Config commands:
   config set <key> <val>  Validate and save one setting
   config edit             Open the config file in your editor
   config path             Print the config file path
+
+Notes commands:
+  notes [list] [--json]    List notes attached to current sessions
+  notes get <id>           Print one session note
+  notes set <id> <text>    Set one session note
+  notes clear <id>         Clear one session note
 
 Export flags:
   --format md|json        Output format (default md)
