@@ -124,6 +124,7 @@ Commands:
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON (no TUI)
   tags [--json]           List tags in use with per-tag session counts
+  views [command]          List named views or set the active view
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
@@ -151,6 +152,11 @@ Search flags:
   --since <date>          Only include sessions active on or after a date
   --until <date>          Only include sessions active on or before a date
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
+
+Views commands:
+  views [list] [--json]    List configured named views
+  views use <name>         Set the active named view
+  views use default        Clear the active named view
 
 Config commands:
   config list [--json]    Print every setting and its value

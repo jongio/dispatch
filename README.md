@@ -241,6 +241,19 @@ dispatch tags --json
 
 Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
 
+### Named Views
+
+List named views and switch the active view from scripts:
+
+```sh
+dispatch views
+dispatch views --json
+dispatch views use Work
+dispatch views use default
+```
+
+Named views come from the `views` array in `config.json`. `dispatch views use <name>` sets `active_view`, and `dispatch views use default` clears it so the TUI opens with the normal filters.
+
 ### Export
 
 Save a full session (metadata and the complete conversation) to a file with `dispatch export <id>`:
@@ -478,6 +491,8 @@ dispatch config path            # print the config file path
 | `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
 | `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
 | `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
+| `views` | array | `[]` | Named search, sort, pivot, and filter presets |
+| `active_view` | string | `""` | Name of the named view to apply on startup. Empty means default filters |
 | `hidden_columns` | array | `[]` | Optional session-list columns to hide (`repo`, `folder`, `turns`, `host`); empty shows all |
 
 #### Pane Direction Semantics

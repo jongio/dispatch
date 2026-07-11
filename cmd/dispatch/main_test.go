@@ -456,16 +456,21 @@ func TestPrintUsage_Output(t *testing.T) {
 
 	origStdout := os.Stdout
 	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
+
+	readDone := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		readDone <- buf.String()
+	}()
 
 	printUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
-
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-
-	output := buf.String()
+	output := <-readDone
+	_ = r.Close()
 	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)

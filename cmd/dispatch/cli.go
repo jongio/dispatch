@@ -127,6 +127,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "views":
+			if vErr := runViews(os.Stdout, args); vErr != nil {
+				fmt.Fprintf(os.Stderr, "views: %v\n", vErr)
+				return true, cleanup, startupOptions{}, vErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "config":
 			if cErr := runConfig(os.Stdout, args); cErr != nil {
 				fmt.Fprintf(os.Stderr, "config: %v\n", cErr)
