@@ -163,6 +163,7 @@ Export flags:
   --format md|json        Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
+  --redact                Mask common secret patterns in the export
 
 Flags:
   -h, --help              Show this help message
