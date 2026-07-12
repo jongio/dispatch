@@ -305,16 +305,28 @@ _dispatch_completion() {
     COMPREPLY=( $(compgen -W "list get set edit path" -- "${cur}") )
     return 0
   fi
+
+  if [[ "${COMP_WORDS[1]}" == "open" ]]; then
+    COMPREPLY=( $(compgen -W "--mode --last --print --agent --model --yolo" -- "${cur}") )
+    return 0
+  fi
+
+  if [[ "${COMP_WORDS[1]}" == "new" ]]; then
+    COMPREPLY=( $(compgen -W "--mode --agent --model --yolo" -- "${cur}") )
+    return 0
+  fi
 }
 complete -F _dispatch_completion dispatch disp
 `
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands shells flags configsubs
+  local -a commands shells flags configsubs openflags newflags
   commands=(help version open new doctor update completion stats search tags config export)
   shells=(bash zsh fish powershell)
   configsubs=(list get set edit path)
+  openflags=(--mode --last --print --agent --model --yolo)
+  newflags=(--mode --agent --model --yolo)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
   if (( CURRENT == 2 )); then
@@ -329,6 +341,16 @@ _dispatch_completion() {
 
   if [[ ${words[2]} == config ]]; then
     _describe -t configsubs 'config subcommand' configsubs
+    return
+  fi
+
+  if [[ ${words[2]} == open ]]; then
+    _describe -t openflags 'open flag' openflags
+    return
+  fi
+
+  if [[ ${words[2]} == new ]]; then
+    _describe -t newflags 'new flag' newflags
     return
   fi
 }
@@ -346,11 +368,18 @@ function __dispatch_using_completion
   test (count $cmd) -ge 2; and test $cmd[2] = completion
 end
 
+function __dispatch_using_subcommand
+  set -l cmd (commandline -opc)
+  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
+end
+
 for bin in dispatch disp
   complete -c $bin -f
   complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_using_completion' -a 'bash zsh fish powershell'
+  complete -c $bin -n '__dispatch_using_subcommand open' -a '--mode --last --print --agent --model --yolo'
+  complete -c $bin -n '__dispatch_using_subcommand new' -a '--mode --agent --model --yolo'
 end
 `
 
@@ -359,6 +388,8 @@ $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
+$script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
+$script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
@@ -367,6 +398,10 @@ Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
         $script:DispatchShells
     } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'config') {
         $script:DispatchConfigSubcommands
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'open') {
+        $script:DispatchOpenFlags
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'new') {
+        $script:DispatchNewFlags
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }

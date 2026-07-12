@@ -183,6 +183,16 @@ Use `--print` to write the resume command to stdout instead of launching it. Thi
 dispatch open <session-id> --print
 ```
 
+Override the agent, model, or yolo mode for a single resume without changing your saved config with `--agent`, `--model`, and `--yolo`:
+
+```sh
+dispatch open <session-id> --agent coder --model gpt-5
+dispatch open --last --yolo
+dispatch open <session-id> --yolo=false   # force off even if config enables it
+```
+
+These flags apply to every launch mode and to `--print`. When omitted, the saved config values are used.
+
 ### Start a New Session
 
 Start a brand-new Copilot session from the command line without opening the TUI:
@@ -191,9 +201,11 @@ Start a brand-new Copilot session from the command line without opening the TUI:
 dispatch new              # start in the current directory
 dispatch new ~/code/app   # start in a specific directory
 dispatch new --mode tab   # override the launch mode (inplace, tab, window, pane)
+dispatch new --agent coder --model gpt-5   # override agent/model for this session
+dispatch new --yolo       # start with yolo mode on for this session only
 ```
 
-The session uses the same agent, model, and launch settings as the TUI. When no directory is given, the current working directory is used.
+The session uses the same agent, model, and launch settings as the TUI unless you pass `--agent`, `--model`, or `--yolo` to override them for that one launch. When no directory is given, the current working directory is used.
 
 
 ### Shell Completion

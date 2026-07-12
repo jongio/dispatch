@@ -129,6 +129,14 @@ Commands:
   export <id> [flags]     Export a session as Markdown or JSON
   update                  Update dispatch to the latest release
 
+Open and new flags:
+  --mode <M>              Launch mode for this run (inplace, tab, window, pane)
+  --agent <name>          Override the configured agent for this run only
+  --model <name>          Override the configured model for this run only
+  --yolo[=true|false]     Override yolo mode for this run only (bare form implies true)
+  --last                  (open only) Resume the most recently active session
+  --print                 (open only) Print the resume command instead of launching
+
 Stats flags:
   --json                  Print the summary as JSON
   --calendar              Add a per-day activity heatmap

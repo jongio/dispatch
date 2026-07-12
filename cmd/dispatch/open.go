@@ -33,7 +33,7 @@ func runOpen(w io.Writer, args []string) error {
 		w = io.Discard
 	}
 
-	id, modeFlag, last, printCmd, err := parseOpenArgs(args)
+	id, modeFlag, last, printCmd, ov, err := parseOpenArgs(args)
 	if err != nil {
 		return err
 	}
@@ -42,6 +42,7 @@ func runOpen(w io.Writer, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+	ov.apply(cfg)
 
 	var sess *data.Session
 	if last {
@@ -94,9 +95,9 @@ func openResumeConfig(cfg *config.Config, sess *data.Session) platform.ResumeCon
 }
 
 // parseOpenArgs extracts the session ID, optional launch mode, the --last
-// flag, and the --print flag from the "open" subcommand arguments. args[0] is
-// expected to be "open".
-func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err error) {
+// flag, the --print flag, and any per-launch agent/model/yolo overrides from
+// the "open" subcommand arguments. args[0] is expected to be "open".
+func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, ov launchOverrides, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "open" token
@@ -105,12 +106,19 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err err
 	var positionals []string
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
+		if matched, next, mErr := matchLaunchOverride(rest, i, &ov); matched {
+			if mErr != nil {
+				return "", "", false, false, launchOverrides{}, mErr
+			}
+			i = next
+			continue
+		}
 		switch {
 		case arg == "--last" || arg == "-l":
 			last = true
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-				return "", "", false, false, errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", false, false, launchOverrides{}, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
@@ -119,7 +127,7 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err err
 		case arg == "--print":
 			printCmd = true
 		case strings.HasPrefix(arg, "-"):
-			return "", "", false, false, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, false, launchOverrides{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
@@ -127,25 +135,25 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err err
 
 	if last {
 		if len(positionals) > 0 {
-			return "", "", false, false, errors.New("open --last does not take a session ID")
+			return "", "", false, false, launchOverrides{}, errors.New("open --last does not take a session ID")
 		}
 	} else {
 		switch len(positionals) {
 		case 0:
-			return "", "", false, false, errors.New("open requires a session ID (or use --last)")
+			return "", "", false, false, launchOverrides{}, errors.New("open requires a session ID (or use --last)")
 		case 1:
 			id = positionals[0]
 		default:
-			return "", "", false, false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
+			return "", "", false, false, launchOverrides{}, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
 		}
 	}
 
 	if mode != "" {
 		if _, mErr := normalizeLaunchMode(mode); mErr != nil {
-			return "", "", false, false, mErr
+			return "", "", false, false, launchOverrides{}, mErr
 		}
 	}
-	return id, mode, last, printCmd, nil
+	return id, mode, last, printCmd, ov, nil
 }
 
 // normalizeLaunchMode maps a user-facing mode string to a config launch mode.

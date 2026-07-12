@@ -457,15 +457,23 @@ func TestPrintUsage_Output(t *testing.T) {
 	origStdout := os.Stdout
 	os.Stdout = w
 
+	// Drain the pipe from a separate goroutine so printUsage never blocks on a
+	// full pipe buffer. Windows pipes buffer only a few KB, which is smaller
+	// than the usage text, so a synchronous read after printUsage would
+	// deadlock.
+	captured := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		captured <- buf.String()
+	}()
+
 	printUsage()
 
 	w.Close()
 	os.Stdout = origStdout
 
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-
-	output := buf.String()
+	output := <-captured
 	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)
