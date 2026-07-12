@@ -438,11 +438,12 @@ dispatch config list            # print every setting and its value
 dispatch config list --json     # same, as a single JSON object
 dispatch config get launch_mode # print one value
 dispatch config set launch_mode window
+dispatch config unset launch_mode # reset one setting to its default
 dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
 ```
 
-`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
 
 ### Options
 
