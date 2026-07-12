@@ -429,6 +429,8 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
+Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
+
 ### From the command line
 
 Read and change settings without opening the TUI or editing JSON by hand:
@@ -625,6 +627,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 
 | Variable | Description |
 |---|---|
+| `DISPATCH_CONFIG` | Override the path to the config file. Must be an absolute, non-UNC path; a relative or UNC value is ignored and the default location is used |
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 | `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |

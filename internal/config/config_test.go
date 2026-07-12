@@ -722,6 +722,97 @@ func TestConfigPathFormat(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// DISPATCH_CONFIG path override
+// ---------------------------------------------------------------------------
+
+func TestConfigPathHonorsDispatchConfigOverride(t *testing.T) {
+	withTempConfigDir(t)
+	custom := filepath.Join(t.TempDir(), "profile.json")
+	t.Setenv("DISPATCH_CONFIG", custom)
+
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if path != custom {
+		t.Errorf("configPath = %q, want override %q", path, custom)
+	}
+	pub, err := ConfigPath()
+	if err != nil {
+		t.Fatalf("ConfigPath: %v", err)
+	}
+	if pub != custom {
+		t.Errorf("ConfigPath = %q, want override %q", pub, custom)
+	}
+}
+
+func TestSaveAndLoadUseDispatchConfigOverride(t *testing.T) {
+	withTempConfigDir(t)
+	custom := filepath.Join(t.TempDir(), "profile.json")
+	t.Setenv("DISPATCH_CONFIG", custom)
+
+	if err := Save(&Config{Agent: "reviewer", Model: "claude-3"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if _, err := os.Stat(custom); err != nil {
+		t.Fatalf("override file should exist after Save: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Agent != "reviewer" {
+		t.Errorf("Agent = %q, want 'reviewer'", loaded.Agent)
+	}
+	if loaded.Model != "claude-3" {
+		t.Errorf("Model = %q, want 'claude-3'", loaded.Model)
+	}
+}
+
+func TestConfigPathIgnoresUnusableDispatchConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value string
+	}{
+		{name: "relative", value: filepath.Join("nested", "profile.json")},
+		{name: "unc", value: `\\server\share\profile.json`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withTempConfigDir(t)
+			t.Setenv("DISPATCH_CONFIG", tc.value)
+
+			path, err := configPath()
+			if err != nil {
+				t.Fatalf("configPath: %v", err)
+			}
+			if filepath.Base(path) != configFileName {
+				t.Errorf("config file name = %q, want %q", filepath.Base(path), configFileName)
+			}
+			if filepath.Base(filepath.Dir(path)) != "dispatch" {
+				t.Errorf("config dir = %q, want default 'dispatch' parent", filepath.Dir(path))
+			}
+		})
+	}
+}
+
+func TestConfigPathUnsetDispatchConfigUsesDefault(t *testing.T) {
+	withTempConfigDir(t)
+	t.Setenv("DISPATCH_CONFIG", "")
+
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if filepath.Base(path) != configFileName {
+		t.Errorf("config file name = %q, want %q", filepath.Base(path), configFileName)
+	}
+	if filepath.Base(filepath.Dir(path)) != "dispatch" {
+		t.Errorf("config dir = %q, want default 'dispatch' parent", filepath.Dir(path))
+	}
+}
+
 func TestDefaultFieldTypes(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
