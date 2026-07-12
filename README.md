@@ -207,6 +207,8 @@ dispatch completion fish
 dispatch completion powershell
 ```
 
+Once the script is sourced, completion covers dynamic values too: `dispatch open <TAB>` completes your configured session aliases, `dispatch config get <TAB>` (and `set`/`unset`) completes config keys, and `dispatch completion <TAB>` completes the supported shells. These come from your local config and static lists, so completion stays fast.
+
 ### Diagnostics
 
 Run `dispatch doctor` to print setup checks for the config file, session store, session-state directory, and Copilot CLI binary. It also reports the detected Copilot CLI version and the number of stored sessions.
