@@ -160,7 +160,7 @@ Config commands:
   config path             Print the config file path
 
 Export flags:
-  --format md|json        Output format (default md)
+  --format md|json|html   Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
 

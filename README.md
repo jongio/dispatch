@@ -248,11 +248,12 @@ Save a full session (metadata and the complete conversation) to a file with `dis
 ```sh
 dispatch export 0a1b2c3d
 dispatch export 0a1b2c3d --format json
+dispatch export 0a1b2c3d --format html
 dispatch export 0a1b2c3d --stdout
 dispatch export 0a1b2c3d --out ./exports
 ```
 
-By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output or `--format html` for a self-contained web page you can open in a browser (styles are inlined, so there are no external files to manage). Use `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
 
 ### Search (JSON)
 
