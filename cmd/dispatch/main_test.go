@@ -457,15 +457,23 @@ func TestPrintUsage_Output(t *testing.T) {
 	origStdout := os.Stdout
 	os.Stdout = w
 
+	// Drain the pipe concurrently. On Windows the OS pipe buffer is small
+	// (~4KB), so a usage banner larger than that would block printUsage on
+	// write if we only read after it returns. Reading on a goroutine keeps
+	// the writer unblocked regardless of banner size.
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+
 	printUsage()
 
 	w.Close()
 	os.Stdout = origStdout
 
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-
-	output := buf.String()
+	output := <-done
 	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)

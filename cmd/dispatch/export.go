@@ -188,7 +188,9 @@ func writeExportFile(dir, id, format, content string) (string, error) {
 }
 
 // defaultExportGetDetail loads a full session detail by ID from the default
-// session store. It returns (nil, nil) when no session with that ID exists.
+// session store. The ID may be a full session ID or a unique short prefix. It
+// returns (nil, nil) when no session matches, and an *data.AmbiguousIDPrefixError
+// when a short prefix matches more than one session.
 func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 	store, err := data.Open()
 	if err != nil {
@@ -196,7 +198,16 @@ func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 	}
 	defer store.Close() //nolint:errcheck // read-only, best-effort close
 
-	detail, err := store.GetSession(context.Background(), id)
+	ctx := context.Background()
+	fullID, err := store.ResolveIDPrefix(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	detail, err := store.GetSession(ctx, fullID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

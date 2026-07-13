@@ -115,7 +115,7 @@ Usage:
 Commands:
   help                    Show this help message
   version                 Print the version
-  open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
+  open <id> [--mode M]    Resume a session by ID or prefix (M: inplace, tab, window, pane)
                           --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
   new [dir] [--mode M]    Start a new session in a directory (default: current)
@@ -128,6 +128,11 @@ Commands:
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
   update                  Update dispatch to the latest release
+
+Session IDs:
+  Commands that take <id> (open, export) accept a full session ID or any
+  unique prefix of one, like a short git SHA. An ambiguous prefix lists the
+  matching sessions so you can add more characters.
 
 Stats flags:
   --json                  Print the summary as JSON

@@ -183,7 +183,16 @@ func defaultOpenGetSession(id string) (*data.Session, error) {
 	}
 	defer store.Close() //nolint:errcheck // read-only, best-effort close
 
-	detail, err := store.GetSession(context.Background(), id)
+	ctx := context.Background()
+	fullID, err := store.ResolveIDPrefix(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	detail, err := store.GetSession(ctx, fullID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
