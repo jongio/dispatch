@@ -141,6 +141,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "man":
+			if mErr := runMan(os.Stdout); mErr != nil {
+				fmt.Fprintf(os.Stderr, "man: %v\n", mErr)
+				return true, cleanup, startupOptions{}, mErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -288,7 +295,7 @@ func runCompletion(w io.Writer, shell string) error {
 const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="help version open new doctor update completion stats search tags config export"
+  local commands="help version open new doctor update completion stats search tags config export man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -312,7 +319,7 @@ complete -F _dispatch_completion dispatch disp
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands shells flags configsubs
-  commands=(help version open new doctor update completion stats search tags config export)
+  commands=(help version open new doctor update completion stats search tags config export man)
   shells=(bash zsh fish powershell)
   configsubs=(list get set edit path)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
@@ -348,14 +355,14 @@ end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_using_completion' -a 'bash zsh fish powershell'
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
