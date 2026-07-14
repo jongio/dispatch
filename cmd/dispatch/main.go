@@ -114,10 +114,12 @@ Usage:
 
 Commands:
   help                    Show this help message
-  version                 Print the version
-  open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
+  version [--json]        Print the version
+  open <id> [--mode M]    Resume a session by ID or prefix (M: inplace, tab, window, pane)
                           --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
+  open --stdin [--mode M] Resume every session ID read from standard input
+                          (one per line; pairs with search --ids)
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
@@ -125,10 +127,17 @@ Commands:
   search [query] [flags]  Print matching sessions as JSON (no TUI)
   tags [--json]           List tags in use with per-tag session counts
   notes [command]          List, get, set, or clear session notes
+  views [command]          List named views or set the active view
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
+  man                     Write the man page (roff) to standard output
   update                  Update dispatch to the latest release
+
+Session IDs:
+  Commands that take <id> (open, export) accept a full session ID or any
+  unique prefix of one, like a short git SHA. An ambiguous prefix lists the
+  matching sessions so you can add more characters.
 
 Stats flags:
   --json                  Print the summary as JSON
@@ -138,6 +147,7 @@ Stats flags:
   --folder <path>         Only count sessions under a folder
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
+  --top <n>               Limit each breakdown to the top N entries
 
 Search flags:
   --json                  Print results as JSON (default)
@@ -153,10 +163,16 @@ Search flags:
   --until <date>          Only include sessions active on or before a date
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
 
+Views commands:
+  views [list] [--json]    List configured named views
+  views use <name>         Set the active named view
+  views use default        Clear the active named view
+
 Config commands:
   config list [--json]    Print every setting and its value
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
+  config unset <key>      Reset one setting to its default
   config edit             Open the config file in your editor
   config path             Print the config file path
 
@@ -167,9 +183,10 @@ Notes commands:
   notes clear <id>         Clear one session note
 
 Export flags:
-  --format md|json        Output format (default md)
+  --format md|json|html   Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
+  --redact                Mask common secret patterns in the export
 
 Flags:
   -h, --help              Show this help message

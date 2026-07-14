@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"errors"
@@ -22,18 +23,24 @@ var (
 	openGetLastSessionFn = defaultOpenGetLastSession
 	openLaunchFn         = defaultOpenLaunch
 	openResumeCmdFn      = platform.BuildResumeCommandString
+
+	// openStdin is the reader used by --stdin batch resume. It is a package
+	// variable so tests can feed it a fixed list of IDs.
+	openStdin io.Reader = os.Stdin
 )
 
 // runOpen resumes a session using the same launch path the TUI uses. It
 // resumes the session named by ID, or the most recently active session when
 // --last is passed. With --print it writes the resolved resume command to w
-// and does not launch. args is the full argument slice with args[0] == "open".
+// and does not launch. With --stdin it reads session IDs from standard input
+// (one per line) and resumes each, which composes with `dispatch search --ids`.
+// args is the full argument slice with args[0] == "open".
 func runOpen(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
 	}
 
-	id, modeFlag, last, printCmd, err := parseOpenArgs(args)
+	id, modeFlag, last, printCmd, stdin, err := parseOpenArgs(args)
 	if err != nil {
 		return err
 	}
@@ -41,6 +48,10 @@ func runOpen(w io.Writer, args []string) error {
 	cfg, err := openLoadConfigFn()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if stdin {
+		return runOpenBatch(w, cfg, modeFlag, printCmd)
 	}
 
 	var sess *data.Session
@@ -80,6 +91,109 @@ func runOpen(w io.Writer, args []string) error {
 	return openLaunchFn(w, cfg, sess, mode)
 }
 
+// runOpenBatch resumes every session whose ID is read from standard input,
+// one ID per line. Blank lines and lines beginning with '#' are ignored, and
+// each line's first whitespace-separated field is used as the ID, so annotated
+// lists still work. It composes with `dispatch search --ids`:
+//
+//	dispatch search --ids feat | dispatch open --stdin --mode tab
+//
+// Resolution and launch reuse the single-session path. A missing session or a
+// launch failure for one ID does not abort the batch; failures are collected
+// and returned together so the exit code is non-zero while the rest still run.
+func runOpenBatch(w io.Writer, cfg *config.Config, modeFlag string, printCmd bool) error {
+	ids, err := readSessionIDs(openStdin)
+	if err != nil {
+		return fmt.Errorf("reading session IDs: %w", err)
+	}
+	if len(ids) == 0 {
+		return errors.New("open --stdin: no session IDs on standard input")
+	}
+
+	mode := resolveOpenMode(modeFlag, cfg)
+	if !printCmd && mode == config.LaunchModeInPlace {
+		return errors.New("open --stdin cannot launch in inplace mode; pass --mode tab, window, or pane")
+	}
+
+	var failures []error
+	resumed := 0
+	for _, rawID := range ids {
+		target := rawID
+		if resolved := cfg.SessionIDForAlias(target); resolved != "" {
+			target = resolved
+		}
+
+		sess, gErr := openGetSessionFn(target)
+		if gErr != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", rawID, gErr))
+			continue
+		}
+		if sess == nil {
+			failures = append(failures, fmt.Errorf("%s: session not found", rawID))
+			continue
+		}
+
+		if printCmd {
+			cmdStr, cErr := openResumeCmdFn(sess.ID, openResumeConfig(cfg, sess))
+			if cErr != nil {
+				failures = append(failures, fmt.Errorf("%s: %w", rawID, cErr))
+				continue
+			}
+			fmt.Fprintln(w, cmdStr)
+			resumed++
+			continue
+		}
+
+		if lErr := openLaunchFn(w, cfg, sess, mode); lErr != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", rawID, lErr))
+			continue
+		}
+		resumed++
+	}
+
+	if len(failures) > 0 {
+		fmt.Fprintf(w, "resumed %d of %d sessions\n", resumed, len(ids))
+		return fmt.Errorf("open --stdin: %d of %d failed: %w",
+			len(failures), len(ids), errors.Join(failures...))
+	}
+	return nil
+}
+
+// readSessionIDs reads session IDs from r, one per line. It trims surrounding
+// whitespace, skips blank lines and lines starting with '#', takes the first
+// whitespace-separated field of each remaining line, and drops duplicates while
+// preserving first-seen order.
+func readSessionIDs(r io.Reader) ([]string, error) {
+	if r == nil {
+		return nil, nil
+	}
+
+	var ids []string
+	seen := make(map[string]struct{})
+
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024) // tolerate long lines
+
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if i := strings.IndexAny(line, " \t"); i >= 0 {
+			line = line[:i]
+		}
+		if _, dup := seen[line]; dup {
+			continue
+		}
+		seen[line] = struct{}{}
+		ids = append(ids, line)
+	}
+	if scErr := sc.Err(); scErr != nil {
+		return nil, scErr
+	}
+	return ids, nil
+}
+
 // openResumeConfig builds the resume config used to launch or print a
 // session's resume command. Terminal, launch style, and pane direction are
 // omitted because they affect terminal placement, not the copilot invocation.
@@ -94,9 +208,9 @@ func openResumeConfig(cfg *config.Config, sess *data.Session) platform.ResumeCon
 }
 
 // parseOpenArgs extracts the session ID, optional launch mode, the --last
-// flag, and the --print flag from the "open" subcommand arguments. args[0] is
-// expected to be "open".
-func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err error) {
+// flag, the --print flag, and the --stdin flag from the "open" subcommand
+// arguments. args[0] is expected to be "open".
+func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "open" token
@@ -108,9 +222,11 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err err
 		switch {
 		case arg == "--last" || arg == "-l":
 			last = true
+		case arg == "--stdin":
+			stdin = true
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-				return "", "", false, false, errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", false, false, false, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
@@ -119,33 +235,41 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd bool, err err
 		case arg == "--print":
 			printCmd = true
 		case strings.HasPrefix(arg, "-"):
-			return "", "", false, false, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, false, false, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
 	}
 
-	if last {
-		if len(positionals) > 0 {
-			return "", "", false, false, errors.New("open --last does not take a session ID")
+	switch {
+	case stdin:
+		if last {
+			return "", "", false, false, false, errors.New("open --stdin cannot be combined with --last")
 		}
-	} else {
+		if len(positionals) > 0 {
+			return "", "", false, false, false, errors.New("open --stdin reads session IDs from standard input; do not also pass an ID")
+		}
+	case last:
+		if len(positionals) > 0 {
+			return "", "", false, false, false, errors.New("open --last does not take a session ID")
+		}
+	default:
 		switch len(positionals) {
 		case 0:
-			return "", "", false, false, errors.New("open requires a session ID (or use --last)")
+			return "", "", false, false, false, errors.New("open requires a session ID (or use --last or --stdin)")
 		case 1:
 			id = positionals[0]
 		default:
-			return "", "", false, false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
+			return "", "", false, false, false, fmt.Errorf("open accepts a single session ID, got %d arguments", len(positionals))
 		}
 	}
 
 	if mode != "" {
 		if _, mErr := normalizeLaunchMode(mode); mErr != nil {
-			return "", "", false, false, mErr
+			return "", "", false, false, false, mErr
 		}
 	}
-	return id, mode, last, printCmd, nil
+	return id, mode, last, printCmd, stdin, nil
 }
 
 // normalizeLaunchMode maps a user-facing mode string to a config launch mode.
@@ -183,7 +307,16 @@ func defaultOpenGetSession(id string) (*data.Session, error) {
 	}
 	defer store.Close() //nolint:errcheck // read-only, best-effort close
 
-	detail, err := store.GetSession(context.Background(), id)
+	ctx := context.Background()
+	fullID, err := store.ResolveIDPrefix(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	detail, err := store.GetSession(ctx, fullID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

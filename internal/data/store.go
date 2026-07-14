@@ -1008,6 +1008,77 @@ func (s *Store) CountSessions(ctx context.Context) (int, error) {
 	return n, nil
 }
 
+// resolveIDPrefixLimit caps how many candidate IDs an ambiguous prefix lists
+// so an error message stays readable when a short prefix matches many sessions.
+const resolveIDPrefixLimit = 10
+
+// AmbiguousIDPrefixError is returned by ResolveIDPrefix when a session ID
+// prefix matches more than one stored session. Candidates lists the matching
+// full IDs (capped) so the caller can tell the user how to disambiguate.
+type AmbiguousIDPrefixError struct {
+	Prefix     string
+	Candidates []string
+}
+
+func (e *AmbiguousIDPrefixError) Error() string {
+	return fmt.Sprintf("session ID prefix %q is ambiguous; add more characters to match one of: %s",
+		e.Prefix, strings.Join(e.Candidates, ", "))
+}
+
+// ResolveIDPrefix expands a session ID or a unique ID prefix to a full session
+// ID, mirroring git's short-SHA behavior. An exact ID match always wins, even
+// when that value is also a prefix of longer IDs. With no exact match the value
+// is treated as a prefix: a single match returns that ID, multiple matches
+// return an *AmbiguousIDPrefixError listing the candidates, and no match
+// returns sql.ErrNoRows. An empty prefix is rejected.
+func (s *Store) ResolveIDPrefix(ctx context.Context, prefix string) (string, error) {
+	if prefix == "" {
+		return "", errors.New("session ID prefix is empty")
+	}
+
+	// An exact match short-circuits: a full ID beats any prefix collision.
+	var exact string
+	err := s.db.QueryRowContext(ctx, "SELECT id FROM sessions WHERE id = ?", prefix).Scan(&exact)
+	switch {
+	case err == nil:
+		return exact, nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return "", fmt.Errorf("looking up session %q: %w", prefix, err)
+	}
+
+	// No exact match: resolve as a prefix. Fetch one more than the display cap
+	// so the candidate list stays bounded even for very short prefixes.
+	pattern := escapeLIKE(prefix) + "%"
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id FROM sessions WHERE id LIKE ? ESCAPE '\' ORDER BY id LIMIT ?`,
+		pattern, resolveIDPrefixLimit+1)
+	if err != nil {
+		return "", fmt.Errorf("resolving session ID prefix %q: %w", prefix, err)
+	}
+	defer closeRows(rows)
+
+	var candidates []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return "", fmt.Errorf("scanning session ID: %w", err)
+		}
+		candidates = append(candidates, id)
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("resolving session ID prefix %q: %w", prefix, err)
+	}
+
+	switch len(candidates) {
+	case 0:
+		return "", sql.ErrNoRows
+	case 1:
+		return candidates[0], nil
+	default:
+		return "", &AmbiguousIDPrefixError{Prefix: prefix, Candidates: candidates}
+	}
+}
+
 // GroupSessions groups sessions by the specified pivot field, applying the
 // given filter and sort order within each group.
 func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
