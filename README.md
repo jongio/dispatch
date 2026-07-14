@@ -245,6 +245,20 @@ dispatch tags --json
 
 Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
 
+### Notes
+
+Manage session notes from the command line without editing `config.json` directly:
+
+```sh
+dispatch notes
+dispatch notes --json
+dispatch notes get 0a1b2c3d
+dispatch notes set 0a1b2c3d "follow up after review"
+dispatch notes clear 0a1b2c3d
+```
+
+`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview.
+
 ### Named Views
 
 List named views and switch the active view from scripts:

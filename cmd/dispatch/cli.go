@@ -163,6 +163,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "notes":
+			if nErr := runNotes(os.Stdout, args); nErr != nil {
+				fmt.Fprintf(os.Stderr, "notes: %v\n", nErr)
+				return true, cleanup, startupOptions{}, nErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "views":
 			if vErr := runViews(os.Stdout, args); vErr != nil {
 				fmt.Fprintf(os.Stderr, "views: %v\n", vErr)
