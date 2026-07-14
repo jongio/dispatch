@@ -157,6 +157,7 @@ Config commands:
   config list [--json]    Print every setting and its value
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
+  config unset <key>      Reset one setting to its default
   config edit             Open the config file in your editor
   config path             Print the config file path
 
