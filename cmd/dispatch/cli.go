@@ -46,6 +46,39 @@ var (
 	doctorSessionCountFn   = defaultSessionCount
 )
 
+type versionOutput struct {
+	Version string `json:"version"`
+}
+
+func runVersion(w io.Writer, args []string) error {
+	if w == nil {
+		w = io.Discard
+	}
+
+	jsonOut := false
+	rest := args
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	for _, arg := range rest {
+		switch arg {
+		case "--json":
+			jsonOut = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return fmt.Errorf("unknown flag: %s", arg)
+			}
+			return fmt.Errorf("version does not take positional arguments, got %q", arg)
+		}
+	}
+
+	if jsonOut {
+		return json.NewEncoder(w).Encode(versionOutput{Version: version.Version})
+	}
+	_, err := fmt.Fprintln(w, version.Version)
+	return err
+}
+
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
 	var flags startupFlags
 	for i := 0; i < len(args); i++ {
@@ -57,7 +90,10 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "--version", "-v", "version":
-			fmt.Println(version.Version)
+			if vErr := runVersion(os.Stdout, args[i:]); vErr != nil {
+				fmt.Fprintf(os.Stderr, "version: %v\n", vErr)
+				return true, cleanup, startupOptions{}, vErr
+			}
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, startupOptions{}, nil
 
@@ -127,6 +163,20 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "notes":
+			if nErr := runNotes(os.Stdout, args); nErr != nil {
+				fmt.Fprintf(os.Stderr, "notes: %v\n", nErr)
+				return true, cleanup, startupOptions{}, nErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
+		case "views":
+			if vErr := runViews(os.Stdout, args); vErr != nil {
+				fmt.Fprintf(os.Stderr, "views: %v\n", vErr)
+				return true, cleanup, startupOptions{}, vErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "config":
 			if cErr := runConfig(os.Stdout, args); cErr != nil {
 				fmt.Fprintf(os.Stderr, "config: %v\n", cErr)
@@ -141,6 +191,25 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "info":
+			if iErr := runInfo(os.Stdout, args); iErr != nil {
+				fmt.Fprintf(os.Stderr, "info: %v\n", iErr)
+				return true, cleanup, startupOptions{}, iErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
+		case "man":
+			if mErr := runMan(os.Stdout); mErr != nil {
+				fmt.Fprintf(os.Stderr, "man: %v\n", mErr)
+				return true, cleanup, startupOptions{}, mErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
+		case "__complete":
+			// Hidden helper used by the shell completion scripts to fetch
+			// dynamic candidates. Deliberately omitted from help and usage.
+			runComplete(os.Stdout, args)
+			return true, cleanup, startupOptions{}, nil
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -288,7 +357,8 @@ func runCompletion(w io.Writer, shell string) error {
 const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  local commands="help version open new doctor update completion stats search tags config export"
+  local bin="${COMP_WORDS[0]}"
+  local commands="help version open new doctor update completion stats search tags config export info man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -296,25 +366,40 @@ _dispatch_completion() {
     return 0
   fi
 
-  if [[ "${COMP_WORDS[1]}" == "completion" ]]; then
-    COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "${cur}") )
-    return 0
-  fi
-
-  if [[ "${COMP_WORDS[1]}" == "config" ]]; then
-    COMPREPLY=( $(compgen -W "list get set edit path" -- "${cur}") )
-    return 0
-  fi
+  case "${COMP_WORDS[1]}" in
+    completion)
+      COMPREPLY=( $(compgen -W "$("${bin}" __complete shells)" -- "${cur}") )
+      return 0
+      ;;
+    open)
+      COMPREPLY=( $(compgen -W "$("${bin}" __complete aliases) --mode --last --print --agent --model --yolo" -- "${cur}") )
+      return 0
+      ;;
+    new)
+      COMPREPLY=( $(compgen -W "--mode --agent --model --yolo" -- "${cur}") )
+      return 0
+      ;;
+    config)
+      if [[ "${COMP_CWORD}" -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "list get set unset edit path" -- "${cur}") )
+      elif [[ "${COMP_WORDS[2]}" == "get" || "${COMP_WORDS[2]}" == "set" || "${COMP_WORDS[2]}" == "unset" ]]; then
+        COMPREPLY=( $(compgen -W "$("${bin}" __complete config-keys)" -- "${cur}") )
+      fi
+      return 0
+      ;;
+  esac
 }
 complete -F _dispatch_completion dispatch disp
 `
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands shells flags configsubs
-  commands=(help version open new doctor update completion stats search tags config export)
-  shells=(bash zsh fish powershell)
-  configsubs=(list get set edit path)
+  local -a commands flags configsubs shells aliases configkeys openflags newflags
+  local bin=${words[1]}
+  commands=(help version open new doctor update completion stats search tags config export info man)
+  configsubs=(list get set unset edit path)
+  openflags=(--mode --last --print --agent --model --yolo)
+  newflags=(--mode --agent --model --yolo)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
   if (( CURRENT == 2 )); then
@@ -323,12 +408,34 @@ _dispatch_completion() {
   fi
 
   if [[ ${words[2]} == completion ]]; then
+    shells=(${(f)"$($bin __complete shells)"})
     _describe -t shells 'shell' shells
     return
   fi
 
+  if [[ ${words[2]} == open ]]; then
+    aliases=(${(f)"$($bin __complete aliases)"})
+    _describe -t aliases 'session alias' aliases
+    return
+  fi
+
   if [[ ${words[2]} == config ]]; then
-    _describe -t configsubs 'config subcommand' configsubs
+    if (( CURRENT == 3 )); then
+      _describe -t configsubs 'config subcommand' configsubs
+    elif [[ ${words[3]} == get || ${words[3]} == set || ${words[3]} == unset ]]; then
+      configkeys=(${(f)"$($bin __complete config-keys)"})
+      _describe -t configkeys 'config key' configkeys
+    fi
+    return
+  fi
+
+  if [[ ${words[2]} == open ]]; then
+    _describe -t openflags 'open flag' openflags
+    return
+  fi
+
+  if [[ ${words[2]} == new ]]; then
+    _describe -t newflags 'new flag' newflags
     return
   fi
 }
@@ -341,32 +448,56 @@ function __dispatch_needs_command
   test (count $cmd) -eq 1
 end
 
-function __dispatch_using_completion
+function __dispatch_after
   set -l cmd (commandline -opc)
-  test (count $cmd) -ge 2; and test $cmd[2] = completion
+  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
+end
+
+function __dispatch_config_key
+  set -l cmd (commandline -opc)
+  test (count $cmd) -ge 3; and test $cmd[2] = config; and contains -- $cmd[3] get set unset
+end
+
+function __dispatch_using_subcommand
+  set -l cmd (commandline -opc)
+  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
 end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export info man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
-  complete -c $bin -n '__dispatch_using_completion' -a 'bash zsh fish powershell'
+  complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
+  complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
+  complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo'
+  complete -c $bin -n '__dispatch_after new' -a '--mode --agent --model --yolo'
+  complete -c $bin -n '__dispatch_config_key' -a "($bin __complete config-keys)"
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'info', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
-$script:DispatchShells = @('bash', 'zsh', 'fish', 'powershell')
-$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
+$script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
+$script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $tokens = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })
+    $bin = $tokens[0]
     $values = if ($tokens.Count -ge 2 -and $tokens[1] -eq 'completion') {
-        $script:DispatchShells
+        & $bin __complete shells
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'open') {
+        (& $bin __complete aliases) + $script:DispatchOpenFlags
     } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'config') {
-        $script:DispatchConfigSubcommands
+        if ($tokens.Count -ge 3 -and @('get', 'set', 'unset') -contains $tokens[2]) {
+            & $bin __complete config-keys
+        } else {
+            $script:DispatchConfigSubcommands
+        }
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'new') {
+        $script:DispatchNewFlags
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }

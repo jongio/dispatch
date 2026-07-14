@@ -183,6 +183,16 @@ Use `--print` to write the resume command to stdout instead of launching it. Thi
 dispatch open <session-id> --print
 ```
 
+Override the agent, model, or yolo mode for a single resume without changing your saved config with `--agent`, `--model`, and `--yolo`:
+
+```sh
+dispatch open <session-id> --agent coder --model gpt-5
+dispatch open --last --yolo
+dispatch open <session-id> --yolo=false   # force off even if config enables it
+```
+
+These flags apply to every launch mode and to `--print`. When omitted, the saved config values are used.
+
 ### Start a New Session
 
 Start a brand-new Copilot session from the command line without opening the TUI:
@@ -191,9 +201,11 @@ Start a brand-new Copilot session from the command line without opening the TUI:
 dispatch new              # start in the current directory
 dispatch new ~/code/app   # start in a specific directory
 dispatch new --mode tab   # override the launch mode (inplace, tab, window, pane)
+dispatch new --agent coder --model gpt-5   # override agent/model for this session
+dispatch new --yolo       # start with yolo mode on for this session only
 ```
 
-The session uses the same agent, model, and launch settings as the TUI. When no directory is given, the current working directory is used.
+The session uses the same agent, model, and launch settings as the TUI unless you pass `--agent`, `--model`, or `--yolo` to override them for that one launch. When no directory is given, the current working directory is used.
 
 
 ### Shell Completion
@@ -206,6 +218,8 @@ dispatch completion zsh
 dispatch completion fish
 dispatch completion powershell
 ```
+
+Once the script is sourced, completion covers dynamic values too: `dispatch open <TAB>` completes your configured session aliases, `dispatch config get <TAB>` (and `set`/`unset`) completes config keys, and `dispatch completion <TAB>` completes the supported shells. These come from your local config and static lists, so completion stays fast.
 
 ### Diagnostics
 
@@ -222,6 +236,7 @@ dispatch stats
 dispatch stats --json
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
+dispatch stats --top 5
 ```
 
 Flags:
@@ -229,6 +244,7 @@ Flags:
 - `--json` prints the summary as a single JSON object.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
+- `--top <n>` caps each repository, branch, and host breakdown to the first N entries.
 
 ### Tags
 
@@ -241,6 +257,33 @@ dispatch tags --json
 
 Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
 
+### Notes
+
+Manage session notes from the command line without editing `config.json` directly:
+
+```sh
+dispatch notes
+dispatch notes --json
+dispatch notes get 0a1b2c3d
+dispatch notes set 0a1b2c3d "follow up after review"
+dispatch notes clear 0a1b2c3d
+```
+
+`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview.
+
+### Named Views
+
+List named views and switch the active view from scripts:
+
+```sh
+dispatch views
+dispatch views --json
+dispatch views use Work
+dispatch views use default
+```
+
+Named views come from the `views` array in `config.json`. `dispatch views use <name>` sets `active_view`, and `dispatch views use default` clears it so the TUI opens with the normal filters.
+
 ### Export
 
 Save a full session (metadata and the complete conversation) to a file with `dispatch export <id>`:
@@ -248,11 +291,13 @@ Save a full session (metadata and the complete conversation) to a file with `dis
 ```sh
 dispatch export 0a1b2c3d
 dispatch export 0a1b2c3d --format json
+dispatch export 0a1b2c3d --format html
 dispatch export 0a1b2c3d --stdout
+dispatch export 0a1b2c3d --redact --stdout
 dispatch export 0a1b2c3d --out ./exports
 ```
 
-By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--stdout` to print to the terminal instead of writing a file, and `--out <dir>` to choose the destination directory. `--stdout` and `--out` cannot be combined.
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output or `--format html` for a self-contained web page you can open in a browser (styles are inlined, so there are no external files to manage). Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
 
 ### Search (JSON)
 
@@ -430,6 +475,8 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
+Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
+
 ### From the command line
 
 Read and change settings without opening the TUI or editing JSON by hand:
@@ -439,11 +486,12 @@ dispatch config list            # print every setting and its value
 dispatch config list --json     # same, as a single JSON object
 dispatch config get launch_mode # print one value
 dispatch config set launch_mode window
+dispatch config unset launch_mode # reset one setting to its default
 dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
 ```
 
-`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
 
 ### Options
 
@@ -479,6 +527,8 @@ dispatch config path            # print the config file path
 | `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
 | `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
 | `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
+| `views` | array | `[]` | Named search, sort, pivot, and filter presets |
+| `active_view` | string | `""` | Name of the named view to apply on startup. Empty means default filters |
 | `hidden_columns` | array | `[]` | Optional session-list columns to hide (`repo`, `folder`, `turns`, `host`); empty shows all |
 
 #### Pane Direction Semantics
@@ -607,7 +657,7 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 | Flag | Description |
 |---|---|
 | `--help`, `-h`, `help` | Show usage information |
-| `--version`, `-v`, `version` | Print the version and exit |
+| `--version`, `-v`, `version` | Print the version and exit. Add `--json` for script output |
 | `update` | Update dispatch to the latest release |
 | `--demo` | Load a demo database with synthetic sessions |
 | `--reindex` | Full chronicle reindex via Copilot CLI (falls back to FTS5 rebuild) |
@@ -626,6 +676,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 
 | Variable | Description |
 |---|---|
+| `DISPATCH_CONFIG` | Override the path to the config file. Must be an absolute, non-UNC path; a relative or UNC value is ignored and the default location is used |
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 | `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |

@@ -31,7 +31,7 @@ func TestParseNewArgs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dir, mode, err := parseNewArgs(tc.args)
+			dir, mode, _, err := parseNewArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got dir=%q mode=%q", dir, mode)
