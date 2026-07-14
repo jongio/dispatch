@@ -191,6 +191,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "info":
+			if iErr := runInfo(os.Stdout, args); iErr != nil {
+				fmt.Fprintf(os.Stderr, "info: %v\n", iErr)
+				return true, cleanup, startupOptions{}, iErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "man":
 			if mErr := runMan(os.Stdout); mErr != nil {
 				fmt.Fprintf(os.Stderr, "man: %v\n", mErr)
@@ -203,7 +210,6 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			// dynamic candidates. Deliberately omitted from help and usage.
 			runComplete(os.Stdout, args)
 			return true, cleanup, startupOptions{}, nil
-
 		case "--demo":
 			c, demoErr := setupDemo()
 			if demoErr != nil {
@@ -352,7 +358,7 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local bin="${COMP_WORDS[0]}"
-  local commands="help version open new doctor update completion stats search tags config export man"
+  local commands="help version open new doctor update completion stats search tags config export info man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -386,7 +392,7 @@ const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys
   local bin=${words[1]}
-  commands=(help version open new doctor update completion stats search tags config export man)
+  commands=(help version open new doctor update completion stats search tags config export info man)
   configsubs=(list get set unset edit path)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
@@ -438,7 +444,7 @@ end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export man'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export info man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
@@ -447,7 +453,7 @@ end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'man')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'info', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
 

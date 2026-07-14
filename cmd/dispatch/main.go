@@ -131,6 +131,7 @@ Commands:
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
+  info <id> [--json]      Print a concise session summary (--json for machine-readable output)
   man                     Write the man page (roff) to standard output
   update                  Update dispatch to the latest release
 
