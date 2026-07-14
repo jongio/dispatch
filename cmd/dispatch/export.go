@@ -25,7 +25,7 @@ var (
 // exportOptions holds the parsed flags for the export command.
 type exportOptions struct {
 	id     string
-	format string // "md" or "json"
+	format string // "md", "json", or "html"
 	stdout bool
 	outDir string
 	redact bool
@@ -153,15 +153,18 @@ func parseExportArgs(args []string) (exportOptions, error) {
 	return opts, nil
 }
 
-// normalizeExportFormat maps a user-facing format string to "md" or "json".
+// normalizeExportFormat maps a user-facing format string to "md", "json", or
+// "html".
 func normalizeExportFormat(format string) (string, error) {
 	switch strings.ToLower(format) {
 	case "md", "markdown":
 		return "md", nil
 	case "json":
 		return "json", nil
+	case "html":
+		return "html", nil
 	default:
-		return "", fmt.Errorf("invalid format %q (want md or json)", format)
+		return "", fmt.Errorf("invalid format %q (want md, json, or html)", format)
 	}
 }
 
@@ -220,6 +223,8 @@ func renderExport(detail *data.SessionDetail, format string) (string, error) {
 			return "", fmt.Errorf("encoding session as JSON: %w", err)
 		}
 		return string(b) + "\n", nil
+	case "html":
+		return data.RenderHTML(detail), nil
 	default:
 		return data.RenderMarkdown(detail), nil
 	}
@@ -231,8 +236,11 @@ func writeExportFile(dir, id, format, content string) (string, error) {
 		return "", fmt.Errorf("creating export directory: %w", err)
 	}
 	ext := "md"
-	if format == "json" {
+	switch format {
+	case "json":
 		ext = "json"
+	case "html":
+		ext = "html"
 	}
 	path := filepath.Join(dir, data.SafeFilename(id)+"."+ext)
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

@@ -53,6 +53,7 @@ func TestParseExportArgs(t *testing.T) {
 	}{
 		{name: "id only", args: []string{"export", "abc"}, wantID: "abc", wantFormat: "md"},
 		{name: "format json", args: []string{"export", "abc", "--format", "json"}, wantID: "abc", wantFormat: "json"},
+		{name: "format html", args: []string{"export", "abc", "--format", "html"}, wantID: "abc", wantFormat: "html"},
 		{name: "format markdown alias", args: []string{"export", "abc", "--format=markdown"}, wantID: "abc", wantFormat: "md"},
 		{name: "short format", args: []string{"export", "-f", "json", "abc"}, wantID: "abc", wantFormat: "json"},
 		{name: "stdout", args: []string{"export", "abc", "--stdout"}, wantID: "abc", wantFormat: "md", wantStdout: true},
@@ -174,6 +175,60 @@ func TestRunExport_WritesFile(t *testing.T) {
 		t.Fatalf("runExport: %v", err)
 	}
 	path := filepath.Join(dir, "ses-001.json")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected export file at %s: %v", path, err)
+	}
+	if !strings.Contains(buf.String(), path) {
+		t.Errorf("output should report the path %q, got %q", path, buf.String())
+	}
+}
+
+func TestRunExport_StdoutHTML(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return sampleDetail(), nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "html"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"<!DOCTYPE html>", "<title>Session: Fix the widget</title>", "<style>"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("html output missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunExport_HTMLEscapesContent(t *testing.T) {
+	detail := sampleDetail()
+	detail.Session.Summary = "Fix <script>alert(1)</script>"
+	detail.Turns = []data.Turn{{UserMessage: "run <b>bold</b> & stuff", AssistantResponse: "ok"}}
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return detail, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "html"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "<script>alert(1)</script>") {
+		t.Errorf("html output must escape raw script tags, got:\n%s", out)
+	}
+	if !strings.Contains(out, "&lt;script&gt;alert(1)&lt;/script&gt;") {
+		t.Errorf("html output missing escaped summary, got:\n%s", out)
+	}
+	if !strings.Contains(out, "run &lt;b&gt;bold&lt;/b&gt; &amp; stuff") {
+		t.Errorf("html output missing escaped message body, got:\n%s", out)
+	}
+}
+
+func TestRunExport_WritesHTMLFile(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return sampleDetail(), nil })
+
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--out", dir, "--format", "html"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	path := filepath.Join(dir, "ses-001.html")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected export file at %s: %v", path, err)
 	}
