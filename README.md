@@ -222,6 +222,7 @@ dispatch stats
 dispatch stats --json
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
+dispatch stats --top 5
 ```
 
 Flags:
@@ -229,6 +230,7 @@ Flags:
 - `--json` prints the summary as a single JSON object.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
+- `--top <n>` caps each repository, branch, and host breakdown to the first N entries.
 
 ### Tags
 
@@ -430,6 +432,8 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
+Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
+
 ### From the command line
 
 Read and change settings without opening the TUI or editing JSON by hand:
@@ -607,7 +611,7 @@ Add custom color schemes using Windows Terminal JSON format in the `schemes` arr
 | Flag | Description |
 |---|---|
 | `--help`, `-h`, `help` | Show usage information |
-| `--version`, `-v`, `version` | Print the version and exit |
+| `--version`, `-v`, `version` | Print the version and exit. Add `--json` for script output |
 | `update` | Update dispatch to the latest release |
 | `--demo` | Load a demo database with synthetic sessions |
 | `--reindex` | Full chronicle reindex via Copilot CLI (falls back to FTS5 rebuild) |
@@ -626,6 +630,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 
 | Variable | Description |
 |---|---|
+| `DISPATCH_CONFIG` | Override the path to the config file. Must be an absolute, non-UNC path; a relative or UNC value is ignored and the default location is used |
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 | `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |

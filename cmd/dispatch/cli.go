@@ -46,6 +46,39 @@ var (
 	doctorSessionCountFn   = defaultSessionCount
 )
 
+type versionOutput struct {
+	Version string `json:"version"`
+}
+
+func runVersion(w io.Writer, args []string) error {
+	if w == nil {
+		w = io.Discard
+	}
+
+	jsonOut := false
+	rest := args
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	for _, arg := range rest {
+		switch arg {
+		case "--json":
+			jsonOut = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return fmt.Errorf("unknown flag: %s", arg)
+			}
+			return fmt.Errorf("version does not take positional arguments, got %q", arg)
+		}
+	}
+
+	if jsonOut {
+		return json.NewEncoder(w).Encode(versionOutput{Version: version.Version})
+	}
+	_, err := fmt.Fprintln(w, version.Version)
+	return err
+}
+
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
 	var flags startupFlags
 	for i := 0; i < len(args); i++ {
@@ -57,7 +90,10 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "--version", "-v", "version":
-			fmt.Println(version.Version)
+			if vErr := runVersion(os.Stdout, args[i:]); vErr != nil {
+				fmt.Fprintf(os.Stderr, "version: %v\n", vErr)
+				return true, cleanup, startupOptions{}, vErr
+			}
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, startupOptions{}, nil
 
