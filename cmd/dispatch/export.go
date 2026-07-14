@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 )
 
 // Function variables allow test substitution of external calls, matching the
@@ -27,6 +28,7 @@ type exportOptions struct {
 	format string // "md", "json", or "html"
 	stdout bool
 	outDir string
+	redact bool
 }
 
 // runExport writes a session's full content as Markdown or JSON. It writes to
@@ -48,6 +50,10 @@ func runExport(w io.Writer, args []string) error {
 	}
 	if detail == nil {
 		return fmt.Errorf("session %q not found", opts.id)
+	}
+
+	if opts.redact {
+		detail = redactedSessionDetail(detail)
 	}
 
 	content, err := renderExport(detail, opts.format)
@@ -122,6 +128,8 @@ func parseExportArgs(args []string) (exportOptions, error) {
 			i = ni
 		case name == "--stdout":
 			opts.stdout = true
+		case name == "--redact":
+			opts.redact = true
 		case strings.HasPrefix(arg, "-"):
 			return exportOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
@@ -160,6 +168,52 @@ func normalizeExportFormat(format string) (string, error) {
 	}
 }
 
+func redactedSessionDetail(detail *data.SessionDetail) *data.SessionDetail {
+	if detail == nil {
+		return nil
+	}
+	redacted := *detail
+	redacted.Session = detail.Session
+	redacted.Session.Cwd = platform.RedactSecrets(redacted.Session.Cwd)
+	redacted.Session.Repository = platform.RedactSecrets(redacted.Session.Repository)
+	redacted.Session.Branch = platform.RedactSecrets(redacted.Session.Branch)
+	redacted.Session.Summary = platform.RedactSecrets(redacted.Session.Summary)
+
+	if len(detail.Turns) > 0 {
+		redacted.Turns = append([]data.Turn(nil), detail.Turns...)
+		for i := range redacted.Turns {
+			redacted.Turns[i].UserMessage = platform.RedactSecrets(redacted.Turns[i].UserMessage)
+			redacted.Turns[i].AssistantResponse = platform.RedactSecrets(redacted.Turns[i].AssistantResponse)
+		}
+	}
+	if len(detail.Checkpoints) > 0 {
+		redacted.Checkpoints = append([]data.Checkpoint(nil), detail.Checkpoints...)
+		for i := range redacted.Checkpoints {
+			redacted.Checkpoints[i].Title = platform.RedactSecrets(redacted.Checkpoints[i].Title)
+			redacted.Checkpoints[i].Overview = platform.RedactSecrets(redacted.Checkpoints[i].Overview)
+			redacted.Checkpoints[i].History = platform.RedactSecrets(redacted.Checkpoints[i].History)
+			redacted.Checkpoints[i].WorkDone = platform.RedactSecrets(redacted.Checkpoints[i].WorkDone)
+			redacted.Checkpoints[i].TechnicalDetails = platform.RedactSecrets(redacted.Checkpoints[i].TechnicalDetails)
+			redacted.Checkpoints[i].ImportantFiles = platform.RedactSecrets(redacted.Checkpoints[i].ImportantFiles)
+			redacted.Checkpoints[i].NextSteps = platform.RedactSecrets(redacted.Checkpoints[i].NextSteps)
+		}
+	}
+	if len(detail.Files) > 0 {
+		redacted.Files = append([]data.SessionFile(nil), detail.Files...)
+		for i := range redacted.Files {
+			redacted.Files[i].FilePath = platform.RedactSecrets(redacted.Files[i].FilePath)
+			redacted.Files[i].ToolName = platform.RedactSecrets(redacted.Files[i].ToolName)
+		}
+	}
+	if len(detail.Refs) > 0 {
+		redacted.Refs = append([]data.SessionRef(nil), detail.Refs...)
+		for i := range redacted.Refs {
+			redacted.Refs[i].RefValue = platform.RedactSecrets(redacted.Refs[i].RefValue)
+		}
+	}
+	return &redacted
+}
+
 // renderExport produces the export content for the given format.
 func renderExport(detail *data.SessionDetail, format string) (string, error) {
 	switch format {
@@ -196,7 +250,9 @@ func writeExportFile(dir, id, format, content string) (string, error) {
 }
 
 // defaultExportGetDetail loads a full session detail by ID from the default
-// session store. It returns (nil, nil) when no session with that ID exists.
+// session store. The ID may be a full session ID or a unique short prefix. It
+// returns (nil, nil) when no session matches, and an *data.AmbiguousIDPrefixError
+// when a short prefix matches more than one session.
 func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 	store, err := data.Open()
 	if err != nil {
@@ -204,7 +260,16 @@ func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 	}
 	defer store.Close() //nolint:errcheck // read-only, best-effort close
 
-	detail, err := store.GetSession(context.Background(), id)
+	ctx := context.Background()
+	fullID, err := store.ResolveIDPrefix(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	detail, err := store.GetSession(ctx, fullID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

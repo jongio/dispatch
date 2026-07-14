@@ -48,6 +48,7 @@ func TestParseExportArgs(t *testing.T) {
 		wantFormat string
 		wantStdout bool
 		wantOut    string
+		wantRedact bool
 		wantErr    bool
 	}{
 		{name: "id only", args: []string{"export", "abc"}, wantID: "abc", wantFormat: "md"},
@@ -56,6 +57,7 @@ func TestParseExportArgs(t *testing.T) {
 		{name: "format markdown alias", args: []string{"export", "abc", "--format=markdown"}, wantID: "abc", wantFormat: "md"},
 		{name: "short format", args: []string{"export", "-f", "json", "abc"}, wantID: "abc", wantFormat: "json"},
 		{name: "stdout", args: []string{"export", "abc", "--stdout"}, wantID: "abc", wantFormat: "md", wantStdout: true},
+		{name: "redact", args: []string{"export", "abc", "--redact"}, wantID: "abc", wantFormat: "md", wantRedact: true},
 		{name: "out dir", args: []string{"export", "abc", "--out", "/tmp/x"}, wantID: "abc", wantFormat: "md", wantOut: "/tmp/x"},
 		{name: "missing id", args: []string{"export"}, wantErr: true},
 		{name: "two ids", args: []string{"export", "a", "b"}, wantErr: true},
@@ -88,6 +90,9 @@ func TestParseExportArgs(t *testing.T) {
 			if opts.outDir != tc.wantOut {
 				t.Errorf("outDir = %q, want %q", opts.outDir, tc.wantOut)
 			}
+			if opts.redact != tc.wantRedact {
+				t.Errorf("redact = %v, want %v", opts.redact, tc.wantRedact)
+			}
 		})
 	}
 }
@@ -118,6 +123,46 @@ func TestRunExport_StdoutJSON(t *testing.T) {
 	}
 	if got.Session.ID != "ses-001" {
 		t.Errorf("json ID = %q, want %q", got.Session.ID, "ses-001")
+	}
+}
+
+func TestRunExport_RedactsStdout(t *testing.T) {
+	detail := sampleDetail()
+	detail.Turns = []data.Turn{
+		{UserMessage: "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456", AssistantResponse: "API_TOKEN=super-secret-token"},
+	}
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return detail, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--redact"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "abcdefghijklmnopqrstuvwxyz123456") || strings.Contains(out, "super-secret-token") {
+		t.Fatalf("redacted export leaked a secret:\n%s", out)
+	}
+	if !strings.Contains(out, "[redacted]") {
+		t.Fatalf("redacted export missing placeholder:\n%s", out)
+	}
+}
+
+func TestRunExport_RedactsJSONWithoutBreakingJSON(t *testing.T) {
+	detail := sampleDetail()
+	detail.Turns = []data.Turn{
+		{UserMessage: "Bearer abcdefghijklmnopqrstuvwxyz123456", AssistantResponse: "safe"},
+	}
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return detail, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "json", "--redact"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	var got data.SessionDetail
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("redacted output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if strings.Contains(buf.String(), "abcdefghijklmnopqrstuvwxyz123456") {
+		t.Fatalf("redacted JSON leaked a token:\n%s", buf.String())
 	}
 }
 
