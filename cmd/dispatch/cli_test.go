@@ -85,6 +85,47 @@ func TestHandleArgs_VersionCommand(t *testing.T) {
 	}
 }
 
+func TestRunVersionJSON(t *testing.T) {
+	for _, args := range [][]string{
+		{"version", "--json"},
+		{"--version", "--json"},
+	} {
+		var buf bytes.Buffer
+		if err := runVersion(&buf, args); err != nil {
+			t.Fatalf("runVersion(%v): %v", args, err)
+		}
+		var out versionOutput
+		if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
+			t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+		}
+		if out.Version == "" {
+			t.Errorf("version should be set for args %v", args)
+		}
+	}
+}
+
+func TestRunVersionPlainText(t *testing.T) {
+	var buf bytes.Buffer
+	if err := runVersion(&buf, []string{"version"}); err != nil {
+		t.Fatalf("runVersion: %v", err)
+	}
+	if got := strings.TrimSpace(buf.String()); got == "" || strings.HasPrefix(got, "{") {
+		t.Errorf("plain version output = %q", got)
+	}
+}
+
+func TestRunVersionRejectsExtraArgs(t *testing.T) {
+	cases := [][]string{
+		{"version", "--yaml"},
+		{"version", "extra"},
+	}
+	for _, args := range cases {
+		if err := runVersion(io.Discard, args); err == nil {
+			t.Errorf("runVersion(%v) returned nil error, want error", args)
+		}
+	}
+}
+
 func TestRunCompletion_SupportedShells(t *testing.T) {
 	for _, tc := range []struct {
 		shell string

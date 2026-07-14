@@ -46,6 +46,39 @@ var (
 	doctorSessionCountFn   = defaultSessionCount
 )
 
+type versionOutput struct {
+	Version string `json:"version"`
+}
+
+func runVersion(w io.Writer, args []string) error {
+	if w == nil {
+		w = io.Discard
+	}
+
+	jsonOut := false
+	rest := args
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	for _, arg := range rest {
+		switch arg {
+		case "--json":
+			jsonOut = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return fmt.Errorf("unknown flag: %s", arg)
+			}
+			return fmt.Errorf("version does not take positional arguments, got %q", arg)
+		}
+	}
+
+	if jsonOut {
+		return json.NewEncoder(w).Encode(versionOutput{Version: version.Version})
+	}
+	_, err := fmt.Fprintln(w, version.Version)
+	return err
+}
+
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
 	var flags startupFlags
 	for i := 0; i < len(args); i++ {
@@ -57,7 +90,10 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "--version", "-v", "version":
-			fmt.Println(version.Version)
+			if vErr := runVersion(os.Stdout, args[i:]); vErr != nil {
+				fmt.Fprintf(os.Stderr, "version: %v\n", vErr)
+				return true, cleanup, startupOptions{}, vErr
+			}
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, startupOptions{}, nil
 
@@ -314,7 +350,7 @@ _dispatch_completion() {
       ;;
     config)
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "list get set edit path" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "list get set unset edit path" -- "${cur}") )
       elif [[ "${COMP_WORDS[2]}" == "get" || "${COMP_WORDS[2]}" == "set" || "${COMP_WORDS[2]}" == "unset" ]]; then
         COMPREPLY=( $(compgen -W "$("${bin}" __complete config-keys)" -- "${cur}") )
       fi
@@ -330,7 +366,7 @@ _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys
   local bin=${words[1]}
   commands=(help version open new doctor update completion stats search tags config export)
-  configsubs=(list get set edit path)
+  configsubs=(list get set unset edit path)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
   if (( CURRENT == 2 )); then
@@ -392,7 +428,7 @@ end
 const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
-$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'edit', 'path')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
