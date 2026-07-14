@@ -21,6 +21,7 @@ func TestParseOpenArgs(t *testing.T) {
 		wantMode  string
 		wantLast  bool
 		wantPrint bool
+		wantStdin bool
 		wantErr   bool
 	}{
 		{name: "id only", args: []string{"open", "abc123"}, wantID: "abc123"},
@@ -34,17 +35,22 @@ func TestParseOpenArgs(t *testing.T) {
 		{name: "print flag", args: []string{"open", "abc", "--print"}, wantID: "abc", wantPrint: true},
 		{name: "print before id", args: []string{"open", "--print", "abc"}, wantID: "abc", wantPrint: true},
 		{name: "print with mode", args: []string{"open", "abc", "--print", "--mode", "tab"}, wantID: "abc", wantMode: "tab", wantPrint: true},
+		{name: "stdin", args: []string{"open", "--stdin"}, wantStdin: true},
+		{name: "stdin with mode", args: []string{"open", "--stdin", "--mode", "tab"}, wantStdin: true, wantMode: "tab"},
+		{name: "stdin with print", args: []string{"open", "--stdin", "--print"}, wantStdin: true, wantPrint: true},
 		{name: "missing id", args: []string{"open"}, wantErr: true},
 		{name: "missing id with mode", args: []string{"open", "--mode", "tab"}, wantErr: true},
 		{name: "two ids", args: []string{"open", "a", "b"}, wantErr: true},
 		{name: "last with id", args: []string{"open", "--last", "abc"}, wantErr: true},
+		{name: "stdin with id", args: []string{"open", "--stdin", "abc"}, wantErr: true},
+		{name: "stdin with last", args: []string{"open", "--stdin", "--last"}, wantErr: true},
 		{name: "unknown flag", args: []string{"open", "--nope", "a"}, wantErr: true},
 		{name: "mode without value", args: []string{"open", "a", "--mode"}, wantErr: true},
 		{name: "invalid mode", args: []string{"open", "a", "--mode", "sideways"}, wantErr: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, last, printCmd, err := parseOpenArgs(tc.args)
+			id, mode, last, printCmd, stdin, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got id=%q mode=%q last=%v", id, mode, last)
@@ -65,6 +71,9 @@ func TestParseOpenArgs(t *testing.T) {
 			}
 			if printCmd != tc.wantPrint {
 				t.Errorf("print = %v, want %v", printCmd, tc.wantPrint)
+			}
+			if stdin != tc.wantStdin {
+				t.Errorf("stdin = %v, want %v", stdin, tc.wantStdin)
 			}
 		})
 	}
@@ -308,5 +317,177 @@ func TestHandleArgs_OpenMissingID(t *testing.T) {
 	}
 	if err == nil {
 		t.Error("expected error for open with no session ID")
+	}
+}
+
+// withOpenBatchStubs installs config, per-ID session lookup, and launch seams
+// for --stdin batch tests. sessions maps a session ID to the session returned
+// for it; an ID absent from the map resolves to "not found" (nil, nil). The
+// returned slice records the IDs launched, in order.
+func withOpenBatchStubs(t *testing.T, cfg *config.Config, sessions map[string]*data.Session) *[]string {
+	t.Helper()
+	launched := &[]string{}
+	origCfg, origGet, origLaunch := openLoadConfigFn, openGetSessionFn, openLaunchFn
+	openLoadConfigFn = func() (*config.Config, error) { return cfg, nil }
+	openGetSessionFn = func(id string) (*data.Session, error) {
+		return sessions[id], nil
+	}
+	openLaunchFn = func(_ io.Writer, _ *config.Config, s *data.Session, _ string) error {
+		*launched = append(*launched, s.ID)
+		return nil
+	}
+	t.Cleanup(func() {
+		openLoadConfigFn, openGetSessionFn, openLaunchFn = origCfg, origGet, origLaunch
+	})
+	return launched
+}
+
+// withStdin points the openStdin seam at s for the duration of the test.
+func withStdin(t *testing.T, s string) {
+	t.Helper()
+	orig := openStdin
+	openStdin = strings.NewReader(s)
+	t.Cleanup(func() { openStdin = orig })
+}
+
+func TestReadSessionIDs(t *testing.T) {
+	in := strings.Join([]string{
+		"sess-1",
+		"  sess-2  ",   // trimmed
+		"",             // blank skipped
+		"# a comment",  // comment skipped
+		"sess-1",       // duplicate skipped
+		"sess-3 extra", // first field only
+		"\tsess-4\t",   // tabs trimmed
+	}, "\n")
+
+	got, err := readSessionIDs(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"sess-1", "sess-2", "sess-3", "sess-4"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("id[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestReadSessionIDs_NilReader(t *testing.T) {
+	got, err := readSessionIDs(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+func TestRunOpen_StdinBatch(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeInPlace // default is inplace; --mode overrides
+	sessions := map[string]*data.Session{
+		"sess-1": {ID: "sess-1", Cwd: "/tmp/a"},
+		"sess-2": {ID: "sess-2", Cwd: "/tmp/b"},
+	}
+	launched := withOpenBatchStubs(t, cfg, sessions)
+	withStdin(t, "sess-1\nsess-2\n")
+
+	if err := runOpen(io.Discard, []string{"open", "--stdin", "--mode", "tab"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(*launched) != 2 || (*launched)[0] != "sess-1" || (*launched)[1] != "sess-2" {
+		t.Errorf("launched = %v, want [sess-1 sess-2]", *launched)
+	}
+}
+
+func TestRunOpen_StdinResolvesAlias(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeTab
+	cfg.SessionAliases = map[string]string{"sess-1": "authfix"}
+	sessions := map[string]*data.Session{"sess-1": {ID: "sess-1", Cwd: "/tmp/a"}}
+	launched := withOpenBatchStubs(t, cfg, sessions)
+	withStdin(t, "authfix\n")
+
+	if err := runOpen(io.Discard, []string{"open", "--stdin"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(*launched) != 1 || (*launched)[0] != "sess-1" {
+		t.Errorf("launched = %v, want [sess-1]", *launched)
+	}
+}
+
+func TestRunOpen_StdinInplaceRejected(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeInPlace
+	withOpenBatchStubs(t, cfg, map[string]*data.Session{"s": {ID: "s"}})
+	withStdin(t, "s\n")
+
+	// No explicit mode, so the inplace default applies and batch must reject it.
+	if err := runOpen(io.Discard, []string{"open", "--stdin"}); err == nil {
+		t.Fatal("expected error rejecting inplace mode for batch resume")
+	}
+}
+
+func TestRunOpen_StdinEmpty(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeTab
+	withOpenBatchStubs(t, cfg, nil)
+	withStdin(t, "\n#only a comment\n")
+
+	if err := runOpen(io.Discard, []string{"open", "--stdin"}); err == nil {
+		t.Fatal("expected error when standard input has no session IDs")
+	}
+}
+
+func TestRunOpen_StdinPartialFailure(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeTab
+	sessions := map[string]*data.Session{"sess-1": {ID: "sess-1", Cwd: "/tmp/a"}}
+	launched := withOpenBatchStubs(t, cfg, sessions)
+	withStdin(t, "sess-1\nmissing\n")
+
+	var buf bytes.Buffer
+	err := runOpen(&buf, []string{"open", "--stdin"})
+	if err == nil {
+		t.Fatal("expected an aggregated error for the missing session")
+	}
+	if len(*launched) != 1 || (*launched)[0] != "sess-1" {
+		t.Errorf("launched = %v, want [sess-1] (found session still resumes)", *launched)
+	}
+	if !strings.Contains(buf.String(), "resumed 1 of 2") {
+		t.Errorf("summary = %q, want it to mention resumed 1 of 2", buf.String())
+	}
+}
+
+func TestRunOpen_StdinPrint(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeInPlace // print ignores mode entirely
+	sessions := map[string]*data.Session{
+		"sess-1": {ID: "sess-1", Cwd: "/tmp/a"},
+		"sess-2": {ID: "sess-2", Cwd: "/tmp/b"},
+	}
+	launched := withOpenBatchStubs(t, cfg, sessions)
+	withStdin(t, "sess-1\nsess-2\n")
+
+	origResume := openResumeCmdFn
+	openResumeCmdFn = func(id string, _ platform.ResumeConfig) (string, error) {
+		return "copilot --resume " + id, nil
+	}
+	t.Cleanup(func() { openResumeCmdFn = origResume })
+
+	var buf bytes.Buffer
+	if err := runOpen(&buf, []string{"open", "--stdin", "--print"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(*launched) != 0 {
+		t.Errorf("expected --print to skip launching, launched = %v", *launched)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "copilot --resume sess-1") || !strings.Contains(out, "copilot --resume sess-2") {
+		t.Errorf("output = %q, want resume commands for both sessions", out)
 	}
 }

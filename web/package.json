@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "astro": "^7.0.7",
-    "marked": "^18.0.5"
+    "marked": "^18.0.6"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@types/node": "^26.1.1",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "volar-service-yaml": "0.0.71"

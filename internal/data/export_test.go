@@ -152,6 +152,121 @@ func TestRenderMarkdown_FullDetail(t *testing.T) {
 	}
 }
 
+func TestRenderHTML_NilDetail(t *testing.T) {
+	got := RenderHTML(nil)
+	if got != "" {
+		t.Errorf("RenderHTML(nil) = %q, want empty string", got)
+	}
+}
+
+func TestRenderHTML_FullDetail(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{
+			ID:           "test-id-123",
+			Cwd:          "/home/user/project",
+			Repository:   "owner/repo",
+			Branch:       "main",
+			Summary:      "Implement feature X",
+			CreatedAt:    "2025-01-01T10:00:00Z",
+			LastActiveAt: "2025-01-01T12:00:00Z",
+			TurnCount:    3,
+			FileCount:    2,
+		},
+		Turns: []Turn{
+			{TurnIndex: 0, UserMessage: "Please add tests", AssistantResponse: "I'll add the tests now."},
+		},
+		Checkpoints: []Checkpoint{
+			{CheckpointNumber: 1, Title: "Initial setup", Overview: "Created project scaffold."},
+		},
+		Files: []SessionFile{
+			{FilePath: "src/main.go", ToolName: "edit"},
+			{FilePath: "src/main.go", ToolName: "edit"}, // duplicate
+		},
+		Refs: []SessionRef{
+			{RefType: "commit", RefValue: "abc123"},
+			{RefType: "commit", RefValue: "abc123"}, // duplicate
+		},
+	}
+
+	out := RenderHTML(detail)
+
+	for _, want := range []string{
+		"<!DOCTYPE html>",
+		"<style>",
+		"<title>Session: Implement feature X</title>",
+		"<h1>Session: Implement feature X</h1>",
+		"<code>test-id-123</code>",
+		"owner/repo",
+		"Please add tests",
+		"I&#39;ll add the tests now.",
+		"1. Initial setup",
+		"Created project scaffold.",
+		"</html>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("RenderHTML output missing %q", want)
+		}
+	}
+
+	if strings.Count(out, "src/main.go") != 1 {
+		t.Error("file deduplication failed: src/main.go appears more than once")
+	}
+	if strings.Count(out, "abc123") != 1 {
+		t.Error("ref deduplication failed: abc123 appears more than once")
+	}
+}
+
+func TestRenderHTML_EscapesContent(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{
+			ID:      "x",
+			Summary: "Fix <script>alert('x')</script>",
+		},
+		Turns: []Turn{
+			{UserMessage: "look at <b>this</b> & that", AssistantResponse: "done"},
+		},
+	}
+
+	out := RenderHTML(detail)
+
+	if strings.Contains(out, "<script>alert(") {
+		t.Errorf("RenderHTML must escape raw script tags, got:\n%s", out)
+	}
+	if !strings.Contains(out, "&lt;script&gt;") {
+		t.Error("RenderHTML missing escaped summary")
+	}
+	if !strings.Contains(out, "look at &lt;b&gt;this&lt;/b&gt; &amp; that") {
+		t.Error("RenderHTML missing escaped message body")
+	}
+}
+
+func TestRenderHTML_MinimalDetail(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{
+			ID:      "minimal-session",
+			Summary: "Empty session",
+		},
+	}
+
+	out := RenderHTML(detail)
+
+	if !strings.Contains(out, "<h1>Session: Empty session</h1>") {
+		t.Error("missing title")
+	}
+	if strings.Contains(out, "<h2>Conversation</h2>") {
+		t.Error("conversation section should be absent with no turns")
+	}
+	if strings.Contains(out, "<h2>Checkpoints</h2>") {
+		t.Error("checkpoints section should be absent with no checkpoints")
+	}
+	if strings.Contains(out, "<h2>Files Touched</h2>") {
+		t.Error("files section should be absent with no files")
+	}
+	if strings.Contains(out, "<h2>References</h2>") {
+		t.Error("references section should be absent with no refs")
+	}
+}
+
 func TestRenderMarkdown_MinimalDetail(t *testing.T) {
 	detail := &SessionDetail{
 		Session: Session{
