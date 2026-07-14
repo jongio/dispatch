@@ -259,6 +259,79 @@ func TestRunConfigSet_SaveError(t *testing.T) {
 	}
 }
 
+func TestRunConfigUnset_ScalarResetsToDefault(t *testing.T) {
+	cfg := config.Default()
+	cfg.MaxSessions = 250
+	cfg = withConfigSeams(t, cfg)
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "unset", "max_sessions"}); err != nil {
+		t.Fatalf("runConfig unset: %v", err)
+	}
+	if cfg.MaxSessions != 100 {
+		t.Errorf("MaxSessions = %d, want default 100 after unset", cfg.MaxSessions)
+	}
+	if !strings.Contains(buf.String(), "max_sessions = 100") {
+		t.Errorf("unset output = %q, want default confirmation", buf.String())
+	}
+
+	// After unset, get reports the default value.
+	var getBuf bytes.Buffer
+	if err := runConfig(&getBuf, []string{"config", "get", "max_sessions"}); err != nil {
+		t.Fatalf("runConfig get after unset: %v", err)
+	}
+	if strings.TrimSpace(getBuf.String()) != "100" {
+		t.Errorf("get after unset = %q, want 100", getBuf.String())
+	}
+}
+
+func TestRunConfigUnset_PointerFieldResetsToUnset(t *testing.T) {
+	cfg := config.Default()
+	n := 45
+	cfg.AutoRefreshSeconds = &n
+	cfg = withConfigSeams(t, cfg)
+
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "unset", "auto_refresh_seconds"}); err != nil {
+		t.Fatalf("runConfig unset auto_refresh_seconds: %v", err)
+	}
+	if cfg.AutoRefreshSeconds != nil {
+		t.Errorf("AutoRefreshSeconds = %v, want nil after unset", *cfg.AutoRefreshSeconds)
+	}
+}
+
+func TestRunConfigUnset_UnknownKey(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	err := runConfig(&bytes.Buffer{}, []string{"config", "unset", "nope"})
+	if err == nil || !strings.Contains(err.Error(), "unknown config key") {
+		t.Errorf("error = %v, want unknown config key", err)
+	}
+}
+
+func TestRunConfigUnset_RequiresKey(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "unset"}); err == nil {
+		t.Fatal("expected error when unset is missing a key")
+	}
+}
+
+func TestRunConfigUnset_TooManyArgs(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	err := runConfig(&bytes.Buffer{}, []string{"config", "unset", "agent", "model"})
+	if err == nil || !strings.Contains(err.Error(), "single key") {
+		t.Errorf("error = %v, want single-key guidance", err)
+	}
+}
+
+func TestRunConfigUnset_SaveError(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	configSaveFn = func(*config.Config) error { return errors.New("disk full") }
+
+	err := runConfig(&bytes.Buffer{}, []string{"config", "unset", "agent"})
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("error = %v, want save failure", err)
+	}
+}
+
 func TestRunConfigPath(t *testing.T) {
 	withConfigSeams(t, config.Default())
 

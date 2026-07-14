@@ -111,7 +111,7 @@ func TestBuildStatsReportEmpty(t *testing.T) {
 }
 
 func TestParseStatsArgs(t *testing.T) {
-	opts, err := parseStatsArgs([]string{"stats", "--json", "--repo", "jongio/dispatch", "--branch=main", "--since", "2026-01-01", "--until=2026-07-01"})
+	opts, err := parseStatsArgs([]string{"stats", "--json", "--repo", "jongio/dispatch", "--branch=main", "--since", "2026-01-01", "--until=2026-07-01", "--top", "2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -130,6 +130,9 @@ func TestParseStatsArgs(t *testing.T) {
 	if opts.filter.Since.Format("2006-01-02") != "2026-01-01" {
 		t.Errorf("Since = %v", opts.filter.Since)
 	}
+	if opts.top != 2 {
+		t.Errorf("top = %d, want 2", opts.top)
+	}
 }
 
 func TestParseStatsArgsErrors(t *testing.T) {
@@ -138,11 +141,30 @@ func TestParseStatsArgsErrors(t *testing.T) {
 		{"stats", "--since", "not-date"}, // bad date
 		{"stats", "--bogus"},             // unknown flag
 		{"stats", "extra"},               // positional
+		{"stats", "--top"},               // missing value
+		{"stats", "--top", "0"},          // not positive
+		{"stats", "--top", "-1"},         // negative
+		{"stats", "--top", "many"},       // not a number
 	}
 	for _, args := range cases {
 		if _, err := parseStatsArgs(args); err == nil {
 			t.Errorf("parseStatsArgs(%v) expected error, got nil", args)
 		}
+	}
+}
+
+func TestApplyStatsTopLimit(t *testing.T) {
+	report := buildStatsReport(sampleSessions())
+	applyStatsTopLimit(&report, 1)
+
+	if len(report.ByRepository) != 1 || report.ByRepository[0].Label != "jongio/dispatch" {
+		t.Fatalf("ByRepository = %+v, want only jongio/dispatch", report.ByRepository)
+	}
+	if len(report.ByBranch) != 1 {
+		t.Fatalf("ByBranch len = %d, want 1", len(report.ByBranch))
+	}
+	if report.TotalSessions != 3 {
+		t.Errorf("TotalSessions = %d, want unchanged total 3", report.TotalSessions)
 	}
 }
 
@@ -163,6 +185,24 @@ func TestRunStatsText(t *testing.T) {
 	}
 }
 
+func TestRunStatsTextTop(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--top", "1"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Sessions: 3") {
+		t.Errorf("top should not change totals\n%s", out)
+	}
+	if strings.Contains(out, "feature") {
+		t.Errorf("top 1 should hide lower branch rows\n%s", out)
+	}
+}
+
 func TestRunStatsJSON(t *testing.T) {
 	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
 		return sampleSessions(), nil
@@ -178,6 +218,27 @@ func TestRunStatsJSON(t *testing.T) {
 	}
 	if report.TotalSessions != 3 || report.TotalTurns != 16 {
 		t.Errorf("unexpected report: %+v", report)
+	}
+}
+
+func TestRunStatsJSONTop(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--json", "--top=1"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	var report statsReport
+	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if len(report.ByRepository) != 1 || len(report.ByBranch) != 1 || len(report.ByHostType) != 1 {
+		t.Errorf("top did not cap breakdown arrays: %+v", report)
+	}
+	if report.TotalSessions != 3 {
+		t.Errorf("TotalSessions = %d, want 3", report.TotalSessions)
 	}
 }
 
