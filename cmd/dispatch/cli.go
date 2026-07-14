@@ -177,6 +177,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "man":
+			if mErr := runMan(os.Stdout); mErr != nil {
+				fmt.Fprintf(os.Stderr, "man: %v\n", mErr)
+				return true, cleanup, startupOptions{}, mErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "__complete":
 			// Hidden helper used by the shell completion scripts to fetch
 			// dynamic candidates. Deliberately omitted from help and usage.
@@ -331,7 +338,7 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local bin="${COMP_WORDS[0]}"
-  local commands="help version open new doctor update completion stats search tags config export"
+  local commands="help version open new doctor update completion stats search tags config export man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -365,7 +372,7 @@ const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys
   local bin=${words[1]}
-  commands=(help version open new doctor update completion stats search tags config export)
+  commands=(help version open new doctor update completion stats search tags config export man)
   configsubs=(list get set unset edit path)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
@@ -417,7 +424,7 @@ end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
@@ -426,7 +433,7 @@ end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
 
