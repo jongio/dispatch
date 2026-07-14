@@ -114,7 +114,7 @@ Usage:
 
 Commands:
   help                    Show this help message
-  version                 Print the version
+  version [--json]        Print the version
   open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
                           --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
@@ -137,6 +137,7 @@ Stats flags:
   --folder <path>         Only count sessions under a folder
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
+  --top <n>               Limit each breakdown to the top N entries
 
 Search flags:
   --json                  Print results as JSON (default)
@@ -164,6 +165,7 @@ Export flags:
   --format md|json        Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
+  --redact                Mask common secret patterns in the export
 
 Flags:
   -h, --help              Show this help message

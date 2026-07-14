@@ -459,19 +459,20 @@ func TestPrintUsage_Output(t *testing.T) {
 
 	origStdout := os.Stdout
 	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
 
 	var buf bytes.Buffer
-	done := make(chan struct{})
+	readDone := make(chan struct{})
 	go func() {
 		_, _ = io.Copy(&buf, r)
-		close(done)
+		close(readDone)
 	}()
 
 	printUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
-	<-done
+	<-readDone
 
 	output := buf.String()
 	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
