@@ -124,7 +124,7 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  search [query] [flags]  Print matching sessions as JSON (no TUI)
+  search [query] [flags]  Print matching sessions as JSON, IDs, or a table
   tags [--json]           List tags in use with per-tag session counts
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
@@ -161,7 +161,8 @@ Stats flags:
 Search flags:
   --json                  Print results as JSON (default)
   --ids                   Print one session ID per line
-  --format json|ids       Choose the output format
+  --table                 Print a readable table
+  --format json|ids|table Choose the output format
   --query <text>          Text to match (also accepted as a positional argument)
   --deep                  Search turns, checkpoints, files, and refs too
   --repo <name>           Only include sessions for a repository

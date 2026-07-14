@@ -91,6 +91,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 		{name: "ids shortcut", args: []string{"search", "--ids"}},
 		{name: "format ids separate", args: []string{"search", "--format", "ids"}},
 		{name: "format ids inline", args: []string{"search", "--format=ids"}},
+		{name: "table shortcut", args: []string{"search", "--table"}},
+		{name: "format table separate", args: []string{"search", "--format", "table"}},
+		{name: "format table inline", args: []string{"search", "--format=table"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,8 +101,12 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parseSearchArgs returned error: %v", err)
 			}
-			if opts.format != searchFormatIDs {
-				t.Errorf("format = %q, want ids", opts.format)
+			want := searchFormatIDs
+			if strings.Contains(strings.Join(tc.args, " "), "table") {
+				want = searchFormatTable
+			}
+			if opts.format != want {
+				t.Errorf("format = %q, want %s", opts.format, want)
 			}
 		})
 	}
@@ -113,7 +120,7 @@ func TestParseSearchArgsErrors(t *testing.T) {
 		{"search", "--limit", "abc"},
 		{"search", "--repo"},
 		{"search", "--format"},
-		{"search", "--format", "table"},
+		{"search", "--format", "yaml"},
 	}
 	for _, args := range cases {
 		if _, err := parseSearchArgs(args); err == nil {
@@ -198,6 +205,58 @@ func TestRunSearchIDsNoMatchesIsEmpty(t *testing.T) {
 	}
 	if got := buf.String(); got != "" {
 		t.Errorf("output = %q, want empty", got)
+	}
+}
+
+func TestRunSearchTableOutput(t *testing.T) {
+	sessions := []data.Session{
+		{
+			ID:           "0123456789abcdef",
+			Summary:      "fix auth bug",
+			Repository:   "jongio/dispatch",
+			Branch:       "main",
+			LastActiveAt: "2026-01-06T10:00:00Z",
+			TurnCount:    5,
+			FileCount:    3,
+		},
+		{
+			ID:        "short",
+			Summary:   "  ",
+			UpdatedAt: "2026-01-05T09:00:00Z",
+		},
+	}
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--table"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	got := buf.String()
+	for _, want := range []string{
+		"ID", "LAST ACTIVE", "REPO", "BRANCH", "TURNS", "FILES", "SUMMARY",
+		"0123456789ab", "2026-01-06", "jongio/dispatch", "main", "fix auth bug",
+		"short", "2026-01-05",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("table output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return nil, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--format", "table"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+	if got := buf.String(); !strings.Contains(got, "ID") || strings.Contains(got, "session-a") {
+		t.Errorf("unexpected table output:\n%s", got)
 	}
 }
 
