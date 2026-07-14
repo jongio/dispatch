@@ -135,6 +135,14 @@ Commands:
   man                     Write the man page (roff) to standard output
   update                  Update dispatch to the latest release
 
+Open and new flags:
+  --mode <M>              Launch mode for this run (inplace, tab, window, pane)
+  --agent <name>          Override the configured agent for this run only
+  --model <name>          Override the configured model for this run only
+  --yolo[=true|false]     Override yolo mode for this run only (bare form implies true)
+  --last                  (open only) Resume the most recently active session
+  --print                 (open only) Print the resume command instead of launching
+
 Session IDs:
   Commands that take <id> (open, export) accept a full session ID or any
   unique prefix of one, like a short git SHA. An ambiguous prefix lists the

@@ -50,7 +50,7 @@ func TestParseOpenArgs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, last, printCmd, stdin, err := parseOpenArgs(tc.args)
+			id, mode, last, printCmd, stdin, _, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got id=%q mode=%q last=%v", id, mode, last)
@@ -241,6 +241,37 @@ func TestRunOpen_PrintError(t *testing.T) {
 
 	if err := runOpen(io.Discard, []string{"open", "s", "--print"}); err == nil {
 		t.Fatal("expected resume command error to propagate")
+	}
+}
+
+func TestRunOpen_OverridesFlowToResumeConfig(t *testing.T) {
+	cfg := config.Default()
+	cfg.Agent = "base-agent"
+	cfg.Model = "base-model"
+	cfg.YoloMode = false
+	sess := &data.Session{ID: "sess-1", Cwd: "/tmp/project"}
+	withOpenStubs(t, cfg, sess, nil)
+
+	var gotRC platform.ResumeConfig
+	origResume := openResumeCmdFn
+	openResumeCmdFn = func(id string, rc platform.ResumeConfig) (string, error) {
+		gotRC = rc
+		return "copilot --resume " + id, nil
+	}
+	t.Cleanup(func() { openResumeCmdFn = origResume })
+
+	args := []string{"open", "sess-1", "--print", "--agent", "coder", "--model", "gpt-5", "--yolo"}
+	if err := runOpen(io.Discard, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotRC.Agent != "coder" {
+		t.Errorf("agent = %q, want %q", gotRC.Agent, "coder")
+	}
+	if gotRC.Model != "gpt-5" {
+		t.Errorf("model = %q, want %q", gotRC.Model, "gpt-5")
+	}
+	if !gotRC.YoloMode {
+		t.Error("yolo = false, want true")
 	}
 }
 

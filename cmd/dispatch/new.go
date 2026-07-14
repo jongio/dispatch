@@ -27,7 +27,7 @@ func runNew(w io.Writer, args []string) error {
 		w = io.Discard
 	}
 
-	dir, modeFlag, err := parseNewArgs(args)
+	dir, modeFlag, ov, err := parseNewArgs(args)
 	if err != nil {
 		return err
 	}
@@ -36,6 +36,7 @@ func runNew(w io.Writer, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+	ov.apply(cfg)
 
 	mode := resolveOpenMode(modeFlag, cfg)
 
@@ -47,10 +48,11 @@ func runNew(w io.Writer, args []string) error {
 	return newLaunchFn(w, cfg, resolvedDir, mode)
 }
 
-// parseNewArgs extracts the optional directory and launch mode from the "new"
-// subcommand arguments. args[0] is expected to be "new". A missing directory
-// means the current working directory.
-func parseNewArgs(args []string) (dir, mode string, err error) {
+// parseNewArgs extracts the optional directory, launch mode, and any per-launch
+// agent/model/yolo overrides from the "new" subcommand arguments. args[0] is
+// expected to be "new". A missing directory means the current working
+// directory.
+func parseNewArgs(args []string) (dir, mode string, ov launchOverrides, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "new" token
@@ -59,17 +61,24 @@ func parseNewArgs(args []string) (dir, mode string, err error) {
 	var positionals []string
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
+		if matched, next, mErr := matchLaunchOverride(rest, i, &ov); matched {
+			if mErr != nil {
+				return "", "", launchOverrides{}, mErr
+			}
+			i = next
+			continue
+		}
 		switch {
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-				return "", "", errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", launchOverrides{}, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
 		case strings.HasPrefix(arg, "--mode="):
 			mode = strings.TrimPrefix(arg, "--mode=")
 		case strings.HasPrefix(arg, "-"):
-			return "", "", fmt.Errorf("unknown flag: %s", arg)
+			return "", "", launchOverrides{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
@@ -81,15 +90,15 @@ func parseNewArgs(args []string) (dir, mode string, err error) {
 	case 1:
 		dir = positionals[0]
 	default:
-		return "", "", fmt.Errorf("new accepts a single directory, got %d arguments", len(positionals))
+		return "", "", launchOverrides{}, fmt.Errorf("new accepts a single directory, got %d arguments", len(positionals))
 	}
 
 	if mode != "" {
 		if _, mErr := normalizeLaunchMode(mode); mErr != nil {
-			return "", "", mErr
+			return "", "", launchOverrides{}, mErr
 		}
 	}
-	return dir, mode, nil
+	return dir, mode, ov, nil
 }
 
 // resolveNewDir validates the target directory and returns an absolute path.

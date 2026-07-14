@@ -372,7 +372,11 @@ _dispatch_completion() {
       return 0
       ;;
     open)
-      COMPREPLY=( $(compgen -W "$("${bin}" __complete aliases)" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "$("${bin}" __complete aliases) --mode --last --print --agent --model --yolo" -- "${cur}") )
+      return 0
+      ;;
+    new)
+      COMPREPLY=( $(compgen -W "--mode --agent --model --yolo" -- "${cur}") )
       return 0
       ;;
     config)
@@ -390,10 +394,12 @@ complete -F _dispatch_completion dispatch disp
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands flags configsubs shells aliases configkeys
+  local -a commands flags configsubs shells aliases configkeys openflags newflags
   local bin=${words[1]}
   commands=(help version open new doctor update completion stats search tags config export info man)
   configsubs=(list get set unset edit path)
+  openflags=(--mode --last --print --agent --model --yolo)
+  newflags=(--mode --agent --model --yolo)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
 
   if (( CURRENT == 2 )); then
@@ -422,6 +428,16 @@ _dispatch_completion() {
     fi
     return
   fi
+
+  if [[ ${words[2]} == open ]]; then
+    _describe -t openflags 'open flag' openflags
+    return
+  fi
+
+  if [[ ${words[2]} == new ]]; then
+    _describe -t newflags 'new flag' newflags
+    return
+  fi
 }
 _dispatch_completion "$@"
 `
@@ -442,12 +458,19 @@ function __dispatch_config_key
   test (count $cmd) -ge 3; and test $cmd[2] = config; and contains -- $cmd[3] get set unset
 end
 
+function __dispatch_using_subcommand
+  set -l cmd (commandline -opc)
+  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
+end
+
 for bin in dispatch disp
   complete -c $bin -f
   complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags config export info man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
+  complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo'
+  complete -c $bin -n '__dispatch_after new' -a '--mode --agent --model --yolo'
   complete -c $bin -n '__dispatch_config_key' -a "($bin __complete config-keys)"
 end
 `
@@ -456,6 +479,8 @@ const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'config', 'export', 'info', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
+$script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
+$script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
@@ -464,13 +489,15 @@ Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     $values = if ($tokens.Count -ge 2 -and $tokens[1] -eq 'completion') {
         & $bin __complete shells
     } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'open') {
-        & $bin __complete aliases
+        (& $bin __complete aliases) + $script:DispatchOpenFlags
     } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'config') {
         if ($tokens.Count -ge 3 -and @('get', 'set', 'unset') -contains $tokens[2]) {
             & $bin __complete config-keys
         } else {
             $script:DispatchConfigSubcommands
         }
+    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'new') {
+        $script:DispatchNewFlags
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }
