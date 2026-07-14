@@ -114,8 +114,8 @@ Usage:
 
 Commands:
   help                    Show this help message
-  version                 Print the version
-  open <id> [--mode M]    Resume a session by ID (M: inplace, tab, window, pane)
+  version [--json]        Print the version
+  open <id> [--mode M]    Resume a session by ID or prefix (M: inplace, tab, window, pane)
                           --print writes the resume command instead of launching
   open --last [--mode M]  Resume the most recently active session
   new [dir] [--mode M]    Start a new session in a directory (default: current)
@@ -128,7 +128,13 @@ Commands:
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown or JSON
+  man                     Write the man page (roff) to standard output
   update                  Update dispatch to the latest release
+
+Session IDs:
+  Commands that take <id> (open, export) accept a full session ID or any
+  unique prefix of one, like a short git SHA. An ambiguous prefix lists the
+  matching sessions so you can add more characters.
 
 Stats flags:
   --json                  Print the summary as JSON
@@ -138,6 +144,7 @@ Stats flags:
   --folder <path>         Only count sessions under a folder
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
+  --top <n>               Limit each breakdown to the top N entries
 
 Search flags:
   --json                  Print results as JSON (default)
@@ -162,13 +169,15 @@ Config commands:
   config list [--json]    Print every setting and its value
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
+  config unset <key>      Reset one setting to its default
   config edit             Open the config file in your editor
   config path             Print the config file path
 
 Export flags:
-  --format md|json        Output format (default md)
+  --format md|json|html   Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
+  --redact                Mask common secret patterns in the export
 
 Flags:
   -h, --help              Show this help message
