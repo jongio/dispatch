@@ -456,6 +456,7 @@ func TestPrintUsage_Output(t *testing.T) {
 
 	origStdout := os.Stdout
 	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
 
 	var buf bytes.Buffer
 	readDone := make(chan struct{})
@@ -466,7 +467,7 @@ func TestPrintUsage_Output(t *testing.T) {
 
 	printUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
 	<-readDone
 
