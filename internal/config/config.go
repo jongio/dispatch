@@ -531,13 +531,36 @@ func Default() *Config {
 	}
 }
 
-// configPath returns the full path to the configuration file.
+// configPath returns the full path to the configuration file. When the
+// DISPATCH_CONFIG environment variable holds an absolute, non-UNC path, that
+// path is used instead of the default OS config location. A relative or UNC
+// value is ignored so a bad override falls back to the default.
 func configPath() (string, error) {
+	if override := configPathOverride(); override != "" {
+		return override, nil
+	}
 	dir, err := platform.ConfigDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(dir, configFileName), nil
+}
+
+// configPathOverride returns a validated config path from the DISPATCH_CONFIG
+// environment variable, or an empty string when the variable is unset or names
+// a relative or UNC path. This mirrors the guard used for the CLI log file so
+// the override cannot point at a network location or a path relative to the
+// current directory.
+func configPathOverride() string {
+	raw := os.Getenv("DISPATCH_CONFIG")
+	if raw == "" {
+		return ""
+	}
+	cleaned := filepath.Clean(raw)
+	if !filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, `\\`) {
+		return ""
+	}
+	return cleaned
 }
 
 // ConfigPath returns the full path to the configuration file.

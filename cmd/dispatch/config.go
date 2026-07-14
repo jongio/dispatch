@@ -251,12 +251,14 @@ func runConfig(w io.Writer, args []string) error {
 		return runConfigGet(w, rest)
 	case "set":
 		return runConfigSet(w, rest)
+	case "unset":
+		return runConfigUnset(w, rest)
 	case "edit":
 		return runConfigEdit(w, rest)
 	case "path":
 		return runConfigPath(w, rest)
 	default:
-		return fmt.Errorf("unknown config subcommand %q (want list, get, set, edit, or path)", sub)
+		return fmt.Errorf("unknown config subcommand %q (want list, get, set, unset, edit, or path)", sub)
 	}
 }
 
@@ -345,6 +347,38 @@ func runConfigSet(w io.Writer, args []string) error {
 		return err
 	}
 	if err := field.set(cfg, value); err != nil {
+		return err
+	}
+	if err := configSaveFn(cfg); err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "%s = %s\n", field.name, field.get(cfg))
+	return nil
+}
+
+// runConfigUnset resets a single setting to its default value and persists the
+// change through the existing save path. It applies the value the setting has
+// in a freshly built default config, reusing each field's validated set so the
+// reset behaves exactly like an explicit set of the default.
+func runConfigUnset(w io.Writer, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("config unset requires a key (see config list for keys)")
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("config unset takes a single key, got %d arguments", len(args))
+	}
+	key := args[0]
+
+	field, ok := findConfigField(key)
+	if !ok {
+		return unknownConfigKeyErr(key)
+	}
+
+	cfg, err := configLoadFn()
+	if err != nil {
+		return err
+	}
+	if err := field.set(cfg, field.get(config.Default())); err != nil {
 		return err
 	}
 	if err := configSaveFn(cfg); err != nil {
