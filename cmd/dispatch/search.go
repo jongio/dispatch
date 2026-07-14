@@ -119,7 +119,8 @@ func writeSearchTable(w io.Writer, sessions []data.Session) error {
 		return err
 	}
 	for _, s := range sessions {
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
+		if _, err := fmt.Fprintf(
+			tw, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
 			shortSearchID(s.ID),
 			searchTableTime(s),
 			searchTableCell(s.Repository),
