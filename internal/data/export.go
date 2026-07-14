@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -121,6 +122,119 @@ func RenderMarkdown(detail *SessionDetail) string {
 		b.WriteString("\n")
 	}
 
+	return b.String()
+}
+
+// htmlExportStyle is the inline stylesheet for HTML exports. It is embedded in
+// the document so the file renders without any external requests.
+const htmlExportStyle = `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#1f2328;background:#fff;margin:0;padding:2rem;max-width:56rem;margin-left:auto;margin-right:auto}
+h1{font-size:1.6rem;margin:0 0 1rem}
+h2{font-size:1.2rem;margin:2rem 0 .75rem;border-bottom:1px solid #d0d7de;padding-bottom:.3rem}
+table{border-collapse:collapse;margin:0 0 1rem}
+th,td{border:1px solid #d0d7de;padding:.35rem .6rem;text-align:left;vertical-align:top}
+th{background:#f6f8fa}
+.turn{border:1px solid #d0d7de;border-radius:6px;margin:0 0 1rem;overflow:hidden}
+.turn .role{font-weight:600;padding:.4rem .75rem;background:#f6f8fa;border-bottom:1px solid #d0d7de}
+.turn.user .role{background:#ddf4ff}
+.turn .body{padding:.75rem;margin:0;white-space:pre-wrap;word-wrap:break-word;font-family:inherit}
+code{background:#eff1f3;padding:.1rem .3rem;border-radius:4px}
+ul{padding-left:1.25rem}`
+
+// RenderHTML formats a SessionDetail as a single self-contained HTML document
+// suitable for reading in a browser. The stylesheet is inlined so the file has
+// no external references. All session and conversation text is escaped so
+// content cannot inject markup.
+func RenderHTML(detail *SessionDetail) string {
+	if detail == nil {
+		return ""
+	}
+
+	s := detail.Session
+	esc := html.EscapeString
+	var b strings.Builder
+
+	b.WriteString("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n")
+	b.WriteString("<meta charset=\"utf-8\">\n")
+	b.WriteString("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
+	fmt.Fprintf(&b, "<title>Session: %s</title>\n", esc(s.Summary))
+	fmt.Fprintf(&b, "<style>\n%s\n</style>\n", htmlExportStyle)
+	b.WriteString("</head>\n<body>\n")
+
+	fmt.Fprintf(&b, "<h1>Session: %s</h1>\n", esc(s.Summary))
+
+	// Metadata.
+	b.WriteString("<h2>Metadata</h2>\n<table>\n")
+	b.WriteString("<tr><th>Field</th><th>Value</th></tr>\n")
+	fmt.Fprintf(&b, "<tr><td>ID</td><td><code>%s</code></td></tr>\n", esc(s.ID))
+	fmt.Fprintf(&b, "<tr><td>Folder</td><td><code>%s</code></td></tr>\n", esc(s.Cwd))
+	if s.Repository != "" {
+		fmt.Fprintf(&b, "<tr><td>Repository</td><td>%s</td></tr>\n", esc(s.Repository))
+	}
+	if s.Branch != "" {
+		fmt.Fprintf(&b, "<tr><td>Branch</td><td>%s</td></tr>\n", esc(s.Branch))
+	}
+	fmt.Fprintf(&b, "<tr><td>Created</td><td>%s</td></tr>\n", esc(s.CreatedAt))
+	fmt.Fprintf(&b, "<tr><td>Last Active</td><td>%s</td></tr>\n", esc(s.LastActiveAt))
+	fmt.Fprintf(&b, "<tr><td>Turns</td><td>%d</td></tr>\n", s.TurnCount)
+	fmt.Fprintf(&b, "<tr><td>Files</td><td>%d</td></tr>\n", s.FileCount)
+	b.WriteString("</table>\n")
+
+	// Conversation.
+	if len(detail.Turns) > 0 {
+		b.WriteString("<h2>Conversation</h2>\n")
+		for _, turn := range detail.Turns {
+			if turn.UserMessage != "" {
+				b.WriteString("<div class=\"turn user\">\n<div class=\"role\">User</div>\n")
+				fmt.Fprintf(&b, "<div class=\"body\">%s</div>\n</div>\n", esc(turn.UserMessage))
+			}
+			if turn.AssistantResponse != "" {
+				b.WriteString("<div class=\"turn assistant\">\n<div class=\"role\">Assistant</div>\n")
+				fmt.Fprintf(&b, "<div class=\"body\">%s</div>\n</div>\n", esc(turn.AssistantResponse))
+			}
+		}
+	}
+
+	// Checkpoints.
+	if len(detail.Checkpoints) > 0 {
+		b.WriteString("<h2>Checkpoints</h2>\n")
+		for _, cp := range detail.Checkpoints {
+			fmt.Fprintf(&b, "<h3>%d. %s</h3>\n", cp.CheckpointNumber, esc(cp.Title))
+			if cp.Overview != "" {
+				fmt.Fprintf(&b, "<p>%s</p>\n", esc(cp.Overview))
+			}
+		}
+	}
+
+	// Files.
+	if len(detail.Files) > 0 {
+		b.WriteString("<h2>Files Touched</h2>\n<ul>\n")
+		seen := make(map[string]struct{})
+		for _, f := range detail.Files {
+			if _, ok := seen[f.FilePath]; ok {
+				continue
+			}
+			seen[f.FilePath] = struct{}{}
+			fmt.Fprintf(&b, "<li><code>%s</code> (%s)</li>\n", esc(f.FilePath), esc(f.ToolName))
+		}
+		b.WriteString("</ul>\n")
+	}
+
+	// References.
+	if len(detail.Refs) > 0 {
+		b.WriteString("<h2>References</h2>\n<ul>\n")
+		seen := make(map[string]struct{})
+		for _, ref := range detail.Refs {
+			key := ref.RefType + ":" + ref.RefValue
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			fmt.Fprintf(&b, "<li>%s: %s</li>\n", esc(ref.RefType), esc(ref.RefValue))
+		}
+		b.WriteString("</ul>\n")
+	}
+
+	b.WriteString("</body>\n</html>\n")
 	return b.String()
 }
 

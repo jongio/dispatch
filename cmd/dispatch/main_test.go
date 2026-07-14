@@ -448,9 +448,10 @@ func TestShiftDemoTimestamps_AlreadyRecent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPrintUsage_Output(t *testing.T) {
-	// Capture stdout. Drain the pipe on a goroutine so the write in
-	// printUsage cannot block once the output grows past the OS pipe buffer
-	// (a few KB on Windows), which would otherwise deadlock this test.
+	// Capture stdout. The pipe must be drained from a separate goroutine while
+	// printUsage writes: on Windows the pipe buffer is only a few KB and the
+	// usage text is larger, so draining after printUsage returned would block
+	// the write and deadlock.
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
@@ -458,20 +459,22 @@ func TestPrintUsage_Output(t *testing.T) {
 
 	origStdout := os.Stdout
 	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
 
-	captured := make(chan string, 1)
+	var buf bytes.Buffer
+	readDone := make(chan struct{})
 	go func() {
-		var buf bytes.Buffer
 		_, _ = io.Copy(&buf, r)
-		captured <- buf.String()
+		close(readDone)
 	}()
 
 	printUsage()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
+	<-readDone
 
-	output := <-captured
+	output := buf.String()
 	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)
