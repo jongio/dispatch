@@ -160,25 +160,25 @@
     - Condition: In session list view
 
 ### Sorting and Organization
-17. **s** → Cycle Sort Order
+17. **s** → Cycle Sort Field
     - File: internal\tui\keys.go (line 69)
     - Code: key.NewBinding(key.WithKeys("s"))
     - Handler: internal\tui\model.go (lines 878-880)
-    - Behavior: Cycles through sort options (Name, Created, Updated, etc.)
+    - Behavior: Cycles through sort options (updated, folder, name, attention, frecency). Affects session ordering within groups. Group ordering is fixed per group mode (A-Z for folder/repo/branch/host, newest first for date).
     - Condition: In session list view
 
 18. **S** (Shift+S) → Toggle Sort Direction
     - File: internal\tui\keys.go (line 70)
     - Code: key.NewBinding(key.WithKeys("S"))
     - Handler: internal\tui\model.go (lines 882-884)
-    - Behavior: Toggles between ascending and descending sort
+    - Behavior: Toggles between ascending and descending sort direction for sessions within groups. Group ordering is fixed per group mode. Has no effect in date group mode (sessions are always sorted by most recent first).
     - Condition: In session list view
 
-19. **Tab** → Cycle Pivot Mode
+19. **Tab** → Cycle Group Mode
     - File: internal\tui\keys.go (line 71)
     - Code: key.NewBinding(key.WithKeys("tab"))
     - Handler: internal\tui\model.go (lines 886-888)
-    - Behavior: Cycles grouping: none → folder → repo → branch → date → none
+    - Behavior: Cycles grouping: list → folder → repo → branch → date → host → list
     - Condition: In session list view
 
 ### Preview and Display
@@ -606,15 +606,15 @@ When help overlay is open (after pressing ?):
     - Behavior: Sets time range filter to clicked option (1h, 1d, 7d, all)
     - Condition: Click on Y=1 (badge line), within time range segment
 
-70. **Click Sort Indicator** → Cycle Sort Order
+70. **Click Sort Indicator** → Cycle Sort Field
     - Handler: internal\tui\model.go (lines 1170-1198)
-    - Behavior: Cycles sort field to next option
+    - Behavior: Cycles sort field to next option. Click the arrow to toggle direction.
     - Condition: Click on Y=1, within sort indicator area
 
-71. **Click Pivot Indicator** → Cycle Pivot Mode
+71. **Click Group Indicator** → Cycle Group Mode
     - Handler: internal\tui\model.go (lines 1170-1198)
-    - Behavior: Cycles pivot grouping mode
-    - Condition: Click on Y=1, within pivot area
+    - Behavior: Cycles group mode (list, folder, repo, branch, date, host)
+    - Condition: Click on Y=1, within group indicator area
 
 ### Scroll Wheel (Mouse)
 

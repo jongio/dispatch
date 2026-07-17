@@ -50,7 +50,7 @@ func TestParseOpenArgs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, last, printCmd, stdin, _, err := parseOpenArgs(tc.args)
+			id, mode, last, printCmd, stdin, _, _, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got id=%q mode=%q last=%v", id, mode, last)
@@ -520,5 +520,93 @@ func TestRunOpen_StdinPrint(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "copilot --resume sess-1") || !strings.Contains(out, "copilot --resume sess-2") {
 		t.Errorf("output = %q, want resume commands for both sessions", out)
+	}
+}
+
+func TestParseOpenArgs_ScopeFlags(t *testing.T) {
+	// --repo flag produces a non-nil scopeFilter.
+	_, _, _, _, _, _, scope, err := parseOpenArgs([]string{"open", "--repo", "jongio/dispatch"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if scope == nil {
+		t.Fatal("expected scope filter to be non-nil")
+	}
+	if scope.Repository != "jongio/dispatch" {
+		t.Errorf("Repository = %q, want jongio/dispatch", scope.Repository)
+	}
+}
+
+func TestParseOpenArgs_CurrentFlag(t *testing.T) {
+	origGit := detectGitRepoFn
+	detectGitRepoFn = func(string) (string, string, error) {
+		return "test/repo", "test-branch", nil
+	}
+	t.Cleanup(func() { detectGitRepoFn = origGit })
+
+	_, _, _, _, _, _, scope, err := parseOpenArgs([]string{"open", "--current"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if scope == nil {
+		t.Fatal("expected scope filter to be non-nil for --current")
+	}
+	if scope.Repository != "test/repo" {
+		t.Errorf("Repository = %q, want test/repo", scope.Repository)
+	}
+}
+
+func TestParseOpenArgs_ScopeWithLastConflict(t *testing.T) {
+	_, _, _, _, _, _, _, err := parseOpenArgs([]string{"open", "--last", "--repo", "x/y"})
+	if err == nil {
+		t.Fatal("expected error for --last + --repo conflict")
+	}
+}
+
+func TestParseOpenArgs_ScopeWithIDConflict(t *testing.T) {
+	_, _, _, _, _, _, _, err := parseOpenArgs([]string{"open", "abc", "--repo", "x/y"})
+	if err == nil {
+		t.Fatal("expected error for ID + --repo conflict")
+	}
+}
+
+func TestRunOpen_ScopedResume(t *testing.T) {
+	cfg := config.Default()
+	cfg.LaunchMode = config.LaunchModeTab
+	sess := &data.Session{ID: "scope-1", Cwd: "/tmp/p", Repository: "x/y", Branch: "main"}
+	capture := withOpenStubs(t, cfg, sess, nil)
+
+	origList := openListSessionsFn
+	openListSessionsFn = func(f data.FilterOptions) ([]data.Session, error) {
+		if f.Repository != "x/y" {
+			t.Errorf("filter.Repository = %q, want x/y", f.Repository)
+		}
+		return []data.Session{*sess}, nil
+	}
+	t.Cleanup(func() { openListSessionsFn = origList })
+
+	if err := runOpen(io.Discard, []string{"open", "--repo", "x/y"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !capture.launched {
+		t.Fatal("expected launch to be invoked")
+	}
+	if capture.session == nil || capture.session.ID != "scope-1" {
+		t.Errorf("launched session = %+v, want scope-1", capture.session)
+	}
+}
+
+func TestRunOpen_ScopedResumeNoMatch(t *testing.T) {
+	withOpenStubs(t, config.Default(), nil, nil)
+
+	origList := openListSessionsFn
+	openListSessionsFn = func(data.FilterOptions) ([]data.Session, error) {
+		return nil, nil
+	}
+	t.Cleanup(func() { openListSessionsFn = origList })
+
+	err := runOpen(io.Discard, []string{"open", "--repo", "nonexistent/repo"})
+	if err == nil {
+		t.Fatal("expected error when no sessions match scope filter")
 	}
 }

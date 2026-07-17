@@ -147,7 +147,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.sort.Field = data.SortByFolder
 		m.sort.Order = data.Ascending
 		if sorted, err := c.store.GroupSessions(context.Background(), data.PivotByFolder, c.flatFilter, m.sort, 0); err == nil {
-			sortGroupsByLatest(sorted, data.Ascending)
+			sortGroupsByLabel(sorted, data.Ascending)
 			m.groups = sorted
 			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(sorted)
@@ -198,7 +198,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.timeRange = tc.tr
 		trFilter := data.FilterOptions{Since: timeRangeToSince(tc.tr)}
 		if trGroups, err := c.store.GroupSessions(context.Background(), data.PivotByFolder, trFilter, c.flatSort, 0); err == nil {
-			sortGroupsByLatest(trGroups, data.Descending)
+			sortGroupsByLabel(trGroups, data.Ascending)
 			m.groups = trGroups
 			m.sessionList.SetPivotField(m.pivot)
 			m.sessionList.SetGroups(trGroups)
@@ -702,7 +702,11 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		if err != nil {
 			return nil
 		}
-		sortGroupsByLatest(groups, data.Descending)
+		if pf == data.PivotByDate {
+			sortGroupsByLabel(groups, data.Descending)
+		} else {
+			sortGroupsByLabel(groups, data.Ascending)
+		}
 		return groups
 	}
 

@@ -21,8 +21,8 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
 - **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
-- **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, created, turns) with toggleable direction
-- **Grouping (pivot) modes** (`Tab`) — flat, folder, repo, branch, date — displayed as collapsible trees with session counts
+- **Sorting** (`s` / `S`) — 7 fields (updated, created, turns, name, folder, attention, frecency) with toggleable direction. Sort applies to both sessions and group ordering
+- **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
@@ -193,6 +193,20 @@ dispatch open <session-id> --yolo=false   # force off even if config enables it
 
 These flags apply to every launch mode and to `--print`. When omitted, the saved config values are used.
 
+#### Scoped Resume
+
+Resume the most recent session matching a repository, branch, or folder instead of specifying an ID:
+
+```sh
+dispatch open --repo jongio/dispatch
+dispatch open --branch feature/auth
+dispatch open --repo jongio/dispatch --branch main
+dispatch open --folder ~/projects/api
+dispatch open --current                    # auto-detect repo and branch from cwd
+```
+
+Scope flags cannot be combined with `--last`, `--stdin`, or a session ID.
+
 ### Start a New Session
 
 Start a brand-new Copilot session from the command line without opening the TUI:
@@ -234,6 +248,7 @@ Run `dispatch stats` to print session totals and breakdowns by repository, branc
 ```sh
 dispatch stats
 dispatch stats --json
+dispatch stats --csv
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
 dispatch stats --top 5
@@ -298,6 +313,82 @@ dispatch export 0a1b2c3d --out ./exports
 ```
 
 By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output or `--format html` for a self-contained web page you can open in a browser (styles are inlined, so there are no external files to manage). Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
+
+#### Batch Export
+
+Export all sessions matching a scope filter at once:
+
+```sh
+dispatch export --repo jongio/dispatch
+dispatch export --repo jongio/dispatch --format json --out ./backup
+dispatch export --branch main --since 2026-01-01 --until 2026-07-01
+dispatch export --query "auth fix" --redact
+```
+
+Filter flags (`--query`, `--repo`, `--branch`, `--folder`, `--since`, `--until`) replace the session ID. Each matching session is exported to its own file in the output directory. `--stdout` is not supported in batch mode.
+
+### Compare
+
+Compare two sessions side by side with `dispatch compare`:
+
+```sh
+dispatch compare 0a1b2c3d 9f8e7d6c
+dispatch compare 0a1b2c3d 9f8e7d6c --json
+```
+
+The output shows metadata differences (summary, branch, turn count), files that appear in only one session, ref differences, and checkpoint title lists. Use `--json` for machine-readable output. Session IDs accept the same prefix shorthand as `open` and `export`.
+
+### Aliases
+
+List every session alias with `dispatch aliases`:
+
+```sh
+dispatch aliases
+dispatch aliases --json
+```
+
+Each entry shows the alias, the target session ID, summary, and repository. Aliases whose target session is no longer in the store are marked as orphaned. Use `--json` for scripting.
+
+### Tag
+
+Manage tags on a single session from the command line:
+
+```sh
+dispatch tag <id>                 # list current tags
+dispatch tag <id> --add work,api  # add tags
+dispatch tag <id> --remove api    # remove tags
+dispatch tag <id> --set a,b       # replace all tags
+dispatch tag <id> --json          # print result as JSON
+```
+
+A session alias can be used in place of the ID. Tags are deduplicated and stored in sorted order.
+
+### Prune
+
+Clean up config entries that reference sessions no longer in the store:
+
+```sh
+dispatch prune               # dry run: report what would be removed
+dispatch prune --apply        # remove stale entries
+dispatch prune --json         # machine-readable summary
+dispatch prune --apply --json # remove and print JSON summary
+```
+
+Scans aliases, tags, notes, favorites, hidden sessions, and launch stats. By default it only reports; `--apply` performs the cleanup.
+
+### Watch
+
+Monitor session attention state without opening the TUI:
+
+```sh
+dispatch watch --once                    # one-shot snapshot
+dispatch watch --once --json             # JSON snapshot
+dispatch watch                           # stream transitions (Ctrl-C to stop)
+dispatch watch --interval 10s            # custom poll interval
+dispatch watch --once --repo jongio/dispatch  # filter by repo
+```
+
+The terminal bell rings when a session transitions to waiting or interrupted. Use `--repo`, `--branch`, or `--folder` to limit which sessions are monitored.
 
 ### Search (JSON)
 
@@ -617,7 +708,7 @@ named keys (`up`, `down`, `left`, `right`, `enter`, `esc`, `tab`, `space`,
 Available action names:
 
 `up`, `down`, `left`, `right`, `enter`, `space`, `quit`, `force_quit`,
-`search`, `escape`, `filter`, `sort`, `sort_order`, `pivot`, `pivot_order`,
+`search`, `escape`, `filter`, `sort`, `sort_order`, `pivot`,
 `preview`, `reindex`, `help`, `config`, `time_range_1`, `time_range_2`,
 `time_range_3`, `time_range_4`, `hide`, `toggle_hidden`, `star`,
 `launch_window`, `launch_tab`, `launch_pane`, `preview_scroll_up`,

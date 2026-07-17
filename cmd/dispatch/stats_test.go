@@ -278,3 +278,44 @@ func TestHandleArgsStats(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestParseStatsArgs_CSV(t *testing.T) {
+	opts, err := parseStatsArgs([]string{"stats", "--csv"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !opts.csv {
+		t.Error("expected csv=true")
+	}
+}
+
+func TestParseStatsArgs_CSVAndJSONConflict(t *testing.T) {
+	_, err := parseStatsArgs([]string{"stats", "--csv", "--json"})
+	if err == nil {
+		t.Fatal("expected error for --csv + --json conflict")
+	}
+	if !strings.Contains(err.Error(), "cannot be combined") {
+		t.Errorf("wrong error: %v", err)
+	}
+}
+
+func TestRunStatsCSV(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--csv"}); err != nil {
+		t.Fatalf("runStats --csv: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "section,label,count") {
+		t.Errorf("CSV missing header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "totals,sessions,3") {
+		t.Errorf("CSV missing totals row, got:\n%s", out)
+	}
+	if !strings.Contains(out, "repository,jongio/dispatch,2") {
+		t.Errorf("CSV missing repo breakdown, got:\n%s", out)
+	}
+}

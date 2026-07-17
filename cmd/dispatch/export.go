@@ -18,8 +18,9 @@ import (
 // Function variables allow test substitution of external calls, matching the
 // pattern used elsewhere in this package (see cli.go and open.go).
 var (
-	exportGetDetailFn = defaultExportGetDetail
-	exportDirFn       = data.ExportDir
+	exportGetDetailFn    = defaultExportGetDetail
+	exportDirFn          = data.ExportDir
+	exportListSessionsFn = defaultStatsListSessions
 )
 
 // exportOptions holds the parsed flags for the export command.
@@ -29,6 +30,7 @@ type exportOptions struct {
 	stdout bool
 	outDir string
 	redact bool
+	filter *data.FilterOptions // non-nil for batch mode
 }
 
 // runExport writes a session's full content as Markdown or JSON. It writes to
@@ -42,6 +44,10 @@ func runExport(w io.Writer, args []string) error {
 	opts, err := parseExportArgs(args)
 	if err != nil {
 		return err
+	}
+
+	if opts.filter != nil {
+		return runExportBatch(w, opts)
 	}
 
 	detail, err := exportGetDetailFn(opts.id)
@@ -103,6 +109,8 @@ func parseExportArgs(args []string) (exportOptions, error) {
 	}
 
 	var positionals []string
+	var filter data.FilterOptions
+	hasFilter := false
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
 		name, inline, hasInline := splitFlag(arg)
@@ -130,6 +138,62 @@ func parseExportArgs(args []string) (exportOptions, error) {
 			opts.stdout = true
 		case name == "--redact":
 			opts.redact = true
+		case name == "--query" || name == "-q":
+			v, ni, err := takeValue(i, "--query", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			filter.Query = v
+			hasFilter = true
+			i = ni
+		case name == "--repo":
+			v, ni, err := takeValue(i, "--repo", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			filter.Repository = v
+			hasFilter = true
+			i = ni
+		case name == "--branch":
+			v, ni, err := takeValue(i, "--branch", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			filter.Branch = v
+			hasFilter = true
+			i = ni
+		case name == "--folder":
+			v, ni, err := takeValue(i, "--folder", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			filter.Folder = v
+			hasFilter = true
+			i = ni
+		case name == "--since":
+			v, ni, err := takeValue(i, "--since", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			t, ok := parseStatsTime(v)
+			if !ok {
+				return exportOptions{}, fmt.Errorf("invalid --since value %q (want YYYY-MM-DD or RFC3339)", v)
+			}
+			filter.Since = &t
+			hasFilter = true
+			i = ni
+		case name == "--until":
+			v, ni, err := takeValue(i, "--until", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			t, ok := parseStatsTime(v)
+			if !ok {
+				return exportOptions{}, fmt.Errorf("invalid --until value %q (want YYYY-MM-DD or RFC3339)", v)
+			}
+			filter.Until = &t
+			hasFilter = true
+			i = ni
 		case strings.HasPrefix(arg, "-"):
 			return exportOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
@@ -137,11 +201,15 @@ func parseExportArgs(args []string) (exportOptions, error) {
 		}
 	}
 
-	switch len(positionals) {
-	case 0:
-		return exportOptions{}, errors.New("export requires a session ID")
-	case 1:
+	switch {
+	case len(positionals) == 0 && hasFilter:
+		opts.filter = &filter
+	case len(positionals) == 0 && !hasFilter:
+		return exportOptions{}, errors.New("export requires a session ID or filter flags (--query, --repo, --branch, --folder, --since, --until)")
+	case len(positionals) == 1 && !hasFilter:
 		opts.id = positionals[0]
+	case len(positionals) == 1 && hasFilter:
+		return exportOptions{}, errors.New("cannot combine a session ID with filter flags; use one or the other")
 	default:
 		return exportOptions{}, fmt.Errorf("export accepts a single session ID, got %d arguments", len(positionals))
 	}
@@ -277,4 +345,61 @@ func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 		return nil, err
 	}
 	return detail, nil
+}
+
+// runExportBatch exports all sessions matching the filter flags. Each session
+// is exported to a separate file in the output directory.
+func runExportBatch(w io.Writer, opts exportOptions) error {
+	if opts.stdout {
+		return errors.New("--stdout is not supported in batch mode; use --out to set the output directory")
+	}
+
+	sessions, err := exportListSessionsFn(*opts.filter)
+	if err != nil {
+		return err
+	}
+	if len(sessions) == 0 {
+		fmt.Fprintln(w, "No sessions match the given filters.")
+		return nil
+	}
+
+	outDir := opts.outDir
+	if outDir == "" {
+		d, dirErr := exportDirFn()
+		if dirErr != nil {
+			return dirErr
+		}
+		outDir = d
+	}
+
+	var exported int
+	for _, s := range sessions {
+		detail, detailErr := exportGetDetailFn(s.ID)
+		if detailErr != nil {
+			fmt.Fprintf(w, "Skipping %s: %v\n", shortID(s.ID), detailErr)
+			continue
+		}
+		if detail == nil {
+			fmt.Fprintf(w, "Skipping %s: session not found\n", shortID(s.ID))
+			continue
+		}
+		if opts.redact {
+			detail = redactedSessionDetail(detail)
+		}
+		content, renderErr := renderExport(detail, opts.format)
+		if renderErr != nil {
+			fmt.Fprintf(w, "Skipping %s: %v\n", shortID(s.ID), renderErr)
+			continue
+		}
+		path, writeErr := writeExportFile(outDir, s.ID, opts.format, content)
+		if writeErr != nil {
+			fmt.Fprintf(w, "Skipping %s: %v\n", shortID(s.ID), writeErr)
+			continue
+		}
+		fmt.Fprintf(w, "Exported %s to %s\n", shortID(s.ID), path)
+		exported++
+	}
+
+	fmt.Fprintf(w, "\nExported %d of %d sessions to %s\n", exported, len(sessions), outDir)
+	return nil
 }
