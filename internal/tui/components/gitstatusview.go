@@ -212,19 +212,23 @@ func upstreamLabel(s platform.GitStatus) string {
 }
 
 // pushPullLabel renders the standard ahead/behind push/pull stats with icons
-// and colors, or a note when there is no upstream to compare against.
+// and colors, or a note when there is no upstream to compare against. Only
+// non-zero counts are shown, matching the preview pane's gitPushPullText.
 func pushPullLabel(s platform.GitStatus) string {
 	if !s.HasUpstream {
 		return styles.DimmedStyle.Render("no upstream")
 	}
-	ahead := styles.GitAheadStyle.Render(fmt.Sprintf("%s%d", styles.IconGitAhead(), s.Ahead))
-	behind := styles.GitBehindStyle.Render(fmt.Sprintf("%s%d", styles.IconGitBehind(), s.Behind))
-	push := styles.DimmedStyle.Render(" to push")
-	pull := styles.DimmedStyle.Render(" to pull")
 	if s.Ahead == 0 && s.Behind == 0 {
 		return styles.SuccessStyle.Render("up to date")
 	}
-	return ahead + push + "   " + behind + pull
+	var parts []string
+	if s.Ahead > 0 {
+		parts = append(parts, styles.GitAheadStyle.Render(fmt.Sprintf("%s%d", styles.IconGitAhead(), s.Ahead))+styles.DimmedStyle.Render(" to push"))
+	}
+	if s.Behind > 0 {
+		parts = append(parts, styles.GitBehindStyle.Render(fmt.Sprintf("%s%d", styles.IconGitBehind(), s.Behind))+styles.DimmedStyle.Render(" to pull"))
+	}
+	return strings.Join(parts, "   ")
 }
 
 // workingLabel returns "clean" (styled) or a short dirty summary.

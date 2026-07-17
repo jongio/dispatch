@@ -570,10 +570,10 @@ func TestWordWrap(t *testing.T) {
 			"hello world\nfoo",
 		},
 		{
-			"long word not broken",
+			"long word hard-broken to width",
 			"superlongword",
 			5,
-			"superlongword",
+			"super\nlongw\nord",
 		},
 		{
 			"multiple wraps",

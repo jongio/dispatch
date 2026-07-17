@@ -38,7 +38,8 @@ type SessionList struct {
 	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
 	planMap        map[string]bool                  // session ID → has plan.md
 	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
-	gitStateMap    map[string]platform.GitState     // session ID → git workspace state
+	gitStateMap    map[string]platform.GitState     // session ID → git workspace state (badge)
+	gitStatusMap   map[string]platform.GitStatus    // session ID → detailed git status (inline stats)
 	notesSet       map[string]struct{}              // session ID → has a user note
 	tagsSet        map[string]struct{}              // session ID → has tags
 	hiddenColumns  map[string]bool                  // optional column key → hidden
@@ -186,6 +187,12 @@ func (s *SessionList) SetWorkStatuses(m map[string]data.WorkStatusResult) {
 // badges on each session row.
 func (s *SessionList) SetGitStates(m map[string]platform.GitState) {
 	s.gitStateMap = m
+}
+
+// SetGitStatuses updates the detailed git status map used to render the inline
+// push/pull (ahead/behind) stats column on each session row.
+func (s *SessionList) SetGitStatuses(m map[string]platform.GitStatus) {
+	s.gitStatusMap = m
 }
 
 // SetSize updates the available rendering dimensions.
@@ -861,6 +868,24 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		turnsW = 0
 	}
 
+	// Inline git push/pull stats column (↑N ↓N ●). Shown at reasonable widths
+	// once a git scan has produced statuses. A fixed reserved width keeps rows
+	// aligned; empty when the session has no divergence or changes.
+	gitStats, gitStatsVis := s.gitStatsSegment(sess.ID, selected)
+	showGitStats := w >= 70 && s.gitStatusMap != nil
+	gitStatsW := 0
+	if showGitStats {
+		gitStatsW = gitStatsColW
+	}
+
+	// The inline stats column supersedes the single-glyph badge, so drop the
+	// badge on rows that show the stats to avoid a duplicate git indicator.
+	gitDotWEff := gitDotW
+	if showGitStats {
+		gitDot = ""
+		gitDotWEff = 0
+	}
+
 	// Very narrow terminal: summary + time only.
 	if w < 50 {
 		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-noteDotW-tagDotW-wrkDotW-gitDotW-timeW-spacing)
@@ -885,9 +910,12 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		}
 	}
 
-	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - tagDotW - wrkDotW - gitDotW - timeW - spacing
+	summaryW := w - selectorW - dotW - hostDotW - planDotW - noteDotW - tagDotW - wrkDotW - gitDotWEff - timeW - spacing
 	if showTurns {
 		summaryW -= turnsW + spacing
+	}
+	if gitStatsW > 0 {
+		summaryW -= gitStatsW + spacing
 	}
 	if folderW > 0 {
 		summaryW -= folderW + spacing
@@ -910,6 +938,11 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	b.WriteString(wrkDot)
 	b.WriteString(gitDot)
 	b.WriteString(PadRight(summary, summaryW))
+	if gitStatsW > 0 {
+		b.WriteString("  ")
+		// Pad the styled segment to the reserved width using its visual width.
+		b.WriteString(gitStats + strings.Repeat(" ", max(0, gitStatsW-gitStatsVis)))
+	}
 	if folderW > 0 {
 		b.WriteString("  ")
 		b.WriteString(PadRight(AbbrevPath(sess.Cwd), folderW))
@@ -1107,4 +1140,96 @@ func (s SessionList) gitStateDot(sessionID string, selected bool) string {
 	}
 
 	return renderDot(gitIcon, dotStyle, selected)
+}
+
+// gitStatsColW is the fixed visual width reserved for the inline git push/pull
+// stats column. It accommodates "↑NN ↓NN ●" (counts are capped at two digits).
+const gitStatsColW = 9
+
+// gitStatsSegment builds the compact inline git push/pull stats for a session:
+// commits ahead (↑N, to push), behind (↓N, to pull), and a dirty marker (●)
+// when the working tree has changes. It returns the rendered (possibly styled)
+// string and its visual width. An empty string with width 0 means there is
+// nothing to show (no status, not a repo, or clean and in sync).
+func (s SessionList) gitStatsSegment(sessionID string, selected bool) (string, int) {
+	if s.gitStatusMap == nil {
+		return "", 0
+	}
+	st, ok := s.gitStatusMap[sessionID]
+	if !ok {
+		return "", 0
+	}
+	// Missing workspace: the folder no longer exists on disk. Surface it here
+	// (the inline column replaces the badge at these widths) with a cross.
+	if !st.Exists {
+		icon := styles.IconGitMissing()
+		if selected {
+			return icon, lipgloss.Width(icon)
+		}
+		return styles.GitMissingStyle.Render(icon), lipgloss.Width(icon)
+	}
+	if !st.IsRepo {
+		return "", 0
+	}
+
+	type seg struct {
+		text  string
+		style lipgloss.Style
+	}
+	var segs []seg
+	if st.HasUpstream && st.Ahead > 0 {
+		segs = append(segs, seg{styles.IconGitAhead() + clampCount(st.Ahead), styles.GitAheadStyle})
+	}
+	if st.HasUpstream && st.Behind > 0 {
+		segs = append(segs, seg{styles.IconGitBehind() + clampCount(st.Behind), styles.GitBehindStyle})
+	}
+	if !st.Clean() {
+		segs = append(segs, seg{gitDirtyMarker, gitDirtyMarkerStyle(st)})
+	}
+	if len(segs) == 0 {
+		return "", 0
+	}
+
+	var b strings.Builder
+	vis := 0
+	for i, sg := range segs {
+		if i > 0 {
+			b.WriteByte(' ')
+			vis++
+		}
+		if selected {
+			b.WriteString(sg.text)
+		} else {
+			b.WriteString(sg.style.Render(sg.text))
+		}
+		vis += lipgloss.Width(sg.text)
+	}
+	return b.String(), vis
+}
+
+// gitDirtyMarker is the glyph shown inline when a working tree has changes.
+const gitDirtyMarker = "\u25cf" // ●
+
+// gitDirtyMarkerStyle picks the marker colour by change severity: conflicts are
+// errors, tracked changes are dirty, and untracked-only trees use the untracked
+// colour.
+func gitDirtyMarkerStyle(st platform.GitStatus) lipgloss.Style {
+	switch {
+	case st.Conflicts > 0:
+		return styles.ErrorStyle
+	case st.Staged > 0 || st.Modified > 0 || st.Deleted > 0:
+		return styles.GitDirtyStyle
+	default:
+		return styles.GitUntrackedStyle
+	}
+}
+
+// clampCount renders a non-negative count for the inline column, capping the
+// display at two digits ("99") so the fixed-width column never overflows. The
+// exact count is always available in the preview pane and the status overlay.
+func clampCount(n int) string {
+	if n > 99 {
+		return "99"
+	}
+	return strconv.Itoa(n)
 }

@@ -28,85 +28,106 @@ func TestGitState_String(t *testing.T) {
 	}
 }
 
-// TestDetectGitState_MissingDir verifies that a nonexistent path returns GitStateMissing.
-func TestDetectGitState_MissingDir(t *testing.T) {
-	state := DetectGitState(filepath.Join(t.TempDir(), "nonexistent"))
-	if state != GitStateMissing {
-		t.Errorf("DetectGitState(nonexistent) = %v, want GitStateMissing", state)
+// TestGitStatus_State verifies the enum derivation precedence: missing and
+// non-repo first, then dirty over untracked, then behind over ahead, then clean.
+func TestGitStatus_State(t *testing.T) {
+	tests := []struct {
+		name   string
+		status GitStatus
+		want   GitState
+	}{
+		{"missing", GitStatus{Exists: false}, GitStateMissing},
+		{"non-repo", GitStatus{Exists: true, IsRepo: false}, GitStateUnknown},
+		{"clean synced", GitStatus{Exists: true, IsRepo: true}, GitStateClean},
+		{"modified", GitStatus{Exists: true, IsRepo: true, Modified: 1}, GitStateDirty},
+		{"staged", GitStatus{Exists: true, IsRepo: true, Staged: 1}, GitStateDirty},
+		{"deleted", GitStatus{Exists: true, IsRepo: true, Deleted: 1}, GitStateDirty},
+		{"conflicts", GitStatus{Exists: true, IsRepo: true, Conflicts: 1}, GitStateDirty},
+		{"untracked only", GitStatus{Exists: true, IsRepo: true, Untracked: 1}, GitStateUntracked},
+		{"dirty beats untracked", GitStatus{Exists: true, IsRepo: true, Modified: 1, Untracked: 1}, GitStateDirty},
+		{"behind", GitStatus{Exists: true, IsRepo: true, Behind: 2}, GitStateBehind},
+		{"ahead", GitStatus{Exists: true, IsRepo: true, Ahead: 2}, GitStateAhead},
+		{"behind beats ahead", GitStatus{Exists: true, IsRepo: true, Ahead: 1, Behind: 1}, GitStateBehind},
+		{"dirty beats divergence", GitStatus{Exists: true, IsRepo: true, Modified: 1, Ahead: 3}, GitStateDirty},
+	}
+	for _, tt := range tests {
+		if got := tt.status.State(); got != tt.want {
+			t.Errorf("%s: State() = %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }
 
-// TestDetectGitState_NotGitRepo verifies that a directory without .git returns GitStateUnknown.
-func TestDetectGitState_NotGitRepo(t *testing.T) {
-	dir := t.TempDir()
-	state := DetectGitState(dir)
-	if state != GitStateUnknown {
-		t.Errorf("DetectGitState(non-git) = %v, want GitStateUnknown", state)
+// TestDetectGitStatus_State_MissingDir verifies a nonexistent path maps to the
+// missing badge state.
+func TestDetectGitStatus_State_MissingDir(t *testing.T) {
+	if got := DetectGitStatus(filepath.Join(t.TempDir(), "nonexistent")).State(); got != GitStateMissing {
+		t.Errorf("State() = %v, want GitStateMissing", got)
 	}
 }
 
-// TestDetectGitState_Clean verifies that a fresh git repo with a commit returns GitStateClean.
-func TestDetectGitState_Clean(t *testing.T) {
+// TestDetectGitStatus_State_NotGitRepo verifies a directory without .git maps to
+// the unknown badge state.
+func TestDetectGitStatus_State_NotGitRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	if got := DetectGitStatus(t.TempDir()).State(); got != GitStateUnknown {
+		t.Errorf("State() = %v, want GitStateUnknown", got)
+	}
+}
+
+// TestDetectGitStatus_State_Clean verifies a fresh committed repo maps to clean.
+func TestDetectGitStatus_State_Clean(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	if got := DetectGitStatus(initTestRepo(t)).State(); got != GitStateClean {
+		t.Errorf("State() = %v, want GitStateClean", got)
+	}
+}
+
+// TestDetectGitStatus_State_Dirty verifies modified tracked files map to dirty.
+func TestDetectGitStatus_State_Dirty(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
 	dir := initTestRepo(t)
-	state := DetectGitState(dir)
-	if state != GitStateClean {
-		t.Errorf("DetectGitState(clean) = %v, want GitStateClean", state)
-	}
-}
-
-// TestDetectGitState_Dirty verifies that modified tracked files produce GitStateDirty.
-func TestDetectGitState_Dirty(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-	dir := initTestRepo(t)
-
-	// Modify the tracked file.
 	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("modified"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	state := DetectGitState(dir)
-	if state != GitStateDirty {
-		t.Errorf("DetectGitState(dirty) = %v, want GitStateDirty", state)
+	if got := DetectGitStatus(dir).State(); got != GitStateDirty {
+		t.Errorf("State() = %v, want GitStateDirty", got)
 	}
 }
 
-// TestDetectGitState_Untracked verifies that untracked files produce GitStateUntracked.
-func TestDetectGitState_Untracked(t *testing.T) {
+// TestDetectGitStatus_State_Untracked verifies untracked files map to untracked.
+func TestDetectGitStatus_State_Untracked(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
 	dir := initTestRepo(t)
-
-	// Add an untracked file.
 	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	state := DetectGitState(dir)
-	if state != GitStateUntracked {
-		t.Errorf("DetectGitState(untracked) = %v, want GitStateUntracked", state)
+	if got := DetectGitStatus(dir).State(); got != GitStateUntracked {
+		t.Errorf("State() = %v, want GitStateUntracked", got)
 	}
 }
 
-// TestDetectGitState_File verifies that pointing at a file returns GitStateMissing.
-func TestDetectGitState_File(t *testing.T) {
+// TestDetectGitStatus_State_File verifies pointing at a file maps to missing.
+func TestDetectGitStatus_State_File(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "afile.txt")
 	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	state := DetectGitState(f)
-	if state != GitStateMissing {
-		t.Errorf("DetectGitState(file) = %v, want GitStateMissing", state)
+	if got := DetectGitStatus(f).State(); got != GitStateMissing {
+		t.Errorf("State() = %v, want GitStateMissing", got)
 	}
 }
 
-// TestScanGitStates verifies the batch scanning function.
-func TestScanGitStates(t *testing.T) {
+// TestScanGitStatuses verifies the batch scanning function returns detailed
+// statuses keyed by session ID, from which badge states can be derived.
+func TestScanGitStatuses(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -118,36 +139,12 @@ func TestScanGitStates(t *testing.T) {
 		"sess-clean":   cleanDir,
 		"sess-missing": missingDir,
 	}
-	results := ScanGitStates(sessions)
-	if results["sess-clean"] != GitStateClean {
-		t.Errorf("ScanGitStates[clean] = %v, want GitStateClean", results["sess-clean"])
+	results := ScanGitStatuses(sessions)
+	if !results["sess-clean"].IsRepo || results["sess-clean"].State() != GitStateClean {
+		t.Errorf("ScanGitStatuses[clean] = %+v, want a clean repo", results["sess-clean"])
 	}
-	if results["sess-missing"] != GitStateMissing {
-		t.Errorf("ScanGitStates[missing] = %v, want GitStateMissing", results["sess-missing"])
-	}
-}
-
-// TestGitStatusPorcelain_EmptyOutput verifies clean state from no output.
-func TestGitStatusPorcelain_EmptyOutput(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-	dir := initTestRepo(t)
-	state := gitStatusPorcelain(dir)
-	if state != GitStateClean {
-		t.Errorf("gitStatusPorcelain(clean) = %v, want GitStateClean", state)
-	}
-}
-
-// TestGitAheadBehind_NoUpstream verifies zero counts when no upstream is set.
-func TestGitAheadBehind_NoUpstream(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-	dir := initTestRepo(t)
-	ahead, behind := gitAheadBehind(dir)
-	if ahead != 0 || behind != 0 {
-		t.Errorf("gitAheadBehind(no upstream) = (%d, %d), want (0, 0)", ahead, behind)
+	if results["sess-missing"].Exists || results["sess-missing"].State() != GitStateMissing {
+		t.Errorf("ScanGitStatuses[missing] = %+v, want missing", results["sess-missing"])
 	}
 }
 

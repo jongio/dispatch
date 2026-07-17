@@ -175,10 +175,11 @@ type exportDoneMsg struct {
 // Git workspace state messages
 // ---------------------------------------------------------------------------
 
-// gitStateScannedMsg delivers git workspace state data from the background
-// scanner that runs bounded git commands against each session directory.
+// gitStateScannedMsg delivers detailed git status data from the background
+// scanner. The session-list badge enum is derived from each GitStatus, while
+// the inline push/pull column and preview pane use the full status.
 type gitStateScannedMsg struct {
-	states map[string]platform.GitState
+	statuses map[string]platform.GitStatus
 }
 
 // gitStatusMsg delivers the detailed git status for a single session folder,

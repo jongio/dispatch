@@ -99,3 +99,40 @@ Added during reconciliation (beyond the Phase 1 plan):
 - F21 (resize) has no dedicated assertion — behavior is a one-line SetSize call
   mirroring the existing stateCompareView resize path; the render it feeds is
   covered by T14/T15. Acceptable per low-risk parity with existing code.
+
+## Extension coverage (inline row + preview pane)
+
+New functionality units and their covering tests:
+
+| # | Functionality introduced | Location | Covered by |
+|---|--------------------------|----------|------------|
+| G1 | `GitStatus.State()` badge derivation | platform/gitstate.go | TestGitStatus_State (all branches) |
+| G2 | `ScanGitStatuses` batch scan | platform/gitstate.go | TestScanGitStatuses |
+| G3 | Enum-path tests migrated to `DetectGitStatus().State()` | platform/gitstate_test.go | TestDetectGitStatus_State_* |
+| G4 | `SessionList.SetGitStatuses` + `gitStatsSegment` inline render | components/sessionlist.go | TestGitStatsSegment_* (nil/non-repo/clean/ahead-behind-dirty/no-upstream/selected/in-row) |
+| G5 | `clampCount` two-digit cap | components/sessionlist.go | TestClampCount |
+| G6 | `PreviewPanel.SetGitStatus` + `writeGitSection` | components/preview.go | TestPreviewGitSection_* |
+| G7 | `gitPushPullText` / `gitChangesText` helpers | components/preview.go | TestGitPushPullText, TestGitChangesText |
+| G8 | `handleGitStateScanned` derives badge + feeds both | tui/handlers.go | TestHandleGitStateScanned_DerivesBadgeAndFeeds |
+| G9 | `demoGitStatuses` synthetic statuses | tui/model.go | TestDemoGitStatuses |
+| G10 | `syncPreviewGitStatus` nil-safe | tui/model.go | TestSyncPreviewGitStatus_NilDetail |
+
+Removed with the consolidation (no longer any callers): `DetectGitState`,
+`gitStatusPorcelain`, `gitAheadBehind`, `ScanGitStates`, and their tests. The
+badge/filter behaviour they provided is now covered by `GitStatus.State()`.
+
+## Coupled fix: chat-bubble overflow (found during testing)
+
+While testing the preview surface, a pre-existing rendering bug surfaced:
+`wordWrap` only broke on spaces, so a message containing a long unbreakable
+token (a Windows path or URL with no spaces) produced a wrapped line wider than
+the chat bubble. Because the bubble is a nested bordered box with no width cap,
+the border was pushed past the pane edge and the preview's outer border
+re-wrapped it — scattering the `│` borders and double-spacing the conversation.
+
+Fix: `wordWrap` now hard-breaks any token longer than the wrap width into
+width-sized chunks, guaranteeing no wrapped line exceeds the width. Covered by
+`TestWordWrap_LongTokenOverflow` and `TestRenderChatBubble_NoOverflowOnLongPath`;
+the existing `TestWordWrap` "long word" case was updated from the old
+(overflowing) expectation to the hard-broken result. This is unchanged-code
+behaviour from `main`, fixed here because it was reported during feature testing.

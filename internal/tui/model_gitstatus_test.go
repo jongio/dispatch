@@ -128,8 +128,52 @@ func TestGitStatusOverlay_CopyError(t *testing.T) {
 	}
 }
 
-// TestGitStatusKeybinding verifies the git-status action is bound to 'i' and is
-// registered as a remappable action.
+// TestHandleGitStateScanned_DerivesBadgeAndFeeds verifies the scan handler
+// stores the detailed status map and derives the collapsed badge enum from it.
+func TestHandleGitStateScanned_DerivesBadgeAndFeeds(t *testing.T) {
+	m := newTestModel()
+	m.sessionList.SetSessions([]data.Session{{ID: "dirty", Cwd: "/a"}, {ID: "ahead", Cwd: "/b"}})
+
+	statuses := map[string]platform.GitStatus{
+		"dirty": {Exists: true, IsRepo: true, Modified: 2},
+		"ahead": {Exists: true, IsRepo: true, HasUpstream: true, Ahead: 3},
+	}
+	result, _ := m.Update(gitStateScannedMsg{statuses: statuses})
+	rm := result.(Model)
+
+	if len(rm.gitStatusMap) != 2 {
+		t.Errorf("gitStatusMap size = %d, want 2", len(rm.gitStatusMap))
+	}
+	if rm.gitStateMap["dirty"] != platform.GitStateDirty {
+		t.Errorf("derived state[dirty] = %v, want GitStateDirty", rm.gitStateMap["dirty"])
+	}
+	if rm.gitStateMap["ahead"] != platform.GitStateAhead {
+		t.Errorf("derived state[ahead] = %v, want GitStateAhead", rm.gitStateMap["ahead"])
+	}
+}
+
+// TestDemoGitStatuses verifies demo mode produces a status per session dir.
+func TestDemoGitStatuses(t *testing.T) {
+	dirs := map[string]string{"a": "/a", "b": "/b", "c": "/c"}
+	statuses := demoGitStatuses(dirs)
+	if len(statuses) != len(dirs) {
+		t.Fatalf("demoGitStatuses size = %d, want %d", len(statuses), len(dirs))
+	}
+	for id, dir := range dirs {
+		if statuses[id].Dir != dir {
+			t.Errorf("status[%s].Dir = %q, want %q", id, statuses[id].Dir, dir)
+		}
+	}
+}
+
+// TestSyncPreviewGitStatus_NilDetail verifies syncing with no loaded detail is
+// safe and clears the preview's git status.
+func TestSyncPreviewGitStatus_NilDetail(t *testing.T) {
+	m := newTestModel()
+	m.detail = nil
+	m.syncPreviewGitStatus() // must not panic
+}
+
 func TestGitStatusKeybinding(t *testing.T) {
 	km := defaultKeyMap()
 	if !key.Matches(tea.KeyPressMsg{Code: 'i', Text: "i"}, km.GitStatus) {

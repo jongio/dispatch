@@ -33,6 +33,8 @@ agent sessions.
 - Handle non-repo, missing-directory, detached-HEAD, and no-upstream cases
   gracefully — never crash and never block the UI
 - Reachable both by a dedicated keybinding and from the command palette
+- Surface the push/pull stats **inline** on each session row and in the
+  **preview pane**, not only in the on-demand overlay
 
 ## Non-Goals
 
@@ -41,6 +43,28 @@ agent sessions.
 - Live auto-refreshing of the overlay while it is open (it is a point-in-time snapshot)
 - Replacing the existing session-list git badge (this complements it)
 - Multi-session/aggregate git status (one folder at a time, the selected row)
+
+## Extension: inline row + preview pane (follow-up)
+
+The overlay alone requires a keypress per session. To make the push/pull state
+scannable at a glance across many sessions, the git info is also surfaced in two
+always-visible places:
+
+- **Session row (inline):** a compact, colored `↑N ↓N ●` segment — commits ahead
+  (to push), behind (to pull), and a dirty marker when the working tree has
+  changes. Shown as a fixed-width, width-gated column so alignment holds and
+  narrow terminals are not crowded; the existing single-glyph badge stays.
+- **Preview pane:** a full git section under the Branch field — branch → upstream,
+  push/pull counts, and per-category working-tree counts (or a clean indicator).
+
+**Design consequence:** the inline row and preview both need the *detailed*
+`GitStatus` for every visible session, not just the collapsed badge enum. Rather
+than scanning twice, `DetectGitStatus` becomes the single git-scanning entry
+point: a new `GitStatus.State()` derives the badge `GitState` enum, and
+`ScanGitStatuses` replaces the old enum-only `ScanGitStates`/`DetectGitState`
+(one `git status --porcelain=v2 --branch` per session instead of up to three
+commands). All existing badge rendering, git-dirty/missing filters, and the
+`gitStateMap` continue to work off the derived enum.
 
 ## Solution
 

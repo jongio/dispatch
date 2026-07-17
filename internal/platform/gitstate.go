@@ -81,127 +81,6 @@ func gitSafeArgs(args ...string) []string {
 	return append(out, args...)
 }
 
-// DetectGitState checks the Git workspace state of a directory. It returns
-// GitStateMissing if the path does not exist, GitStateUnknown if git is not
-// available or the directory is not a git repository, and the appropriate
-// state otherwise.
-//
-// The function uses context-bounded exec calls to ensure it never blocks
-// longer than gitCommandTimeout per command.
-func DetectGitState(dir string) GitState {
-	// Check if directory exists.
-	info, err := os.Stat(dir)
-	if err != nil || !info.IsDir() {
-		return GitStateMissing
-	}
-
-	// Verify this is a git repository by running git rev-parse.
-	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", gitSafeArgs("rev-parse", "--git-dir")...)
-	cmd.Dir = dir
-	if err := cmd.Run(); err != nil {
-		return GitStateUnknown
-	}
-
-	// Run git status --porcelain to detect dirty/untracked state.
-	state := gitStatusPorcelain(dir)
-	if state != GitStateClean {
-		return state
-	}
-
-	// Check ahead/behind relative to upstream.
-	ahead, behind := gitAheadBehind(dir)
-	if behind > 0 {
-		return GitStateBehind
-	}
-	if ahead > 0 {
-		return GitStateAhead
-	}
-
-	return GitStateClean
-}
-
-// gitStatusPorcelain runs `git status --porcelain` and returns the workspace
-// state based on the output. Returns GitStateClean if no output.
-func gitStatusPorcelain(dir string) GitState {
-	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", gitSafeArgs("status", "--porcelain")...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	if err != nil {
-		return GitStateUnknown
-	}
-
-	if len(out) == 0 {
-		return GitStateClean
-	}
-
-	// Parse output: lines starting with "?" indicate untracked files only.
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	hasModified := false
-	hasUntracked := false
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "??") {
-			hasUntracked = true
-		} else {
-			hasModified = true
-		}
-	}
-
-	if hasModified {
-		return GitStateDirty
-	}
-	if hasUntracked {
-		return GitStateUntracked
-	}
-
-	return GitStateClean
-}
-
-// gitAheadBehind runs `git rev-list --left-right --count HEAD...@{u}` and
-// returns the ahead/behind counts. Returns (0, 0) on any error (no upstream,
-// timeout, etc.).
-func gitAheadBehind(dir string) (ahead, behind int) {
-	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", gitSafeArgs("rev-list", "--left-right", "--count", "HEAD...@{u}")...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0
-	}
-
-	parts := strings.Fields(strings.TrimSpace(string(out)))
-	if len(parts) != 2 {
-		return 0, 0
-	}
-
-	a, errA := strconv.Atoi(parts[0])
-	b, errB := strconv.Atoi(parts[1])
-	if errA != nil || errB != nil {
-		return 0, 0
-	}
-	return a, b
-}
-
-// ScanGitStates runs DetectGitState for each session directory in the provided
-// map (session ID to directory path) and returns the results. This is designed
-// to be called as a background command during refresh cycles.
-func ScanGitStates(sessions map[string]string) map[string]GitState {
-	results := make(map[string]GitState, len(sessions))
-	for id, dir := range sessions {
-		results[id] = DetectGitState(dir)
-	}
-	return results
-}
-
 // ---------------------------------------------------------------------------
 // Detailed git status (push/pull stats + working-tree counts)
 // ---------------------------------------------------------------------------
@@ -252,6 +131,30 @@ func (s GitStatus) Clean() bool {
 		s.Deleted == 0 && s.Conflicts == 0
 }
 
+// State collapses a detailed GitStatus into the single GitState enum used for
+// the session-list badge and the git-dirty / missing-workspace filters. The
+// precedence matches the historical DetectGitState behaviour: missing and
+// non-repo first, then working-tree changes (dirty over untracked), then
+// upstream divergence (behind over ahead), then clean.
+func (s GitStatus) State() GitState {
+	switch {
+	case !s.Exists:
+		return GitStateMissing
+	case !s.IsRepo:
+		return GitStateUnknown
+	case s.Staged > 0 || s.Modified > 0 || s.Deleted > 0 || s.Conflicts > 0:
+		return GitStateDirty
+	case s.Untracked > 0:
+		return GitStateUntracked
+	case s.Behind > 0:
+		return GitStateBehind
+	case s.Ahead > 0:
+		return GitStateAhead
+	default:
+		return GitStateClean
+	}
+}
+
 // DetectGitStatus gathers a detailed Git status for dir. It returns a GitStatus
 // with Exists=false when the path is missing, IsRepo=false when the path is not
 // a Git repository (or git is unavailable / times out), and the fully populated
@@ -285,6 +188,19 @@ func DetectGitStatus(dir string) GitStatus {
 	s.Exists = true
 	s.IsRepo = true
 	return s
+}
+
+// ScanGitStatuses runs DetectGitStatus for each session directory in the
+// provided map (session ID to directory path) and returns the detailed results.
+// It is the single git-scanning entry point used by the background refresh: the
+// session-list badge enum is derived from each GitStatus via State(), while the
+// inline push/pull column and the preview pane use the full status.
+func ScanGitStatuses(sessions map[string]string) map[string]GitStatus {
+	results := make(map[string]GitStatus, len(sessions))
+	for id, dir := range sessions {
+		results[id] = DetectGitStatus(dir)
+	}
+	return results
 }
 
 // parseGitStatusV2 parses the output of `git status --porcelain=v2 --branch`
