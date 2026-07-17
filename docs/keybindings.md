@@ -231,6 +231,13 @@
      - Behavior: Opens the selected session's linked reference on github.com in the default browser. Chooses the pull request first, then the issue, then the commit. Only http/https URLs are opened.
      - Condition: Only when the selected session has a repository and at least one PR, issue, or commit reference
 
+20h. **i** → Git Status of Session Folder
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "git status"))
+     - Handler: internal\tui\model.go (handleGitStatus / handleGitStatusMsg)
+     - Behavior: Opens a modal overlay showing the git status of the folder the selected session (or folder-pivot row) is mapped to: current branch and upstream, the standard push/pull stats (commits ahead to push, behind to pull), and working-tree counts (staged, modified, untracked, deleted, conflicts), plus a scrollable list of changed files. Inside the overlay: Esc or i closes it, ↑/↓ (or PgUp/PgDn) scroll the file list, and c copies a plain-text summary to the clipboard. Git commands run under a bounded timeout so the UI never blocks; non-repo, missing, detached-HEAD, and no-upstream folders are reported without error.
+     - Condition: Only when a session or folder row with a working directory is selected
+
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
     - File: internal\tui\keys.go (line 85)
     - Code: key.NewBinding(key.WithKeys("pgup"))

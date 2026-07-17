@@ -626,7 +626,8 @@ Available action names:
 `resume_interrupted`, `view_plan`, `copy_id`, `copy_path`,
 `copy_resume_command`, `copy_preview`, `expand_collapse_all`,
 `scan_work_status`, `export`, `note`, `shift_up`, `shift_down`, `view_switch`,
-`open_file`, `open_dir`, `timeline`, `compare`, `cmd_palette`.
+`open_file`, `open_dir`, `open_ref`, `timeline`, `compare`, `git_status`,
+`cmd_palette`.
 
 ## Themes
 

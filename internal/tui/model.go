@@ -136,6 +136,7 @@ const (
 	stateFilePicker               // file picker overlay
 	stateCompareView              // compare two sessions overlay
 	stateCmdPalette               // command palette overlay
+	stateGitStatusView            // git status overlay for a session's folder
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -327,6 +328,7 @@ type Model struct {
 	viewPicker      components.ViewPicker
 	filePicker      components.FilePicker
 	compareView     components.CompareView
+	gitStatusView   components.GitStatusView
 	cmdPalette      components.CmdPalette
 	spinner         spinner.Model
 
@@ -506,6 +508,7 @@ func NewModel() Model {
 		viewPicker:      components.NewViewPicker(),
 		filePicker:      components.NewFilePicker(),
 		compareView:     components.NewCompareView(),
+		gitStatusView:   components.NewGitStatusView(),
 		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		waitingNotified: make(map[string]struct{}),
@@ -672,6 +675,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case compareDetailMsg:
 		return m.handleCompareDetail(msg)
 
+	case gitStatusMsg:
+		return m.handleGitStatusMsg(msg), nil
+
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
 		return m.handleClearStatus()
@@ -818,6 +824,9 @@ func (m Model) View() tea.View {
 
 		case stateCompareView:
 			content = m.compareView.View()
+
+		case stateGitStatusView:
+			content = m.gitStatusView.View()
 
 		case stateCmdPalette:
 			content = m.cmdPalette.View()
@@ -1010,6 +1019,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.statusErr = "clipboard: " + err.Error()
 			} else {
 				m.statusInfo = "Copied compare summary \u2713"
+			}
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case stateGitStatusView:
+		switch {
+		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.GitStatus):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up), key.Matches(msg, keys.PreviewScrollUp):
+			m.gitStatusView.ScrollUp()
+		case key.Matches(msg, keys.Down), key.Matches(msg, keys.PreviewScrollDown):
+			m.gitStatusView.ScrollDown()
+		case key.Matches(msg, keys.CopyID):
+			// 'c' copies the git status summary to the clipboard.
+			txt := m.gitStatusView.PlainText()
+			if err := clipboardWrite(txt); err != nil {
+				m.statusErr = "clipboard: " + err.Error()
+			} else {
+				m.statusInfo = "Copied git status \u2713"
 			}
 			return m, clearStatusAfter(2 * time.Second)
 		}
@@ -1650,6 +1679,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Compare):
 		return m.handleCompare()
+
+	case key.Matches(msg, keys.GitStatus):
+		return m.handleGitStatus()
 	}
 
 	return m, nil
@@ -2058,6 +2090,73 @@ func (m Model) handleCompareDetail(msg compareDetailMsg) (Model, tea.Cmd) {
 	m.compareView.SetSize(m.width, m.height)
 	m.state = stateCompareView
 	return m, nil
+}
+
+// handleGitStatus opens the git status overlay for the selected session's
+// working directory (or the selected folder-pivot row's path). The path is
+// resolved synchronously; the status itself is gathered off the UI thread.
+func (m Model) handleGitStatus() (tea.Model, tea.Cmd) {
+	path := m.gitStatusTargetDir()
+	if path == "" {
+		m.statusInfo = "No folder to inspect"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	return m, m.showGitStatusCmd(path)
+}
+
+// gitStatusTargetDir returns the directory whose git status should be shown:
+// the selected session's Cwd, or the selected folder-pivot row's path.
+func (m Model) gitStatusTargetDir() string {
+	if sess, ok := m.sessionList.Selected(); ok {
+		return sess.Cwd
+	}
+	return m.sessionList.SelectedFolderCwd()
+}
+
+// showGitStatusCmd gathers the detailed git status for dir in the background
+// and delivers it via gitStatusMsg. In demo mode it returns a synthetic status
+// so the overlay renders realistic stats without a real repo on disk.
+func (m Model) showGitStatusCmd(dir string) tea.Cmd {
+	if os.Getenv("DISPATCH_DEMO_GIT_STATES") != "" {
+		return func() tea.Msg {
+			return gitStatusMsg{status: demoGitStatus(dir)}
+		}
+	}
+	return func() tea.Msg {
+		return gitStatusMsg{status: platform.DetectGitStatus(dir)}
+	}
+}
+
+// handleGitStatusMsg populates and opens the git status overlay.
+func (m Model) handleGitStatusMsg(msg gitStatusMsg) Model {
+	m.gitStatusView.SetStatus(msg.status)
+	m.gitStatusView.SetSize(m.width, m.height)
+	m.state = stateGitStatusView
+	return m
+}
+
+// demoGitStatus returns a synthetic detailed status for demo/screenshot mode
+// (gated by DISPATCH_DEMO_GIT_STATES) so the overlay shows realistic push/pull
+// stats and changed files without requiring a real repository.
+func demoGitStatus(dir string) platform.GitStatus {
+	return platform.GitStatus{
+		Dir:         dir,
+		Exists:      true,
+		IsRepo:      true,
+		Branch:      "feature/login",
+		Upstream:    "origin/feature/login",
+		HasUpstream: true,
+		Ahead:       2,
+		Behind:      1,
+		Staged:      1,
+		Modified:    3,
+		Untracked:   2,
+		Files: []platform.GitFileStatus{
+			{Code: "M ", Path: "internal/auth/login.go"},
+			{Code: " M", Path: "internal/auth/session.go"},
+			{Code: "??", Path: "internal/auth/login_test.go"},
+		},
+	}
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic

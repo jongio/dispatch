@@ -468,13 +468,6 @@ func TestPrintUsage_Output(t *testing.T) {
 		close(readDone)
 	}()
 
-	var buf bytes.Buffer
-	readDone := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(&buf, r)
-		close(readDone)
-	}()
-
 	printUsage()
 
 	_ = w.Close()

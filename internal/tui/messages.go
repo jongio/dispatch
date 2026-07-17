@@ -181,6 +181,12 @@ type gitStateScannedMsg struct {
 	states map[string]platform.GitState
 }
 
+// gitStatusMsg delivers the detailed git status for a single session folder,
+// gathered off the UI thread for the git status overlay.
+type gitStatusMsg struct {
+	status platform.GitStatus
+}
+
 // fileOpenedMsg reports the result of opening a file with the platform opener.
 type fileOpenedMsg struct {
 	path string
