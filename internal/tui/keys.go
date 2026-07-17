@@ -72,12 +72,13 @@ type keyMap struct {
 	OpenRef           key.Binding
 	Timeline          key.Binding
 	Compare           key.Binding
+	GitStatus         key.Binding
 	CmdPalette        key.Binding
 }
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.PreviewFullscreen, k.ViewPlan, k.Timeline, k.Compare, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.PreviewFullscreen, k.ViewPlan, k.Timeline, k.Compare, k.GitStatus, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -87,7 +88,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
 		{k.Search, k.Escape, k.Filter},
 		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewFullscreen, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
+		{k.Preview, k.PreviewFullscreen, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.GitStatus, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
 		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.Tags, k.Alias, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
 		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
 		{k.Help, k.CmdPalette, k.Quit},
@@ -161,6 +162,7 @@ func defaultKeyMap() keyMap {
 		OpenRef:           key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "open PR/issue/commit")),
 		Timeline:          key.NewBinding(key.WithKeys("T"), key.WithHelp("T", "activity timeline")),
 		Compare:           key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "compare selected")),
+		GitStatus:         key.NewBinding(key.WithKeys("i"), key.WithHelp("i", "git status")),
 		CmdPalette:        key.NewBinding(key.WithKeys(":"), key.WithHelp(":", "command palette")),
 	}
 }
@@ -238,6 +240,7 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 		{"open_ref", &km.OpenRef},
 		{"timeline", &km.Timeline},
 		{"compare", &km.Compare},
+		{"git_status", &km.GitStatus},
 		{"cmd_palette", &km.CmdPalette},
 	}
 }

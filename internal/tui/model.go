@@ -136,6 +136,7 @@ const (
 	stateFilePicker               // file picker overlay
 	stateCompareView              // compare two sessions overlay
 	stateCmdPalette               // command palette overlay
+	stateGitStatusView            // git status overlay for a session's folder
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -327,6 +328,7 @@ type Model struct {
 	viewPicker      components.ViewPicker
 	filePicker      components.FilePicker
 	compareView     components.CompareView
+	gitStatusView   components.GitStatusView
 	cmdPalette      components.CmdPalette
 	spinner         spinner.Model
 
@@ -388,6 +390,9 @@ type Model struct {
 	filterPlans bool // when true, only show sessions with a plan.md file
 
 	// Git workspace state tracking — scanned from session directories.
+	// gitStatusMap holds the detailed per-session status; gitStateMap is the
+	// collapsed badge enum derived from it for rendering and filters.
+	gitStatusMap   map[string]platform.GitStatus
 	gitStateMap    map[string]platform.GitState
 	filterGitDirty bool // when true, only show sessions with local git changes
 	// filterMissingWorkspace, when true, shows only sessions whose working
@@ -506,6 +511,7 @@ func NewModel() Model {
 		viewPicker:      components.NewViewPicker(),
 		filePicker:      components.NewFilePicker(),
 		compareView:     components.NewCompareView(),
+		gitStatusView:   components.NewGitStatusView(),
 		cmdPalette:      components.NewCmdPalette(),
 		attentionFilter: make(map[data.AttentionStatus]struct{}),
 		waitingNotified: make(map[string]struct{}),
@@ -672,6 +678,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case compareDetailMsg:
 		return m.handleCompareDetail(msg)
 
+	case gitStatusMsg:
+		return m.handleGitStatusMsg(msg), nil
+
 	// ----- Transient status clear -----------------------------------------
 	case clearStatusMsg:
 		return m.handleClearStatus()
@@ -818,6 +827,9 @@ func (m Model) View() tea.View {
 
 		case stateCompareView:
 			content = m.compareView.View()
+
+		case stateGitStatusView:
+			content = m.gitStatusView.View()
 
 		case stateCmdPalette:
 			content = m.cmdPalette.View()
@@ -1010,6 +1022,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.statusErr = "clipboard: " + err.Error()
 			} else {
 				m.statusInfo = "Copied compare summary \u2713"
+			}
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case stateGitStatusView:
+		switch {
+		case key.Matches(msg, keys.Escape), key.Matches(msg, keys.GitStatus):
+			m.state = stateSessionList
+		case key.Matches(msg, keys.Up), key.Matches(msg, keys.PreviewScrollUp):
+			m.gitStatusView.ScrollUp()
+		case key.Matches(msg, keys.Down), key.Matches(msg, keys.PreviewScrollDown):
+			m.gitStatusView.ScrollDown()
+		case key.Matches(msg, keys.CopyID):
+			// 'c' copies the git status summary to the clipboard.
+			txt := m.gitStatusView.PlainText()
+			if err := clipboardWrite(txt); err != nil {
+				m.statusErr = "clipboard: " + err.Error()
+			} else {
+				m.statusInfo = "Copied git status \u2713"
 			}
 			return m, clearStatusAfter(2 * time.Second)
 		}
@@ -1650,6 +1682,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Compare):
 		return m.handleCompare()
+
+	case key.Matches(msg, keys.GitStatus):
+		return m.handleGitStatus()
 	}
 
 	return m, nil
@@ -2058,6 +2093,73 @@ func (m Model) handleCompareDetail(msg compareDetailMsg) (Model, tea.Cmd) {
 	m.compareView.SetSize(m.width, m.height)
 	m.state = stateCompareView
 	return m, nil
+}
+
+// handleGitStatus opens the git status overlay for the selected session's
+// working directory (or the selected folder-pivot row's path). The path is
+// resolved synchronously; the status itself is gathered off the UI thread.
+func (m Model) handleGitStatus() (tea.Model, tea.Cmd) {
+	path := m.gitStatusTargetDir()
+	if path == "" {
+		m.statusInfo = "No folder to inspect"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	return m, m.showGitStatusCmd(path)
+}
+
+// gitStatusTargetDir returns the directory whose git status should be shown:
+// the selected session's Cwd, or the selected folder-pivot row's path.
+func (m Model) gitStatusTargetDir() string {
+	if sess, ok := m.sessionList.Selected(); ok {
+		return sess.Cwd
+	}
+	return m.sessionList.SelectedFolderCwd()
+}
+
+// showGitStatusCmd gathers the detailed git status for dir in the background
+// and delivers it via gitStatusMsg. In demo mode it returns a synthetic status
+// so the overlay renders realistic stats without a real repo on disk.
+func (m Model) showGitStatusCmd(dir string) tea.Cmd {
+	if os.Getenv("DISPATCH_DEMO_GIT_STATES") != "" {
+		return func() tea.Msg {
+			return gitStatusMsg{status: demoGitStatus(dir)}
+		}
+	}
+	return func() tea.Msg {
+		return gitStatusMsg{status: platform.DetectGitStatus(dir)}
+	}
+}
+
+// handleGitStatusMsg populates and opens the git status overlay.
+func (m Model) handleGitStatusMsg(msg gitStatusMsg) Model {
+	m.gitStatusView.SetStatus(msg.status)
+	m.gitStatusView.SetSize(m.width, m.height)
+	m.state = stateGitStatusView
+	return m
+}
+
+// demoGitStatus returns a synthetic detailed status for demo/screenshot mode
+// (gated by DISPATCH_DEMO_GIT_STATES) so the overlay shows realistic push/pull
+// stats and changed files without requiring a real repository.
+func demoGitStatus(dir string) platform.GitStatus {
+	return platform.GitStatus{
+		Dir:         dir,
+		Exists:      true,
+		IsRepo:      true,
+		Branch:      "feature/login",
+		Upstream:    "origin/feature/login",
+		HasUpstream: true,
+		Ahead:       2,
+		Behind:      1,
+		Staged:      1,
+		Modified:    3,
+		Untracked:   2,
+		Files: []platform.GitFileStatus{
+			{Code: "M ", Path: "internal/auth/login.go"},
+			{Code: " M", Path: "internal/auth/session.go"},
+			{Code: "??", Path: "internal/auth/login_test.go"},
+		},
+	}
 }
 
 // sortedKeys converts a string set to a sorted slice for deterministic
@@ -3097,6 +3199,18 @@ func (m *Model) syncPreviewWorkspaceMissing() {
 	m.preview.SetWorkspaceMissing(m.gitStateMap[m.detail.Session.ID] == platform.GitStateMissing)
 }
 
+// syncPreviewGitStatus pushes the currently selected session's detailed git
+// status to the preview so its git section (upstream, push/pull, change counts)
+// reflects the latest scan. Safe to call when no detail is loaded or no status
+// has been scanned yet (the preview renders nothing for a non-repo status).
+func (m *Model) syncPreviewGitStatus() {
+	if m.detail == nil {
+		m.preview.SetGitStatus(platform.GitStatus{})
+		return
+	}
+	m.preview.SetGitStatus(m.gitStatusMap[m.detail.Session.ID])
+}
+
 // syncSessionListStatuses pushes all current status maps (hidden, favorited,
 // attention, plan, work status) to the sessionList component. Call this after
 // loading or filtering sessions/groups to keep the list's decorations in sync.
@@ -3109,6 +3223,7 @@ func (m *Model) syncSessionListStatuses() {
 	m.sessionList.SetPlanStatuses(m.planMap)
 	m.sessionList.SetWorkStatuses(m.workStatus.workStatusMap)
 	m.sessionList.SetGitStates(m.gitStateMap)
+	m.sessionList.SetGitStatuses(m.gitStatusMap)
 }
 
 // syncSessionListWorkStatuses pushes only the work status map to the
@@ -4024,40 +4139,40 @@ func (m Model) scanGitStatesCmd() tea.Cmd {
 		return nil
 	}
 
-	// In demo mode, return synthetic git states so all badge types are visible
-	// without requiring real git repos on disk.
+	// In demo mode, return synthetic git statuses so all badge types and
+	// push/pull stats are visible without requiring real git repos on disk.
 	if os.Getenv("DISPATCH_DEMO_GIT_STATES") != "" {
 		return func() tea.Msg {
-			states := demoGitStates(sessionDirs)
-			return gitStateScannedMsg{states: states}
+			return gitStateScannedMsg{statuses: demoGitStatuses(sessionDirs)}
 		}
 	}
 
 	return func() tea.Msg {
-		states := platform.ScanGitStates(sessionDirs)
-		return gitStateScannedMsg{states: states}
+		return gitStateScannedMsg{statuses: platform.ScanGitStatuses(sessionDirs)}
 	}
 }
 
-// demoGitStates assigns a rotating set of git states to sessions so all
-// badge types are visible in demo mode. The order cycles through dirty,
-// ahead, untracked, behind, clean, and missing.
-func demoGitStates(sessionDirs map[string]string) map[string]platform.GitState {
-	cycle := []platform.GitState{
-		platform.GitStateDirty,
-		platform.GitStateAhead,
-		platform.GitStateUntracked,
-		platform.GitStateBehind,
-		platform.GitStateClean,
-		platform.GitStateMissing,
+// demoGitStatuses assigns a rotating set of synthetic git statuses to sessions
+// so all badge types and inline push/pull stats are visible in demo mode. The
+// order cycles through dirty, ahead, untracked, behind, clean, and missing.
+func demoGitStatuses(sessionDirs map[string]string) map[string]platform.GitStatus {
+	cycle := []platform.GitStatus{
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Modified: 3, Staged: 1},
+		{Exists: true, IsRepo: true, Branch: "feature/x", Upstream: "origin/feature/x", HasUpstream: true, Ahead: 2},
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Untracked: 4},
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Behind: 1},
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true},
+		{Exists: false},
 	}
-	states := make(map[string]platform.GitState, len(sessionDirs))
+	statuses := make(map[string]platform.GitStatus, len(sessionDirs))
 	i := 0
-	for id := range sessionDirs {
-		states[id] = cycle[i%len(cycle)]
+	for id, dir := range sessionDirs {
+		st := cycle[i%len(cycle)]
+		st.Dir = dir
+		statuses[id] = st
 		i++
 	}
-	return states
+	return statuses
 }
 
 // loadPlanContentCmd reads the plan.md content for a specific session.

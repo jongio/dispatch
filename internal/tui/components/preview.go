@@ -32,6 +32,7 @@ type PreviewPanel struct {
 	hasPlan          bool                  // whether the session has a plan.md file
 	workStatus       data.WorkStatusResult // current session's work status
 	workspaceMissing bool                  // true when the session cwd no longer exists on disk
+	gitStatus        platform.GitStatus    // detailed git status for the current session's folder
 
 	timelineMode bool // when true, render activity timeline instead of session detail
 
@@ -110,6 +111,13 @@ func (p *PreviewPanel) SetAttentionStatus(status data.AttentionStatus) {
 // missing from disk. When true, the preview shows a Missing workspace badge.
 func (p *PreviewPanel) SetWorkspaceMissing(missing bool) {
 	p.workspaceMissing = missing
+	p.updateTotalLines()
+}
+
+// SetGitStatus stores the detailed git status for the current session so the
+// preview can render a git section (branch/upstream, push/pull, change counts).
+func (p *PreviewPanel) SetGitStatus(status platform.GitStatus) {
+	p.gitStatus = status
 	p.updateTotalLines()
 }
 
@@ -633,6 +641,9 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		field(styles.IconGitBranch()+"Branch", s.Branch)
 	}
 
+	// ── Git status ──
+	p.writeGitSection(&b, contentW)
+
 	// ── Timing & stats ──
 	b.WriteString("\n")
 	field(styles.IconClock()+"Created", FormatTimestamp(s.CreatedAt))
@@ -835,7 +846,75 @@ func countUniqueRefs(refs []data.SessionRef) int {
 	return len(seen)
 }
 
-// wordWrap wraps text to a maximum line width, breaking on spaces.
+// writeGitSection renders the git status block for the current session: upstream,
+// push/pull (ahead/behind) stats, and per-category change counts. It is a no-op
+// when no git status has been scanned or the folder is not a git repository, so
+// non-repo sessions render unchanged.
+func (p *PreviewPanel) writeGitSection(b *strings.Builder, contentW int) {
+	st := p.gitStatus
+	if !st.IsRepo {
+		return
+	}
+	label := func(s string) string { return styles.PreviewLabelStyle.Render(s) }
+
+	if st.HasUpstream && st.Upstream != "" {
+		l := label("Upstream: ")
+		v := styles.PreviewValueStyle.Render(Truncate(st.Upstream, max(1, contentW-lipgloss.Width(l))))
+		b.WriteString(l + v + "\n")
+	}
+	b.WriteString(label("Push/Pull: ") + gitPushPullText(st) + "\n")
+	b.WriteString(label("Changes: ") + gitChangesText(st) + "\n")
+}
+
+// gitPushPullText renders the standard push/pull stats for the preview: commits
+// ahead (to push) and behind (to pull), or a note when synced or without an
+// upstream to compare against.
+func gitPushPullText(st platform.GitStatus) string {
+	if !st.HasUpstream {
+		return styles.DimmedStyle.Render("no upstream")
+	}
+	if st.Ahead == 0 && st.Behind == 0 {
+		return styles.SuccessStyle.Render("up to date")
+	}
+	var parts []string
+	if st.Ahead > 0 {
+		parts = append(parts, styles.GitAheadStyle.Render(
+			fmt.Sprintf("%s%d to push", styles.IconGitAhead(), st.Ahead),
+		))
+	}
+	if st.Behind > 0 {
+		parts = append(parts, styles.GitBehindStyle.Render(
+			fmt.Sprintf("%s%d to pull", styles.IconGitBehind(), st.Behind),
+		))
+	}
+	return strings.Join(parts, styles.DimmedStyle.Render(" · "))
+}
+
+// gitChangesText renders the per-category working-tree counts for the preview,
+// or a styled "clean" when there is nothing to report.
+func gitChangesText(st platform.GitStatus) string {
+	if st.Clean() {
+		return styles.GitCleanStyle.Render("clean")
+	}
+	var parts []string
+	add := func(name string, n int, style lipgloss.Style) {
+		if n > 0 {
+			parts = append(parts, style.Render(fmt.Sprintf("%d %s", n, name)))
+		}
+	}
+	add("staged", st.Staged, styles.SuccessStyle)
+	add("modified", st.Modified, styles.GitDirtyStyle)
+	add("untracked", st.Untracked, styles.GitUntrackedStyle)
+	add("deleted", st.Deleted, styles.ErrorStyle)
+	add("conflicts", st.Conflicts, styles.ErrorStyle)
+	return strings.Join(parts, styles.DimmedStyle.Render(", "))
+}
+
+// wordWrap wraps text to a maximum line width, breaking on spaces. Tokens that
+// are themselves longer than the width (e.g. long file paths or URLs with no
+// spaces) are hard-broken into width-sized chunks so no wrapped line ever
+// exceeds width — otherwise an over-long line would overflow chat bubbles and
+// corrupt the preview's outer border.
 func wordWrap(text string, width int) string {
 	if width <= 0 {
 		return text
@@ -845,7 +924,23 @@ func wordWrap(text string, width int) string {
 		words := strings.Fields(paragraph)
 		lineLen := 0
 		for i, word := range words {
-			wLen := len([]rune(word))
+			wRunes := []rune(word)
+			wLen := len(wRunes)
+
+			// Hard-break a token longer than the available width.
+			if wLen > width {
+				if i > 0 {
+					result.WriteString("\n")
+				}
+				for len(wRunes) > width {
+					result.WriteString(string(wRunes[:width]) + "\n")
+					wRunes = wRunes[width:]
+				}
+				result.WriteString(string(wRunes))
+				lineLen = len(wRunes)
+				continue
+			}
+
 			if i > 0 && lineLen+1+wLen > width {
 				result.WriteString("\n")
 				lineLen = 0

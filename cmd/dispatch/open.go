@@ -234,7 +234,7 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, 
 			stdin = true
 		case arg == "--mode" || arg == "-m":
 			if i+1 >= len(rest) {
-			return "", "", false, false, false, launchOverrides{}, errors.New("--mode requires a value: inplace, tab, window, or pane")
+				return "", "", false, false, false, launchOverrides{}, errors.New("--mode requires a value: inplace, tab, window, or pane")
 			}
 			mode = rest[i+1]
 			i++
@@ -243,7 +243,7 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, 
 		case arg == "--print":
 			printCmd = true
 		case strings.HasPrefix(arg, "-"):
-		return "", "", false, false, false, launchOverrides{}, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, false, false, launchOverrides{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}

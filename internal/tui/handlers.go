@@ -13,6 +13,7 @@ import (
 
 	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
@@ -45,6 +46,9 @@ func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) { //nolint:u
 	m.recalcLayout()
 	if m.state == stateCompareView {
 		m.compareView.SetSize(m.width, m.height)
+	}
+	if m.state == stateGitStatusView {
+		m.gitStatusView.SetSize(m.width, m.height)
 	}
 	return m, nil
 }
@@ -299,6 +303,7 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	m.preview.SetAlias(m.cfg.AliasFor(m.detail.Session.ID))
 	m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
 	m.syncPreviewWorkspaceMissing()
+	m.syncPreviewGitStatus()
 	m.preview.SetHasPlan(m.planMap[m.detail.Session.ID])
 	if result, ok := m.workStatus.workStatusMap[m.detail.Session.ID]; ok {
 		m.preview.SetWorkStatus(result)
@@ -614,9 +619,17 @@ func (m Model) handleContinuationPlanCreated(msg continuationPlanCreatedMsg) (Mo
 // ----- Git workspace state scanning ----------------------------------------
 
 func (m Model) handleGitStateScanned(msg gitStateScannedMsg) (Model, tea.Cmd) {
-	m.gitStateMap = msg.states
+	m.gitStatusMap = msg.statuses
+	// Derive the collapsed badge enum from the detailed statuses so existing
+	// badge rendering and git-dirty / missing-workspace filters keep working.
+	m.gitStateMap = make(map[string]platform.GitState, len(msg.statuses))
+	for id, st := range msg.statuses {
+		m.gitStateMap[id] = st.State()
+	}
 	m.sessionList.SetGitStates(m.gitStateMap)
+	m.sessionList.SetGitStatuses(m.gitStatusMap)
 	m.syncPreviewWorkspaceMissing()
+	m.syncPreviewGitStatus()
 	// When a git-state filter is active, reload sessions so the list
 	// reflects the detected states.
 	if m.filterGitDirty || m.filterMissingWorkspace {
