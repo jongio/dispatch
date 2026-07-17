@@ -1,7 +1,7 @@
 ---
-issue: pending
+issue: https://github.com/jongio/dispatch/pull/316
 author: @jongio
-status: approved
+status: shipped
 ---
 
 # Git Status Overlay
