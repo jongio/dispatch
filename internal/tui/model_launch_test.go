@@ -600,25 +600,6 @@ func TestSortByAttention_Ascending(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// togglePivotOrder — 0% coverage
-// ---------------------------------------------------------------------------
-
-func TestTogglePivotOrder(t *testing.T) {
-	m := newTestModel()
-	m.pivotOrder = data.Ascending
-
-	m.togglePivotOrder()
-	if m.pivotOrder != data.Descending {
-		t.Errorf("after toggle: pivotOrder = %q, want Descending", m.pivotOrder)
-	}
-
-	m.togglePivotOrder()
-	if m.pivotOrder != data.Ascending {
-		t.Errorf("after second toggle: pivotOrder = %q, want Ascending", m.pivotOrder)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // updateSelectionStatus — 0% coverage
 // ---------------------------------------------------------------------------
 

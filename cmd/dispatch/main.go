@@ -120,18 +120,28 @@ Commands:
   open --last [--mode M]  Resume the most recently active session
   open --stdin [--mode M] Resume every session ID read from standard input
                           (one per line; pairs with search --ids)
+  open --repo R [--mode M]
+                          Resume the most recent session matching a scope filter
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, IDs, or a table
   tags [--json]           List tags in use with per-tag session counts
+  aliases [--json]        List session aliases with orphan detection
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
-  export <id> [flags]     Export a session as Markdown or JSON
+  export <id> [flags]     Export a session as Markdown, JSON, or HTML
+  export --repo R [flags] Export all sessions matching a scope filter (batch mode)
   info <id> [--json]      Print a concise session summary (--json for machine-readable output)
+  compare <a> <b> [--json]
+                          Compare two sessions side by side
+  tag <id> [flags]        Add, remove, set, or list tags on a session
+  prune [--apply] [--json]
+                          Report (or remove) config entries for missing sessions
+  watch [--once] [flags]  Monitor session attention state
   man                     Write the man page (roff) to standard output
   update                  Update dispatch to the latest release
 
@@ -142,14 +152,19 @@ Open and new flags:
   --yolo[=true|false]     Override yolo mode for this run only (bare form implies true)
   --last                  (open only) Resume the most recently active session
   --print                 (open only) Print the resume command instead of launching
+  --repo <name>           (open only) Resume the most recent session for a repository
+  --branch <name>         (open only) Resume the most recent session on a branch
+  --folder <path>         (open only) Resume the most recent session under a folder
+  --current               (open only) Auto-detect repo and branch from the current directory
 
 Session IDs:
-  Commands that take <id> (open, export) accept a full session ID or any
-  unique prefix of one, like a short git SHA. An ambiguous prefix lists the
-  matching sessions so you can add more characters.
+  Commands that take <id> (open, export, info, compare, tag) accept a full session
+  ID or any unique prefix of one, like a short git SHA. An ambiguous prefix
+  lists the matching sessions so you can add more characters.
 
 Stats flags:
   --json                  Print the summary as JSON
+  --csv                   Print the summary as CSV
   --calendar              Add a per-day activity heatmap
   --repo <name>           Only count sessions for a repository
   --branch <name>         Only count sessions on a branch
@@ -197,6 +212,31 @@ Export flags:
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
   --redact                Mask common secret patterns in the export
+  --query <text>          (batch) Text filter for session matching
+  --repo <name>           (batch) Only export sessions for a repository
+  --branch <name>         (batch) Only export sessions on a branch
+  --folder <path>         (batch) Only export sessions under a folder
+  --since <date>          (batch) Only export sessions created on or after a date
+  --until <date>          (batch) Only export sessions created on or before a date
+
+Tag commands:
+  tag <id>                List tags for one session
+  tag <id> --add a,b      Add tags (comma-separated)
+  tag <id> --remove a     Remove tags
+  tag <id> --set a,b      Replace all tags
+  tag <id> --json         Print the result as JSON
+
+Prune flags:
+  --apply                 Remove stale entries (default is dry run)
+  --json                  Print the summary as JSON
+
+Watch flags:
+  --once                  Print a snapshot and exit (default: stream transitions)
+  --json                  Print as JSON
+  --interval <dur>        Poll interval (default 5s, minimum 1s)
+  --repo <name>           Only watch sessions for a repository
+  --branch <name>         Only watch sessions on a branch
+  --folder <path>         Only watch sessions under a folder
 
 Flags:
   -h, --help              Show this help message

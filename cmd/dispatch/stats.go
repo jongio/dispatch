@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ const statsQueryLimit = 100_000
 type statsOptions struct {
 	filter   data.FilterOptions
 	json     bool
+	csv      bool
 	calendar bool
 	top      int
 }
@@ -86,6 +88,9 @@ func runStats(w io.Writer, args []string) error {
 		report.Calendar = &cal
 	}
 	applyStatsTopLimit(&report, opts.top)
+	if opts.csv {
+		return writeStatsCSV(w, report)
+	}
 	if opts.json {
 		return writeStatsJSON(w, report)
 	}
@@ -123,6 +128,8 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 		switch {
 		case name == "--json":
 			opts.json = true
+		case name == "--csv":
+			opts.csv = true
 		case name == "--calendar":
 			opts.calendar = true
 		case name == "--top":
@@ -184,6 +191,10 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 		default:
 			return statsOptions{}, fmt.Errorf("stats does not take positional arguments, got %q", arg)
 		}
+	}
+
+	if opts.json && opts.csv {
+		return statsOptions{}, fmt.Errorf("--json and --csv cannot be combined")
 	}
 
 	return opts, nil
@@ -335,6 +346,51 @@ func writeStatsJSON(w io.Writer, report statsReport) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
+}
+
+// writeStatsCSV prints the report as RFC 4180 CSV rows.
+func writeStatsCSV(w io.Writer, report statsReport) error {
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+
+	if err := cw.Write([]string{"section", "label", "count"}); err != nil {
+		return err
+	}
+	if err := cw.Write([]string{"totals", "sessions", strconv.Itoa(report.TotalSessions)}); err != nil {
+		return err
+	}
+	if err := cw.Write([]string{"totals", "turns", strconv.Itoa(report.TotalTurns)}); err != nil {
+		return err
+	}
+	if err := cw.Write([]string{"totals", "files", strconv.Itoa(report.TotalFiles)}); err != nil {
+		return err
+	}
+
+	for _, e := range report.ByRepository {
+		if err := cw.Write([]string{"repository", e.Label, strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
+	for _, e := range report.ByBranch {
+		if err := cw.Write([]string{"branch", e.Label, strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
+	for _, e := range report.ByHostType {
+		if err := cw.Write([]string{"host_type", e.Label, strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
+
+	if report.Calendar != nil {
+		for _, d := range report.Calendar.Days {
+			if err := cw.Write([]string{"calendar", d.Date, strconv.Itoa(d.Count)}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // writeStatsText prints the report in a plain, human-readable layout.

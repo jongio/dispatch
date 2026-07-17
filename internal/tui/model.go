@@ -298,11 +298,10 @@ type Model struct {
 	cfg   *config.Config
 
 	// Query parameters.
-	filter     data.FilterOptions
-	sort       data.SortOptions
-	timeRange  string         // "1h", "1d", "7d", "all"
-	pivot      string         // "none", "folder", "repo", "branch", "date", "host"
-	pivotOrder data.SortOrder // group header sort direction
+	filter    data.FilterOptions
+	sort      data.SortOptions
+	timeRange string // "1h", "1d", "7d", "all"
+	pivot     string // "none", "folder", "repo", "branch", "date", "host"
 
 	// Loaded data.
 	sessions []data.Session
@@ -1457,10 +1456,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cyclePivot()
 		return m, m.loadSessionsCmd()
 
-	case key.Matches(msg, keys.PivotOrder):
-		m.togglePivotOrder()
-		return m, m.loadSessionsCmd()
-
 	case key.Matches(msg, keys.Preview):
 		m.showPreview = !m.showPreview
 		m.cfg.ShowPreview = m.showPreview
@@ -2606,9 +2601,6 @@ func (m Model) handleHeaderClick(x, y int) (tea.Model, tea.Cmd) {
 		case "pivot":
 			m.cyclePivot()
 			return m, m.loadSessionsCmd()
-		case "pivotorder":
-			m.togglePivotOrder()
-			return m, m.loadSessionsCmd()
 		case "expandall":
 			if m.sessionList.AllExpanded() {
 				m.sessionList.CollapseAll()
@@ -2686,29 +2678,14 @@ func (m Model) badgeClickAction(x int) string {
 	}
 	cursor += w + 2
 
-	// Pivot indicator — split into arrow (order toggle) and label (cycle mode).
+	// Pivot/group indicator (no direction arrow; sort direction controls both).
 	pivotLabel := m.pivot
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	pivotArrow := styles.IconSortDown()
-	if m.pivotOrder == data.Ascending {
-		pivotArrow = styles.IconSortUp()
-	}
-	pivotLabel = pivotArrow + " " + pivotLabel
-	pivotKeyRendered := styles.KeyStyle.Render("tab")
-	pivotKeyW := lipgloss.Width(pivotKeyRendered)
-	pivotPrefix := styles.DimmedStyle.Render(": ")
-	pivotPrefixW := lipgloss.Width(pivotPrefix)
-	pivotRendered := pivotKeyRendered + styles.DimmedStyle.Render(": "+pivotLabel)
+	pivotRendered := styles.KeyStyle.Render("tab") + styles.DimmedStyle.Render(": "+pivotLabel)
 	pw := lipgloss.Width(pivotRendered)
 	if x >= cursor && x < cursor+pw {
-		pivotArrowRendered := styles.DimmedStyle.Render(styles.IconSortDown() + " ")
-		pivotArrowW := lipgloss.Width(pivotArrowRendered)
-		arrowStart := cursor + pivotKeyW + pivotPrefixW
-		if x >= arrowStart && x < arrowStart+pivotArrowW {
-			return "pivotorder"
-		}
 		return "pivot"
 	}
 	cursor += pw + 2
@@ -2889,16 +2866,11 @@ func (m Model) renderBadges() string {
 	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
 	parts = append(parts, styles.KeyStyle.Render("s")+styles.DimmedStyle.Render(": "+sortLabel))
 
-	// Pivot indicator with shortcut (always shown).
+	// Pivot/group indicator with shortcut (no direction arrow).
 	pivotLabel := m.pivot
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	pivotArrow := styles.IconSortDown()
-	if m.pivotOrder == data.Ascending {
-		pivotArrow = styles.IconSortUp()
-	}
-	pivotLabel = pivotArrow + " " + pivotLabel
 	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(": "+pivotLabel))
 
 	// Expand/collapse all indicator — only shown in tree mode.
@@ -3592,33 +3564,14 @@ func (m *Model) cyclePivot() {
 	for i, p := range pivotModes {
 		if p == m.pivot {
 			m.pivot = pivotModes[(i+1)%len(pivotModes)]
-			m.pivotOrder = defaultPivotOrder(m.pivot)
 			m.cfg.DefaultPivot = m.pivot
 			m.saveConfig()
 			return
 		}
 	}
 	m.pivot = pivotNone
-	m.pivotOrder = data.Ascending
 	m.cfg.DefaultPivot = m.pivot
 	m.saveConfig()
-}
-
-// defaultPivotOrder returns the natural default sort direction for a pivot.
-// Date defaults to descending (newest first); others to ascending (A-Z).
-func defaultPivotOrder(pivot string) data.SortOrder {
-	if pivot == pivotDate {
-		return data.Descending
-	}
-	return data.Ascending
-}
-
-func (m *Model) togglePivotOrder() {
-	if m.pivotOrder == data.Descending {
-		m.pivotOrder = data.Ascending
-	} else {
-		m.pivotOrder = data.Descending
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -4031,7 +3984,6 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
 	pivot := m.pivot
-	pivotOrd := m.pivotOrder
 
 	return func() tea.Msg {
 		if store == nil {
@@ -4039,17 +3991,26 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
+
+			// Date grouping always shows most recent sessions first,
+			// regardless of the user's sort field/direction.
+			sessionSort := sortOpts
+			if pivot == pivotDate {
+				sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+			}
+
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sessionSort, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
-			// When sorting by updated time, reorder groups so the most
-			// recently active group appears first; otherwise sort groups
-			// alphabetically by their pivot label.
-			if sortOpts.Field == data.SortByUpdated {
-				sortGroupsByLatest(groups, sortOpts.Order)
+			// Group ordering is fixed per pivot mode (sort direction
+			// only affects sessions, not groups):
+			//   date  → newest date first (descending labels)
+			//   other → A-Z (ascending labels)
+			if pivot == pivotDate {
+				sortGroupsByLabel(groups, data.Descending)
 			} else {
-				sortGroupsByLabel(groups, pivotOrd)
+				sortGroupsByLabel(groups, data.Ascending)
 			}
 			return groupsLoadedMsg{groups: groups}
 		}
@@ -4541,7 +4502,6 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
 	pivot := m.pivot
-	pivotOrd := m.pivotOrder
 
 	return func() tea.Msg {
 		if store == nil {
@@ -4549,14 +4509,20 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
-			groups, err := store.GroupSessions(context.Background(), pf, filter, sortOpts, limit)
+
+			sessionSort := sortOpts
+			if pivot == pivotDate {
+				sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+			}
+
+			groups, err := store.GroupSessions(context.Background(), pf, filter, sessionSort, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
-			if sortOpts.Field == data.SortByUpdated {
-				sortGroupsByLatest(groups, sortOpts.Order)
+			if pivot == pivotDate {
+				sortGroupsByLabel(groups, data.Descending)
 			} else {
-				sortGroupsByLabel(groups, pivotOrd)
+				sortGroupsByLabel(groups, data.Ascending)
 			}
 			return deepSearchResultMsg{version: version, groups: groups}
 		}
@@ -4714,28 +4680,6 @@ func (m Model) openRefCmd(url, label string) tea.Cmd {
 // ---------------------------------------------------------------------------
 // Group sorting helpers
 // ---------------------------------------------------------------------------
-
-// sortGroupsByLatest reorders groups so that the group containing the most
-// recently updated session appears first (or last, for ascending).
-func sortGroupsByLatest(groups []data.SessionGroup, order data.SortOrder) {
-	slices.SortFunc(groups, func(a, b data.SessionGroup) int {
-		c := cmp.Compare(latestUpdate(a.Sessions), latestUpdate(b.Sessions))
-		if order == data.Descending {
-			return -c
-		}
-		return c
-	})
-}
-
-func latestUpdate(sessions []data.Session) string {
-	latest := ""
-	for _, s := range sessions {
-		if s.LastActiveAt > latest {
-			latest = s.LastActiveAt
-		}
-	}
-	return latest
-}
 
 // sortGroupsByLabel sorts groups alphabetically by their label.
 // Descending reverses the order (e.g. newest date first).

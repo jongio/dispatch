@@ -49,6 +49,7 @@ func TestParseExportArgs(t *testing.T) {
 		wantStdout bool
 		wantOut    string
 		wantRedact bool
+		wantFilter bool
 		wantErr    bool
 	}{
 		{name: "id only", args: []string{"export", "abc"}, wantID: "abc", wantFormat: "md"},
@@ -65,6 +66,11 @@ func TestParseExportArgs(t *testing.T) {
 		{name: "invalid format", args: []string{"export", "a", "--format", "yaml"}, wantErr: true},
 		{name: "format without value", args: []string{"export", "a", "--format"}, wantErr: true},
 		{name: "stdout and out", args: []string{"export", "a", "--stdout", "--out", "/tmp/x"}, wantErr: true},
+		{name: "id with filter", args: []string{"export", "a", "--repo", "x/y"}, wantErr: true},
+		{name: "batch query only", args: []string{"export", "--query", "fix"}, wantFormat: "md", wantFilter: true},
+		{name: "batch repo", args: []string{"export", "--repo", "x/y"}, wantFormat: "md", wantFilter: true},
+		{name: "batch since until", args: []string{"export", "--since", "2026-01-01", "--until", "2026-02-01"}, wantFormat: "md", wantFilter: true},
+		{name: "batch with format", args: []string{"export", "--branch", "main", "--format", "json"}, wantFormat: "json", wantFilter: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,6 +98,12 @@ func TestParseExportArgs(t *testing.T) {
 			}
 			if opts.redact != tc.wantRedact {
 				t.Errorf("redact = %v, want %v", opts.redact, tc.wantRedact)
+			}
+			if tc.wantFilter && opts.filter == nil {
+				t.Errorf("expected filter to be set")
+			}
+			if !tc.wantFilter && opts.filter != nil {
+				t.Errorf("expected filter to be nil, got %+v", opts.filter)
 			}
 		})
 	}
@@ -253,5 +265,63 @@ func TestRunExport_LoadError(t *testing.T) {
 	err := runExport(&bytes.Buffer{}, []string{"export", "abc"})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("err = %v, want %v", err, sentinel)
+	}
+}
+
+func withExportList(t *testing.T, fn func(data.FilterOptions) ([]data.Session, error)) {
+	t.Helper()
+	prev := exportListSessionsFn
+	exportListSessionsFn = fn
+	t.Cleanup(func() { exportListSessionsFn = prev })
+}
+
+func TestRunExportBatch_WriteFiles(t *testing.T) {
+	sessions := []data.Session{
+		{ID: "ses-001", Summary: "First"},
+		{ID: "ses-002", Summary: "Second"},
+	}
+	withExportList(t, func(data.FilterOptions) ([]data.Session, error) { return sessions, nil })
+	withExportDetail(t, func(id string) (*data.SessionDetail, error) {
+		return &data.SessionDetail{
+			Session: data.Session{ID: id, Summary: "S " + id},
+		}, nil
+	})
+
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "--repo", "x/y", "--out", dir}); err != nil {
+		t.Fatalf("runExport batch: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Exported 2 of 2 sessions") {
+		t.Errorf("summary missing, got:\n%s", out)
+	}
+	for _, id := range []string{"ses-001", "ses-002"} {
+		path := filepath.Join(dir, id+".md")
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("expected file %s: %v", path, err)
+		}
+	}
+}
+
+func TestRunExportBatch_NoMatches(t *testing.T) {
+	withExportList(t, func(data.FilterOptions) ([]data.Session, error) { return nil, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "--query", "nomatch"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "No sessions match") {
+		t.Errorf("expected no-match message, got: %s", buf.String())
+	}
+}
+
+func TestRunExportBatch_StdoutForbidden(t *testing.T) {
+	withExportList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return []data.Session{{ID: "a"}}, nil
+	})
+	err := runExport(&bytes.Buffer{}, []string{"export", "--repo", "x/y", "--stdout"})
+	if err == nil || !strings.Contains(err.Error(), "--stdout is not supported in batch mode") {
+		t.Fatalf("expected stdout-batch error, got: %v", err)
 	}
 }

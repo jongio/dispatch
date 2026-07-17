@@ -40,7 +40,7 @@ func TestParseOpenArgs_Overrides(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, mode, _, _, _, ov, err := parseOpenArgs(tc.args)
+			id, mode, _, _, _, ov, _, err := parseOpenArgs(tc.args)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got id=%q mode=%q", id, mode)
