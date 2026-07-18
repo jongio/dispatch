@@ -351,7 +351,6 @@ func writeStatsJSON(w io.Writer, report statsReport) error {
 // writeStatsCSV prints the report as RFC 4180 CSV rows.
 func writeStatsCSV(w io.Writer, report statsReport) error {
 	cw := csv.NewWriter(w)
-	defer cw.Flush()
 
 	if err := cw.Write([]string{"section", "label", "count"}); err != nil {
 		return err
@@ -367,17 +366,17 @@ func writeStatsCSV(w io.Writer, report statsReport) error {
 	}
 
 	for _, e := range report.ByRepository {
-		if err := cw.Write([]string{"repository", e.Label, strconv.Itoa(e.Count)}); err != nil {
+		if err := cw.Write([]string{"repository", csvSafe(e.Label), strconv.Itoa(e.Count)}); err != nil {
 			return err
 		}
 	}
 	for _, e := range report.ByBranch {
-		if err := cw.Write([]string{"branch", e.Label, strconv.Itoa(e.Count)}); err != nil {
+		if err := cw.Write([]string{"branch", csvSafe(e.Label), strconv.Itoa(e.Count)}); err != nil {
 			return err
 		}
 	}
 	for _, e := range report.ByHostType {
-		if err := cw.Write([]string{"host_type", e.Label, strconv.Itoa(e.Count)}); err != nil {
+		if err := cw.Write([]string{"host_type", csvSafe(e.Label), strconv.Itoa(e.Count)}); err != nil {
 			return err
 		}
 	}
@@ -390,7 +389,28 @@ func writeStatsCSV(w io.Writer, report statsReport) error {
 		}
 	}
 
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// csvSafe neutralizes spreadsheet formula injection (CWE-1236). encoding/csv
+// only applies RFC 4180 quoting, not formula-trigger escaping, so a field
+// beginning with =, +, -, @, tab, or CR would be evaluated as a formula when
+// the CSV is opened in Excel/Sheets/LibreOffice. Prefix such values with a
+// single quote so they render as literal text.
+func csvSafe(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + s
+	default:
+		return s
+	}
 }
 
 // writeStatsText prints the report in a plain, human-readable layout.

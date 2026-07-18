@@ -23,7 +23,8 @@ var (
 	openGetLastSessionFn = defaultOpenGetLastSession
 	openLaunchFn         = defaultOpenLaunch
 	openResumeCmdFn      = platform.BuildResumeCommandString
-	openListSessionsFn   = defaultStatsListSessions
+	openListSessionsFn   = defaultOpenListScopedSessions
+	openDetectGitFn      = detectGitContext
 
 	// openStdin is the reader used by --stdin batch resume. It is a package
 	// variable so tests can feed it a fixed list of IDs.
@@ -314,7 +315,7 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, 
 			Folder:     folder,
 		}
 		if current {
-			detectedRepo, detectedBranch, cErr := detectGitContext()
+			detectedRepo, detectedBranch, cErr := openDetectGitFn()
 			if cErr != nil {
 				return "", "", false, false, false, launchOverrides{}, nil, fmt.Errorf("--current: %w", cErr)
 			}
@@ -323,6 +324,13 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, 
 			}
 			if filter.Branch == "" {
 				filter.Branch = detectedBranch
+			}
+			// Guard against an empty scope: without a detected repo/branch (no
+			// origin remote, detached HEAD) the filter would match every
+			// session and resume an unrelated one.
+			if filter.Repository == "" && filter.Branch == "" && filter.Folder == "" {
+				return "", "", false, false, false, launchOverrides{}, nil,
+					errors.New("--current: could not detect a repository or branch from the current directory")
 			}
 		}
 		scopeFilter = &filter
@@ -422,6 +430,24 @@ func defaultOpenGetLastSession() (*data.Session, error) {
 		return nil, nil
 	}
 	return &sessions[0], nil
+}
+
+// defaultOpenListScopedSessions lists sessions matching a scope filter, ordered
+// most-recently-active first (the same ordering --last uses), so the scoped
+// resume path can pick sessions[0] as the most recent match.
+func defaultOpenListScopedSessions(filter data.FilterOptions) ([]data.Session, error) {
+	store, err := data.Open()
+	if err != nil {
+		return nil, fmt.Errorf("opening session store: %w", err)
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	sortOpts := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+	sessions, err := store.ListSessions(context.Background(), filter, sortOpts, statsQueryLimit)
+	if err != nil {
+		return nil, fmt.Errorf("listing sessions: %w", err)
+	}
+	return sessions, nil
 }
 
 // defaultOpenLaunch resumes the session using the resolved launch mode. For

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jongio/dispatch/internal/config"
@@ -20,11 +22,25 @@ func withTagSeams(t *testing.T, cfg *config.Config, sessions []data.Session) {
 	configSaveFn = func(c *config.Config) error { return nil }
 	t.Cleanup(func() { configLoadFn = prevLoad; configSaveFn = prevSave })
 
-	prevList := tagListSessionsFn
-	tagListSessionsFn = func(data.FilterOptions) ([]data.Session, error) {
-		return sessions, nil
+	prevResolve := tagResolveIDFn
+	tagResolveIDFn = func(id string) (string, error) {
+		// Exact match wins; otherwise resolve a unique prefix — mirroring the
+		// store's ResolveIDPrefix so tests can exercise prefix resolution.
+		var match string
+		for _, s := range sessions {
+			if s.ID == id {
+				return s.ID, nil
+			}
+			if strings.HasPrefix(s.ID, id) {
+				if match != "" {
+					return "", fmt.Errorf("ambiguous prefix %q", id)
+				}
+				match = s.ID
+			}
+		}
+		return match, nil
 	}
-	t.Cleanup(func() { tagListSessionsFn = prevList })
+	t.Cleanup(func() { tagResolveIDFn = prevResolve })
 }
 
 func TestRunTag_ListTags(t *testing.T) {
@@ -80,6 +96,23 @@ func TestRunTag_Add(t *testing.T) {
 	tags := cfg.SessionTags["ses-1"]
 	if len(tags) != 3 {
 		t.Errorf("expected 3 tags, got %v", tags)
+	}
+}
+
+// TestRunTag_ResolvesPrefix verifies tag accepts a unique ID prefix (like the
+// other <id> commands) and keys the tags by the resolved full ID (regression:
+// it used to require an exact match).
+func TestRunTag_ResolvesPrefix(t *testing.T) {
+	cfg := &config.Config{}
+	sessions := []data.Session{{ID: "ses-abc123"}}
+	withTagSeams(t, cfg, sessions)
+
+	var buf bytes.Buffer
+	if err := runTag(&buf, []string{"tag", "ses-a", "--add", "work"}); err != nil {
+		t.Fatalf("prefix should resolve, got error: %v", err)
+	}
+	if got := cfg.SessionTags["ses-abc123"]; len(got) != 1 || got[0] != "work" {
+		t.Errorf("tags keyed by full ID = %v, want [work] on ses-abc123", cfg.SessionTags)
 	}
 }
 
