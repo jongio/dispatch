@@ -24,9 +24,27 @@ import CliTable from '../components/CliTable.astro';
           <div id="commands" class="shortcut-group">
             <h3>Commands</h3>
             <CliTable rows={[
-              { name: 'help', description: 'Show usage information and exit.' },
-              { name: 'version', description: 'Print the version number and exit.' },
+              { name: 'open <id>', description: 'Resume a session by ID, alias, or short prefix. Flags: --last, --print, --stdin, --mode, --repo, --branch, --folder, --current, --agent, --model, --yolo.' },
+              { name: 'new [dir]', description: 'Start a new session from the CLI, with --mode/--agent/--model/--yolo overrides.' },
+              { name: 'search [query]', description: 'Non-interactive session search with --json, --table, --ids, --deep, and filters.' },
+              { name: 'stats', description: 'Session totals and breakdowns, with --json, --csv, --calendar, --top.' },
+              { name: 'export <id>', description: 'Export a session as Markdown, JSON, or HTML, with --redact, --stdout, and batch by --repo/--branch/--query.' },
+              { name: 'info <id>', description: 'Print a concise summary of one session.' },
+              { name: 'compare <a> <b>', description: 'Compare two sessions side by side, with --json.' },
+              { name: 'tags', description: 'List all tags with per-tag session counts.' },
+              { name: 'tag <id>', description: 'Add, remove, or set tags on a session (--add, --remove, --set, --json).' },
+              { name: 'notes', description: "Get, set, or clear a session's local notes." },
+              { name: 'views', description: 'List named views and switch the active view.' },
+              { name: 'aliases', description: 'List all session aliases.' },
+              { name: 'watch', description: 'Monitor attention state across sessions (--once, --json, --interval).' },
+              { name: 'prune', description: 'Report and remove stale config entries (--apply, --json).' },
+              { name: 'config', description: 'Read and set preferences (list, get, set, unset, edit, path).' },
+              { name: 'doctor', description: 'Print setup diagnostics, with --json.' },
+              { name: 'completion <shell>', description: 'Generate a completion script (bash, zsh, fish, powershell).' },
+              { name: 'man', description: 'Generate a roff man page.' },
               { name: 'update', description: 'Check GitHub Releases for a newer version and upgrade in-place.' },
+              { name: 'version', description: 'Print the version number and exit.' },
+              { name: 'help', description: 'Show usage information and exit.' },
             ]} />
           </div>
 
@@ -46,6 +64,7 @@ import CliTable from '../components/CliTable.astro';
             <CliTable rows={[
               { name: 'DISPATCH_DB', description: 'Path to a custom session store database.' },
               { name: 'DISPATCH_SESSION_STATE', description: 'Path to a custom session state directory.' },
+              { name: 'DISPATCH_CONFIG', description: 'Path to a custom config file (overrides the default location).' },
               { name: 'DISPATCH_LOG', description: 'Path to a log file. Enables debug logging when set.' },
             ]} />
           </div>
@@ -55,6 +74,15 @@ import CliTable from '../components/CliTable.astro';
             <pre><code>{`# Launch the TUI
 dispatch
 
+# Resume the most recent session
+dispatch open --last
+
+# Search sessions in table form
+dispatch search auth --table
+
+# Print stats as JSON
+dispatch stats --json
+
 # Check for updates
 dispatch update
 
@@ -62,14 +90,7 @@ dispatch update
 dispatch --demo
 
 # Use a custom database
-DISPATCH_DB=~/my-sessions.db dispatch
-
-# Enable debug logging
-DISPATCH_LOG=/tmp/dispatch.log dispatch
-
-# Reset config and reindex
-dispatch --clear-cache
-dispatch --reindex`}</code></pre>
+DISPATCH_DB=~/my-sessions.db dispatch`}</code></pre>
           </div>
         </div>
 
