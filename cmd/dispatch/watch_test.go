@@ -56,6 +56,35 @@ func TestRunWatch_OnceText(t *testing.T) {
 	}
 }
 
+// TestRunWatch_InterruptedNotIdle verifies an interrupted session is counted as
+// interrupted, not silently bucketed into the idle total (regression).
+func TestRunWatch_InterruptedNotIdle(t *testing.T) {
+	attention := map[string]data.AttentionStatus{
+		"ses-1": data.AttentionInterrupted,
+		"ses-2": data.AttentionIdle,
+	}
+	sessions := []data.Session{
+		{ID: "ses-1", Summary: "Crashed"},
+		{ID: "ses-2", Summary: "Quiet"},
+	}
+	withWatchSeams(t, attention, sessions)
+
+	var buf bytes.Buffer
+	if err := runWatch(&buf, []string{"watch", "--once", "--json"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var got watchSnapshot
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if got.Interrupted != 1 {
+		t.Errorf("Interrupted = %d, want 1", got.Interrupted)
+	}
+	if got.Idle != 1 {
+		t.Errorf("Idle = %d, want 1 (only the truly idle session)", got.Idle)
+	}
+}
+
 func TestRunWatch_OnceJSON(t *testing.T) {
 	attention := map[string]data.AttentionStatus{
 		"ses-1": data.AttentionWaiting,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,9 +12,26 @@ import (
 	"github.com/jongio/dispatch/internal/data"
 )
 
-// pruneListSessionsFn loads sessions for the prune command. It is a package
-// variable so tests can substitute a fixed set of sessions.
-var pruneListSessionsFn = defaultStatsListSessions
+// pruneAllSessionIDsFn returns the IDs of every session in the store, including
+// empty ones. It is a package variable so tests can substitute a fixed set. It
+// must NOT use the filtered session list (which drops empty sessions), or prune
+// would delete config metadata for real-but-empty sessions.
+var pruneAllSessionIDsFn = defaultPruneAllSessionIDs
+
+// defaultPruneAllSessionIDs loads all session IDs from the default store.
+func defaultPruneAllSessionIDs() ([]string, error) {
+	store, err := data.Open()
+	if err != nil {
+		return nil, fmt.Errorf("opening session store: %w", err)
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	ids, err := store.AllSessionIDs(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("listing session IDs: %w", err)
+	}
+	return ids, nil
+}
 
 // pruneCategory describes stale entries found in one config section.
 type pruneCategory struct {
@@ -53,18 +71,25 @@ func runPrune(w io.Writer, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	sessions, err := pruneListSessionsFn(data.FilterOptions{})
+	ids, err := pruneAllSessionIDsFn()
 	if err != nil {
 		return err
 	}
 
-	liveIDs := make(map[string]bool, len(sessions))
-	for _, s := range sessions {
-		liveIDs[s.ID] = true
+	liveIDs := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		liveIDs[id] = true
 	}
 
 	report := buildPruneReport(cfg, liveIDs)
 	report.Applied = opts.apply
+
+	// Safety guard: an empty store would classify every config entry as stale
+	// and wipe all of it. That is almost always a misconfiguration (wrong DB
+	// path) rather than genuine intent, so refuse to apply.
+	if opts.apply && len(liveIDs) == 0 && report.TotalStale > 0 {
+		return fmt.Errorf("refusing to prune: the session store has no sessions, so applying would remove all %d config entries; if this is intentional, edit the config file directly", report.TotalStale)
+	}
 
 	if opts.apply && report.TotalStale > 0 {
 		applyPrune(cfg, liveIDs)

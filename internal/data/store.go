@@ -605,6 +605,33 @@ func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session,
 	return result, nil
 }
 
+// AllSessionIDs returns the IDs of every session in the store, including
+// "empty" sessions (no turns/files/checkpoints/refs) that ListSessions filters
+// out. Callers that need to know whether a session still exists on disk — such
+// as `dispatch prune`, which deletes config metadata for vanished sessions —
+// must use this rather than ListSessions, otherwise metadata for real-but-empty
+// sessions would be wrongly treated as stale.
+func (s *Store) AllSessionIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id FROM sessions")
+	if err != nil {
+		return nil, fmt.Errorf("querying session IDs: %w", err)
+	}
+	defer closeRows(rows)
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning session ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating session IDs: %w", err)
+	}
+	return ids, nil
+}
+
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
 func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, error) {

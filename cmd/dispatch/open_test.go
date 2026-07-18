@@ -596,6 +596,61 @@ func TestRunOpen_ScopedResume(t *testing.T) {
 	}
 }
 
+// TestRunOpen_ScopedResumePicksMostRecent verifies the scoped resume selects the
+// first session returned by the lister — which lists most-recently-active first,
+// so the newest matching session is resumed (regression: it used to take the
+// oldest via a created-ascending sort).
+func TestRunOpen_ScopedResumePicksMostRecent(t *testing.T) {
+	cfg := config.Default()
+	newest := data.Session{ID: "newest", Repository: "x/y"}
+	older := data.Session{ID: "older", Repository: "x/y"}
+	capture := withOpenStubs(t, cfg, &newest, nil)
+
+	origList := openListSessionsFn
+	// Most-recently-active first, as defaultOpenListScopedSessions returns.
+	openListSessionsFn = func(data.FilterOptions) ([]data.Session, error) {
+		return []data.Session{newest, older}, nil
+	}
+	t.Cleanup(func() { openListSessionsFn = origList })
+
+	if err := runOpen(io.Discard, []string{"open", "--repo", "x/y"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capture.session == nil || capture.session.ID != "newest" {
+		t.Errorf("resumed %+v, want the most recent session 'newest'", capture.session)
+	}
+}
+
+// TestRunOpen_CurrentNoDetection verifies --current errors instead of resuming
+// an unrelated session when no repo/branch can be detected (no origin remote /
+// detached HEAD), which would otherwise leave an all-matching empty filter.
+func TestRunOpen_CurrentNoDetection(t *testing.T) {
+	withOpenStubs(t, config.Default(), nil, nil)
+
+	origDetect := openDetectGitFn
+	openDetectGitFn = func() (string, string, error) { return "", "", nil }
+	t.Cleanup(func() { openDetectGitFn = origDetect })
+
+	origList := openListSessionsFn
+	listCalled := false
+	openListSessionsFn = func(data.FilterOptions) ([]data.Session, error) {
+		listCalled = true
+		return nil, nil
+	}
+	t.Cleanup(func() { openListSessionsFn = origList })
+
+	err := runOpen(io.Discard, []string{"open", "--current"})
+	if err == nil {
+		t.Fatal("expected an error when nothing is detected, got nil")
+	}
+	if !strings.Contains(err.Error(), "could not detect") {
+		t.Errorf("error = %q, want a 'could not detect' message", err.Error())
+	}
+	if listCalled {
+		t.Error("session lister should not run when detection is empty")
+	}
+}
+
 func TestRunOpen_ScopedResumeNoMatch(t *testing.T) {
 	withOpenStubs(t, config.Default(), nil, nil)
 

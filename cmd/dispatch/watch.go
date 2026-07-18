@@ -40,16 +40,17 @@ type watchOptions struct {
 
 // watchSnapshot is the JSON representation of attention state at a point in time.
 type watchSnapshot struct {
-	Timestamp  string              `json:"timestamp"`
-	Total      int                 `json:"total"`
-	Waiting    int                 `json:"waiting"`
-	Working    int                 `json:"working"`
-	Thinking   int                 `json:"thinking"`
-	Active     int                 `json:"active"`
-	Stale      int                 `json:"stale"`
-	Idle       int                 `json:"idle"`
-	Compacting int                 `json:"compacting"`
-	Sessions   []watchSessionEntry `json:"sessions,omitempty"`
+	Timestamp   string              `json:"timestamp"`
+	Total       int                 `json:"total"`
+	Waiting     int                 `json:"waiting"`
+	Working     int                 `json:"working"`
+	Thinking    int                 `json:"thinking"`
+	Active      int                 `json:"active"`
+	Stale       int                 `json:"stale"`
+	Idle        int                 `json:"idle"`
+	Compacting  int                 `json:"compacting"`
+	Interrupted int                 `json:"interrupted"`
+	Sessions    []watchSessionEntry `json:"sessions,omitempty"`
 }
 
 // watchSessionEntry describes one session in the watch output.
@@ -297,6 +298,8 @@ func buildWatchSnapshot(opts watchOptions) (watchSnapshot, error) {
 			snap.Stale++
 		case data.AttentionCompacting:
 			snap.Compacting++
+		case data.AttentionInterrupted:
+			snap.Interrupted++
 		default:
 			snap.Idle++
 		}
@@ -348,6 +351,9 @@ func writeWatchSnapshotText(w io.Writer, snap watchSnapshot) {
 	}
 	if snap.Compacting > 0 {
 		parts = append(parts, fmt.Sprintf("%d compacting", snap.Compacting))
+	}
+	if snap.Interrupted > 0 {
+		parts = append(parts, fmt.Sprintf("%d interrupted", snap.Interrupted))
 	}
 	if snap.Idle > 0 {
 		parts = append(parts, fmt.Sprintf("%d idle", snap.Idle))

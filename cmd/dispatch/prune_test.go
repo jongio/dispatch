@@ -20,11 +20,15 @@ func withPruneSeams(t *testing.T, cfg *config.Config, sessions []data.Session) {
 	configSaveFn = func(c *config.Config) error { return nil }
 	t.Cleanup(func() { configLoadFn = prevLoad; configSaveFn = prevSave })
 
-	prevList := pruneListSessionsFn
-	pruneListSessionsFn = func(data.FilterOptions) ([]data.Session, error) {
-		return sessions, nil
+	prevList := pruneAllSessionIDsFn
+	pruneAllSessionIDsFn = func() ([]string, error) {
+		ids := make([]string, len(sessions))
+		for i, s := range sessions {
+			ids[i] = s.ID
+		}
+		return ids, nil
 	}
-	t.Cleanup(func() { pruneListSessionsFn = prevList })
+	t.Cleanup(func() { pruneAllSessionIDsFn = prevList })
 }
 
 func makePruneConfig() *config.Config {
@@ -90,6 +94,27 @@ func TestRunPrune_Apply(t *testing.T) {
 	}
 	if len(cfg.FavoriteSessions) != 1 || cfg.FavoriteSessions[0] != "live-1" {
 		t.Errorf("favorites = %v, want [live-1]", cfg.FavoriteSessions)
+	}
+}
+
+// TestRunPrune_EmptyStoreGuard verifies that --apply refuses to wipe all config
+// entries when the store reports zero sessions (a likely misconfiguration),
+// rather than silently deleting everything.
+func TestRunPrune_EmptyStoreGuard(t *testing.T) {
+	cfg := makePruneConfig()
+	withPruneSeams(t, cfg, nil) // empty store: no session IDs
+
+	var buf bytes.Buffer
+	err := runPrune(&buf, []string{"prune", "--apply"})
+	if err == nil {
+		t.Fatal("expected a guard error when applying against an empty store")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("refusing to prune")) {
+		t.Errorf("error = %q, want a 'refusing to prune' guard message", err.Error())
+	}
+	// Nothing should have been deleted.
+	if _, ok := cfg.SessionAliases["gone-1"]; !ok {
+		t.Error("guard must not delete any config entries")
 	}
 }
 

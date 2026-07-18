@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -11,9 +14,30 @@ import (
 	"github.com/jongio/dispatch/internal/data"
 )
 
-// tagListSessionsFn loads sessions for the tag command. It is a package
-// variable so tests can substitute a fixed set of sessions.
-var tagListSessionsFn = defaultStatsListSessions
+// tagResolveIDFn resolves a session ID or unique prefix to a full session ID.
+// It is a package variable so tests can substitute a fixed resolver.
+var tagResolveIDFn = defaultTagResolveID
+
+// defaultTagResolveID resolves an ID or unique prefix to a full session ID via
+// the store. It returns ("", nil) when no session matches — including empty
+// sessions, which the filtered session list would miss — and an error for an
+// ambiguous prefix or a store failure.
+func defaultTagResolveID(id string) (string, error) {
+	store, err := data.Open()
+	if err != nil {
+		return "", fmt.Errorf("opening session store: %w", err)
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	fullID, err := store.ResolveIDPrefix(context.Background(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return fullID, nil
+}
 
 // tagResult is the JSON output after a tag mutation.
 type tagResult struct {
@@ -49,21 +73,16 @@ func runTag(w io.Writer, args []string) error {
 		sessionID = resolved
 	}
 
-	// Verify the session exists in the store.
-	sessions, err := tagListSessionsFn(data.FilterOptions{})
+	// Resolve the ID or unique prefix to a full session ID. This also confirms
+	// the session exists (including empty sessions the filtered list omits).
+	fullID, err := tagResolveIDFn(sessionID)
 	if err != nil {
 		return err
 	}
-	found := false
-	for _, s := range sessions {
-		if s.ID == sessionID {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if fullID == "" {
 		return fmt.Errorf("session %q not found", opts.id)
 	}
+	sessionID = fullID
 
 	// Apply mutation if requested.
 	mutated := false

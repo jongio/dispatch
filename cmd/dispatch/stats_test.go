@@ -319,3 +319,45 @@ func TestRunStatsCSV(t *testing.T) {
 		t.Errorf("CSV missing repo breakdown, got:\n%s", out)
 	}
 }
+
+// TestRunStatsCSV_FormulaInjection verifies a repo/branch label starting with a
+// spreadsheet formula trigger is neutralized (prefixed with ') so it can't
+// execute as a formula when opened in Excel/Sheets (CWE-1236).
+func TestRunStatsCSV_FormulaInjection(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return []data.Session{
+			{ID: "s1", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
+			{ID: "s2", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
+		}, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--csv"}); err != nil {
+		t.Fatalf("runStats --csv: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "\n=cmd") || strings.Contains(out, ",=cmd") {
+		t.Errorf("CSV emitted an unescaped formula label, got:\n%s", out)
+	}
+	if !strings.Contains(out, "'=cmd") {
+		t.Errorf("CSV should prefix a formula-triggering label with a quote, got:\n%s", out)
+	}
+}
+
+func TestCsvSafe(t *testing.T) {
+	cases := map[string]string{
+		"":            "",
+		"jongio/repo": "jongio/repo",
+		"main":        "main",
+		"=1+1":        "'=1+1",
+		"+cmd":        "'+cmd",
+		"-2":          "'-2",
+		"@ref":        "'@ref",
+		"\ttab":       "'\ttab",
+	}
+	for in, want := range cases {
+		if got := csvSafe(in); got != want {
+			t.Errorf("csvSafe(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
