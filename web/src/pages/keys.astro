@@ -20,6 +20,8 @@ import KeyTable from '../components/KeyTable.astro';
             <KeyTable rows={[
               { keys: '↑ / k', action: 'Move up' },
               { keys: '↓ / j', action: 'Move down' },
+              { keys: 'g / Home', action: 'Jump to top' },
+              { keys: 'G / End', action: 'Jump to bottom' },
               { keys: '←', action: 'Collapse folder group' },
               { keys: '→', action: 'Expand folder group' },
             ]} />
@@ -31,9 +33,7 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'Enter', action: 'Launch selected session (or toggle folder)' },
               { keys: 'w', action: 'Launch in new window' },
               { keys: 't', action: 'Launch in new tab' },
-              { keys: 'e', action: 'Launch in split pane (Windows Terminal)' },
-              { keys: 'h', action: 'Hide/unhide current session' },
-              { keys: 'H', action: 'Toggle visibility of hidden sessions' },
+              { keys: 'e', action: 'Launch in split pane (Windows Terminal, or tmux inside a tmux session)' },
             ]} />
           </div>
 
@@ -54,7 +54,7 @@ import KeyTable from '../components/KeyTable.astro';
             <h3>Search & Filter</h3>
             <KeyTable rows={[
               { keys: '/', action: 'Focus search bar' },
-              { keys: 'Esc', action: 'Blur search / Clear query' },
+              { keys: 'Esc', action: 'Clear search / close overlay' },
               { keys: 'f', action: 'Open filter panel' },
             ]} />
           </div>
@@ -65,15 +65,37 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 's', action: 'Cycle sort field' },
               { keys: 'S', action: 'Toggle sort direction' },
               { keys: 'Tab', action: 'Cycle grouping mode' },
+              { keys: 'Shift+Tab', action: 'Reverse grouping order' },
               { keys: 'p', action: 'Toggle preview panel' },
               { keys: 'P', action: 'Cycle preview position (right → bottom → left → top)' },
+              { keys: 'z', action: 'Toggle fullscreen preview' },
               { keys: 'v', action: 'View plan in preview pane' },
               { keys: 'o', action: 'Toggle conversation sort order (oldest/newest first)' },
-              { keys: 'c', action: 'Copy session ID to clipboard' },
+              { keys: 'x', action: 'Expand or collapse all groups' },
               { keys: 'PgUp', action: 'Scroll preview up' },
               { keys: 'PgDn', action: 'Scroll preview down' },
-              { keys: 'r', action: 'Reindex sessions' },
+              { keys: 'r', action: 'Refresh session store' },
               { keys: ',', action: 'Open settings panel' },
+            ]} />
+          </div>
+
+          <div id="session-actions" class="shortcut-group">
+            <h3>Session Actions</h3>
+            <KeyTable rows={[
+              { keys: 'i', action: "Show git status overlay for the session's folder" },
+              { keys: 'b', action: 'Open linked PR, issue, or commit in browser' },
+              { keys: 'O', action: 'Open working directory in file manager' },
+              { keys: 'F', action: 'Open a file the session touched' },
+              { keys: 'D', action: 'Compare two selected sessions' },
+              { keys: 'T', action: 'Show activity timeline in preview' },
+              { keys: 'V', action: 'Switch named view' },
+              { keys: 'X', action: 'Export selected sessions to Markdown' },
+              { keys: 'm', action: 'Edit note on current session' },
+              { keys: 'c', action: 'Copy session ID to clipboard' },
+              { keys: 'C', action: 'Copy working directory path to clipboard' },
+              { keys: 'Y', action: 'Copy resume command to clipboard' },
+              { keys: 'y', action: 'Copy preview text to clipboard' },
+              { keys: ':', action: 'Open the command palette' },
             ]} />
           </div>
 
@@ -98,6 +120,8 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'h', action: 'Hide/unhide current session' },
               { keys: 'H', action: 'Toggle visibility of hidden sessions' },
               { keys: '*', action: 'Toggle favorite on current session' },
+              { keys: '#', action: 'Add or edit tags on current session' },
+              { keys: 'A', action: 'Set or clear a short alias on current session' },
             ]} />
             <p class="text-secondary text-sm">Attention dots show real-time session activity: waiting (purple ●), active (green ●), stale (yellow ●), interrupted (orange ⚡), idle (gray ○). The <kbd>!</kbd> key opens a picker overlay to filter by one or more statuses, including "Has plan", "Favorites only", "Incomplete work", and "Complete work" rows. Press <kbd>N</kbd> to batch-resume all interrupted sessions. Press <kbd>R</kbd> to scan work status across sessions with plans.</p>
           </div>
@@ -165,6 +189,7 @@ import KeyTable from '../components/KeyTable.astro';
             <li><a href="#multi-select">Multi-Select</a></li>
             <li><a href="#search-filter">Search & Filter</a></li>
             <li><a href="#view-sort">View & Sorting</a></li>
+            <li><a href="#session-actions">Session Actions</a></li>
             <li><a href="#time-keys">Time Range</a></li>
             <li><a href="#settings-keys">Attention & Status</a></li>
             <li><a href="#general-keys">Settings</a></li>

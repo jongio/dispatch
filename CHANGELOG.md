@@ -6,12 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+This release turns Dispatch from a TUI-only tool into a scriptable CLI: most session operations are now available as non-interactive commands with JSON output, and the TUI gains a git status overlay plus several navigation and organization features.
+
 ### Added
-- **Configurable auto-refresh** — set `auto_refresh_seconds` (also in the settings panel) to tune the session-list poll interval, or set it to `0` to turn polling off and refresh only with `r` or reindex
-- **Machine-readable doctor output** — `dispatch doctor --json` prints diagnostics as a single JSON object so scripts and CI can parse them instead of scraping text
-- **Search query argument** — pass a search string on the command line (`dispatch auth` or `dispatch fix auth bug`) to launch the TUI with the search box pre-filled and the list already filtered
+
+#### CLI commands
+- **`dispatch open`** — resume a session by ID, alias, or short ID prefix. Supports `--last` (most recent), `--print` (print the resume command without launching), `--stdin` (batch resume piped IDs), `--mode` (inplace, tab, window, pane), scoped resume (`--repo`, `--branch`, `--folder`, `--current` to auto-detect from the working directory), and per-launch `--agent`, `--model`, and `--yolo` overrides
+- **`dispatch new`** — start a fresh session from the CLI in the current or a given directory, with the same per-launch overrides as `open`
+- **`dispatch stats`** — session totals and breakdowns by repository, branch, and host type, with `--json`, `--csv`, `--calendar` (activity heatmap), `--top`, and date/scope filters
+- **`dispatch search`** — non-interactive session search with `--json`, `--table`, and `--ids` / `--format ids` output, `--deep` search, and repo/branch/date/limit filters
+- **`dispatch export`** — save a session as Markdown, JSON, or HTML, with `--redact` (mask secrets), `--stdout`, and batch export by `--repo`, `--branch`, or `--query`
+- **`dispatch config`** — `list`, `get`, `set`, `unset` (reset to default), `edit` (open in your editor), and `path`
+- **`dispatch tags`** — list every tag in use with per-tag session counts
+- **`dispatch tag <id>`** — add, remove, or set tags on a session (`--add`, `--remove`, `--set`, `--json`)
+- **`dispatch notes`** — get, set, or clear a session's local notes
+- **`dispatch views`** — list named views and switch the active view
+- **`dispatch aliases`** — list every session alias
+- **`dispatch compare`** — compare two sessions side by side (metadata, files, refs), with `--json`
+- **`dispatch info <id>`** — print a concise summary of one session
+- **`dispatch watch`** — monitor attention state across sessions; stream transitions or take a one-shot `--once` snapshot, with `--json` and `--interval`
+- **`dispatch prune`** — report and remove stale config entries for sessions that no longer exist (`--apply`, `--json`)
+- **`dispatch man`** — generate a roff man page
+- **`dispatch completion`** — bash, zsh, fish, and PowerShell scripts, with dynamic completion of session aliases and config keys
+- **`dispatch doctor --json`** — machine-readable diagnostics; doctor also reports the detected Copilot CLI version and stored session count
+
+#### TUI
+- **Git status overlay** (`i`) — shows the git status of the folder a session is mapped to: current branch and upstream, push/pull stats (commits ahead to push, behind to pull), working-tree counts (staged, modified, untracked, deleted, conflicts), and a scrollable changed-file list. The same push/pull stats appear inline on each session row and in the preview pane
+- **Open linked reference** (`b`) — open a session's linked pull request, issue, or commit on github.com
+- **Frecency sort** — rank sessions by a blend of launch frequency and recency
+- **Session tags** (`#`) — attach comma-separated tags and filter with the `tag:` search token
+- **Session aliases** (`A`) — give a session a short alias and resume it with `dispatch open <alias>`
+- **Fullscreen preview zoom** (`z`) — view the preview pane fullscreen
+- **Configurable list columns** — choose which optional columns (repo, folder, turns, host) appear in the session list
+- **Jump navigation** — `g` / `Home` jump to top, `G` / `End` jump to bottom
+- **Date search tokens** — `after:` and `before:` narrow the list by session activity date
+- **Waiting notifications** — optional desktop notification when a session enters the waiting state
+- **Configurable keybindings** — remap any key via `config.json`
+- **Split-pane launch** — open sessions in a tmux split when running inside tmux
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer, Finder, or the Linux file manager)
-- **Bulk hide and favorite** — with sessions marked via `Space`, `h` and `*` now apply to the whole selection instead of just the cursor session
+- **Bulk hide and favorite** — with sessions marked via `Space`, `h` and `*` apply to the whole selection instead of just the cursor session
+- **Search query argument** — pass a search string on the command line (`dispatch auth` or `dispatch fix auth bug`) to launch the TUI with the search box pre-filled and the list already filtered
+
+#### Configuration
+- **`DISPATCH_CONFIG`** — environment variable to override the config file path
+- **Configurable auto-refresh** — set `auto_refresh_seconds` (also in the settings panel) to tune the session-list poll interval, or set it to `0` to turn polling off and refresh only with `r` or reindex
+
+### Changed
+- Upgraded Go and website dependencies to latest
+
+### Fixed
+- Hardened the swarm CLI commands: `open` scoped resume now picks the most recently active match, `open --current` errors instead of resuming an unrelated session when nothing can be detected, `watch` counts interrupted sessions separately, `stats --csv` neutralizes spreadsheet formula injection, `prune` refuses to apply against an empty store, and `tag` resolves ID prefixes
 
 ## [v0.13.0] — 2026-06-30
 

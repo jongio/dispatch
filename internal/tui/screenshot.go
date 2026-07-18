@@ -646,6 +646,37 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		addOverlay("cmd-palette", m)
 	}
 
+	// ── Git status overlay ───────────────────────────────────────────
+	{
+		m := newBase()
+		m.gitStatusView.SetStatus(platform.GitStatus{
+			Dir:         "/home/me/code/dispatch",
+			Exists:      true,
+			IsRepo:      true,
+			Branch:      "feature/git-status",
+			Upstream:    "origin/feature/git-status",
+			HasUpstream: true,
+			Ahead:       2,
+			Behind:      1,
+			Staged:      1,
+			Modified:    3,
+			Untracked:   2,
+			Deleted:     1,
+			Files: []platform.GitFileStatus{
+				{Code: "M ", Path: "internal/tui/model.go"},
+				{Code: " M", Path: "internal/tui/components/gitstatusview.go"},
+				{Code: " M", Path: "internal/platform/gitstate.go"},
+				{Code: " D", Path: "internal/tui/old_preview.go"},
+				{Code: "??", Path: "docs/specs/git-status/spec.md"},
+				{Code: "??", Path: "docs/specs/git-status/test-plan.md"},
+			},
+		})
+		m.gitStatusView.SetSize(m.width, m.height)
+		m.state = stateGitStatusView
+		m.recalcLayout()
+		addOverlay("git-status", m)
+	}
+
 	return shots
 }
 

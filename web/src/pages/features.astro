@@ -682,6 +682,34 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- Git Status Overlay -->
+    <section class="section" id="git-status">
+      <div class="feature-section">
+        <div class="feature-text">
+          <h2>Git Status Overlay</h2>
+          <p>
+            Press <kbd>i</kbd> on any session to see the full Git status of the
+            folder it is mapped to, without leaving the TUI. Git commands run
+            under a bounded timeout so the interface never blocks.
+          </p>
+          <ul>
+            <li>Current <strong>branch</strong> and <strong>upstream</strong> ref</li>
+            <li><strong>Push/pull stats</strong> — commits ahead to push and behind to pull</li>
+            <li><strong>Working-tree counts</strong> — staged, modified, untracked, deleted, and conflicts</li>
+            <li>A scrollable <strong>changed-file list</strong> with status codes</li>
+            <li><kbd>c</kbd> copies a plain-text summary; <kbd>Esc</kbd> closes the overlay</li>
+          </ul>
+          <p>
+            The same push/pull stats also appear inline on each session row and
+            in the preview pane's Git section.
+          </p>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/git-status.png" alt="Git status overlay showing branch, upstream, push and pull counts, working-tree changes, and a changed-file list" caption="Git status overlay for a session's folder" />
+        </div>
+      </div>
+    </section>
+
     <!-- Search Tokens -->
     <section class="section" id="search-tokens">
       <div class="feature-section">
