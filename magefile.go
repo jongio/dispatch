@@ -450,15 +450,22 @@ func ensurePath() error {
 		return nil
 	}
 
-	fmt.Printf("\n=== Adding %s to system PATH ===\n", binDir)
-	newPath := binDir + ";" + machinePath
-	err := exec.Command("powershell", "-NoProfile", "-Command",
-		fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s','Machine')`, newPath)).Run()
-	if err != nil {
-		fmt.Println("   Machine PATH failed (need admin), trying User PATH...")
-		if !containsPath(userPath, binDir) {
-			exec.Command("powershell", "-NoProfile", "-Command",
-				fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s;%s','User')`, binDir, userPath)).Run()
+	fmt.Printf("\n=== Adding %s to PATH ===\n", binDir)
+	// Prefer Machine PATH (visible to every user) but fall back to User PATH,
+	// which does not need administrator rights. Report the outcome either way
+	// so a failed persist is never silent.
+	machineErr := exec.Command("powershell", "-NoProfile", "-Command",
+		fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s;%s','Machine')`, binDir, machinePath)).Run()
+	if machineErr == nil {
+		fmt.Println("   Added to Machine PATH.")
+	} else {
+		fmt.Println("   Machine PATH needs admin; adding to User PATH instead...")
+		if userErr := exec.Command("powershell", "-NoProfile", "-Command",
+			fmt.Sprintf(`[Environment]::SetEnvironmentVariable('Path','%s;%s','User')`, binDir, userPath)).Run(); userErr != nil {
+			fmt.Printf("   WARNING: could not add %s to User PATH: %v\n", binDir, userErr)
+			fmt.Println("   Add it manually, or re-run `mage install` from an elevated terminal.")
+		} else {
+			fmt.Println("   Added to User PATH.")
 		}
 	}
 	ensureSessionPath(binDir)
@@ -555,6 +562,7 @@ func verify() error {
 	fmt.Printf("\n✅ %s installed\n", binaryName())
 	fmt.Printf("   Path:  %s\n", outPath)
 	fmt.Printf("   Built: %s\n", info.ModTime().Format(time.DateTime))
+	fmt.Printf("   Run:   open a new terminal, then `%s` (already-open shells keep the old PATH)\n", binName)
 	return nil
 }
 
