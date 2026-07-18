@@ -35,16 +35,16 @@ sboms:
   - artifacts: archive
 
 signs:
-  # Keep cosign's classic output (separate .sig + .pem) instead of the new
-  # single-file bundle: install.sh and install.ps1 verify the checksums with
-  # `cosign verify-blob --signature ...sig --certificate ...pem`, which the
-  # bundle format would break.
+  # Classic detached signature: produces ${artifact}.sig and ${artifact}.pem,
+  # which install.sh and install.ps1 verify with
+  # `cosign verify-blob --signature ...sig --certificate ...pem`. cosign is
+  # pinned to the v2.x line in release.yml so this keeps working; cosign v3
+  # forces the single-file bundle format instead.
   - cmd: cosign
     artifacts: checksum
     args:
       - "sign-blob"
       - "--yes"
-      - "--new-bundle-format=false"
       - "--output-signature=${signature}"
       - "--output-certificate=${certificate}"
       - "${artifact}"
