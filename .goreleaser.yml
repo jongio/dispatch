@@ -40,7 +40,6 @@ signs:
     args:
       - "sign-blob"
       - "--yes"
-      - "--oidc-issuer=https://token.actions.githubusercontent.com"
       - "--output-signature=${signature}"
       - "--output-certificate=${certificate}"
       - "${artifact}"
