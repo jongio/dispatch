@@ -308,12 +308,13 @@ Save a full session (metadata and the complete conversation) to a file with `dis
 dispatch export 0a1b2c3d
 dispatch export 0a1b2c3d --format json
 dispatch export 0a1b2c3d --format html
+dispatch export 0a1b2c3d --format text
 dispatch export 0a1b2c3d --stdout
 dispatch export 0a1b2c3d --redact --stdout
 dispatch export 0a1b2c3d --out ./exports
 ```
 
-By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output or `--format html` for a self-contained web page you can open in a browser (styles are inlined, so there are no external files to manage). Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--format html` for a self-contained web page you can open in a browser, or `--format text` for plain text. Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
 
 #### Batch Export
 
@@ -322,6 +323,7 @@ Export all sessions matching a scope filter at once:
 ```sh
 dispatch export --repo jongio/dispatch
 dispatch export --repo jongio/dispatch --format json --out ./backup
+dispatch export --repo jongio/dispatch --format text --out ./backup
 dispatch export --branch main --since 2026-01-01 --until 2026-07-01
 dispatch export --query "auth fix" --redact
 ```
