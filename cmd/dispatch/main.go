@@ -129,6 +129,7 @@ Commands:
   search [query] [flags]  Print matching sessions as JSON, IDs, or a table
   tags [--json]           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
+  alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
   config [get|set|list|edit|path]

@@ -142,6 +142,7 @@ type manExample struct {
 var manExamples = []manExample{
 	{desc: "Launch the TUI filtered to the current repo and branch:", cmd: "dispatch --current"},
 	{desc: "Export a session as JSON to standard output:", cmd: "dispatch export <id> --format json --stdout"},
+	{desc: "Give a session a memorable alias for quick resume:", cmd: "dispatch alias <id> review"},
 	{desc: "Install the man page for the current user:", cmd: "dispatch man > ~/.local/share/man/man1/dispatch.1"},
 }
 
