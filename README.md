@@ -410,6 +410,7 @@ Query the session store from scripts without opening the TUI. `dispatch search` 
 dispatch search auth
 dispatch search --query "fix login" --repo jongio/dispatch
 dispatch search --branch main --since 2026-01-01 --limit 20
+dispatch search --sort turns --order desc --limit 10
 dispatch search --deep refactor --json
 dispatch search auth --format ids
 dispatch search auth --ids
@@ -421,6 +422,7 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--repo`, `--branch`, `--folder`, `--host` narrow by session metadata.
 - `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
 - `--deep` also searches turns, checkpoints, touched files, and refs.
+- `--sort updated|created|turns|name|folder` and `--order asc|desc` control result order.
 - `--limit <n>` caps the result count (default 50, `0` for no limit).
 - `--format json|ids|table` chooses JSON output, one session ID per line, or a readable table. `--ids` and `--table` are shortcuts.
 
