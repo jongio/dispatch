@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **`dispatch path`** — print only a session's working directory so you can `cd "$(dispatch path <id>)"`. Resolves the session by full ID, alias, short ID prefix, `--last`, or `--current` the same way `dispatch open` does. Errors if the session has no recorded directory or the directory no longer exists.
+
 ## [v0.14.0] — 2026-07-18
 
 This release turns Dispatch from a TUI-only tool into a scriptable CLI: most session operations are now available as non-interactive commands with JSON output, and the TUI gains a git status overlay plus several navigation and organization features.
