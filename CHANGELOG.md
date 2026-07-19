@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **`dispatch watch --exec <cmd>`**: run a command on each session attention transition while streaming. Session context is passed through `DISPATCH_SESSION_ID`, `DISPATCH_SESSION_STATE`, `DISPATCH_SESSION_PREV_STATE`, `DISPATCH_SESSION_REPO`, `DISPATCH_SESSION_BRANCH`, `DISPATCH_SESSION_FOLDER`, and `DISPATCH_SESSION_SUMMARY` environment variables. Hook output goes to stderr and a failing hook never stops the watch loop.
+
 ## [v0.14.0] — 2026-07-18
 
 This release turns Dispatch from a TUI-only tool into a scriptable CLI: most session operations are now available as non-interactive commands with JSON output, and the TUI gains a git status overlay plus several navigation and organization features.

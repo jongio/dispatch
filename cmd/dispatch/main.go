@@ -237,6 +237,7 @@ Watch flags:
   --repo <name>           Only watch sessions for a repository
   --branch <name>         Only watch sessions on a branch
   --folder <path>         Only watch sessions under a folder
+  --exec <cmd>            Run a command on each attention transition (streaming only)
 
 Flags:
   -h, --help              Show this help message
