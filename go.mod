@@ -20,7 +20,7 @@ require (
 
 require (
 	github.com/coder/websocket v1.8.15 // indirect
-	github.com/dlclark/regexp2/v2 v2.5.1 // indirect
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 	modernc.org/gc/v3 v3.1.5 // indirect
