@@ -4115,14 +4115,27 @@ func (m Model) scanGitStatesCmd() tea.Cmd {
 
 // demoGitStatuses assigns a rotating set of synthetic git statuses to sessions
 // so all badge types and inline push/pull stats are visible in demo mode. The
-// order cycles through dirty, ahead, untracked, behind, clean, and missing.
+// cycle includes combined states (push/pull with local changes) alongside
+// single-concern states so screenshots show realistic variety.
 func demoGitStatuses(sessionDirs map[string]string) map[string]platform.GitStatus {
 	cycle := []platform.GitStatus{
-		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Modified: 3, Staged: 1},
-		{Exists: true, IsRepo: true, Branch: "feature/x", Upstream: "origin/feature/x", HasUpstream: true, Ahead: 2},
-		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Untracked: 4},
-		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Behind: 1},
+		// Ahead + dirty: commits to push and local modifications.
+		{Exists: true, IsRepo: true, Branch: "feature/auth", Upstream: "origin/feature/auth", HasUpstream: true, Ahead: 3, Modified: 2, Staged: 1},
+		// Clean: nothing to show (in sync, no changes).
 		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true},
+		// Behind + dirty: needs pull and has local changes.
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Behind: 2, Modified: 1},
+		// Ahead only: commits to push, clean working tree.
+		{Exists: true, IsRepo: true, Branch: "feature/api", Upstream: "origin/feature/api", HasUpstream: true, Ahead: 1},
+		// Ahead + behind + dirty: fully diverged with local changes.
+		{Exists: true, IsRepo: true, Branch: "feature/ui", Upstream: "origin/feature/ui", HasUpstream: true, Ahead: 1, Behind: 3, Modified: 2, Untracked: 1},
+		// Behind only: needs pull, clean working tree.
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Behind: 1},
+		// Dirty only: local modifications, in sync with upstream.
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Modified: 3, Staged: 1},
+		// Untracked only: new files not yet tracked.
+		{Exists: true, IsRepo: true, Branch: "main", Upstream: "origin/main", HasUpstream: true, Untracked: 4},
+		// Missing: workspace directory no longer exists.
 		{Exists: false},
 	}
 	statuses := make(map[string]platform.GitStatus, len(sessionDirs))
