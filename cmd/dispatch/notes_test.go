@@ -110,6 +110,29 @@ func TestRunNotesGetSetClear(t *testing.T) {
 	}
 }
 
+func TestRunNotesSetFromStdin(t *testing.T) {
+	cfg := withConfigSeams(t, config.Default())
+	prev := notesStdin
+	notesStdin = strings.NewReader("line one\nline two\n")
+	t.Cleanup(func() { notesStdin = prev })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "set", "ses-1", "--stdin"}); err != nil {
+		t.Fatalf("set note from stdin: %v", err)
+	}
+	if got := cfg.SessionNotes["ses-1"]; got != "line one\nline two\n" {
+		t.Fatalf("stored note = %q", got)
+	}
+
+	buf.Reset()
+	if err := runNotes(&buf, []string{"notes", "get", "ses-1"}); err != nil {
+		t.Fatalf("get note: %v", err)
+	}
+	if buf.String() != "line one\nline two\n\n" {
+		t.Fatalf("get output = %q", buf.String())
+	}
+}
+
 func TestRunNotesErrors(t *testing.T) {
 	withConfigSeams(t, config.Default())
 	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return nil, errors.New("boom") })
@@ -117,6 +140,7 @@ func TestRunNotesErrors(t *testing.T) {
 		{"notes", "bogus"},
 		{"notes", "get"},
 		{"notes", "set", "ses-1"},
+		{"notes", "set", "ses-1", "--stdin", "extra"},
 		{"notes", "clear"},
 		{"notes", "list", "extra"},
 	} {
