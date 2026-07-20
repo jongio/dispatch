@@ -135,7 +135,8 @@ Commands:
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown, JSON, or HTML
   export --repo R [flags] Export all sessions matching a scope filter (batch mode)
-  info <id> [--json]      Print a concise session summary (--json for machine-readable output)
+  info <id> [--json] [--refs]
+                          Print a concise session summary
   compare <a> <b> [--json]
                           Compare two sessions side by side
   tag <id> [flags]        Add, remove, set, or list tags on a session
