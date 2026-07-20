@@ -31,6 +31,7 @@ type exportOptions struct {
 	outDir string
 	redact bool
 	filter *data.FilterOptions // non-nil for batch mode
+	tag    string
 }
 
 // runExport writes a session's full content. It writes to the exports directory
@@ -170,6 +171,18 @@ func parseExportArgs(args []string) (exportOptions, error) {
 			filter.Folder = v
 			hasFilter = true
 			i = ni
+		case name == "--tag":
+			v, ni, err := takeValue(i, "--tag", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return exportOptions{}, err
+			}
+			tag, err := parseSingleTagFilter(v, "--tag")
+			if err != nil {
+				return exportOptions{}, err
+			}
+			opts.tag = tag
+			hasFilter = true
+			i = ni
 		case name == "--since":
 			v, ni, err := takeValue(i, "--since", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -205,7 +218,7 @@ func parseExportArgs(args []string) (exportOptions, error) {
 	case len(positionals) == 0 && hasFilter:
 		opts.filter = &filter
 	case len(positionals) == 0 && !hasFilter:
-		return exportOptions{}, errors.New("export requires a session ID or filter flags (--query, --repo, --branch, --folder, --since, --until)")
+		return exportOptions{}, errors.New("export requires a session ID or filter flags (--query, --repo, --branch, --folder, --tag, --since, --until)")
 	case len(positionals) == 1 && !hasFilter:
 		opts.id = positionals[0]
 	case len(positionals) == 1 && hasFilter:
@@ -361,6 +374,10 @@ func runExportBatch(w io.Writer, opts exportOptions) error {
 	}
 
 	sessions, err := exportListSessionsFn(*opts.filter)
+	if err != nil {
+		return err
+	}
+	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
 	if err != nil {
 		return err
 	}

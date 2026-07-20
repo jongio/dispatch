@@ -41,6 +41,7 @@ type searchOptions struct {
 	sort   data.SortOptions
 	limit  int
 	format searchOutputFormat
+	tag    string
 }
 
 // searchSession is the machine-readable shape emitted for each matching
@@ -76,6 +77,10 @@ func runSearch(w io.Writer, args []string) error {
 	}
 
 	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
+	if err != nil {
+		return err
+	}
+	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
 	if err != nil {
 		return err
 	}
@@ -277,6 +282,17 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 				return searchOptions{}, err
 			}
 			opts.filter.HostType = v
+			i = ni
+		case name == "--tag":
+			v, ni, err := takeValue(i, "--tag", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return searchOptions{}, err
+			}
+			tag, err := parseSingleTagFilter(v, "--tag")
+			if err != nil {
+				return searchOptions{}, err
+			}
+			opts.tag = tag
 			i = ni
 		case name == "--since":
 			v, ni, err := takeValue(i, "--since", inlineOrEmpty(inline, hasInline))

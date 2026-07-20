@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -111,7 +112,7 @@ func TestBuildStatsReportEmpty(t *testing.T) {
 }
 
 func TestParseStatsArgs(t *testing.T) {
-	opts, err := parseStatsArgs([]string{"stats", "--json", "--repo", "jongio/dispatch", "--branch=main", "--since", "2026-01-01", "--until=2026-07-01", "--top", "2"})
+	opts, err := parseStatsArgs([]string{"stats", "--json", "--repo", "jongio/dispatch", "--branch=main", "--tag", "Work", "--since", "2026-01-01", "--until=2026-07-01", "--top", "2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,6 +124,9 @@ func TestParseStatsArgs(t *testing.T) {
 	}
 	if opts.filter.Branch != "main" {
 		t.Errorf("Branch = %q", opts.filter.Branch)
+	}
+	if opts.tag != "work" {
+		t.Errorf("tag = %q, want work", opts.tag)
 	}
 	if opts.filter.Since == nil || opts.filter.Until == nil {
 		t.Fatal("expected Since and Until to be set")
@@ -145,11 +149,36 @@ func TestParseStatsArgsErrors(t *testing.T) {
 		{"stats", "--top", "0"},          // not positive
 		{"stats", "--top", "-1"},         // negative
 		{"stats", "--top", "many"},       // not a number
+		{"stats", "--tag"},               // missing value
+		{"stats", "--tag", "a,b"},        // one tag only
 	}
 	for _, args := range cases {
 		if _, err := parseStatsArgs(args); err == nil {
 			t.Errorf("parseStatsArgs(%v) expected error, got nil", args)
 		}
+	}
+}
+
+func TestRunStatsTagFilter(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+	prevLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: map[string][]string{"a": {"work"}, "c": {"other"}}}, nil
+	}
+	t.Cleanup(func() { configLoadFn = prevLoad })
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--json", "--tag", "work"}); err != nil {
+		t.Fatalf("runStats: %v", err)
+	}
+	var report statsReport
+	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if report.TotalSessions != 1 || report.TotalTurns != 5 {
+		t.Errorf("unexpected report: %+v", report)
 	}
 }
 
