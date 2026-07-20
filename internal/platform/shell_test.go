@@ -532,7 +532,7 @@ func TestNewResumeCmd_SetsDirFromCwd(t *testing.T) {
 	dir := t.TempDir()
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
 		ResumeSessionCommand: "echo {sessionId}",
-		Cwd:           dir,
+		Cwd:                  dir,
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)
@@ -545,7 +545,7 @@ func TestNewResumeCmd_SetsDirFromCwd(t *testing.T) {
 func TestNewResumeCmd_IgnoresInvalidCwd(t *testing.T) {
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
 		ResumeSessionCommand: "echo {sessionId}",
-		Cwd:           "/no/such/path/here",
+		Cwd:                  "/no/such/path/here",
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)

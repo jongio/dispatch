@@ -8,7 +8,7 @@ import (
 
 // defaultNewSessionCommand is used when the user has not configured a custom
 // new session command.
-const defaultNewSessionCommand = "gh copilot"
+const defaultNewSessionCommand = "copilot"
 
 // LaunchNewSessionConfig holds parameters for launching a brand new Copilot
 // CLI session (as opposed to resuming an existing one).

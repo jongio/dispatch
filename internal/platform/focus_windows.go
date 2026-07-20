@@ -15,10 +15,10 @@ var (
 	procIsWindowVisible     = user32.NewProc("IsWindowVisible")
 	procShowWindow          = user32.NewProc("ShowWindow")
 
-	kernel32                  = windows.NewLazySystemDLL("kernel32.dll")
-	procCreateToolhelp32      = kernel32.NewProc("CreateToolhelp32Snapshot")
-	procProcess32First        = kernel32.NewProc("Process32FirstW")
-	procProcess32Next         = kernel32.NewProc("Process32NextW")
+	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
+	procCreateToolhelp32 = kernel32.NewProc("CreateToolhelp32Snapshot")
+	procProcess32First   = kernel32.NewProc("Process32FirstW")
+	procProcess32Next    = kernel32.NewProc("Process32NextW")
 )
 
 const (

@@ -57,13 +57,13 @@ type TerminalInfo struct {
 }
 
 // FindCLIBinary returns the absolute path to the Copilot CLI binary,
-// preferring "ghcs" and falling back to "copilot". Returns an empty
+// preferring "copilot" and falling back to "ghcs". Returns an empty
 // string when neither is found on PATH.
 func FindCLIBinary() string {
-	if p, err := exec.LookPath("ghcs"); err == nil {
+	if p, err := exec.LookPath("copilot"); err == nil {
 		return p
 	}
-	if p, err := exec.LookPath("copilot"); err == nil {
+	if p, err := exec.LookPath("ghcs"); err == nil {
 		return p
 	}
 	return ""

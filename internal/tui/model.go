@@ -403,9 +403,9 @@ type Model struct {
 	dbWatchCh chan struct{} // receives pings from the watcher callback
 
 	// Event watcher — push-based fsnotify watcher for session-state changes.
-	eventWatcher  *data.EventWatcher
-	eventWatchCh  chan eventWatcherUpdateMsg // receives push updates from the watcher
-	sessionTracker *data.SessionTracker      // tracks PIDs of dispatch-launched sessions
+	eventWatcher   *data.EventWatcher
+	eventWatchCh   chan eventWatcherUpdateMsg // receives push updates from the watcher
+	sessionTracker *data.SessionTracker       // tracks PIDs of dispatch-launched sessions
 }
 
 // NewModel creates the root Model with default configuration.
@@ -434,25 +434,25 @@ func NewModel() Model {
 
 	cp := components.NewConfigPanel()
 	cp.SetValues(components.ConfigValues{
-		YoloMode:          cfg.YoloMode,
-		Agent:             cfg.Agent,
-		Model:             cfg.Model,
-		LaunchMode:        cfg.EffectiveLaunchMode(),
-		Terminal:          cfg.DefaultTerminal,
-		Shell:             cfg.DefaultShell,
-		ResumeSessionCommand:     cfg.ResumeSessionCommand,
-		NewSessionCommand:        cfg.NewSessionCommand,
-		Theme:             cfg.Theme,
-		WorkspaceRecovery: cfg.WorkspaceRecovery,
-		PreviewPosition:   cfg.EffectivePreviewPosition(),
-		RedactSecrets:     cfg.RedactPreviewSecrets,
-		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
-		AutoRefresh:       autoRefreshFieldValue(cfg.AutoRefreshSeconds),
-		NotifyOnWaiting:   cfg.NotifyOnWaiting,
-		ShowRepoColumn:    cfg.ColumnVisible(config.ColumnRepo),
-		ShowFolderColumn:  cfg.ColumnVisible(config.ColumnFolder),
-		ShowTurnsColumn:   cfg.ColumnVisible(config.ColumnTurns),
-		ShowHostColumn:    cfg.ColumnVisible(config.ColumnHost),
+		YoloMode:             cfg.YoloMode,
+		Agent:                cfg.Agent,
+		Model:                cfg.Model,
+		LaunchMode:           cfg.EffectiveLaunchMode(),
+		Terminal:             cfg.DefaultTerminal,
+		Shell:                cfg.DefaultShell,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
+		NewSessionCommand:    cfg.NewSessionCommand,
+		Theme:                cfg.Theme,
+		WorkspaceRecovery:    cfg.WorkspaceRecovery,
+		PreviewPosition:      cfg.EffectivePreviewPosition(),
+		RedactSecrets:        cfg.RedactPreviewSecrets,
+		ExcludedWords:        strings.Join(cfg.ExcludedWords, ", "),
+		AutoRefresh:          autoRefreshFieldValue(cfg.AutoRefreshSeconds),
+		NotifyOnWaiting:      cfg.NotifyOnWaiting,
+		ShowRepoColumn:       cfg.ColumnVisible(config.ColumnRepo),
+		ShowFolderColumn:     cfg.ColumnVisible(config.ColumnFolder),
+		ShowTurnsColumn:      cfg.ColumnVisible(config.ColumnTurns),
+		ShowHostColumn:       cfg.ColumnVisible(config.ColumnHost),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -1343,26 +1343,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Config):
 		m.configPanel.SetValues(components.ConfigValues{
-			YoloMode:          m.cfg.YoloMode,
-			Agent:             m.cfg.Agent,
-			Model:             m.cfg.Model,
-			LaunchMode:        m.cfg.EffectiveLaunchMode(),
-			PaneDirection:     m.cfg.EffectivePaneDirection(),
-			Terminal:          m.cfg.DefaultTerminal,
-			Shell:             m.cfg.DefaultShell,
-			ResumeSessionCommand:     m.cfg.ResumeSessionCommand,
-			NewSessionCommand:        m.cfg.NewSessionCommand,
-			Theme:             m.cfg.Theme,
-			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
-			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
-			RedactSecrets:     m.cfg.RedactPreviewSecrets,
-			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
-			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
-			NotifyOnWaiting:   m.cfg.NotifyOnWaiting,
-			ShowRepoColumn:    m.cfg.ColumnVisible(config.ColumnRepo),
-			ShowFolderColumn:  m.cfg.ColumnVisible(config.ColumnFolder),
-			ShowTurnsColumn:   m.cfg.ColumnVisible(config.ColumnTurns),
-			ShowHostColumn:    m.cfg.ColumnVisible(config.ColumnHost),
+			YoloMode:             m.cfg.YoloMode,
+			Agent:                m.cfg.Agent,
+			Model:                m.cfg.Model,
+			LaunchMode:           m.cfg.EffectiveLaunchMode(),
+			PaneDirection:        m.cfg.EffectivePaneDirection(),
+			Terminal:             m.cfg.DefaultTerminal,
+			Shell:                m.cfg.DefaultShell,
+			ResumeSessionCommand: m.cfg.ResumeSessionCommand,
+			NewSessionCommand:    m.cfg.NewSessionCommand,
+			Theme:                m.cfg.Theme,
+			WorkspaceRecovery:    m.cfg.WorkspaceRecovery,
+			PreviewPosition:      m.cfg.EffectivePreviewPosition(),
+			RedactSecrets:        m.cfg.RedactPreviewSecrets,
+			ExcludedWords:        strings.Join(m.cfg.ExcludedWords, ", "),
+			AutoRefresh:          autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
+			NotifyOnWaiting:      m.cfg.NotifyOnWaiting,
+			ShowRepoColumn:       m.cfg.ColumnVisible(config.ColumnRepo),
+			ShowFolderColumn:     m.cfg.ColumnVisible(config.ColumnFolder),
+			ShowTurnsColumn:      m.cfg.ColumnVisible(config.ColumnTurns),
+			ShowHostColumn:       m.cfg.ColumnVisible(config.ColumnHost),
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -3900,13 +3900,13 @@ func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchS
 
 func (m Model) resumeConfigForSession(cwd string) platform.ResumeConfig {
 	return platform.ResumeConfig{
-		YoloMode:      m.cfg.YoloMode,
-		Agent:         m.cfg.Agent,
-		Model:         m.cfg.Model,
-		Terminal:      m.cfg.DefaultTerminal,
+		YoloMode:             m.cfg.YoloMode,
+		Agent:                m.cfg.Agent,
+		Model:                m.cfg.Model,
+		Terminal:             m.cfg.DefaultTerminal,
 		ResumeSessionCommand: m.cfg.ResumeSessionCommand,
-		Cwd:           cwd,
-		PaneDirection: m.cfg.EffectivePaneDirection(),
+		Cwd:                  cwd,
+		PaneDirection:        m.cfg.EffectivePaneDirection(),
 	}
 }
 

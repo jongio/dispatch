@@ -319,10 +319,10 @@ func TestLaunchSession_RoutesToPlatformLauncher(t *testing.T) {
 		"test-session",
 		ResumeConfig{
 			ResumeSessionCommand: "my-cli --resume {sessionId}",
-			Terminal:      "my-terminal",
-			Cwd:           cwd,
-			LaunchStyle:   LaunchStyleWindow,
-			PaneDirection: "right",
+			Terminal:             "my-terminal",
+			Cwd:                  cwd,
+			LaunchStyle:          LaunchStyleWindow,
+			PaneDirection:        "right",
 		},
 	)
 	if err != nil {
@@ -364,8 +364,8 @@ func TestLaunchSession_PaneStylePassedThrough(t *testing.T) {
 		"sess",
 		ResumeConfig{
 			ResumeSessionCommand: "echo {sessionId}",
-			LaunchStyle:   LaunchStylePane,
-			PaneDirection: "down",
+			LaunchStyle:          LaunchStylePane,
+			PaneDirection:        "down",
 		},
 	)
 	if err != nil {
@@ -413,7 +413,7 @@ func TestLaunchSession_DefaultsTerminalWhenEmpty(t *testing.T) {
 		"sess",
 		ResumeConfig{
 			ResumeSessionCommand: "echo {sessionId}",
-			Terminal:      "", // empty - should default
+			Terminal:             "", // empty - should default
 		},
 	)
 	if err != nil {

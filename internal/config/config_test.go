@@ -77,22 +77,22 @@ func TestDefaultValues(t *testing.T) {
 func TestConfigJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 	original := &Config{
-		DefaultShell:     "zsh",
-		DefaultTerminal:  "alacritty",
-		DefaultTimeRange: "7d",
-		DefaultSort:      "created",
-		DefaultSortOrder: "asc",
-		DefaultPivot:     "repo",
-		ShowPreview:      false,
-		MaxSessions:      50,
-		YoloMode:         true,
-		Agent:            "coder",
-		Model:            "gpt-4",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/tmp", "/var"},
-		ResumeSessionCommand:    "ghcs --resume {sessionId} --custom",
-		HiddenSessions:   []string{"sess-1", "sess-2"},
-		PreviewPosition:  "bottom",
+		DefaultShell:         "zsh",
+		DefaultTerminal:      "alacritty",
+		DefaultTimeRange:     "7d",
+		DefaultSort:          "created",
+		DefaultSortOrder:     "asc",
+		DefaultPivot:         "repo",
+		ShowPreview:          false,
+		MaxSessions:          50,
+		YoloMode:             true,
+		Agent:                "coder",
+		Model:                "gpt-4",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/tmp", "/var"},
+		ResumeSessionCommand: "ghcs --resume {sessionId} --custom",
+		HiddenSessions:       []string{"sess-1", "sess-2"},
+		PreviewPosition:      "bottom",
 	}
 
 	data, err := json.Marshal(original)
@@ -303,20 +303,20 @@ func TestSaveAndLoad(t *testing.T) {
 	withTempConfigDir(t)
 
 	original := &Config{
-		DefaultShell:     "bash",
-		DefaultTerminal:  "alacritty",
-		DefaultTimeRange: "30d",
-		DefaultSort:      "turns",
-		DefaultPivot:     "repo",
-		ShowPreview:      false,
-		MaxSessions:      200,
-		YoloMode:         true,
-		Agent:            "reviewer",
-		Model:            "claude-3",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/opt/scratch"},
-		ResumeSessionCommand:    "my-cli --resume {sessionId}",
-		HiddenSessions:   []string{"hidden-1"},
+		DefaultShell:         "bash",
+		DefaultTerminal:      "alacritty",
+		DefaultTimeRange:     "30d",
+		DefaultSort:          "turns",
+		DefaultPivot:         "repo",
+		ShowPreview:          false,
+		MaxSessions:          200,
+		YoloMode:             true,
+		Agent:                "reviewer",
+		Model:                "claude-3",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/opt/scratch"},
+		ResumeSessionCommand: "my-cli --resume {sessionId}",
+		HiddenSessions:       []string{"hidden-1"},
 	}
 
 	if err := Save(original); err != nil {
@@ -535,20 +535,20 @@ func TestSaveAndLoadPreservesAllFields(t *testing.T) {
 	withTempConfigDir(t)
 
 	cfg := &Config{
-		DefaultShell:     "fish",
-		DefaultTerminal:  "wezterm",
-		DefaultTimeRange: "all",
-		DefaultSort:      "name",
-		DefaultPivot:     "date",
-		ShowPreview:      false,
-		MaxSessions:      500,
-		YoloMode:         true,
-		Agent:            "developer",
-		Model:            "o1-preview",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/a", "/b", "/c"},
-		ResumeSessionCommand:    "custom-cli {sessionId} --flag",
-		HiddenSessions:   []string{"h1", "h2", "h3"},
+		DefaultShell:         "fish",
+		DefaultTerminal:      "wezterm",
+		DefaultTimeRange:     "all",
+		DefaultSort:          "name",
+		DefaultPivot:         "date",
+		ShowPreview:          false,
+		MaxSessions:          500,
+		YoloMode:             true,
+		Agent:                "developer",
+		Model:                "o1-preview",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/a", "/b", "/c"},
+		ResumeSessionCommand: "custom-cli {sessionId} --flag",
+		HiddenSessions:       []string{"h1", "h2", "h3"},
 	}
 
 	if err := Save(cfg); err != nil {
