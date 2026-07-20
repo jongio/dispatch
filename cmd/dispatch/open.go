@@ -215,7 +215,7 @@ func openResumeConfig(cfg *config.Config, sess *data.Session) platform.ResumeCon
 		YoloMode:      cfg.YoloMode,
 		Agent:         cfg.Agent,
 		Model:         cfg.Model,
-		CustomCommand: cfg.CustomCommand,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
 		Cwd:           sess.Cwd,
 	}
 }
@@ -475,7 +475,7 @@ func defaultOpenLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode
 		Agent:         cfg.Agent,
 		Model:         cfg.Model,
 		Terminal:      cfg.DefaultTerminal,
-		CustomCommand: cfg.CustomCommand,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
 		Cwd:           sess.Cwd,
 		LaunchStyle:   launchStyleForOpenMode(mode),
 		PaneDirection: cfg.EffectivePaneDirection(),

@@ -139,7 +139,7 @@ func defaultNewLaunch(w io.Writer, cfg *config.Config, dir string, mode string) 
 			YoloMode:      cfg.YoloMode,
 			Agent:         cfg.Agent,
 			Model:         cfg.Model,
-			CustomCommand: cfg.CustomCommand,
+			ResumeSessionCommand: cfg.ResumeSessionCommand,
 			Cwd:           dir,
 		}
 		cmd, err := platform.NewResumeCmd("", rc)
@@ -161,7 +161,7 @@ func defaultNewLaunch(w io.Writer, cfg *config.Config, dir string, mode string) 
 		Agent:         cfg.Agent,
 		Model:         cfg.Model,
 		Terminal:      cfg.DefaultTerminal,
-		CustomCommand: cfg.CustomCommand,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
 		Cwd:           dir,
 		LaunchStyle:   launchStyleForOpenMode(mode),
 		PaneDirection: cfg.EffectivePaneDirection(),

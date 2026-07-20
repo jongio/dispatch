@@ -1305,7 +1305,7 @@ func TestSaveConfigFromPanel(t *testing.T) {
 		LaunchMode:    config.LaunchModeInPlace,
 		Terminal:      "wt",
 		Shell:         "bash",
-		CustomCommand: "my-cmd",
+		ResumeSessionCommand: "my-cmd",
 		Theme:         "dark",
 	})
 	m.saveConfigFromPanel()
@@ -1330,8 +1330,8 @@ func TestSaveConfigFromPanel(t *testing.T) {
 	if m.cfg.DefaultShell != "bash" {
 		t.Errorf("DefaultShell = %q, want 'bash'", m.cfg.DefaultShell)
 	}
-	if m.cfg.CustomCommand != "my-cmd" {
-		t.Errorf("CustomCommand = %q, want 'my-cmd'", m.cfg.CustomCommand)
+	if m.cfg.ResumeSessionCommand != "my-cmd" {
+		t.Errorf("ResumeSessionCommand = %q, want 'my-cmd'", m.cfg.ResumeSessionCommand)
 	}
 	if m.cfg.Theme != "dark" {
 		t.Errorf("Theme = %q, want 'dark'", m.cfg.Theme)
@@ -2321,7 +2321,7 @@ func TestHandleKey_CopyResumeCommand_Success(t *testing.T) {
 	t.Cleanup(func() { clipboardWrite = orig })
 
 	m := newTestModel()
-	m.cfg.CustomCommand = "copilot --resume {sessionId} --agent test-agent"
+	m.cfg.ResumeSessionCommand = "copilot --resume {sessionId} --agent test-agent"
 	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
 
 	result, cmd := m.Update(runeKeyMsg('Y'))
@@ -2361,7 +2361,7 @@ func TestHandleKey_CopyResumeCommand_BuildError(t *testing.T) {
 	t.Cleanup(func() { clipboardWrite = orig })
 
 	m := newTestModel()
-	m.cfg.CustomCommand = "bad\ncommand {sessionId}"
+	m.cfg.ResumeSessionCommand = "bad\ncommand {sessionId}"
 	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
 
 	result, cmd := m.Update(runeKeyMsg('Y'))
@@ -2382,7 +2382,7 @@ func TestHandleKey_CopyResumeCommand_ClipboardError(t *testing.T) {
 	t.Cleanup(func() { clipboardWrite = orig })
 
 	m := newTestModel()
-	m.cfg.CustomCommand = "copilot --resume {sessionId}"
+	m.cfg.ResumeSessionCommand = "copilot --resume {sessionId}"
 	m.sessionList.SetSessions([]data.Session{{ID: "abc-123", Cwd: "/a"}})
 
 	result, cmd := m.Update(runeKeyMsg('Y'))
@@ -2408,7 +2408,7 @@ func TestHandleKey_CopyResumeCommand_MultiSelect(t *testing.T) {
 	t.Cleanup(func() { clipboardWrite = orig })
 
 	m := newTestModel()
-	m.cfg.CustomCommand = "copilot --resume {sessionId}"
+	m.cfg.ResumeSessionCommand = "copilot --resume {sessionId}"
 	m.sessionList.SetSessions([]data.Session{
 		{ID: "s1", Cwd: "/a"},
 		{ID: "s2", Cwd: "/b"},

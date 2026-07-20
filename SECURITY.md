@@ -55,7 +55,7 @@ The application may contact the following domains:
 
 - **Configuration file** (platform config directory, e.g.
   `~/.config/dispatch/config.json`): Treated as trusted user
-  input. If a `custom_command` is configured, it is executed as-is. Keep your
+  input. If a `resume_session_command` is configured, it is executed as-is. Keep your
   config file permissions restricted to your user account.
 - **Session data**: Read from the Copilot CLI SQLite database in read-only mode.
   Malformed session data cannot cause code execution.

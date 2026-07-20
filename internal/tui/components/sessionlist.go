@@ -785,6 +785,14 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		return ""
 	}
 
+	// Check if this session is waiting for user input.
+	isWaiting := false
+	if s.attentionMap != nil {
+		if status, ok := s.attentionMap[sess.ID]; ok && status == data.AttentionWaiting {
+			isWaiting = true
+		}
+	}
+
 	summary := CleanSummary(sess.Summary)
 	if favorited {
 		summary = "★ " + summary
@@ -890,7 +898,7 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	if w < 50 {
 		summaryW := max(10, w-selectorW-dotW-hostDotW-planDotW-noteDotW-tagDotW-wrkDotW-gitDotW-timeW-spacing)
 		line := indent + selector + attDot + hostDot + plnDot + ntDot + tgDot + wrkDot + gitDot + PadRight(summary, summaryW) + "  " + PadLeft(relTime, timeW)
-		return s.applyRowStyle(line, selected, hidden, favorited)
+		return s.applyRowStyle(line, selected, hidden, favorited, isWaiting)
 	}
 
 	// Show folder/repo columns at wider terminals, honouring column visibility.
@@ -962,14 +970,17 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 		b.WriteString(PadLeft(turns, turnsW))
 	}
 
-	return s.applyRowStyle(b.String(), selected, hidden, favorited)
+	return s.applyRowStyle(b.String(), selected, hidden, favorited, isWaiting)
 }
 
 // applyRowStyle renders a row line with the appropriate style based on state.
-func (s SessionList) applyRowStyle(line string, selected, hidden, favorited bool) string {
+func (s SessionList) applyRowStyle(line string, selected, hidden, favorited, waiting bool) string {
 	padded := PadToWidth(line, s.width)
 	if selected {
 		return styles.SelectedStyle.Render(padded)
+	}
+	if waiting {
+		return styles.WaitingRowStyle.Render(padded)
 	}
 	if hidden {
 		return styles.HiddenStyle.Render(padded)

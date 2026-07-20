@@ -41,14 +41,14 @@ const (
 
 // ResumeConfig holds optional CLI flags appended when resuming a session.
 type ResumeConfig struct {
-	YoloMode      bool
-	Agent         string
-	Model         string
-	Terminal      string // preferred terminal emulator name (empty = auto-detect)
-	CustomCommand string // when set, replaces the entire copilot CLI command
-	Cwd           string // working directory to launch the session in
-	LaunchStyle   string // "", "window", or "pane" — controls tab vs window vs split pane
-	PaneDirection string // "auto", "right", "down", "left", "up" — split direction for pane mode
+	YoloMode             bool
+	Agent                string
+	Model                string
+	Terminal             string // preferred terminal emulator name (empty = auto-detect)
+	ResumeSessionCommand string // when set, replaces the entire copilot CLI command
+	Cwd                  string // working directory to launch the session in
+	LaunchStyle          string // "", "window", or "pane" — controls tab vs window vs split pane
+	PaneDirection        string // "auto", "right", "down", "left", "up" — split direction for pane mode
 }
 
 // TerminalInfo describes a terminal emulator available on the system.
@@ -114,7 +114,7 @@ func BuildResumeArgs(sessionID string, cfg ResumeConfig) []string {
 // The returned command has no Stdin/Stdout/Stderr configured; callers
 // (or tea.ExecProcess) should attach them as needed.
 //
-// When cfg.CustomCommand is set, the custom command string (with
+// When cfg.ResumeSessionCommand is set, the resume session command string (with
 // {sessionId} replaced) is split on whitespace and executed directly,
 // bypassing the copilot CLI binary lookup.
 func NewResumeCmd(sessionID string, cfg ResumeConfig) (*exec.Cmd, error) {
@@ -124,8 +124,8 @@ func NewResumeCmd(sessionID string, cfg ResumeConfig) (*exec.Cmd, error) {
 		}
 	}
 	var cmd *exec.Cmd
-	if cfg.CustomCommand != "" {
-		c, err := buildCustomCmd(sessionID, cfg.CustomCommand)
+	if cfg.ResumeSessionCommand != "" {
+		c, err := buildCustomCmd(sessionID, cfg.ResumeSessionCommand)
 		if err != nil {
 			return nil, err
 		}
@@ -144,26 +144,26 @@ func NewResumeCmd(sessionID string, cfg ResumeConfig) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// validateCustomCommand rejects custom command templates containing dangerous
-// characters. The custom_command comes from the user's own local config file,
+// validateResumeCommand rejects resume session command templates containing dangerous
+// characters. The resume_session_command comes from the user's own local config file,
 // so this is defense-in-depth (not a remote attack vector). The argv-style
 // exec path (strings.Fields) is inherently safer, but buildResumeCommandString
 // passes the expanded command through a shell, so we guard against embedded
 // newlines that could inject additional shell commands.
-func validateCustomCommand(cmd string) error {
+func validateResumeCommand(cmd string) error {
 	if strings.TrimSpace(cmd) == "" {
-		return errors.New("custom command is empty or whitespace-only")
+		return errors.New("resume session command is empty or whitespace-only")
 	}
 	if strings.ContainsAny(cmd, "\n\r") {
-		return errors.New("custom command contains embedded newlines")
+		return errors.New("resume session command contains embedded newlines")
 	}
 	return nil
 }
 
-// buildCustomCmd parses a custom command template, replaces {sessionId}
+// buildCustomCmd parses a resume session command template, replaces {sessionId}
 // with the actual session ID, splits on whitespace, and returns an *exec.Cmd.
 func buildCustomCmd(sessionID, template string) (*exec.Cmd, error) {
-	if err := validateCustomCommand(template); err != nil {
+	if err := validateResumeCommand(template); err != nil {
 		return nil, err
 	}
 	expanded := strings.ReplaceAll(template, "{sessionId}", sessionID)
@@ -182,20 +182,20 @@ func buildCustomCmd(sessionID, template string) (*exec.Cmd, error) {
 // and PowerShell both understand double quotes, while POSIX single
 // quotes cause misinterpretation on Windows (e.g., UNC-path errors).
 //
-// When cfg.CustomCommand is set, {sessionId} is replaced and the result
+// When cfg.ResumeSessionCommand is set, {sessionId} is replaced and the result
 // is returned directly (the user is responsible for quoting within their
-// custom command template).
+// resume session command template).
 func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error) {
 	if sessionID != "" {
 		if err := validateSessionID(sessionID); err != nil {
 			return "", err
 		}
 	}
-	if cfg.CustomCommand != "" {
-		if err := validateCustomCommand(cfg.CustomCommand); err != nil {
+	if cfg.ResumeSessionCommand != "" {
+		if err := validateResumeCommand(cfg.ResumeSessionCommand); err != nil {
 			return "", err
 		}
-		expanded := strings.ReplaceAll(cfg.CustomCommand, "{sessionId}", sessionID)
+		expanded := strings.ReplaceAll(cfg.ResumeSessionCommand, "{sessionId}", sessionID)
 		if strings.TrimSpace(expanded) == "" {
 			return "", ErrEmptyAfterExpansion
 		}
@@ -226,7 +226,7 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 }
 
 // BuildResumeCommandString returns the shell command Dispatch uses to start or
-// resume a Copilot CLI session, including configured flags and custom command
+// resume a Copilot CLI session, including configured flags and resume session command
 // templates. It is exported for UI and diagnostics code that need to display or
 // copy the same command used by the launcher.
 func BuildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error) {
