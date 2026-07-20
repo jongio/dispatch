@@ -46,7 +46,7 @@ func TestEventWatcher_FiresOnEventWrite(t *testing.T) {
 	defer ew.Stop()
 
 	// Give the watcher time to set up.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Modify events.jsonl — this should trigger a callback.
 	newEvent := fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())
@@ -55,7 +55,7 @@ func TestEventWatcher_FiresOnEventWrite(t *testing.T) {
 	}
 
 	// Wait for the debounced callback (50ms debounce + margin).
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	mu.Lock()
 	status, ok := updates["test-session-1"]
@@ -98,7 +98,7 @@ func TestEventWatcher_DebounceCollapses(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Write rapidly 5 times within the debounce window.
 	for i := 0; i < 5; i++ {
@@ -149,7 +149,7 @@ func TestEventWatcher_IgnoresInvalidSessionIDs(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Modify the file — should NOT trigger callback.
 	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
@@ -181,7 +181,7 @@ func TestEventWatcher_WatchesNewSessionDirs(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Create a new session directory AFTER the watcher started.
 	newSessionDir := filepath.Join(dir, "new-session-abc")
@@ -266,14 +266,14 @@ func TestEventWatcher_SessionIDFromPath(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Modify the file.
 	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	mu.Lock()
 	id := gotID

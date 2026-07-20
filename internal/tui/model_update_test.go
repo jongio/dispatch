@@ -1299,14 +1299,14 @@ func TestSaveConfigFromPanel(t *testing.T) {
 	m := newTestModel()
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetValues(components.ConfigValues{
-		YoloMode:      true,
-		Agent:         "test-agent",
-		Model:         "test-model",
-		LaunchMode:    config.LaunchModeInPlace,
-		Terminal:      "wt",
-		Shell:         "bash",
+		YoloMode:             true,
+		Agent:                "test-agent",
+		Model:                "test-model",
+		LaunchMode:           config.LaunchModeInPlace,
+		Terminal:             "wt",
+		Shell:                "bash",
 		ResumeSessionCommand: "my-cmd",
-		Theme:         "dark",
+		Theme:                "dark",
 	})
 	m.saveConfigFromPanel()
 	if !m.cfg.YoloMode {

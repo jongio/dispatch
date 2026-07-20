@@ -311,8 +311,8 @@ type Config struct {
 
 	// NewSessionCommand is the command template used to launch a brand new
 	// Copilot CLI session from dispatch. The placeholder {cwd} is replaced
-	// with the target working directory. When empty, defaults to "gh copilot".
-	// Examples: "gh copilot", "copilot", "gh cs new"
+	// with the target working directory. When empty, defaults to "copilot".
+	// Examples: "copilot", "copilot --agent workspace", "gh copilot"
 	NewSessionCommand string `json:"new_session_command,omitempty"`
 }
 

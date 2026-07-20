@@ -44,7 +44,7 @@ type EventWatcher struct {
 // a session's attention status changes. Call Start() to begin watching.
 func NewEventWatcher(onChange func(id string, status AttentionStatus), threshold time.Duration, workspaceRecovery bool) *EventWatcher {
 	return &EventWatcher{
-		onChange:           onChange,
+		onChange:          onChange,
 		stop:              make(chan struct{}),
 		threshold:         threshold,
 		workspaceRecovery: workspaceRecovery,

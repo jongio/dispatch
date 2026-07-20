@@ -316,7 +316,7 @@ func TestSessionStorePath_DispatchDBOverride(t *testing.T) {
 func TestBuildResumeCommandString_WithCwd(t *testing.T) {
 	cfg := ResumeConfig{
 		ResumeSessionCommand: "my-tool {sessionId}",
-		Cwd:           t.TempDir(),
+		Cwd:                  t.TempDir(),
 	}
 	result, err := buildResumeCommandString("abc123", cfg)
 	if err != nil {
@@ -335,7 +335,7 @@ func TestNewResumeCmd_ResumeSessionCommandWithCwd(t *testing.T) {
 	cwd := t.TempDir()
 	cmd, err := NewResumeCmd("abc123", ResumeConfig{
 		ResumeSessionCommand: "echo {sessionId}",
-		Cwd:           cwd,
+		Cwd:                  cwd,
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd error: %v", err)
@@ -579,7 +579,7 @@ func TestBuildResumeCommandString_ArgsWithSpaces(t *testing.T) {
 func TestBuildResumeCommandString_WithModel(t *testing.T) {
 	cfg := ResumeConfig{
 		ResumeSessionCommand: "tool",
-		Cwd:           t.TempDir(),
+		Cwd:                  t.TempDir(),
 	}
 	result, err := buildResumeCommandString("abc123", cfg)
 	if err != nil {

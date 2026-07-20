@@ -33,7 +33,7 @@ A new `EventWatcher` struct using `fsnotify` to monitor `~/.copilot/session-stat
 
 ### New Session Launch
 
-Config adds `NewSessionCommand string` (default: `"gh copilot"` or whatever `copilot` resolves to). Template variables: `{cwd}`. Keybinding: `N` (uppercase, mnemonic: "New"). When triggered, dispatch runs the configured command in a new WT tab/pane at the selected folder's cwd.
+Config adds `NewSessionCommand string` (default: `"copilot"`). Template variables: `{cwd}`. Keybinding: `N` (uppercase, mnemonic: "New"). When triggered, dispatch runs the configured command in a new WT tab/pane at the selected folder's cwd.
 
 ### Session Process Tracking (`internal/data/sessiontrack.go`)
 

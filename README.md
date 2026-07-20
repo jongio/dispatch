@@ -706,8 +706,8 @@ dispatch config path            # print the config file path
 | `model` | string | `""` | Pass `--model <name>` to Copilot CLI |
 | `launch_mode` | string | `"tab"` | How to open sessions: `in-place`, `tab`, `window`, `pane` |
 | `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` (see note below) |
-| `resume_session_command` | string | `""` | Custom resume command (`{sessionId}` is replaced) |
-| `new_session_command` | string | `""` | Command to launch new sessions (`{cwd}` is replaced). Defaults to `gh copilot` |
+| `resume_session_command` | string | `""` | Custom resume command (`{sessionId}` is replaced). Defaults to `copilot --resume` |
+| `new_session_command` | string | `""` | Command to launch new sessions (`{cwd}` is replaced). Defaults to `copilot` |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
@@ -791,10 +791,10 @@ Set `resume_session_command` to replace the default Copilot CLI resume command. 
 
 ### New Session Command
 
-Set `new_session_command` to customize the command used when launching a brand new session from dispatch (the `+` keybinding). Use `{cwd}` as the placeholder for the working directory. When empty, defaults to `gh copilot`.
+Set `new_session_command` to customize the command used when launching a brand new session from dispatch (the `+` keybinding). Use `{cwd}` as the placeholder for the working directory. When empty, defaults to `copilot`.
 
 ```json
-"new_session_command": "gh copilot --agent workspace"
+"new_session_command": "copilot --agent workspace"
 ```
 
 ### Customizing Keybindings

@@ -102,26 +102,26 @@ func NewConfigPanel() ConfigPanel {
 // ConfigValues bundles the editable fields exchanged between the config
 // panel and the rest of the application.
 type ConfigValues struct {
-	YoloMode          bool
-	Agent             string
-	Model             string
-	LaunchMode        string
-	PaneDirection     string
-	Terminal          string
-	Shell             string
-	ResumeSessionCommand     string
-	NewSessionCommand        string
-	Theme             string
-	WorkspaceRecovery bool
-	PreviewPosition   string
-	RedactSecrets     bool
-	ExcludedWords     string // comma-separated filter words
-	AutoRefresh       string // auto-refresh seconds ("" default, "0" off)
-	NotifyOnWaiting   bool
-	ShowRepoColumn    bool
-	ShowFolderColumn  bool
-	ShowTurnsColumn   bool
-	ShowHostColumn    bool
+	YoloMode             bool
+	Agent                string
+	Model                string
+	LaunchMode           string
+	PaneDirection        string
+	Terminal             string
+	Shell                string
+	ResumeSessionCommand string
+	NewSessionCommand    string
+	Theme                string
+	WorkspaceRecovery    bool
+	PreviewPosition      string
+	RedactSecrets        bool
+	ExcludedWords        string // comma-separated filter words
+	AutoRefresh          string // auto-refresh seconds ("" default, "0" off)
+	NotifyOnWaiting      bool
+	ShowRepoColumn       bool
+	ShowFolderColumn     bool
+	ShowTurnsColumn      bool
+	ShowHostColumn       bool
 }
 
 // SetValues loads the config panel state from external values.
@@ -151,26 +151,26 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 // Values returns the current state of all editable fields.
 func (c *ConfigPanel) Values() ConfigValues {
 	return ConfigValues{
-		YoloMode:          c.yoloMode,
-		Agent:             c.agent,
-		Model:             c.model,
-		LaunchMode:        c.launchMode,
-		PaneDirection:     c.paneDirection,
-		Terminal:          c.terminal,
-		Shell:             c.shell,
-		ResumeSessionCommand:     c.resumeSessionCommand,
-		NewSessionCommand:        c.newSessionCommand,
-		Theme:             c.theme,
-		WorkspaceRecovery: c.workspaceRecovery,
-		PreviewPosition:   c.previewPosition,
-		RedactSecrets:     c.redactSecrets,
-		ExcludedWords:     c.excludedWords,
-		AutoRefresh:       c.autoRefresh,
-		NotifyOnWaiting:   c.notifyOnWaiting,
-		ShowRepoColumn:    c.colRepo,
-		ShowFolderColumn:  c.colFolder,
-		ShowTurnsColumn:   c.colTurns,
-		ShowHostColumn:    c.colHost,
+		YoloMode:             c.yoloMode,
+		Agent:                c.agent,
+		Model:                c.model,
+		LaunchMode:           c.launchMode,
+		PaneDirection:        c.paneDirection,
+		Terminal:             c.terminal,
+		Shell:                c.shell,
+		ResumeSessionCommand: c.resumeSessionCommand,
+		NewSessionCommand:    c.newSessionCommand,
+		Theme:                c.theme,
+		WorkspaceRecovery:    c.workspaceRecovery,
+		PreviewPosition:      c.previewPosition,
+		RedactSecrets:        c.redactSecrets,
+		ExcludedWords:        c.excludedWords,
+		AutoRefresh:          c.autoRefresh,
+		NotifyOnWaiting:      c.notifyOnWaiting,
+		ShowRepoColumn:       c.colRepo,
+		ShowFolderColumn:     c.colFolder,
+		ShowTurnsColumn:      c.colTurns,
+		ShowHostColumn:       c.colHost,
 	}
 }
 

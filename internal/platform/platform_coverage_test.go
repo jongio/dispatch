@@ -485,7 +485,7 @@ func TestCovNewResumeCmd_CustomCmdWithCwd(t *testing.T) {
 	dir := t.TempDir()
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
 		ResumeSessionCommand: "echo {sessionId}",
-		Cwd:           dir,
+		Cwd:                  dir,
 	})
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -498,7 +498,7 @@ func TestCovNewResumeCmd_CustomCmdWithCwd(t *testing.T) {
 func TestCovNewResumeCmd_CustomCmdInvalidCwd(t *testing.T) {
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
 		ResumeSessionCommand: "echo {sessionId}",
-		Cwd:           "C:\\nonexistent\\path",
+		Cwd:                  "C:\\nonexistent\\path",
 	})
 	if err != nil {
 		t.Fatalf("error: %v", err)
