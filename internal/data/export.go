@@ -125,6 +125,87 @@ func RenderMarkdown(detail *SessionDetail) string {
 	return b.String()
 }
 
+// RenderText formats a SessionDetail as plain text for systems that do not
+// render Markdown or HTML.
+func RenderText(detail *SessionDetail) string {
+	if detail == nil {
+		return ""
+	}
+
+	s := detail.Session
+	var b strings.Builder
+
+	b.WriteString("Session: " + s.Summary + "\n\n")
+
+	b.WriteString("Metadata\n")
+	fmt.Fprintf(&b, "ID: %s\n", s.ID)
+	fmt.Fprintf(&b, "Folder: %s\n", s.Cwd)
+	if s.Repository != "" {
+		fmt.Fprintf(&b, "Repository: %s\n", s.Repository)
+	}
+	if s.Branch != "" {
+		fmt.Fprintf(&b, "Branch: %s\n", s.Branch)
+	}
+	fmt.Fprintf(&b, "Created: %s\n", s.CreatedAt)
+	fmt.Fprintf(&b, "Last Active: %s\n", s.LastActiveAt)
+	fmt.Fprintf(&b, "Turns: %d\n", s.TurnCount)
+	fmt.Fprintf(&b, "Files: %d\n\n", s.FileCount)
+
+	if len(detail.Turns) > 0 {
+		b.WriteString("Conversation\n\n")
+		for _, turn := range detail.Turns {
+			if turn.UserMessage != "" {
+				b.WriteString("User:\n")
+				b.WriteString(turn.UserMessage + "\n\n")
+			}
+			if turn.AssistantResponse != "" {
+				b.WriteString("Assistant:\n")
+				b.WriteString(turn.AssistantResponse + "\n\n")
+			}
+		}
+	}
+
+	if len(detail.Checkpoints) > 0 {
+		b.WriteString("Checkpoints\n\n")
+		for _, cp := range detail.Checkpoints {
+			fmt.Fprintf(&b, "%d. %s\n", cp.CheckpointNumber, cp.Title)
+			if cp.Overview != "" {
+				b.WriteString(cp.Overview + "\n")
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	if len(detail.Files) > 0 {
+		b.WriteString("Files Touched\n\n")
+		seen := make(map[string]struct{})
+		for _, f := range detail.Files {
+			if _, ok := seen[f.FilePath]; ok {
+				continue
+			}
+			seen[f.FilePath] = struct{}{}
+			fmt.Fprintf(&b, "- %s (%s)\n", f.FilePath, f.ToolName)
+		}
+		b.WriteString("\n")
+	}
+
+	if len(detail.Refs) > 0 {
+		b.WriteString("References\n\n")
+		seen := make(map[string]struct{})
+		for _, ref := range detail.Refs {
+			key := ref.RefType + ":" + ref.RefValue
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			fmt.Fprintf(&b, "- %s: %s\n", ref.RefType, ref.RefValue)
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
 // htmlExportStyle is the inline stylesheet for HTML exports. It is embedded in
 // the document so the file renders without any external requests.
 const htmlExportStyle = `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#1f2328;background:#fff;margin:0;padding:2rem;max-width:56rem;margin-left:auto;margin-right:auto}

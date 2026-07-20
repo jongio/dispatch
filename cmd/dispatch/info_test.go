@@ -52,11 +52,14 @@ func TestParseInfoArgs(t *testing.T) {
 		args     []string
 		wantID   string
 		wantJSON bool
+		wantRefs bool
 		wantErr  bool
 	}{
 		{name: "id only", args: []string{"info", "abc"}, wantID: "abc"},
 		{name: "id with json", args: []string{"info", "abc", "--json"}, wantID: "abc", wantJSON: true},
 		{name: "json before id", args: []string{"info", "--json", "abc"}, wantID: "abc", wantJSON: true},
+		{name: "id with refs", args: []string{"info", "abc", "--refs"}, wantID: "abc", wantRefs: true},
+		{name: "json with refs", args: []string{"info", "--json", "--refs", "abc"}, wantID: "abc", wantJSON: true, wantRefs: true},
 		{name: "missing id", args: []string{"info"}, wantErr: true},
 		{name: "two ids", args: []string{"info", "a", "b"}, wantErr: true},
 		{name: "unknown flag", args: []string{"info", "abc", "--nope"}, wantErr: true},
@@ -64,7 +67,7 @@ func TestParseInfoArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			id, asJSON, err := parseInfoArgs(tt.args)
+			id, asJSON, includeRefs, err := parseInfoArgs(tt.args)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected an error")
@@ -79,6 +82,9 @@ func TestParseInfoArgs(t *testing.T) {
 			}
 			if asJSON != tt.wantJSON {
 				t.Errorf("asJSON = %v, want %v", asJSON, tt.wantJSON)
+			}
+			if includeRefs != tt.wantRefs {
+				t.Errorf("includeRefs = %v, want %v", includeRefs, tt.wantRefs)
 			}
 		})
 	}
@@ -128,6 +134,28 @@ func TestRunInfo_Text(t *testing.T) {
 	}
 }
 
+func TestRunInfo_TextWithRefs(t *testing.T) {
+	withInfoDetail(t, func(string) (*data.SessionDetail, error) {
+		return infoSampleDetail(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runInfo(&buf, []string{"info", "ses-info-1", "--refs"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, want := range []string{
+		"Commits:     abc123, def456",
+		"PRs:         42, 43",
+		"Issues:      7",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
 func TestRunInfo_TextOmitsEmptyFields(t *testing.T) {
 	withInfoDetail(t, func(string) (*data.SessionDetail, error) {
 		return &data.SessionDetail{Session: data.Session{ID: "bare"}}, nil
@@ -164,6 +192,34 @@ func TestRunInfo_JSON(t *testing.T) {
 	}
 	if got.ID != "ses-info-1" || got.Turns != 5 || got.Commits != 2 || got.PRs != 2 || got.Issues != 1 {
 		t.Errorf("decoded info = %+v", got)
+	}
+}
+
+func TestRunInfo_JSONWithRefs(t *testing.T) {
+	withInfoDetail(t, func(string) (*data.SessionDetail, error) {
+		return infoSampleDetail(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runInfo(&buf, []string{"info", "ses-info-1", "--json", "--refs"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var got sessionInfo
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
+	}
+	if got.Refs == nil {
+		t.Fatal("refs = nil, want ref arrays")
+	}
+	if strings.Join(got.Refs.Commits, ",") != "abc123,def456" {
+		t.Errorf("commits = %+v", got.Refs.Commits)
+	}
+	if strings.Join(got.Refs.PRs, ",") != "42,43" {
+		t.Errorf("prs = %+v", got.Refs.PRs)
+	}
+	if strings.Join(got.Refs.Issues, ",") != "7" {
+		t.Errorf("issues = %+v", got.Refs.Issues)
 	}
 }
 

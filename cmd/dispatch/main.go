@@ -126,16 +126,18 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  search [query] [flags]  Print matching sessions as JSON, IDs, or a table
+  search [query] [flags]  Print matching sessions as JSON, CSV, IDs, or a table
   tags [--json]           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
+  alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
   config [get|set|list|edit|path]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown, JSON, or HTML
   export --repo R [flags] Export all sessions matching a scope filter (batch mode)
-  info <id> [--json]      Print a concise session summary (--json for machine-readable output)
+  info <id> [--json] [--refs]
+                          Print a concise session summary
   path <id|--last|--current>
                           Print only a session's working directory (for cd "$(dispatch path x)")
   compare <a> <b> [--json]
@@ -179,7 +181,8 @@ Search flags:
   --json                  Print results as JSON (default)
   --ids                   Print one session ID per line
   --table                 Print a readable table
-  --format json|ids|table Choose the output format
+  --format json|csv|ids|table
+                          Choose the output format
   --query <text>          Text to match (also accepted as a positional argument)
   --deep                  Search turns, checkpoints, files, and refs too
   --repo <name>           Only include sessions for a repository
@@ -206,7 +209,8 @@ Config commands:
 Notes commands:
   notes [list] [--json]    List notes attached to current sessions
   notes get <id>           Print one session note
-  notes set <id> <text>    Set one session note
+  notes set <id> <text...> Set one session note
+  notes set <id> --stdin   Read one session note from stdin
   notes clear <id>         Clear one session note
 
 Export flags:
@@ -239,6 +243,7 @@ Watch flags:
   --repo <name>           Only watch sessions for a repository
   --branch <name>         Only watch sessions on a branch
   --folder <path>         Only watch sessions under a folder
+  --exec <cmd>            Run a command on each attention transition (streaming only)
 
 Flags:
   -h, --help              Show this help message
@@ -257,6 +262,7 @@ Startup filters:
 Environment:
   DISPATCH_DB             Path to a custom session store database
   DISPATCH_SESSION_STATE  Path to a custom session state directory
+  DISPATCH_CONFIG         Path to a custom config file (overrides the default location)
   DISPATCH_LOG            Path to a log file (enables debug logging)
   DISPATCH_NO_UPDATE_CHECK
                           Skip the background release check when set to 1, true, yes, or on
