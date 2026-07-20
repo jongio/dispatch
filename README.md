@@ -404,9 +404,31 @@ dispatch watch --once --json             # JSON snapshot
 dispatch watch                           # stream transitions (Ctrl-C to stop)
 dispatch watch --interval 10s            # custom poll interval
 dispatch watch --once --repo jongio/dispatch  # filter by repo
+dispatch watch --exec 'notify-send "$DISPATCH_SESSION_STATE"'  # run a hook on each transition
 ```
 
 The terminal bell rings when a session transitions to waiting or interrupted. Use `--repo`, `--branch`, or `--folder` to limit which sessions are monitored.
+
+#### Transition hooks
+
+`--exec <cmd>` runs a command every time a session changes attention state while streaming (it cannot be combined with `--once`). The command runs through your shell, so pipelines and quoting work as usual. Session context is passed as environment variables, never interpolated into the command string:
+
+| Variable | Value |
+| --- | --- |
+| `DISPATCH_SESSION_ID` | Full session ID |
+| `DISPATCH_SESSION_STATE` | New attention state (`waiting`, `working`, `gone`, ...) |
+| `DISPATCH_SESSION_PREV_STATE` | Prior state, or `none` for a newly seen session |
+| `DISPATCH_SESSION_REPO` | Repository |
+| `DISPATCH_SESSION_BRANCH` | Branch |
+| `DISPATCH_SESSION_FOLDER` | Working directory |
+| `DISPATCH_SESSION_SUMMARY` | Session summary |
+
+Hook output and non-zero exits are written to stderr, and a slow or failing command never stops the watch loop. Example that posts to a webhook when a session starts waiting for input:
+
+```sh
+dispatch watch --exec '[ "$DISPATCH_SESSION_STATE" = waiting ] && \
+  curl -s -X POST "$WEBHOOK_URL" -d "session=$DISPATCH_SESSION_ID needs input"'
+```
 
 ### Search (JSON)
 
