@@ -255,6 +255,7 @@ Startup filters:
 Environment:
   DISPATCH_DB             Path to a custom session store database
   DISPATCH_SESSION_STATE  Path to a custom session state directory
+  DISPATCH_CONFIG         Path to a custom config file (overrides the default location)
   DISPATCH_LOG            Path to a log file (enables debug logging)
   DISPATCH_NO_UPDATE_CHECK
                           Skip the background release check when set to 1, true, yes, or on

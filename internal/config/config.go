@@ -120,7 +120,7 @@ type Config struct {
 	DefaultTimeRange string `json:"default_time_range"`
 
 	// DefaultSort is the field used to order session lists.
-	// Valid values: "updated", "created", "turns", "name", "folder".
+	// Valid values: "updated", "created", "turns", "name", "folder", "frecency".
 	DefaultSort string `json:"default_sort"`
 
 	// DefaultSortOrder is the direction used to order session lists.
