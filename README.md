@@ -404,10 +404,11 @@ dispatch watch --once --json             # JSON snapshot
 dispatch watch                           # stream transitions (Ctrl-C to stop)
 dispatch watch --interval 10s            # custom poll interval
 dispatch watch --once --repo jongio/dispatch  # filter by repo
+dispatch watch --once --status waiting   # filter by attention status
 dispatch watch --exec 'notify-send "$DISPATCH_SESSION_STATE"'  # run a hook on each transition
 ```
 
-The terminal bell rings when a session transitions to waiting or interrupted. Use `--repo`, `--branch`, or `--folder` to limit which sessions are monitored.
+The terminal bell rings when a session transitions to waiting or interrupted. Use `--repo`, `--branch`, `--folder`, or `--status waiting|working|thinking|active|stale|compacting|interrupted|idle` to limit which sessions are monitored.
 
 #### Transition hooks
 

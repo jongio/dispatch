@@ -153,6 +153,35 @@ func TestRunWatch_FilteredByRepo(t *testing.T) {
 	}
 }
 
+func TestRunWatch_FilteredByStatus(t *testing.T) {
+	attention := map[string]data.AttentionStatus{
+		"ses-1": data.AttentionWaiting,
+		"ses-2": data.AttentionIdle,
+		"ses-3": data.AttentionWaiting,
+	}
+	sessions := []data.Session{
+		{ID: "ses-1", Summary: "Auth"},
+		{ID: "ses-2", Summary: "Quiet"},
+		{ID: "ses-3", Summary: "Review"},
+	}
+	withWatchSeams(t, attention, sessions)
+
+	var buf bytes.Buffer
+	if err := runWatch(&buf, []string{"watch", "--once", "--json", "--status", "waiting"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var got watchSnapshot
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Total != 2 || got.Waiting != 2 || got.Idle != 0 {
+		t.Fatalf("snapshot = %+v, want two waiting sessions only", got)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("sessions len = %d, want 2", len(got.Sessions))
+	}
+}
+
 func TestParseWatchArgs_Interval(t *testing.T) {
 	opts, err := parseWatchArgs([]string{"watch", "--interval", "10s"})
 	if err != nil {
@@ -173,6 +202,16 @@ func TestParseWatchArgs_IntervalClamped(t *testing.T) {
 	}
 }
 
+func TestParseWatchArgs_Status(t *testing.T) {
+	opts, err := parseWatchArgs([]string{"watch", "--status", "Interrupted"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !opts.hasStatus || opts.status != data.AttentionInterrupted {
+		t.Fatalf("status filter = %v %v, want interrupted", opts.hasStatus, opts.status)
+	}
+}
+
 func TestParseWatchArgs_UnknownFlag(t *testing.T) {
 	_, err := parseWatchArgs([]string{"watch", "--nope"})
 	if err == nil {
@@ -184,6 +223,17 @@ func TestParseWatchArgs_MissingIntervalValue(t *testing.T) {
 	_, err := parseWatchArgs([]string{"watch", "--interval"})
 	if err == nil {
 		t.Fatal("expected error for missing interval value")
+	}
+}
+
+func TestParseWatchArgs_StatusErrors(t *testing.T) {
+	for _, args := range [][]string{
+		{"watch", "--status"},
+		{"watch", "--status", "blocked"},
+	} {
+		if _, err := parseWatchArgs(args); err == nil {
+			t.Fatalf("parseWatchArgs(%v) returned nil error", args)
+		}
 	}
 }
 
