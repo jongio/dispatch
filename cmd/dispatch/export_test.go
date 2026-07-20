@@ -55,6 +55,8 @@ func TestParseExportArgs(t *testing.T) {
 		{name: "id only", args: []string{"export", "abc"}, wantID: "abc", wantFormat: "md"},
 		{name: "format json", args: []string{"export", "abc", "--format", "json"}, wantID: "abc", wantFormat: "json"},
 		{name: "format html", args: []string{"export", "abc", "--format", "html"}, wantID: "abc", wantFormat: "html"},
+		{name: "format text", args: []string{"export", "abc", "--format", "text"}, wantID: "abc", wantFormat: "text"},
+		{name: "format txt alias", args: []string{"export", "abc", "--format=txt"}, wantID: "abc", wantFormat: "text"},
 		{name: "format markdown alias", args: []string{"export", "abc", "--format=markdown"}, wantID: "abc", wantFormat: "md"},
 		{name: "short format", args: []string{"export", "-f", "json", "abc"}, wantID: "abc", wantFormat: "json"},
 		{name: "stdout", args: []string{"export", "abc", "--stdout"}, wantID: "abc", wantFormat: "md", wantStdout: true},
@@ -71,6 +73,7 @@ func TestParseExportArgs(t *testing.T) {
 		{name: "batch repo", args: []string{"export", "--repo", "x/y"}, wantFormat: "md", wantFilter: true},
 		{name: "batch since until", args: []string{"export", "--since", "2026-01-01", "--until", "2026-02-01"}, wantFormat: "md", wantFilter: true},
 		{name: "batch with format", args: []string{"export", "--branch", "main", "--format", "json"}, wantFormat: "json", wantFilter: true},
+		{name: "batch with text format", args: []string{"export", "--branch", "main", "--format", "text"}, wantFormat: "text", wantFilter: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -129,6 +132,7 @@ func TestRunExport_StdoutJSON(t *testing.T) {
 	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "json"}); err != nil {
 		t.Fatalf("runExport: %v", err)
 	}
+
 	var got data.SessionDetail
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
@@ -323,5 +327,60 @@ func TestRunExportBatch_StdoutForbidden(t *testing.T) {
 	err := runExport(&bytes.Buffer{}, []string{"export", "--repo", "x/y", "--stdout"})
 	if err == nil || !strings.Contains(err.Error(), "--stdout is not supported in batch mode") {
 		t.Fatalf("expected stdout-batch error, got: %v", err)
+	}
+}
+
+func TestRunExport_StdoutText(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return sampleDetail(), nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "text"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Session: Fix the widget", "Metadata", "Conversation", "User:", "References"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("text output missing %q, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "# Session") || strings.Contains(out, "| Field |") {
+		t.Errorf("text output should not contain Markdown formatting, got:\n%s", out)
+	}
+}
+
+func TestRunExport_RedactsTextStdout(t *testing.T) {
+	detail := sampleDetail()
+	detail.Turns = []data.Turn{
+		{UserMessage: "Authorization: ******", AssistantResponse: "API_TOKEN=super-secret-token"},
+	}
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return detail, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--format", "text", "--redact"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "super-secret-token") {
+		t.Fatalf("redacted text export leaked a secret:\n%s", out)
+	}
+	if !strings.Contains(out, "[redacted]") {
+		t.Fatalf("redacted text export missing placeholder:\n%s", out)
+	}
+}
+
+func TestRunExport_WritesTextFile(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return sampleDetail(), nil })
+
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--out", dir, "--format", "text"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	path := filepath.Join(dir, "ses-001.txt")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected export file at %s: %v", path, err)
+	}
+	if !strings.Contains(buf.String(), path) {
+		t.Errorf("output should report the path %q, got %q", path, buf.String())
 	}
 }

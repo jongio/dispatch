@@ -26,16 +26,16 @@ var (
 // exportOptions holds the parsed flags for the export command.
 type exportOptions struct {
 	id     string
-	format string // "md", "json", or "html"
+	format string // "md", "json", "html", or "text"
 	stdout bool
 	outDir string
 	redact bool
 	filter *data.FilterOptions // non-nil for batch mode
 }
 
-// runExport writes a session's full content as Markdown or JSON. It writes to
-// the exports directory by default, or to stdout with --stdout. args is the
-// full argument slice with args[0] == "export".
+// runExport writes a session's full content. It writes to the exports directory
+// by default, or to stdout with --stdout. args is the full argument slice with
+// args[0] == "export".
 func runExport(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
@@ -221,8 +221,8 @@ func parseExportArgs(args []string) (exportOptions, error) {
 	return opts, nil
 }
 
-// normalizeExportFormat maps a user-facing format string to "md", "json", or
-// "html".
+// normalizeExportFormat maps a user-facing format string to a canonical export
+// format.
 func normalizeExportFormat(format string) (string, error) {
 	switch strings.ToLower(format) {
 	case "md", "markdown":
@@ -231,8 +231,10 @@ func normalizeExportFormat(format string) (string, error) {
 		return "json", nil
 	case "html":
 		return "html", nil
+	case "txt", "text":
+		return "text", nil
 	default:
-		return "", fmt.Errorf("invalid format %q (want md, json, or html)", format)
+		return "", fmt.Errorf("invalid format %q (want md, json, html, or text)", format)
 	}
 }
 
@@ -293,6 +295,8 @@ func renderExport(detail *data.SessionDetail, format string) (string, error) {
 		return string(b) + "\n", nil
 	case "html":
 		return data.RenderHTML(detail), nil
+	case "text":
+		return data.RenderText(detail), nil
 	default:
 		return data.RenderMarkdown(detail), nil
 	}
@@ -309,6 +313,8 @@ func writeExportFile(dir, id, format, content string) (string, error) {
 		ext = "json"
 	case "html":
 		ext = "html"
+	case "text":
+		ext = "txt"
 	}
 	path := filepath.Join(dir, data.SafeFilename(id)+"."+ext)
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
