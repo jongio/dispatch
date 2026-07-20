@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -50,6 +51,7 @@ func TestParseExportArgs(t *testing.T) {
 		wantOut    string
 		wantRedact bool
 		wantFilter bool
+		wantTag    string
 		wantErr    bool
 	}{
 		{name: "id only", args: []string{"export", "abc"}, wantID: "abc", wantFormat: "md"},
@@ -74,6 +76,7 @@ func TestParseExportArgs(t *testing.T) {
 		{name: "batch since until", args: []string{"export", "--since", "2026-01-01", "--until", "2026-02-01"}, wantFormat: "md", wantFilter: true},
 		{name: "batch with format", args: []string{"export", "--branch", "main", "--format", "json"}, wantFormat: "json", wantFilter: true},
 		{name: "batch with text format", args: []string{"export", "--branch", "main", "--format", "text"}, wantFormat: "text", wantFilter: true},
+		{name: "batch with tag", args: []string{"export", "--tag", "Work"}, wantFormat: "md", wantFilter: true, wantTag: "work"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,6 +110,9 @@ func TestParseExportArgs(t *testing.T) {
 			}
 			if !tc.wantFilter && opts.filter != nil {
 				t.Errorf("expected filter to be nil, got %+v", opts.filter)
+			}
+			if opts.tag != tc.wantTag {
+				t.Errorf("tag = %q, want %q", opts.tag, tc.wantTag)
 			}
 		})
 	}
@@ -305,6 +311,37 @@ func TestRunExportBatch_WriteFiles(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("expected file %s: %v", path, err)
 		}
+	}
+}
+
+func TestRunExportBatch_TagFilter(t *testing.T) {
+	sessions := []data.Session{
+		{ID: "ses-001", Summary: "First"},
+		{ID: "ses-002", Summary: "Second"},
+	}
+	withExportList(t, func(data.FilterOptions) ([]data.Session, error) { return sessions, nil })
+	withExportDetail(t, func(id string) (*data.SessionDetail, error) {
+		return &data.SessionDetail{Session: data.Session{ID: id, Summary: "S " + id}}, nil
+	})
+	prevLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: map[string][]string{"ses-002": {"work"}}}, nil
+	}
+	t.Cleanup(func() { configLoadFn = prevLoad })
+
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "--tag", "work", "--out", dir}); err != nil {
+		t.Fatalf("runExport batch: %v", err)
+	}
+	if strings.Contains(buf.String(), "ses-001") || !strings.Contains(buf.String(), "Exported 1 of 1 sessions") {
+		t.Errorf("unexpected output:\n%s", buf.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ses-002.md")); err != nil {
+		t.Fatalf("expected tagged export: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ses-001.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("untagged session should not be exported, stat err = %v", err)
 	}
 }
 

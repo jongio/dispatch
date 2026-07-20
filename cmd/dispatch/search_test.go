@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -27,6 +28,7 @@ func TestParseSearchArgsQueryAndFilters(t *testing.T) {
 		"--branch=main",
 		"--folder", "/code",
 		"--host", "cli",
+		"--tag", "Work",
 		"--deep",
 		"--limit", "10",
 		"--sort", "turns",
@@ -51,6 +53,9 @@ func TestParseSearchArgsQueryAndFilters(t *testing.T) {
 	}
 	if opts.filter.HostType != "cli" {
 		t.Errorf("HostType = %q, want cli", opts.filter.HostType)
+	}
+	if opts.tag != "work" {
+		t.Errorf("tag = %q, want work", opts.tag)
 	}
 	if !opts.filter.DeepSearch {
 		t.Error("DeepSearch = false, want true")
@@ -141,11 +146,33 @@ func TestParseSearchArgsErrors(t *testing.T) {
 		{"search", "--sort"},
 		{"search", "--sort", "attention"},
 		{"search", "--order", "sideways"},
+		{"search", "--tag"},
+		{"search", "--tag", "a,b"},
 	}
 	for _, args := range cases {
 		if _, err := parseSearchArgs(args); err == nil {
 			t.Errorf("parseSearchArgs(%v) = nil error, want error", args)
 		}
+	}
+}
+
+func TestRunSearchTagFilter(t *testing.T) {
+	sessions := []data.Session{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+	prevLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: map[string][]string{"a": {"work"}, "c": {"other"}}}, nil
+	}
+	t.Cleanup(func() { configLoadFn = prevLoad })
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--ids", "--tag", "Work"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+	if got, want := buf.String(), "a\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
 	}
 }
 

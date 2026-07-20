@@ -253,6 +253,7 @@ dispatch stats --csv
 dispatch stats --markdown
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
+dispatch stats --tag work
 dispatch stats --top 5
 ```
 
@@ -261,7 +262,7 @@ Flags:
 - `--json` prints the summary as a single JSON object.
 - `--markdown` prints the summary as Markdown tables for reports and issue comments.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
-- `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
+- `--repo`, `--branch`, `--folder`, `--tag`, `--since`, and `--until` narrow which sessions are counted.
 - `--top <n>` caps each repository, branch, and host breakdown to the first N entries.
 
 ### Tags
@@ -329,9 +330,10 @@ dispatch export --repo jongio/dispatch --format json --out ./backup
 dispatch export --repo jongio/dispatch --format text --out ./backup
 dispatch export --branch main --since 2026-01-01 --until 2026-07-01
 dispatch export --query "auth fix" --redact
+dispatch export --tag work --out ./work-sessions
 ```
 
-Filter flags (`--query`, `--repo`, `--branch`, `--folder`, `--since`, `--until`) replace the session ID. Each matching session is exported to its own file in the output directory. `--stdout` is not supported in batch mode.
+Filter flags (`--query`, `--repo`, `--branch`, `--folder`, `--tag`, `--since`, `--until`) replace the session ID. Each matching session is exported to its own file in the output directory. `--stdout` is not supported in batch mode.
 
 ### Compare
 
@@ -465,6 +467,7 @@ Query the session store from scripts without opening the TUI. `dispatch search` 
 dispatch search auth
 dispatch search --query "fix login" --repo jongio/dispatch
 dispatch search --branch main --since 2026-01-01 --limit 20
+dispatch search --tag work --ids
 dispatch search --sort turns --order desc --limit 10
 dispatch search --deep refactor --json
 dispatch search auth --format ids
@@ -476,6 +479,7 @@ dispatch search auth --csv
 The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
 
 - `--repo`, `--branch`, `--folder`, `--host` narrow by session metadata.
+- `--tag <tag>` narrows by tags stored in Dispatch config.
 - `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
 - `--deep` also searches turns, checkpoints, touched files, and refs.
 - `--sort updated|created|turns|name|folder` and `--order asc|desc` control result order.

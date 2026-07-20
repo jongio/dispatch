@@ -31,6 +31,7 @@ type statsOptions struct {
 	markdown bool
 	calendar bool
 	top      int
+	tag      string
 }
 
 // countEntry is one label and count pair in a grouped breakdown.
@@ -79,6 +80,10 @@ func runStats(w io.Writer, args []string) error {
 	}
 
 	sessions, err := statsListSessionsFn(opts.filter)
+	if err != nil {
+		return err
+	}
+	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
 	if err != nil {
 		return err
 	}
@@ -170,6 +175,17 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 				return statsOptions{}, err
 			}
 			opts.filter.Folder = v
+			i = ni
+		case name == "--tag":
+			v, ni, err := takeValue(i, "--tag", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return statsOptions{}, err
+			}
+			tag, err := parseSingleTagFilter(v, "--tag")
+			if err != nil {
+				return statsOptions{}, err
+			}
+			opts.tag = tag
 			i = ni
 		case name == "--since":
 			v, ni, err := takeValue(i, "--since", inlineOrEmpty(inline, hasInline))
