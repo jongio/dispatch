@@ -126,7 +126,7 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  search [query] [flags]  Print matching sessions as JSON, IDs, or a table
+  search [query] [flags]  Print matching sessions as JSON, CSV, IDs, or a table
   tags [--json]           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
   notes [command]          List, get, set, or clear session notes
@@ -178,7 +178,8 @@ Search flags:
   --json                  Print results as JSON (default)
   --ids                   Print one session ID per line
   --table                 Print a readable table
-  --format json|ids|table Choose the output format
+  --format json|csv|ids|table
+                          Choose the output format
   --query <text>          Text to match (also accepted as a positional argument)
   --deep                  Search turns, checkpoints, files, and refs too
   --repo <name>           Only include sessions for a repository

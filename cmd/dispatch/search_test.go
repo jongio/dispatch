@@ -105,6 +105,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 		{name: "table shortcut", args: []string{"search", "--table"}},
 		{name: "format table separate", args: []string{"search", "--format", "table"}},
 		{name: "format table inline", args: []string{"search", "--format=table"}},
+		{name: "csv shortcut", args: []string{"search", "--csv"}},
+		{name: "format csv separate", args: []string{"search", "--format", "csv"}},
+		{name: "format csv inline", args: []string{"search", "--format=csv"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -115,6 +118,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 			want := searchFormatIDs
 			if strings.Contains(strings.Join(tc.args, " "), "table") {
 				want = searchFormatTable
+			}
+			if strings.Contains(strings.Join(tc.args, " "), "csv") {
+				want = searchFormatCSV
 			}
 			if opts.format != want {
 				t.Errorf("format = %q, want %s", opts.format, want)
@@ -276,6 +282,54 @@ func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
 	}
 	if got := buf.String(); !strings.Contains(got, "ID") || strings.Contains(got, "session-a") {
 		t.Errorf("unexpected table output:\n%s", got)
+	}
+}
+
+func TestRunSearchCSVOutput(t *testing.T) {
+	sessions := []data.Session{
+		{
+			ID:         "session-a",
+			Summary:    "fix, auth bug",
+			Cwd:        "/code/app",
+			Repository: "jongio/dispatch",
+			Branch:     "main",
+			CreatedAt:  "2026-01-05T10:00:00Z",
+			UpdatedAt:  "2026-01-06T10:00:00Z",
+			TurnCount:  5,
+			FileCount:  3,
+		},
+	}
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--csv"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	got := buf.String()
+	for _, want := range []string{
+		"id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count",
+		"session-a,\"fix, auth bug\",/code/app,jongio/dispatch,main,2026-01-05T10:00:00Z,2026-01-06T10:00:00Z,5,3",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("csv output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
+	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+		return nil, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--format", "csv"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+	if got, want := buf.String(), "id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
 	}
 }
 

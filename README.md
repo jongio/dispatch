@@ -443,6 +443,7 @@ dispatch search --deep refactor --json
 dispatch search auth --format ids
 dispatch search auth --ids
 dispatch search auth --table
+dispatch search auth --csv
 ```
 
 The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
@@ -452,9 +453,9 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--deep` also searches turns, checkpoints, touched files, and refs.
 - `--sort updated|created|turns|name|folder` and `--order asc|desc` control result order.
 - `--limit <n>` caps the result count (default 50, `0` for no limit).
-- `--format json|ids|table` chooses JSON output, one session ID per line, or a readable table. `--ids` and `--table` are shortcuts.
+- `--format json|csv|ids|table` chooses JSON output, CSV output, one session ID per line, or a readable table. `--csv`, `--ids`, and `--table` are shortcuts.
 
-Each JSON result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. Both exit 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+Each JSON or CSV result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. CSV always prints a header row. Invalid flags or an unreadable store exit non-zero with a message on stderr.
 
 ### Man
 

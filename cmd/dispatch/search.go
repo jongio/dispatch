@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ const (
 	searchFormatJSON  searchOutputFormat = "json"
 	searchFormatIDs   searchOutputFormat = "ids"
 	searchFormatTable searchOutputFormat = "table"
+	searchFormatCSV   searchOutputFormat = "csv"
 )
 
 // searchOptions holds the parsed flags for the search command.
@@ -84,6 +86,9 @@ func runSearch(w io.Writer, args []string) error {
 	if opts.format == searchFormatTable {
 		return writeSearchTable(w, sessions)
 	}
+	if opts.format == searchFormatCSV {
+		return writeSearchCSV(w, sessions)
+	}
 
 	results := make([]searchSession, 0, len(sessions))
 	for _, s := range sessions {
@@ -134,6 +139,30 @@ func writeSearchTable(w io.Writer, sessions []data.Session) error {
 		}
 	}
 	return tw.Flush()
+}
+
+func writeSearchCSV(w io.Writer, sessions []data.Session) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"id", "summary", "cwd", "repository", "branch", "created_at", "updated_at", "turn_count", "file_count"}); err != nil {
+		return err
+	}
+	for _, s := range sessions {
+		if err := cw.Write([]string{
+			s.ID,
+			s.Summary,
+			s.Cwd,
+			s.Repository,
+			s.Branch,
+			s.CreatedAt,
+			s.UpdatedAt,
+			strconv.Itoa(s.TurnCount),
+			strconv.Itoa(s.FileCount),
+		}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 func shortSearchID(id string) string {
@@ -199,6 +228,8 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 			opts.format = searchFormatIDs
 		case name == "--table":
 			opts.format = searchFormatTable
+		case name == "--csv":
+			opts.format = searchFormatCSV
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -356,8 +387,10 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 		return searchFormatIDs, nil
 	case string(searchFormatTable):
 		return searchFormatTable, nil
+	case string(searchFormatCSV):
+		return searchFormatCSV, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json, ids, or table)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, ids, table, or csv)", v)
 	}
 }
 
