@@ -250,6 +250,7 @@ Run `dispatch stats` to print session totals and breakdowns by repository, branc
 dispatch stats
 dispatch stats --json
 dispatch stats --csv
+dispatch stats --markdown
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
 dispatch stats --top 5
@@ -258,6 +259,7 @@ dispatch stats --top 5
 Flags:
 
 - `--json` prints the summary as a single JSON object.
+- `--markdown` prints the summary as Markdown tables for reports and issue comments.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
 - `--top <n>` caps each repository, branch, and host breakdown to the first N entries.

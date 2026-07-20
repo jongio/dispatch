@@ -28,6 +28,7 @@ type statsOptions struct {
 	filter   data.FilterOptions
 	json     bool
 	csv      bool
+	markdown bool
 	calendar bool
 	top      int
 }
@@ -94,6 +95,10 @@ func runStats(w io.Writer, args []string) error {
 	if opts.json {
 		return writeStatsJSON(w, report)
 	}
+	if opts.markdown {
+		writeStatsMarkdown(w, report)
+		return nil
+	}
 	writeStatsText(w, report)
 	if opts.calendar {
 		writeActivityCalendar(w, *report.Calendar)
@@ -130,6 +135,8 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 			opts.json = true
 		case name == "--csv":
 			opts.csv = true
+		case name == "--markdown":
+			opts.markdown = true
 		case name == "--calendar":
 			opts.calendar = true
 		case name == "--top":
@@ -193,8 +200,8 @@ func parseStatsArgs(args []string) (statsOptions, error) {
 		}
 	}
 
-	if opts.json && opts.csv {
-		return statsOptions{}, fmt.Errorf("--json and --csv cannot be combined")
+	if (opts.json && opts.csv) || (opts.json && opts.markdown) || (opts.csv && opts.markdown) {
+		return statsOptions{}, fmt.Errorf("--json, --csv, and --markdown cannot be combined")
 	}
 
 	return opts, nil
@@ -433,6 +440,74 @@ func writeStatsText(w io.Writer, report statsReport) {
 	writeCountSection(w, "By repository", report.ByRepository)
 	writeCountSection(w, "By branch", report.ByBranch)
 	writeCountSection(w, "By host type", report.ByHostType)
+}
+
+// writeStatsMarkdown prints the report as Markdown tables for pasting into
+// issues, PRs, or reports.
+func writeStatsMarkdown(w io.Writer, report statsReport) {
+	fmt.Fprintln(w, "# Dispatch stats")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| Metric | Value |")
+	fmt.Fprintln(w, "|---|---:|")
+	fmt.Fprintf(w, "| Sessions | %d |\n", report.TotalSessions)
+	fmt.Fprintf(w, "| Turns | %d |\n", report.TotalTurns)
+	fmt.Fprintf(w, "| Files | %d |\n", report.TotalFiles)
+	if report.Earliest != "" && report.Latest != "" {
+		fmt.Fprintf(w, "| Range | %s to %s |\n", markdownCell(report.Earliest), markdownCell(report.Latest))
+	}
+
+	if report.TotalSessions == 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "No sessions found.")
+		return
+	}
+
+	writeMarkdownCountSection(w, "By repository", report.ByRepository)
+	writeMarkdownCountSection(w, "By branch", report.ByBranch)
+	writeMarkdownCountSection(w, "By host type", report.ByHostType)
+	if report.Calendar != nil {
+		writeMarkdownCalendar(w, *report.Calendar)
+	}
+}
+
+func writeMarkdownCountSection(w io.Writer, title string, entries []countEntry) {
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "## %s\n\n", title)
+	if len(entries) == 0 {
+		fmt.Fprintln(w, "_No data._")
+		return
+	}
+	fmt.Fprintln(w, "| Label | Count |")
+	fmt.Fprintln(w, "|---|---:|")
+	for _, e := range entries {
+		fmt.Fprintf(w, "| %s | %d |\n", markdownCell(e.Label), e.Count)
+	}
+}
+
+func writeMarkdownCalendar(w io.Writer, cal activityCalendar) {
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "## Activity")
+	fmt.Fprintln(w)
+	if len(cal.Days) == 0 {
+		fmt.Fprintln(w, "_No data._")
+		return
+	}
+	fmt.Fprintln(w, "| Date | Sessions |")
+	fmt.Fprintln(w, "|---|---:|")
+	for _, d := range cal.Days {
+		if d.Count == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "| %s | %d |\n", markdownCell(d.Date), d.Count)
+	}
+}
+
+func markdownCell(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "|", "\\|")
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
 }
 
 // writeCountSection prints a titled breakdown with aligned counts.

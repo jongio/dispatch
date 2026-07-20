@@ -289,6 +289,16 @@ func TestParseStatsArgs_CSV(t *testing.T) {
 	}
 }
 
+func TestParseStatsArgs_Markdown(t *testing.T) {
+	opts, err := parseStatsArgs([]string{"stats", "--markdown"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !opts.markdown {
+		t.Error("expected markdown=true")
+	}
+}
+
 func TestParseStatsArgs_CSVAndJSONConflict(t *testing.T) {
 	_, err := parseStatsArgs([]string{"stats", "--csv", "--json"})
 	if err == nil {
@@ -296,6 +306,18 @@ func TestParseStatsArgs_CSVAndJSONConflict(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cannot be combined") {
 		t.Errorf("wrong error: %v", err)
+	}
+}
+
+func TestParseStatsArgs_MarkdownConflict(t *testing.T) {
+	cases := [][]string{
+		{"stats", "--markdown", "--json"},
+		{"stats", "--markdown", "--csv"},
+	}
+	for _, args := range cases {
+		if _, err := parseStatsArgs(args); err == nil {
+			t.Errorf("parseStatsArgs(%v) expected conflict error", args)
+		}
 	}
 }
 
@@ -308,6 +330,7 @@ func TestRunStatsCSV(t *testing.T) {
 	if err := runStats(&buf, []string{"stats", "--csv"}); err != nil {
 		t.Fatalf("runStats --csv: %v", err)
 	}
+
 	out := buf.String()
 	if !strings.Contains(out, "section,label,count") {
 		t.Errorf("CSV missing header, got:\n%s", out)
@@ -359,5 +382,43 @@ func TestCsvSafe(t *testing.T) {
 		if got := csvSafe(in); got != want {
 			t.Errorf("csvSafe(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestRunStatsMarkdown(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--markdown"}); err != nil {
+		t.Fatalf("runStats --markdown: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"# Dispatch stats", "| Metric | Value |", "| Sessions | 3 |", "## By repository", "| jongio/dispatch | 2 |"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Markdown output missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunStatsMarkdownTop(t *testing.T) {
+	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return sampleSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runStats(&buf, []string{"stats", "--markdown", "--top", "1"}); err != nil {
+		t.Fatalf("runStats --markdown --top: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "| feature |") {
+		t.Errorf("top 1 should hide lower branch rows\n%s", out)
+	}
+}
+
+func TestMarkdownCell(t *testing.T) {
+	if got := markdownCell("repo|branch\\name\nnext"); got != "repo\\|branch\\\\name next" {
+		t.Errorf("markdownCell escaped value = %q", got)
 	}
 }
