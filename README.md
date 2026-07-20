@@ -356,6 +356,19 @@ dispatch info 0a1b2c3d --refs
 
 The summary covers the session's repository, branch, working directory, host type, turn and file counts, timestamps, and linked ref counts. Use `--refs` to include linked commit, PR, and issue values, or `--json` for scripting. The session ID accepts the same prefix shorthand as `open`.
 
+### Path
+
+Print only a session's working directory so you can change into it from a subshell:
+
+```sh
+cd "$(dispatch path 0a1b2c3d)"   # by ID or short prefix
+cd "$(dispatch path my-alias)"   # by alias
+cd "$(dispatch path --last)"     # most recently active session
+cd "$(dispatch path --current)"  # match the current repo and branch
+```
+
+`path` writes a single line (the absolute directory) and nothing else, so it drops straight into `cd`. It resolves the session the same way `open` does. It exits with an error if the session has no recorded directory or if that directory no longer exists, so `cd "$(...)"` fails loudly instead of landing somewhere wrong.
+
 ### Aliases
 
 List every session alias with `dispatch aliases`:

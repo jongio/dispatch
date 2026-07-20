@@ -138,6 +138,8 @@ Commands:
   export --repo R [flags] Export all sessions matching a scope filter (batch mode)
   info <id> [--json] [--refs]
                           Print a concise session summary
+  path <id|--last|--current>
+                          Print only a session's working directory (for cd "$(dispatch path x)")
   compare <a> <b> [--json]
                           Compare two sessions side by side
   tag <id> [flags]        Add, remove, set, or list tags on a session
