@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/update"
 )
@@ -17,7 +18,12 @@ func withInfoDetail(t *testing.T, fn func(string) (*data.SessionDetail, error)) 
 	t.Helper()
 	prev := infoGetDetailFn
 	infoGetDetailFn = fn
-	t.Cleanup(func() { infoGetDetailFn = prev })
+	prevConfig := configLoadFn
+	configLoadFn = func() (*config.Config, error) { return &config.Config{}, nil }
+	t.Cleanup(func() {
+		infoGetDetailFn = prev
+		configLoadFn = prevConfig
+	})
 }
 
 func infoSampleDetail() *data.SessionDetail {
@@ -153,6 +159,47 @@ func TestRunInfo_TextWithRefs(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q, got:\n%s", want, out)
 		}
+	}
+}
+
+func TestRunInfo_IncludesAnnotations(t *testing.T) {
+	withInfoDetail(t, func(string) (*data.SessionDetail, error) {
+		return infoSampleDetail(), nil
+	})
+	prevConfig := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{
+			SessionAliases: map[string]string{"ses-info-1": "widget"},
+			SessionTags:    map[string][]string{"ses-info-1": {"work", "ui"}},
+			SessionNotes:   map[string]string{"ses-info-1": "follow up\nwith tests"},
+		}, nil
+	}
+	t.Cleanup(func() { configLoadFn = prevConfig })
+
+	var text bytes.Buffer
+	if err := runInfo(&text, []string{"info", "ses-info-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"Alias:       widget",
+		"Tags:        work, ui",
+		"Note:        follow up with tests",
+	} {
+		if !strings.Contains(text.String(), want) {
+			t.Errorf("text output missing %q, got:\n%s", want, text.String())
+		}
+	}
+
+	var jsonOut bytes.Buffer
+	if err := runInfo(&jsonOut, []string{"info", "ses-info-1", "--json"}); err != nil {
+		t.Fatalf("unexpected JSON error: %v", err)
+	}
+	var got sessionInfo
+	if err := json.Unmarshal(jsonOut.Bytes(), &got); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, jsonOut.String())
+	}
+	if got.Alias != "widget" || strings.Join(got.Tags, ",") != "work,ui" || got.Note != "follow up\nwith tests" {
+		t.Errorf("annotations = alias %q tags %+v note %q", got.Alias, got.Tags, got.Note)
 	}
 }
 

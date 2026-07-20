@@ -354,7 +354,7 @@ dispatch info 0a1b2c3d --json
 dispatch info 0a1b2c3d --refs
 ```
 
-The summary covers the session's repository, branch, working directory, host type, turn and file counts, timestamps, and linked ref counts. Use `--refs` to include linked commit, PR, and issue values, or `--json` for scripting. The session ID accepts the same prefix shorthand as `open`.
+The summary covers the session's repository, branch, working directory, host type, saved alias, tags, note, turn and file counts, timestamps, and linked ref counts. Use `--refs` to include linked commit, PR, and issue values, or `--json` for scripting. The session ID accepts the same prefix shorthand as `open`.
 
 ### Path
 
