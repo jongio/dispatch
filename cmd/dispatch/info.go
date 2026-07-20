@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -28,6 +29,9 @@ type sessionInfo struct {
 	CreatedAt    string    `json:"created_at,omitempty"`
 	UpdatedAt    string    `json:"updated_at,omitempty"`
 	LastActiveAt string    `json:"last_active_at,omitempty"`
+	Alias        string    `json:"alias,omitempty"`
+	Tags         []string  `json:"tags,omitempty"`
+	Note         string    `json:"note,omitempty"`
 	Turns        int       `json:"turns"`
 	Files        int       `json:"files"`
 	Checkpoints  int       `json:"checkpoints"`
@@ -64,6 +68,11 @@ func runInfo(w io.Writer, args []string) error {
 	}
 
 	info := buildSessionInfo(detail)
+	cfg, err := configLoadFn()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	addInfoAnnotations(&info, cfg)
 	if includeRefs {
 		addInfoRefs(&info, detail.Refs)
 	}
@@ -136,6 +145,17 @@ func buildSessionInfo(detail *data.SessionDetail) sessionInfo {
 	return info
 }
 
+func addInfoAnnotations(info *sessionInfo, cfg *config.Config) {
+	if info == nil || cfg == nil {
+		return
+	}
+	info.Alias = cfg.AliasFor(info.ID)
+	if tags := cfg.TagsFor(info.ID); len(tags) > 0 {
+		info.Tags = append([]string(nil), tags...)
+	}
+	info.Note = cfg.SessionNotes[info.ID]
+}
+
 func addInfoRefs(info *sessionInfo, refs []data.SessionRef) {
 	info.Refs = &infoRefs{
 		Commits: []string{},
@@ -180,6 +200,11 @@ func writeInfoText(w io.Writer, info sessionInfo) error {
 	writeField("Branch:", info.Branch)
 	writeField("Directory:", info.Directory)
 	writeField("Host:", info.HostType)
+	writeField("Alias:", info.Alias)
+	if len(info.Tags) > 0 {
+		writeField("Tags:", strings.Join(info.Tags, ", "))
+	}
+	writeField("Note:", oneLine(info.Note))
 	writeField("Created:", info.CreatedAt)
 	writeField("Updated:", info.UpdatedAt)
 	writeField("Last active:", info.LastActiveAt)
@@ -213,6 +238,10 @@ func pluralize(n int, singular, plural string) string {
 		return "1 " + singular
 	}
 	return fmt.Sprintf("%d %s", n, plural)
+}
+
+func oneLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
 }
 
 func formatRefList(values []string) string {
