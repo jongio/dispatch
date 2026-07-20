@@ -318,7 +318,7 @@ func TestLaunchSession_RoutesToPlatformLauncher(t *testing.T) {
 		ShellInfo{Name: "test-shell", Path: "test-path"},
 		"test-session",
 		ResumeConfig{
-			CustomCommand: "my-cli --resume {sessionId}",
+			ResumeSessionCommand: "my-cli --resume {sessionId}",
 			Terminal:      "my-terminal",
 			Cwd:           cwd,
 			LaunchStyle:   LaunchStyleWindow,
@@ -363,7 +363,7 @@ func TestLaunchSession_PaneStylePassedThrough(t *testing.T) {
 		ShellInfo{Name: "sh", Path: "sh"},
 		"sess",
 		ResumeConfig{
-			CustomCommand: "echo {sessionId}",
+			ResumeSessionCommand: "echo {sessionId}",
 			LaunchStyle:   LaunchStylePane,
 			PaneDirection: "down",
 		},
@@ -391,7 +391,7 @@ func TestLaunchSession_PropagatesLauncherError(t *testing.T) {
 	err := LaunchSession(
 		ShellInfo{Name: "sh", Path: "sh"},
 		"sess",
-		ResumeConfig{CustomCommand: "echo {sessionId}"},
+		ResumeConfig{ResumeSessionCommand: "echo {sessionId}"},
 	)
 	if !errors.Is(err, wantErr) {
 		t.Errorf("got error %v, want %v", err, wantErr)
@@ -412,7 +412,7 @@ func TestLaunchSession_DefaultsTerminalWhenEmpty(t *testing.T) {
 		ShellInfo{Name: "sh", Path: "sh"},
 		"sess",
 		ResumeConfig{
-			CustomCommand: "echo {sessionId}",
+			ResumeSessionCommand: "echo {sessionId}",
 			Terminal:      "", // empty - should default
 		},
 	)
@@ -441,7 +441,7 @@ func TestLaunchSession_DefaultsShellWhenEmpty(t *testing.T) {
 	err := LaunchSession(
 		ShellInfo{}, // empty - should default
 		"sess",
-		ResumeConfig{CustomCommand: "echo {sessionId}"},
+		ResumeConfig{ResumeSessionCommand: "echo {sessionId}"},
 	)
 	if err != nil {
 		t.Fatalf("LaunchSession error: %v", err)
@@ -489,7 +489,7 @@ func TestPlatformLaunchSession_RoutesByGOOS(t *testing.T) {
 	err := LaunchSession(
 		ShellInfo{Name: "sh", Path: "sh"},
 		"test-sess",
-		ResumeConfig{CustomCommand: "echo {sessionId}"},
+		ResumeConfig{ResumeSessionCommand: "echo {sessionId}"},
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

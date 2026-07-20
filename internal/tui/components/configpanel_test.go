@@ -21,7 +21,7 @@ func TestNewConfigPanel_Defaults(t *testing.T) {
 	if v.YoloMode {
 		t.Error("default yoloMode should be false")
 	}
-	if v.Agent != "" || v.Model != "" || v.LaunchMode != "" || v.Terminal != "" || v.Shell != "" || v.CustomCommand != "" || v.Theme != "" {
+	if v.Agent != "" || v.Model != "" || v.LaunchMode != "" || v.Terminal != "" || v.Shell != "" || v.ResumeSessionCommand != "" || v.Theme != "" {
 		t.Error("default string values should be empty")
 	}
 }
@@ -35,7 +35,7 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	cp := NewConfigPanel()
 	cp.SetValues(ConfigValues{
 		YoloMode: true, Agent: "myagent", Model: "gpt-4", LaunchMode: "tab",
-		Terminal: "Windows Terminal", Shell: "pwsh", CustomCommand: "my-cmd {sessionId}", Theme: "Campbell",
+		Terminal: "Windows Terminal", Shell: "pwsh", ResumeSessionCommand: "my-cmd {sessionId}", Theme: "Campbell",
 		WorkspaceRecovery: true, PreviewPosition: "bottom",
 	})
 
@@ -58,8 +58,8 @@ func TestConfigPanel_SetValues_RoundTrip(t *testing.T) {
 	if v.Shell != "pwsh" {
 		t.Errorf("shell = %q, want %q", v.Shell, "pwsh")
 	}
-	if v.CustomCommand != "my-cmd {sessionId}" {
-		t.Errorf("customCommand = %q, want %q", v.CustomCommand, "my-cmd {sessionId}")
+	if v.ResumeSessionCommand != "my-cmd {sessionId}" {
+		t.Errorf("ResumeSessionCommand = %q, want %q", v.ResumeSessionCommand, "my-cmd {sessionId}")
 	}
 	if v.Theme != "Campbell" {
 		t.Errorf("theme = %q, want %q", v.Theme, "Campbell")
@@ -229,10 +229,10 @@ func TestConfigPanel_HandleEnter_AgentEditing(t *testing.T) {
 	cp.CancelEdit()
 }
 
-func TestConfigPanel_HandleEnter_CustomCommandOverrides(t *testing.T) {
+func TestConfigPanel_HandleEnter_ResumeSessionCommandOverrides(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()
-	cp.SetValues(ConfigValues{CustomCommand: "my-cmd"})
+	cp.SetValues(ConfigValues{ResumeSessionCommand: "my-cmd"})
 
 	// With custom command set, yolo/agent/model should be no-ops.
 	cp.cursor = cfgYoloMode
@@ -373,17 +373,17 @@ func TestConfigPanel_View_ContainsFields(t *testing.T) {
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
 	view := cp.View()
-	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Custom Command", "Theme", "Crash Recovery", "Preview Position"} {
+	for _, field := range []string{"Yolo Mode", "Agent", "Model", "Launch Mode", "Terminal", "Shell", "Resume Command", "Theme", "Crash Recovery", "Preview Position"} {
 		if !strings.Contains(view, field) {
 			t.Errorf("View should contain field %q", field)
 		}
 	}
 }
 
-func TestConfigPanel_View_ShowsOverriddenWhenCustomCommand(t *testing.T) {
+func TestConfigPanel_View_ShowsOverriddenWhenResumeSessionCommand(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()
-	cp.SetValues(ConfigValues{CustomCommand: "my-cmd"})
+	cp.SetValues(ConfigValues{ResumeSessionCommand: "my-cmd"})
 	cp.SetSize(80, 40)
 	view := cp.View()
 	if !strings.Contains(view, "overridden") {
@@ -404,11 +404,11 @@ func TestConfigPanel_View_ShowsEditFooter(t *testing.T) {
 	cp.CancelEdit()
 }
 
-func TestConfigPanel_View_CustomCommandHelp(t *testing.T) {
+func TestConfigPanel_View_ResumeSessionCommandHelp(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()
 	cp.SetSize(80, 40)
-	cp.cursor = cfgCustomCommand
+	cp.cursor = cfgResumeSessionCommand
 	view := cp.View()
 	if !strings.Contains(view, "{sessionId}") {
 		t.Error("View on Custom Command field should show {sessionId} help")

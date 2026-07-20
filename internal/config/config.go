@@ -31,7 +31,7 @@ const (
 	// currentConfigVersion is the schema version written to new and migrated
 	// config files. Increment this when making breaking schema changes and
 	// add a corresponding migration case in [migrate].
-	currentConfigVersion = 1
+	currentConfigVersion = 2
 )
 
 // NamedView holds a saved combination of list state filters that can be
@@ -180,7 +180,18 @@ type Config struct {
 	// with the actual session ID at launch time. When set, YoloMode, Agent,
 	// and Model are ignored (they only apply to the default copilot CLI).
 	// Terminal and Shell settings are still used.
+	//
+	// Deprecated: renamed to ResumeSessionCommand in config v2. This field
+	// exists only for backward-compatible deserialization; migrate() copies
+	// it to ResumeSessionCommand then clears it.
 	CustomCommand string `json:"custom_command,omitempty"`
+
+	// ResumeSessionCommand is a user-defined command that replaces the
+	// default copilot CLI resume command. The placeholder {sessionId} is
+	// replaced with the actual session ID at launch time. When set,
+	// YoloMode, Agent, and Model are ignored (they only apply to the
+	// default copilot CLI). Terminal and Shell settings are still used.
+	ResumeSessionCommand string `json:"resume_session_command,omitempty"`
 
 	// ExcludedWords is a list of words used to filter sessions from the
 	// dispatch list. Sessions whose summary or turn content contains any
@@ -297,6 +308,12 @@ type Config struct {
 	// ActiveView is the name of the currently active named view.
 	// Empty or "Default" means no named view is active.
 	ActiveView string `json:"active_view,omitempty"`
+
+	// NewSessionCommand is the command template used to launch a brand new
+	// Copilot CLI session from dispatch. The placeholder {cwd} is replaced
+	// with the target working directory. When empty, defaults to "gh copilot".
+	// Examples: "gh copilot", "copilot", "gh cs new"
+	NewSessionCommand string `json:"new_session_command,omitempty"`
 }
 
 // LaunchMode describes how sessions are opened in the terminal.
@@ -626,6 +643,15 @@ func migrate(cfg *Config) {
 		if cfg.LaunchInPlace && cfg.LaunchMode == "" {
 			cfg.LaunchMode = LaunchModeInPlace
 		}
+	}
+
+	// v1 → v2: custom_command renamed to resume_session_command.
+	// Copy the old value if the new field is empty.
+	if cfg.ConfigVersion < 2 {
+		if cfg.CustomCommand != "" && cfg.ResumeSessionCommand == "" {
+			cfg.ResumeSessionCommand = cfg.CustomCommand
+		}
+		cfg.CustomCommand = "" // clear so it won't be written back
 	}
 }
 

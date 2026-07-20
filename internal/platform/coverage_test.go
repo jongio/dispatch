@@ -255,20 +255,20 @@ func TestValidateSessionID_WithUnderscore(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// validateCustomCommand — additional edge cases
+// validateResumeCommand — additional edge cases
 // ---------------------------------------------------------------------------
 
-func TestValidateCustomCommand_TabsAllowed(t *testing.T) {
+func TestValidateResumeCommand_TabsAllowed(t *testing.T) {
 	// Tabs are allowed (not newlines)
-	if err := validateCustomCommand("cmd\targ"); err != nil {
+	if err := validateResumeCommand("cmd\targ"); err != nil {
 		t.Errorf("tab should be allowed: %v", err)
 	}
 }
 
-func TestValidateCustomCommand_LongCommand(t *testing.T) {
+func TestValidateResumeCommand_LongCommand(t *testing.T) {
 	// Very long command should be allowed
 	long := "my-cli " + string(make([]byte, 1000))
-	err := validateCustomCommand(long)
+	err := validateResumeCommand(long)
 	// Should not error for length (only newlines/empty)
 	if err != nil {
 		t.Errorf("long command should be allowed: %v", err)
@@ -276,12 +276,12 @@ func TestValidateCustomCommand_LongCommand(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildResumeCommandString — custom command with empty session ID
+// buildResumeCommandString — resume session command with empty session ID
 // ---------------------------------------------------------------------------
 
-func TestBuildResumeCommandString_CustomCommandNoSession(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommandNoSession(t *testing.T) {
 	cmd, err := buildResumeCommandString("", ResumeConfig{
-		CustomCommand: "my-cli --start",
+		ResumeSessionCommand: "my-cli --start",
 	})
 	if err != nil {
 		t.Fatalf("buildResumeCommandString: %v", err)
@@ -291,9 +291,9 @@ func TestBuildResumeCommandString_CustomCommandNoSession(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_CustomCommandReplacesSessionID(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommandReplacesSessionID(t *testing.T) {
 	cmd, err := buildResumeCommandString("sess-123", ResumeConfig{
-		CustomCommand: "cli resume {sessionId} --verbose",
+		ResumeSessionCommand: "cli resume {sessionId} --verbose",
 	})
 	if err != nil {
 		t.Fatalf("buildResumeCommandString: %v", err)

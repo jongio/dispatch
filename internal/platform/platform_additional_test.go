@@ -42,9 +42,9 @@ func TestHasNerdFontFiles_SubdirNotRecursive(t *testing.T) {
 // buildResumeCommandString — additional coverage
 // ---------------------------------------------------------------------------
 
-func TestBuildResumeCommandString_CustomCommandWithSessionID(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommandWithSessionID(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "my-tool --session {sessionId}",
+		ResumeSessionCommand: "my-tool --session {sessionId}",
 	}
 	result, err := buildResumeCommandString("abc123", cfg)
 	if err != nil {
@@ -58,9 +58,9 @@ func TestBuildResumeCommandString_CustomCommandWithSessionID(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_CustomCommandNoSessionID(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommandNoSessionID(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "simple-tool",
+		ResumeSessionCommand: "simple-tool",
 	}
 	result, err := buildResumeCommandString("test123", cfg)
 	if err != nil {
@@ -79,19 +79,19 @@ func TestBuildResumeCommandString_InvalidSessionIDWithSpaces(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_InvalidCustomCommand(t *testing.T) {
+func TestBuildResumeCommandString_InvalidResumeSessionCommand(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "has\nnewline",
+		ResumeSessionCommand: "has\nnewline",
 	}
 	_, err := buildResumeCommandString("valid123", cfg)
 	if err == nil {
-		t.Error("expected error for custom command with newline")
+		t.Error("expected error for resume session command with newline")
 	}
 }
 
 func TestBuildResumeCommandString_EmptySessionID(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "my-tool",
+		ResumeSessionCommand: "my-tool",
 	}
 	result, err := buildResumeCommandString("", cfg)
 	if err != nil {
@@ -166,12 +166,12 @@ func TestLaunchSession_InvalidSessionIDReturnsError(t *testing.T) {
 	}
 }
 
-func TestLaunchSession_InvalidCustomCommandReturnsError(t *testing.T) {
+func TestLaunchSession_InvalidResumeSessionCommandReturnsError(t *testing.T) {
 	err := LaunchSession(ShellInfo{Path: "test"}, "valid123", ResumeConfig{
-		CustomCommand: "cmd\nwith\nnewlines",
+		ResumeSessionCommand: "cmd\nwith\nnewlines",
 	})
 	if err == nil {
-		t.Error("expected error for custom command with newlines")
+		t.Error("expected error for resume session command with newlines")
 	}
 }
 
@@ -223,7 +223,7 @@ func TestDetectTerminals_AllHaveNames(t *testing.T) {
 // buildResumeCommandString — non-custom-command path
 // ---------------------------------------------------------------------------
 
-func TestBuildResumeCommandString_NormalPathWithoutCustomCommand(t *testing.T) {
+func TestBuildResumeCommandString_NormalPathWithoutResumeSessionCommand(t *testing.T) {
 	// Exercise the non-custom-command code path. Whether CLI is in PATH
 	// varies by environment — we test both outcomes.
 	result, err := buildResumeCommandString("test123", ResumeConfig{
@@ -315,7 +315,7 @@ func TestSessionStorePath_DispatchDBOverride(t *testing.T) {
 
 func TestBuildResumeCommandString_WithCwd(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "my-tool {sessionId}",
+		ResumeSessionCommand: "my-tool {sessionId}",
 		Cwd:           t.TempDir(),
 	}
 	result, err := buildResumeCommandString("abc123", cfg)
@@ -331,10 +331,10 @@ func TestBuildResumeCommandString_WithCwd(t *testing.T) {
 // NewResumeCmd — with CWD (covers cmd.Dir assignment)
 // ---------------------------------------------------------------------------
 
-func TestNewResumeCmd_CustomCommandWithCwd(t *testing.T) {
+func TestNewResumeCmd_ResumeSessionCommandWithCwd(t *testing.T) {
 	cwd := t.TempDir()
 	cmd, err := NewResumeCmd("abc123", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
+		ResumeSessionCommand: "echo {sessionId}",
 		Cwd:           cwd,
 	})
 	if err != nil {
@@ -345,9 +345,9 @@ func TestNewResumeCmd_CustomCommandWithCwd(t *testing.T) {
 	}
 }
 
-func TestNewResumeCmd_CustomCommandNoCwd(t *testing.T) {
+func TestNewResumeCmd_ResumeSessionCommandNoCwd(t *testing.T) {
 	cmd, err := NewResumeCmd("abc123", ResumeConfig{
-		CustomCommand: "echo test",
+		ResumeSessionCommand: "echo test",
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd error: %v", err)
@@ -565,7 +565,7 @@ func TestIsNerdFontInstalledWindows_NoLocalAppData(t *testing.T) {
 
 func TestBuildResumeCommandString_ArgsWithSpaces(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "my tool --arg {sessionId}",
+		ResumeSessionCommand: "my tool --arg {sessionId}",
 	}
 	result, err := buildResumeCommandString("abc-123", cfg)
 	if err != nil {
@@ -578,7 +578,7 @@ func TestBuildResumeCommandString_ArgsWithSpaces(t *testing.T) {
 
 func TestBuildResumeCommandString_WithModel(t *testing.T) {
 	cfg := ResumeConfig{
-		CustomCommand: "tool",
+		ResumeSessionCommand: "tool",
 		Cwd:           t.TempDir(),
 	}
 	result, err := buildResumeCommandString("abc123", cfg)

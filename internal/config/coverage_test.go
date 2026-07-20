@@ -114,7 +114,7 @@ func TestConfigJSONRoundTrip_AllFields(t *testing.T) {
 		LaunchMode:       "window",
 		LaunchInPlace:    true,
 		ExcludedDirs:     []string{"/tmp"},
-		CustomCommand:    "my-cli {sessionId}",
+		ResumeSessionCommand:    "my-cli {sessionId}",
 		HiddenSessions:   []string{"sess1", "sess2"},
 		Theme:            "One Half Dark",
 	}

@@ -160,7 +160,7 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 			PaneDirection:     m.cfg.EffectivePaneDirection(),
 			Terminal:          m.cfg.DefaultTerminal,
 			Shell:             m.cfg.DefaultShell,
-			CustomCommand:     m.cfg.CustomCommand,
+			ResumeSessionCommand:     m.cfg.ResumeSessionCommand,
 			Theme:             m.cfg.Theme,
 			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
 			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
