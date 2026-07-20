@@ -13,7 +13,7 @@ import (
 
 // withSearchList swaps the search command's session loader for a test double
 // and restores it afterward, matching the seam helper used by the stats tests.
-func withSearchList(t *testing.T, fn func(data.FilterOptions, int) ([]data.Session, error)) {
+func withSearchList(t *testing.T, fn func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error)) {
 	t.Helper()
 	prev := searchListSessionsFn
 	searchListSessionsFn = fn
@@ -29,6 +29,8 @@ func TestParseSearchArgsQueryAndFilters(t *testing.T) {
 		"--host", "cli",
 		"--deep",
 		"--limit", "10",
+		"--sort", "turns",
+		"--order=asc",
 		"--since", "2026-01-01",
 		"--until", "2026-12-31",
 	})
@@ -56,6 +58,12 @@ func TestParseSearchArgsQueryAndFilters(t *testing.T) {
 	if opts.limit != 10 {
 		t.Errorf("limit = %d, want 10", opts.limit)
 	}
+	if opts.sort.Field != data.SortByTurns {
+		t.Errorf("sort field = %q, want %q", opts.sort.Field, data.SortByTurns)
+	}
+	if opts.sort.Order != data.Ascending {
+		t.Errorf("sort order = %q, want %q", opts.sort.Order, data.Ascending)
+	}
 	if opts.format != searchFormatJSON {
 		t.Errorf("format = %q, want json", opts.format)
 	}
@@ -74,6 +82,9 @@ func TestParseSearchArgsDefaultLimit(t *testing.T) {
 	}
 	if opts.limit != searchDefaultLimit {
 		t.Errorf("limit = %d, want default %d", opts.limit, searchDefaultLimit)
+	}
+	if opts.sort != defaultSearchSort() {
+		t.Errorf("sort = %+v, want %+v", opts.sort, defaultSearchSort())
 	}
 	if opts.filter.Query != "" {
 		t.Errorf("Query = %q, want empty", opts.filter.Query)
@@ -121,6 +132,9 @@ func TestParseSearchArgsErrors(t *testing.T) {
 		{"search", "--repo"},
 		{"search", "--format"},
 		{"search", "--format", "yaml"},
+		{"search", "--sort"},
+		{"search", "--sort", "attention"},
+		{"search", "--order", "sideways"},
 	}
 	for _, args := range cases {
 		if _, err := parseSearchArgs(args); err == nil {
@@ -144,15 +158,17 @@ func TestRunSearchJSONOutput(t *testing.T) {
 		},
 	}
 	var gotFilter data.FilterOptions
+	var gotSort data.SortOptions
 	var gotLimit int
-	withSearchList(t, func(f data.FilterOptions, limit int) ([]data.Session, error) {
+	withSearchList(t, func(f data.FilterOptions, sort data.SortOptions, limit int) ([]data.Session, error) {
 		gotFilter = f
+		gotSort = sort
 		gotLimit = limit
 		return sessions, nil
 	})
 
 	var buf bytes.Buffer
-	if err := runSearch(&buf, []string{"search", "auth", "--limit", "5"}); err != nil {
+	if err := runSearch(&buf, []string{"search", "auth", "--limit", "5", "--sort", "name", "--order", "asc"}); err != nil {
 		t.Fatalf("runSearch returned error: %v", err)
 	}
 
@@ -161,6 +177,9 @@ func TestRunSearchJSONOutput(t *testing.T) {
 	}
 	if gotLimit != 5 {
 		t.Errorf("limit = %d, want 5", gotLimit)
+	}
+	if gotSort.Field != data.SortByName || gotSort.Order != data.Ascending {
+		t.Errorf("sort = %+v, want name asc", gotSort)
 	}
 
 	var out []searchSession
@@ -180,7 +199,7 @@ func TestRunSearchIDsOutput(t *testing.T) {
 		{ID: "session-a"},
 		{ID: "session-b"},
 	}
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return sessions, nil
 	})
 
@@ -195,7 +214,7 @@ func TestRunSearchIDsOutput(t *testing.T) {
 }
 
 func TestRunSearchIDsNoMatchesIsEmpty(t *testing.T) {
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, nil
 	})
 
@@ -225,7 +244,7 @@ func TestRunSearchTableOutput(t *testing.T) {
 			UpdatedAt: "2026-01-05T09:00:00Z",
 		},
 	}
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return sessions, nil
 	})
 
@@ -247,7 +266,7 @@ func TestRunSearchTableOutput(t *testing.T) {
 }
 
 func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, nil
 	})
 
@@ -261,7 +280,7 @@ func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
 }
 
 func TestRunSearchEmptyIsEmptyArray(t *testing.T) {
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, nil
 	})
 
@@ -276,7 +295,7 @@ func TestRunSearchEmptyIsEmptyArray(t *testing.T) {
 
 func TestRunSearchNoLimitUsesCeiling(t *testing.T) {
 	var gotLimit int
-	withSearchList(t, func(_ data.FilterOptions, limit int) ([]data.Session, error) {
+	withSearchList(t, func(_ data.FilterOptions, _ data.SortOptions, limit int) ([]data.Session, error) {
 		gotLimit = limit
 		return nil, nil
 	})
@@ -291,7 +310,7 @@ func TestRunSearchNoLimitUsesCeiling(t *testing.T) {
 }
 
 func TestRunSearchPropagatesStoreError(t *testing.T) {
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, errors.New("store boom")
 	})
 
