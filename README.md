@@ -630,12 +630,13 @@ dispatch config path            # print the config file path
 | `default_shell` | string | `""` | Preferred shell (`bash`, `zsh`, `pwsh`, `cmd.exe`). Empty = auto-detect |
 | `default_terminal` | string | `""` | Terminal emulator. Empty = auto-detect |
 | `default_time_range` | string | `"1d"` | Time filter: `1h`, `1d`, `7d`, `all` |
-| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
+| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder`, `frecency` |
 | `default_sort_order` | string | `"desc"` | Sort direction: `asc`, `desc` |
-| `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date` |
+| `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date`, `host` |
 | `default_collapsed` | bool | `false` | Start group headers collapsed (single-line) |
 | `show_preview` | bool | `true` | Show preview pane on startup |
 | `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |
+| `redact_preview_secrets` | bool | `false` | Mask common secret patterns (bearer tokens, GitHub PATs, connection strings, `.env` secrets) with `[redacted]` in the preview pane. Rendering only; stored session data is never modified |
 | `conversation_newest_first` | bool | `true` | Show newest conversation turns first in preview |
 | `max_sessions` | int | `100` | Maximum sessions to load |
 | `yoloMode` | bool | `false` | Pass `--allow-all` to Copilot CLI (auto-confirm commands) |
@@ -746,18 +747,18 @@ named keys (`up`, `down`, `left`, `right`, `enter`, `esc`, `tab`, `space`,
 
 Available action names:
 
-`up`, `down`, `left`, `right`, `enter`, `space`, `quit`, `force_quit`,
-`search`, `escape`, `filter`, `sort`, `sort_order`, `pivot`,
-`preview`, `reindex`, `help`, `config`, `time_range_1`, `time_range_2`,
-`time_range_3`, `time_range_4`, `hide`, `toggle_hidden`, `star`,
-`launch_window`, `launch_tab`, `launch_pane`, `preview_scroll_up`,
-`preview_scroll_down`, `jump_next_attention`, `filter_attention`, `launch_all`,
-`select_all`, `deselect_all`, `conversation_sort`, `preview_position`,
-`resume_interrupted`, `view_plan`, `copy_id`, `copy_path`,
-`copy_resume_command`, `copy_preview`, `expand_collapse_all`,
-`scan_work_status`, `export`, `note`, `shift_up`, `shift_down`, `view_switch`,
-`open_file`, `open_dir`, `open_ref`, `timeline`, `compare`, `git_status`,
-`cmd_palette`.
+`up`, `down`, `jump_top`, `jump_bottom`, `left`, `right`, `enter`, `space`,
+`quit`, `force_quit`, `search`, `escape`, `filter`, `sort`, `sort_order`,
+`pivot`, `pivot_order`, `preview`, `preview_fullscreen`, `reindex`, `help`,
+`config`, `time_range_1`, `time_range_2`, `time_range_3`, `time_range_4`,
+`hide`, `toggle_hidden`, `star`, `launch_window`, `launch_tab`, `launch_pane`,
+`preview_scroll_up`, `preview_scroll_down`, `jump_next_attention`,
+`filter_attention`, `launch_all`, `select_all`, `deselect_all`,
+`conversation_sort`, `preview_position`, `resume_interrupted`, `view_plan`,
+`copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
+`expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,
+`shift_up`, `shift_down`, `view_switch`, `open_file`, `open_dir`, `open_ref`,
+`timeline`, `compare`, `git_status`, `cmd_palette`.
 
 ## Themes
 
@@ -809,6 +810,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 |---|---|
 | `DISPATCH_CONFIG` | Override the path to the config file. Must be an absolute, non-UNC path; a relative or UNC value is ignored and the default location is used |
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
+| `DISPATCH_SESSION_STATE` | Override the path to the Copilot CLI session state directory |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 | `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |
 

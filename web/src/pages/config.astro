@@ -7,7 +7,7 @@ import ConfigTable from '../components/ConfigTable.astro';
   <div class="page-header">
     <div class="container">
       <h1>Configuration</h1>
-      <p>All settings and their defaults.</p>
+      <p>Settings and their defaults.</p>
     </div>
   </div>
 
@@ -29,10 +29,14 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'default_shell', type: 'string', default: '""', description: 'Preferred shell (bash, zsh, pwsh, cmd.exe). Empty = auto-detect.' },
         { key: 'default_terminal', type: 'string', default: '""', description: 'Terminal emulator. Empty = auto-detect.' },
         { key: 'default_time_range', type: 'string', default: '"1d"', description: 'Time filter on startup: 1h, 1d, 7d, all.' },
-        { key: 'default_sort', type: 'string', default: '"updated"', description: 'Sort field: updated, created, turns, name, folder.' },
-        { key: 'default_pivot', type: 'string', default: '"folder"', description: 'Grouping mode: none, folder, repo, branch, date.' },
+        { key: 'default_sort', type: 'string', default: '"updated"', description: 'Sort field: updated, created, turns, name, folder, frecency.' },
+        { key: 'default_sort_order', type: 'string', default: '"desc"', description: 'Sort direction: asc, desc.' },
+        { key: 'default_pivot', type: 'string', default: '"folder"', description: 'Grouping mode: none, folder, repo, branch, date, host.' },
+        { key: 'default_collapsed', type: 'bool', default: 'false', description: 'Start group header rows collapsed (single-line).' },
         { key: 'show_preview', type: 'bool', default: 'true', description: 'Show preview pane on startup.' },
         { key: 'preview_position', type: 'string', default: '"right"', description: 'Position of the preview pane: right, bottom, left, top.' },
+        { key: 'redact_preview_secrets', type: 'bool', default: 'false', description: 'Mask common secret patterns (bearer tokens, GitHub PATs, connection strings, .env secrets) with [redacted] in the preview pane. Rendering only; stored data is unchanged.' },
+        { key: 'conversation_newest_first', type: 'bool', default: 'true', description: 'Show newest conversation turns first in the preview.' },
         { key: 'max_sessions', type: 'int', default: '100', description: 'Maximum sessions to load from the store.' },
         { key: 'yoloMode', type: 'bool', default: 'false', description: 'Pass --allow-all to Copilot CLI (auto-confirm commands).' },
         { key: 'agent', type: 'string', default: '""', description: 'Pass --agent <name> to Copilot CLI.' },
@@ -42,9 +46,15 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'custom_command', type: 'string', default: '""', description: 'Custom launch command. {sessionId} is replaced with the session ID.' },
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
         { key: 'excluded_words', type: 'array', default: '[]', description: 'Words to filter sessions by. Sessions whose name or turn content contains any word (case-insensitive) are hidden.' },
-        { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
+        { key: 'attention_threshold', type: 'string', default: '"15m"', description: 'Duration after which an inactive running session is marked stale instead of waiting/active.' },
+        { key: 'notify_on_waiting', type: 'bool', default: 'false', description: 'Ring the terminal bell and show a footer message when a session enters the waiting state.' },
+        { key: 'auto_refresh_seconds', type: 'int', default: '(unset)', description: 'Session-list poll interval in seconds. Unset uses the default (2s); 0 disables polling; a positive value sets the interval (minimum 1s).' },
         { key: 'theme', type: 'string', default: '"auto"', description: 'Color scheme: auto or a named scheme.' },
         { key: 'workspace_recovery', type: 'bool', default: 'true', description: 'Detect sessions interrupted by crash/reboot. Disable if you see false positives.' },
+        { key: 'ai_search', type: 'bool', default: 'false', description: 'Enable Copilot SDK-powered AI semantic search in addition to the local FTS5 index.' },
+        { key: 'hidden_columns', type: 'array', default: '[]', description: 'Optional session-list columns to hide (repo, folder, turns, host). Empty shows every column.' },
+        { key: 'keybindings', type: 'object', default: '{}', description: 'Remap keyboard shortcuts. Keys are action names; values are comma-separated key lists (see the Keys page).' },
+        { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
       ]} />
     </div>
   </section>

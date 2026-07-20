@@ -393,7 +393,7 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local bin="${COMP_WORDS[0]}"
-  local commands="help version open new doctor update completion stats search tags aliases compare prune tag watch config export info man"
+  local commands="help version open new doctor update completion stats search tags notes views aliases compare prune tag watch config export info man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
@@ -431,7 +431,7 @@ const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys openflags newflags
   local bin=${words[1]}
-  commands=(help version open new doctor update completion stats search tags aliases compare prune tag watch config export info man)
+  commands=(help version open new doctor update completion stats search tags notes views aliases compare prune tag watch config export info man)
   configsubs=(list get set unset edit path)
   openflags=(--mode --last --print --agent --model --yolo)
   newflags=(--mode --agent --model --yolo)
@@ -500,7 +500,7 @@ end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags aliases compare prune tag watch config export info man'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags notes views aliases compare prune tag watch config export info man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"

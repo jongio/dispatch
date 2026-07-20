@@ -12,9 +12,9 @@
 
 ### Force Quit (Works in All States)
 1. **Ctrl+C** → Force Quit
-   - File: internal\tui\keys.go (line 65)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("ctrl+c"))
-   - Handler: internal\tui\model.go (lines 629-631)
+   - Handler: internal\tui\model.go
    - Behavior: Closes store and exits application immediately
    - Condition: Works in ALL states, including overlays
 
@@ -22,16 +22,16 @@
 
 ### Navigation Keys
 2. **k** or **↑ (Up Arrow)** → Move Up in List
-   - File: internal\tui\keys.go (line 58)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("up", "k"))
-   - Handler: internal\tui\model.go (lines 831-834)
+   - Handler: internal\tui\model.go
    - Behavior: Moves selection up, loads detail for selected item
    - Condition: Only in session list view (stateSessionList)
 
 3. **j** or **↓ (Down Arrow)** → Move Down in List
-   - File: internal\tui\keys.go (line 59)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("down", "j"))
-   - Handler: internal\tui\model.go (lines 836-839)
+   - Handler: internal\tui\model.go
    - Behavior: Moves selection down, loads detail for selected item
    - Condition: Only in session list view
 
@@ -50,45 +50,45 @@
    - Condition: Only in session list view, when the search bar is not focused
 
 4. **← (Left Arrow)** → Collapse Folder (if selected item is a folder)
-   - File: internal\tui\keys.go (line 60)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("left"))
-   - Handler: internal\tui\model.go (lines 866-870)
+   - Handler: internal\tui\model.go
    - Behavior: Collapses expanded folder tree item
    - Condition: Only works if a folder is currently selected
 
 5. **→ (Right Arrow)** → Expand Folder (if selected item is a folder)
-   - File: internal\tui\keys.go (line 61)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("right"))
-   - Handler: internal\tui\model.go (lines 872-876)
+   - Handler: internal\tui\model.go
    - Behavior: Expands folder to show child items
    - Condition: Only works if a folder is currently selected
 
 ### Launch/Interaction Keys
 6. **Enter** → Launch Session or Toggle Folder
-   - File: internal\tui\keys.go (line 62)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("enter"))
-   - Handler: internal\tui\model.go (lines 841-846)
+   - Handler: internal\tui\model.go
    - Behavior: Launches selected session OR toggles folder expansion
    - Condition: Works for both sessions and folders
 
 7. **w** → Open in Window
-   - File: internal\tui\keys.go (line 82)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("w"))
-   - Handler: internal\tui\model.go (lines 848-852)
+   - Handler: internal\tui\model.go
    - Behavior: Forces launch in a new window
    - Condition: Only when a session (not folder) is selected
 
 8. **t** → Open in Tab
-   - File: internal\tui\keys.go (line 83)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("t"))
-   - Handler: internal\tui\model.go (lines 854-858)
+   - Handler: internal\tui\model.go
    - Behavior: Forces launch in a new tab
    - Condition: Only when a session (not folder) is selected
 
 9. **e** → Open in Pane
-   - File: internal\tui\keys.go (line 84)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("e"))
-   - Handler: internal\tui\model.go (lines 860-864)
+   - Handler: internal\tui\model.go
    - Behavior: Forces launch in a split pane of the current tab (Windows Terminal only)
    - Condition: Only when a session (not folder) is selected
 
@@ -137,62 +137,62 @@
 
 ### Search and Filtering
 16. **/** → Focus Search Bar / Open Search
-   - File: internal\tui\keys.go (line 66)
+   - File: internal\tui\keys.go
    - Code: key.NewBinding(key.WithKeys("/"))
-   - Handler: internal\tui\model.go (lines 823-825)
+   - Handler: internal\tui\model.go
    - Behavior: Focuses search bar for typing queries
    - Condition: In session list view
 
 17. **Esc** → Clear Search Query or Back to List
-    - File: internal\tui\keys.go (line 67)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("esc"))
-    - Handler: internal\tui\model.go (lines 788-802)
+    - Handler: internal\tui\model.go
     - Behavior: 
       - If search query active: clears query and reloads list
       - If no query: returns to list (used to exit overlays)
     - Condition: In session list view or after exiting search bar
 
 16. **f** → Open Filter Panel
-    - File: internal\tui\keys.go (line 68)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("f"))
-    - Handler: internal\tui\model.go (lines 827-829)
+    - Handler: internal\tui\model.go
     - Behavior: Opens directory filter overlay panel
     - Condition: In session list view
 
 ### Sorting and Organization
 17. **s** → Cycle Sort Field
-    - File: internal\tui\keys.go (line 69)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("s"))
-    - Handler: internal\tui\model.go (lines 878-880)
+    - Handler: internal\tui\model.go
     - Behavior: Cycles through sort options (updated, folder, name, attention, frecency). Affects session ordering within groups. Group ordering is fixed per group mode (A-Z for folder/repo/branch/host, newest first for date).
     - Condition: In session list view
 
 18. **S** (Shift+S) → Toggle Sort Direction
-    - File: internal\tui\keys.go (line 70)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("S"))
-    - Handler: internal\tui\model.go (lines 882-884)
+    - Handler: internal\tui\model.go
     - Behavior: Toggles between ascending and descending sort direction for sessions within groups. Group ordering is fixed per group mode. Has no effect in date group mode (sessions are always sorted by most recent first).
     - Condition: In session list view
 
 19. **Tab** → Cycle Group Mode
-    - File: internal\tui\keys.go (line 71)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("tab"))
-    - Handler: internal\tui\model.go (lines 886-888)
+    - Handler: internal\tui\model.go
     - Behavior: Cycles grouping: list → folder → repo → branch → date → host → list
     - Condition: In session list view
 
 ### Preview and Display
 20. **p** → Toggle Preview Panel
-    - File: internal\tui\keys.go (line 72)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("p"))
-    - Handler: internal\tui\model.go (lines 890-897)
+    - Handler: internal\tui\model.go
     - Behavior: Shows/hides detailed session info preview on the right
     - Condition: In session list view
 
 20b. **o** → Toggle Conversation Sort Order
-     - File: internal\tui\keys.go (line 101)
+     - File: internal\tui\keys.go
      - Code: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order"))
-     - Handler: internal\tui\model.go (lines 1009-1011)
+     - Handler: internal\tui\model.go
      - Behavior: Toggles conversation display order between oldest-first and newest-first in the preview pane. Also clickable via the sort arrow in the conversation header. Persisted in config.
      - Condition: Only when preview panel is visible (showPreview=true)
 
@@ -239,38 +239,38 @@
      - Condition: Only when a session or folder row with a working directory is selected
 
 21. **PgUp (Page Up)** → Preview Panel Scroll Up
-    - File: internal\tui\keys.go (line 85)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("pgup"))
-    - Handler: internal\tui\model.go (lines 899-903)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls preview panel content up by one page
     - Condition: Only when preview panel is visible (showPreview=true)
 
 22. **PgDn (Page Down)** → Preview Panel Scroll Down
-    - File: internal\tui\keys.go (line 86)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("pgdown"))
-    - Handler: internal\tui\model.go (lines 905-909)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls preview panel content down by one page
     - Condition: Only when preview panel is visible
 
 ### Session Management
 23. **r** → Rebuild Index
-    - File: internal\tui\keys.go (line 73)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("r"))
-    - Handler: internal\tui\model.go (lines 911-922)
+    - Handler: internal\tui\model.go
     - Behavior: Manual repair action. Launches Copilot CLI in a pseudo-terminal and runs /chronicle reindex for a full ETL rebuild. Falls back to FTS5 maintenance if the binary is not found. Shows a streaming log overlay during the operation. Normal refresh is handled automatically by DB change detection.
     - Condition: In session list view; ignored if already rebuilding
 
 24. **h** → Hide Current Session
-    - File: internal\tui\keys.go (line 80)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("h"))
-    - Handler: internal\tui\model.go (lines 937-938)
+    - Handler: internal\tui\model.go
     - Behavior: Hides the currently selected session (persisted to config)
     - Condition: Only when a session is selected (not a folder)
 
 25. **H** (Shift+H) → Toggle Hidden Sessions Visibility
-    - File: internal\tui\keys.go (line 81)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("H"))
-    - Handler: internal\tui\model.go (lines 940-943)
+    - Handler: internal\tui\model.go
     - Behavior: Shows/hides all sessions marked as hidden
     - Condition: In session list view
 
@@ -353,52 +353,52 @@
 
 ### Time Range Filter
 31. **1** → Set Time Range to 1 Hour
-    - File: internal\tui\keys.go (line 76)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("1"))
-    - Handler: internal\tui\model.go (lines 924-926)
+    - Handler: internal\tui\model.go
     - Behavior: Filters sessions to last 1 hour
     - Condition: In session list view
 
 29. **2** → Set Time Range to 1 Day
-    - File: internal\tui\keys.go (line 77)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("2"))
-    - Handler: internal\tui\model.go (lines 927-929)
+    - Handler: internal\tui\model.go
     - Behavior: Filters sessions to last 1 day
     - Condition: In session list view
 
 30. **3** → Set Time Range to 7 Days
-    - File: internal\tui\keys.go (line 78)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("3"))
-    - Handler: internal\tui\model.go (lines 930-932)
+    - Handler: internal\tui\model.go
     - Behavior: Filters sessions to last 7 days
     - Condition: In session list view
 
 31. **4** → Set Time Range to All Time
-    - File: internal\tui\keys.go (line 79)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("4"))
-    - Handler: internal\tui\model.go (lines 933-935)
+    - Handler: internal\tui\model.go
     - Behavior: Shows all sessions (removes time filter)
     - Condition: In session list view
 
 ### Info and Settings
 32. **?** → Toggle Help Overlay
-    - File: internal\tui\keys.go (line 74)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("?"))
-    - Handler: internal\tui\model.go (lines 804-806)
+    - Handler: internal\tui\model.go
     - Behavior: Opens/closes comprehensive help modal
     - Condition: Can open from session list; closed by ? or Esc
 
 33. **,** → Open Settings/Config Panel
-    - File: internal\tui\keys.go (line 75)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys(","))
-    - Handler: internal\tui\model.go (lines 808-821)
+    - Handler: internal\tui\model.go
     - Behavior: Opens configuration panel to modify settings
     - Condition: In session list view
 
 34. **q** → Quit (Graceful)
-    - File: internal\tui\keys.go (line 64)
+    - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("q"))
-    - Handler: internal\tui\model.go (lines 784-786)
+    - Handler: internal\tui\model.go
     - Behavior: Closes store and exits application gracefully
     - Condition: In session list view
 
@@ -407,27 +407,27 @@
 When the search bar is focused (after pressing /):
 
 35. **Up Arrow / k** → Blur Search and Move Selection Up
-    - Handler: internal\tui\model.go (lines 740-744)
+    - Handler: internal\tui\model.go
     - Behavior: Unfocuses search bar and moves list selection up
     - Condition: Only when search bar is focused
 
 36. **Down Arrow / j** → Blur Search and Move Selection Down
-    - Handler: internal\tui\model.go (lines 745-749)
+    - Handler: internal\tui\model.go
     - Behavior: Unfocuses search bar and moves list selection down
     - Condition: Only when search bar is focused
 
 37. **Esc** → Blur Search Bar
-    - Handler: internal\tui\model.go (lines 706-725)
+    - Handler: internal\tui\model.go
     - Behavior: Unfocuses search bar; query stays active if non-empty
     - Condition: Only when search bar is focused
 
 38. **Enter** → Confirm Search
-    - Handler: internal\tui\model.go (lines 726-739)
+    - Handler: internal\tui\model.go
     - Behavior: Triggers deep search if pending; unfocuses bar
     - Condition: Only when search bar is focused
 
 39. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
-    - Handler: internal\tui\model.go (lines 750-779)
+    - Handler: internal\tui\model.go
     - Behavior: Adds character to query; triggers quick search immediately and deep search after delay
     - Condition: Only when search bar is focused
 
@@ -436,37 +436,37 @@ When the search bar is focused (after pressing /):
 When filter panel is open (after pressing f):
 
 40. **↑ (Up Arrow)** → Move Up in Filter List
-    - Handler: internal\tui\model.go (lines 673-674)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection up in directory filter tree
     - Condition: Only in stateFilterPanel
 
 41. **↓ (Down Arrow)** → Move Down in Filter List
-    - Handler: internal\tui\model.go (lines 675-676)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection down in directory filter tree
     - Condition: Only in stateFilterPanel
 
 42. **← (Left Arrow)** → Collapse Filter Group
-    - Handler: internal\tui\model.go (lines 677-678)
+    - Handler: internal\tui\model.go
     - Behavior: Collapses expanded directory group
     - Condition: Only in stateFilterPanel
 
 43. **→ (Right Arrow)** → Expand Filter Group
-    - Handler: internal\tui\model.go (lines 679-680)
+    - Handler: internal\tui\model.go
     - Behavior: Expands directory group to show subdirectories
     - Condition: Only in stateFilterPanel
 
 44. **Space** → Toggle Filter Exclusion
-    - Handler: internal\tui\model.go (lines 681-682)
+    - Handler: internal\tui\model.go
     - Behavior: Toggles whether selected directory is excluded from results
     - Condition: Only in stateFilterPanel
 
 45. **Enter** → Apply Filters and Close Panel
-    - Handler: internal\tui\model.go (lines 683-692)
+    - Handler: internal\tui\model.go
     - Behavior: Saves exclusion settings to config and reloads session list
     - Condition: Only in stateFilterPanel
 
 46. **Esc** → Cancel and Close Filter Panel
-    - Handler: internal\tui\model.go (lines 670-672)
+    - Handler: internal\tui\model.go
     - Behavior: Discards changes and returns to session list
     - Condition: Only in stateFilterPanel
 
@@ -475,22 +475,22 @@ When filter panel is open (after pressing f):
 When shell picker is open (shown after selecting launch mode):
 
 47. **↑ (Up Arrow)** → Move Up in Shell List
-    - Handler: internal\tui\model.go (lines 655-656)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection up in available shells list
     - Condition: Only in stateShellPicker
 
 48. **↓ (Down Arrow)** → Move Down in Shell List
-    - Handler: internal\tui\model.go (lines 657-658)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection down in available shells list
     - Condition: Only in stateShellPicker
 
 49. **Enter** → Select Shell and Launch
-    - Handler: internal\tui\model.go (lines 659-665)
+    - Handler: internal\tui\model.go
     - Behavior: Launches session with selected shell
     - Condition: Only in stateShellPicker
 
 50. **Esc** → Cancel and Return to List
-    - Handler: internal\tui\model.go (lines 653-654)
+    - Handler: internal\tui\model.go
     - Behavior: Closes shell picker without launching
     - Condition: Only in stateShellPicker
 
@@ -500,38 +500,38 @@ When config panel is open (after pressing ,):
 
 ### Non-Edit Mode
 51. **↑ (Up Arrow)** → Move Up in Config Options
-    - Handler: internal\tui\model.go (lines 1016-1017)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection up through config options
     - Condition: When NOT in edit mode within config panel
 
 52. **↓ (Down Arrow)** → Move Down in Config Options
-    - Handler: internal\tui\model.go (lines 1018-1019)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection down through config options
     - Condition: When NOT in edit mode
 
 53. **Enter** → Select/Edit Config Option
-    - Handler: internal\tui\model.go (lines 1020-1022)
+    - Handler: internal\tui\model.go
     - Behavior: Enters edit mode for selected option
     - Condition: When NOT in edit mode
 
 54. **Esc** → Save and Close Config Panel
-    - Handler: internal\tui\model.go (lines 1011-1015)
+    - Handler: internal\tui\model.go
     - Behavior: Saves all config changes and returns to session list
     - Condition: When NOT in edit mode
 
 ### Edit Mode (Inside Text Field)
 55. **Esc** → Cancel Edit of Current Field
-    - Handler: internal\tui\model.go (lines 997-998)
+    - Handler: internal\tui\model.go
     - Behavior: Discards changes to current field, returns to option selection
     - Condition: When in edit mode for a field
 
 56. **Enter** → Confirm Edit of Current Field
-    - Handler: internal\tui\model.go (lines 1000-1001)
+    - Handler: internal\tui\model.go
     - Behavior: Accepts changes to field and returns to option selection
     - Condition: When in edit mode for a field
 
 57. **Any Printable Character** (a-z, A-Z, 0-9, spaces, etc.)
-    - Handler: internal\tui\model.go (lines 1003-1006)
+    - Handler: internal\tui\model.go
     - Behavior: Types character into text field (delegated to textinput)
     - Condition: When in edit mode for a text field
 
@@ -540,12 +540,12 @@ When config panel is open (after pressing ,):
 When help overlay is open (after pressing ?):
 
 58. **?** → Toggle Help (Close)
-    - Handler: internal\tui\model.go (lines 646-649)
+    - Handler: internal\tui\model.go
     - Behavior: Closes help overlay and returns to session list
     - Condition: In stateHelpOverlay
 
 59. **Esc** → Close Help
-    - Handler: internal\tui\model.go (lines 646-649)
+    - Handler: internal\tui\model.go
     - Behavior: Closes help overlay and returns to session list
     - Condition: In stateHelpOverlay
 
@@ -553,30 +553,30 @@ When help overlay is open (after pressing ?):
 
 ### Left Mouse Button (Click)
 60. **Single Click on Session** → Select Session
-    - Handler: internal\tui\model.go (lines 1096-1163)
+    - Handler: internal\tui\model.go
     - Behavior: Moves selection to clicked item; deferred timer allows double-click detection
-    - Timing: Single click fires after 300ms (doubleClickTimeout constant at line 40)
+    - Timing: Single click fires after 300ms (doubleClickTimeout constant)
     - Condition: Only in stateSessionList, within list area (not preview pane)
 
 61. **Double Click on Session** → Launch Session
-    - Handler: internal\tui\model.go (lines 1122-1144)
+    - Handler: internal\tui\model.go
     - Behavior: Launches selected session with default or override mode
     - Ctrl Modifier: Forces window launch (config.LaunchModeWindow)
     - Shift Modifier: Forces tab launch (config.LaunchModeTab)
     - Condition: Only in stateSessionList, within list area
 
 62. **Double Click on Folder + Ctrl** → Launch New Session in Window
-    - Handler: internal\tui\model.go (lines 1127-1135)
+    - Handler: internal\tui\model.go
     - Behavior: Creates new session in folder's path, opens in new window
     - Condition: Double-click on folder item + Ctrl modifier pressed
 
 63. **Double Click on Folder + Shift** → Launch New Session in Tab
-    - Handler: internal\tui\model.go (lines 1127-1135)
+    - Handler: internal\tui\model.go
     - Behavior: Creates new session in folder's path, opens in new tab
     - Condition: Double-click on folder item + Shift modifier pressed
 
 64. **Double Click on Folder** → Launch New Session with Default Mode
-    - Handler: internal\tui\model.go (lines 1127-1135)
+    - Handler: internal\tui\model.go
     - Behavior: Creates new session in folder's path
     - Condition: Double-click on folder item (no modifiers)
 
@@ -596,23 +596,23 @@ When help overlay is open (after pressing ?):
     - Condition: Only in stateSessionList, when selectedSessions set is non-empty
 
 68. **Click on Header Area (Search Bar)** → Focus Search
-    - Handler: internal\tui\model.go (lines 1101-1103, 1168-1230)
+    - Handler: internal\tui\model.go
     - Behavior: Focuses search bar for typing; click position determines if on search area
     - Condition: Click on Y=0 (title line), X >= title width
 
 ### Header Badge Clicks
 69. **Click Time Range Badge** → Set Time Range
-    - Handler: internal\tui\model.go (lines 1170-1198, 1216-1230)
+    - Handler: internal\tui\model.go
     - Behavior: Sets time range filter to clicked option (1h, 1d, 7d, all)
     - Condition: Click on Y=1 (badge line), within time range segment
 
 70. **Click Sort Indicator** → Cycle Sort Field
-    - Handler: internal\tui\model.go (lines 1170-1198)
+    - Handler: internal\tui\model.go
     - Behavior: Cycles sort field to next option. Click the arrow to toggle direction.
     - Condition: Click on Y=1, within sort indicator area
 
 71. **Click Group Indicator** → Cycle Group Mode
-    - Handler: internal\tui\model.go (lines 1170-1198)
+    - Handler: internal\tui\model.go
     - Behavior: Cycles group mode (list, folder, repo, branch, date, host)
     - Condition: Click on Y=1, within group indicator area
 
@@ -625,22 +625,22 @@ When help overlay is open (after pressing ?):
      - Condition: Preview pane visible, click lands on the "ID: ..." row
 
 72. **Mouse Wheel Up (List Area)** → Scroll List Up
-    - Handler: internal\tui\model.go (lines 1076-1084)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls session list up by 3 items
     - Condition: Only in stateSessionList, when mouse is over list (not preview)
 
 73. **Mouse Wheel Down (List Area)** → Scroll List Down
-    - Handler: internal\tui\model.go (lines 1086-1094)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls session list down by 3 items
     - Condition: Only in stateSessionList, when mouse is over list
 
 74. **Mouse Wheel Up (Preview Area)** → Scroll Preview Up
-    - Handler: internal\tui\model.go (lines 1076-1084)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls preview panel content up by 3 lines
     - Condition: Only in stateSessionList, when mouse is over preview pane
 
 75. **Mouse Wheel Down (Preview Area)** → Scroll Preview Down
-    - Handler: internal\tui\model.go (lines 1086-1094)
+    - Handler: internal\tui\model.go
     - Behavior: Scrolls preview panel content down by 3 lines
     - Condition: Only in stateSessionList, when mouse is over preview pane
 
@@ -658,7 +658,7 @@ When help overlay is open (after pressing ?):
 ### Key Binding Implementation
 - Uses Bubble Tea's key.Binding system (charmbracelet/bubbles/key)
 - Key matching via key.Matches(msg, keyBindingName)
-- All key bindings defined in internal\tui\keys.go (lines 57-87)
+- All key bindings defined in internal\tui\keys.go
 
 ### Modifiers
 - **Ctrl+C** → Force quit (special case, always active)
