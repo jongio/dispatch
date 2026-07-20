@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -28,6 +30,64 @@ var watchListSessionsFn = defaultStatsListSessions
 // suppress the audible bell.
 var bellFn = func() { fmt.Fprint(os.Stderr, "\a") }
 
+// watchExecFn runs a hook command with session context supplied through
+// environment variables. It is a package variable so tests can capture
+// invocations without spawning a shell.
+var watchExecFn = runWatchHook
+
+// runWatchHook executes command through the platform shell, appending sessionEnv
+// to the current process environment. Session metadata reaches the command only
+// through DISPATCH_SESSION_* variables and is never interpolated into the
+// command string, so untrusted session data cannot change what runs. Command
+// output is routed to stderr to keep stdout clean for --json consumers.
+func runWatchHook(command string, sessionEnv []string) error {
+	shellPath, flag := hookShell()
+	cmd := exec.CommandContext(context.Background(), shellPath, flag, command)
+	cmd.Env = append(os.Environ(), sessionEnv...)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// hookShell returns the shell binary and command flag used to run watch hooks
+// on the current OS.
+func hookShell() (shellPath, flag string) {
+	if runtime.GOOS == "windows" {
+		if comspec := os.Getenv("COMSPEC"); comspec != "" {
+			return comspec, "/c"
+		}
+		return "cmd.exe", "/c"
+	}
+	if sh := os.Getenv("SHELL"); sh != "" {
+		return sh, "-c"
+	}
+	return "/bin/sh", "-c"
+}
+
+// hookEnv builds the DISPATCH_SESSION_* environment for a transition. state is
+// the new attention state; prevState is the prior state ("none" for a session
+// seen for the first time). meta carries the session's repository, branch,
+// folder, and summary when available.
+func hookEnv(id, state, prevState string, meta data.Session) []string {
+	return []string{
+		"DISPATCH_SESSION_ID=" + id,
+		"DISPATCH_SESSION_STATE=" + state,
+		"DISPATCH_SESSION_PREV_STATE=" + prevState,
+		"DISPATCH_SESSION_REPO=" + meta.Repository,
+		"DISPATCH_SESSION_BRANCH=" + meta.Branch,
+		"DISPATCH_SESSION_FOLDER=" + meta.Cwd,
+		"DISPATCH_SESSION_SUMMARY=" + meta.Summary,
+	}
+}
+
+// fireWatchHook runs the configured hook command for one transition. Any error
+// is written to stderr; the watch loop continues regardless.
+func fireWatchHook(command, id, state, prevState string, meta data.Session) {
+	if err := watchExecFn(command, hookEnv(id, state, prevState, meta)); err != nil {
+		fmt.Fprintf(os.Stderr, "watch hook failed for %s: %v\n", shortID(id), err)
+	}
+}
+
 // watchOptions holds parsed flags for the watch command.
 type watchOptions struct {
 	once     bool
@@ -36,6 +96,7 @@ type watchOptions struct {
 	repo     string
 	branch   string
 	folder   string
+	exec     string
 }
 
 // watchSnapshot is the JSON representation of attention state at a point in time.
@@ -126,12 +187,22 @@ func parseWatchArgs(args []string) (watchOptions, error) {
 				return watchOptions{}, fmt.Errorf("--folder requires a value")
 			}
 			opts.folder = rest[i]
+		case arg == "--exec":
+			i++
+			if i >= len(rest) {
+				return watchOptions{}, fmt.Errorf("--exec requires a command")
+			}
+			opts.exec = rest[i]
 		case strings.HasPrefix(arg, "-"):
 			return watchOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			return watchOptions{}, fmt.Errorf("watch does not take positional arguments, got %q", arg)
 		}
 		i++
+	}
+
+	if opts.exec != "" && opts.once {
+		return watchOptions{}, fmt.Errorf("--exec cannot be combined with --once (hooks run only in streaming mode)")
 	}
 
 	return opts, nil
@@ -188,6 +259,10 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 			return nil
 		case <-ticker.C:
 			current := scanFiltered(opts)
+			var meta map[string]data.Session
+			if opts.exec != "" {
+				meta = watchSessionMeta(opts)
+			}
 			for id, status := range current {
 				old, existed := prev[id]
 				if !existed || old != status {
@@ -205,6 +280,13 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 					} else {
 						fmt.Fprintf(w, "[%s] %s  %s\n", ts, shortID(id), status.String())
 					}
+					if opts.exec != "" {
+						prevState := "none"
+						if existed {
+							prevState = old.String()
+						}
+						fireWatchHook(opts.exec, id, status.String(), prevState, meta[id])
+					}
 				}
 			}
 			// Detect sessions that disappeared.
@@ -220,6 +302,9 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 						})
 					} else {
 						fmt.Fprintf(w, "[%s] %s  gone\n", ts, shortID(id))
+					}
+					if opts.exec != "" {
+						fireWatchHook(opts.exec, id, "gone", prev[id].String(), meta[id])
 					}
 				}
 			}
@@ -258,6 +343,25 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 		}
 	}
 	return filtered
+}
+
+// watchSessionMeta returns a map from session ID to session metadata, honoring
+// the same filters as the attention scan. A lookup error yields an empty map so
+// a metadata failure never stops the watch loop.
+func watchSessionMeta(opts watchOptions) map[string]data.Session {
+	sessions, err := watchListSessionsFn(data.FilterOptions{
+		Repository: opts.repo,
+		Branch:     opts.branch,
+		Folder:     opts.folder,
+	})
+	if err != nil {
+		return map[string]data.Session{}
+	}
+	meta := make(map[string]data.Session, len(sessions))
+	for _, s := range sessions {
+		meta[s.ID] = s
+	}
+	return meta
 }
 
 // buildWatchSnapshot creates a snapshot of the current attention state.

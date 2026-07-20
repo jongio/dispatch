@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 
@@ -14,6 +15,10 @@ import (
 // notesListSessionsFn loads sessions for the notes command. It is a package
 // variable so tests can substitute a fixed set of sessions.
 var notesListSessionsFn = defaultStatsListSessions
+
+// notesStdin is the input stream used by `notes set --stdin`. Tests swap it
+// for an in-memory reader.
+var notesStdin io.Reader = os.Stdin
 
 type noteEntry struct {
 	ID      string `json:"id"`
@@ -96,13 +101,16 @@ func runNotesGet(w io.Writer, args []string) error {
 }
 
 func runNotesSet(w io.Writer, args []string) error {
-	if len(args) < 2 {
+	if len(args) < 1 {
 		return fmt.Errorf("notes set requires a session ID and note text")
 	}
 	sessionID := args[0]
-	note := strings.Join(args[1:], " ")
 	if strings.TrimSpace(sessionID) == "" {
 		return fmt.Errorf("notes set requires a session ID")
+	}
+	note, err := parseNoteText(args[1:])
+	if err != nil {
+		return err
 	}
 	cfg, err := configLoadFn()
 	if err != nil {
@@ -114,6 +122,32 @@ func runNotesSet(w io.Writer, args []string) error {
 	}
 	fmt.Fprintf(w, "Set note for %s\n", sessionID)
 	return nil
+}
+
+func parseNoteText(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("notes set requires a session ID and note text")
+	}
+	readStdin := false
+	var textParts []string
+	for _, arg := range args {
+		if arg == "--stdin" {
+			readStdin = true
+			continue
+		}
+		textParts = append(textParts, arg)
+	}
+	if readStdin {
+		if len(textParts) > 0 {
+			return "", fmt.Errorf("notes set --stdin cannot be combined with note text")
+		}
+		b, err := io.ReadAll(notesStdin)
+		if err != nil {
+			return "", fmt.Errorf("reading note from stdin: %w", err)
+		}
+		return string(b), nil
+	}
+	return strings.Join(textParts, " "), nil
 }
 
 func runNotesClear(w io.Writer, args []string) error {

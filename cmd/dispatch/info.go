@@ -19,31 +19,38 @@ var infoGetDetailFn = defaultExportGetDetail
 // info command. Unlike export, it summarizes the conversation with counts
 // rather than including every turn.
 type sessionInfo struct {
-	ID           string `json:"id"`
-	Summary      string `json:"summary,omitempty"`
-	Repository   string `json:"repository,omitempty"`
-	Branch       string `json:"branch,omitempty"`
-	Directory    string `json:"directory,omitempty"`
-	HostType     string `json:"host_type,omitempty"`
-	CreatedAt    string `json:"created_at,omitempty"`
-	UpdatedAt    string `json:"updated_at,omitempty"`
-	LastActiveAt string `json:"last_active_at,omitempty"`
-	Turns        int    `json:"turns"`
-	Files        int    `json:"files"`
-	Checkpoints  int    `json:"checkpoints"`
-	Commits      int    `json:"commits"`
-	PRs          int    `json:"prs"`
-	Issues       int    `json:"issues"`
+	ID           string    `json:"id"`
+	Summary      string    `json:"summary,omitempty"`
+	Repository   string    `json:"repository,omitempty"`
+	Branch       string    `json:"branch,omitempty"`
+	Directory    string    `json:"directory,omitempty"`
+	HostType     string    `json:"host_type,omitempty"`
+	CreatedAt    string    `json:"created_at,omitempty"`
+	UpdatedAt    string    `json:"updated_at,omitempty"`
+	LastActiveAt string    `json:"last_active_at,omitempty"`
+	Turns        int       `json:"turns"`
+	Files        int       `json:"files"`
+	Checkpoints  int       `json:"checkpoints"`
+	Commits      int       `json:"commits"`
+	PRs          int       `json:"prs"`
+	Issues       int       `json:"issues"`
+	Refs         *infoRefs `json:"refs,omitempty"`
+}
+
+type infoRefs struct {
+	Commits []string `json:"commits"`
+	PRs     []string `json:"prs"`
+	Issues  []string `json:"issues"`
 }
 
 // runInfo prints a concise summary of a single session as text, or as JSON
-// with --json. args is the full argument slice with args[0] == "info".
+// with --json. The --refs flag adds linked reference values.
 func runInfo(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
 	}
 
-	id, asJSON, err := parseInfoArgs(args)
+	id, asJSON, includeRefs, err := parseInfoArgs(args)
 	if err != nil {
 		return err
 	}
@@ -57,15 +64,18 @@ func runInfo(w io.Writer, args []string) error {
 	}
 
 	info := buildSessionInfo(detail)
+	if includeRefs {
+		addInfoRefs(&info, detail.Refs)
+	}
 	if asJSON {
 		return writeInfoJSON(w, info)
 	}
 	return writeInfoText(w, info)
 }
 
-// parseInfoArgs extracts the session ID and the --json flag from the info
+// parseInfoArgs extracts the session ID and flags from the info
 // subcommand arguments. args[0] is expected to be "info".
-func parseInfoArgs(args []string) (id string, asJSON bool, err error) {
+func parseInfoArgs(args []string) (id string, asJSON, includeRefs bool, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "info" token
@@ -76,8 +86,10 @@ func parseInfoArgs(args []string) (id string, asJSON bool, err error) {
 		switch {
 		case arg == "--json":
 			asJSON = true
+		case arg == "--refs":
+			includeRefs = true
 		case strings.HasPrefix(arg, "-"):
-			return "", false, fmt.Errorf("unknown flag: %s", arg)
+			return "", false, false, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
@@ -85,11 +97,11 @@ func parseInfoArgs(args []string) (id string, asJSON bool, err error) {
 
 	switch len(positionals) {
 	case 0:
-		return "", false, errors.New("info requires a session ID")
+		return "", false, false, errors.New("info requires a session ID")
 	case 1:
-		return positionals[0], asJSON, nil
+		return positionals[0], asJSON, includeRefs, nil
 	default:
-		return "", false, fmt.Errorf("info accepts a single session ID, got %d arguments", len(positionals))
+		return "", false, false, fmt.Errorf("info accepts a single session ID, got %d arguments", len(positionals))
 	}
 }
 
@@ -122,6 +134,24 @@ func buildSessionInfo(detail *data.SessionDetail) sessionInfo {
 		}
 	}
 	return info
+}
+
+func addInfoRefs(info *sessionInfo, refs []data.SessionRef) {
+	info.Refs = &infoRefs{
+		Commits: []string{},
+		PRs:     []string{},
+		Issues:  []string{},
+	}
+	for _, ref := range refs {
+		switch strings.ToLower(ref.RefType) {
+		case "commit":
+			info.Refs.Commits = append(info.Refs.Commits, ref.RefValue)
+		case "pr":
+			info.Refs.PRs = append(info.Refs.PRs, ref.RefValue)
+		case "issue":
+			info.Refs.Issues = append(info.Refs.Issues, ref.RefValue)
+		}
+	}
 }
 
 // writeInfoJSON encodes info as indented JSON.
@@ -158,6 +188,11 @@ func writeInfoText(w io.Writer, info sessionInfo) error {
 	fmt.Fprintf(&b, "  %-12s %d\n", "Files:", info.Files)
 	fmt.Fprintf(&b, "  %-12s %d\n", "Checkpoints:", info.Checkpoints)
 	fmt.Fprintf(&b, "  %-12s %s\n", "Refs:", formatRefCounts(info))
+	if info.Refs != nil {
+		fmt.Fprintf(&b, "  %-12s %s\n", "Commits:", formatRefList(info.Refs.Commits))
+		fmt.Fprintf(&b, "  %-12s %s\n", "PRs:", formatRefList(info.Refs.PRs))
+		fmt.Fprintf(&b, "  %-12s %s\n", "Issues:", formatRefList(info.Refs.Issues))
+	}
 
 	_, err := io.WriteString(w, b.String())
 	return err
@@ -178,4 +213,11 @@ func pluralize(n int, singular, plural string) string {
 		return "1 " + singular
 	}
 	return fmt.Sprintf("%d %s", n, plural)
+}
+
+func formatRefList(values []string) string {
+	if len(values) == 0 {
+		return "-"
+	}
+	return strings.Join(values, ", ")
 }

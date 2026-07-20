@@ -250,6 +250,7 @@ Run `dispatch stats` to print session totals and breakdowns by repository, branc
 dispatch stats
 dispatch stats --json
 dispatch stats --csv
+dispatch stats --markdown
 dispatch stats --calendar
 dispatch stats --repo jongio/dispatch --since 2026-01-01
 dispatch stats --top 5
@@ -258,6 +259,7 @@ dispatch stats --top 5
 Flags:
 
 - `--json` prints the summary as a single JSON object.
+- `--markdown` prints the summary as Markdown tables for reports and issue comments.
 - `--calendar` adds a GitHub-style activity heatmap of sessions per day, with an intensity legend. It honors the `--repo`, `--branch`, `--since`, and `--until` filters.
 - `--repo`, `--branch`, `--folder`, `--since`, and `--until` narrow which sessions are counted.
 - `--top <n>` caps each repository, branch, and host breakdown to the first N entries.
@@ -282,10 +284,11 @@ dispatch notes
 dispatch notes --json
 dispatch notes get 0a1b2c3d
 dispatch notes set 0a1b2c3d "follow up after review"
+printf 'line one\nline two\n' | dispatch notes set 0a1b2c3d --stdin
 dispatch notes clear 0a1b2c3d
 ```
 
-`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview.
+`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview. Use `--stdin` to set a multiline note without shell quoting.
 
 ### Named Views
 
@@ -308,12 +311,13 @@ Save a full session (metadata and the complete conversation) to a file with `dis
 dispatch export 0a1b2c3d
 dispatch export 0a1b2c3d --format json
 dispatch export 0a1b2c3d --format html
+dispatch export 0a1b2c3d --format text
 dispatch export 0a1b2c3d --stdout
 dispatch export 0a1b2c3d --redact --stdout
 dispatch export 0a1b2c3d --out ./exports
 ```
 
-By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output or `--format html` for a self-contained web page you can open in a browser (styles are inlined, so there are no external files to manage). Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--format html` for a self-contained web page you can open in a browser, or `--format text` for plain text. Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
 
 #### Batch Export
 
@@ -322,6 +326,7 @@ Export all sessions matching a scope filter at once:
 ```sh
 dispatch export --repo jongio/dispatch
 dispatch export --repo jongio/dispatch --format json --out ./backup
+dispatch export --repo jongio/dispatch --format text --out ./backup
 dispatch export --branch main --since 2026-01-01 --until 2026-07-01
 dispatch export --query "auth fix" --redact
 ```
@@ -346,9 +351,10 @@ Print a concise summary of one session with `dispatch info <id>`:
 ```sh
 dispatch info 0a1b2c3d
 dispatch info 0a1b2c3d --json
+dispatch info 0a1b2c3d --refs
 ```
 
-The summary covers the session's repository, branch, working directory, host type, turn and file counts, timestamps, tags, alias, and any linked refs. Use `--json` for scripting. The session ID accepts the same prefix shorthand as `open`.
+The summary covers the session's repository, branch, working directory, host type, turn and file counts, timestamps, and linked ref counts. Use `--refs` to include linked commit, PR, and issue values, or `--json` for scripting. The session ID accepts the same prefix shorthand as `open`.
 
 ### Aliases
 
@@ -411,9 +417,31 @@ dispatch watch --once --json             # JSON snapshot
 dispatch watch                           # stream transitions (Ctrl-C to stop)
 dispatch watch --interval 10s            # custom poll interval
 dispatch watch --once --repo jongio/dispatch  # filter by repo
+dispatch watch --exec 'notify-send "$DISPATCH_SESSION_STATE"'  # run a hook on each transition
 ```
 
 The terminal bell rings when a session transitions to waiting or interrupted. Use `--repo`, `--branch`, or `--folder` to limit which sessions are monitored.
+
+#### Transition hooks
+
+`--exec <cmd>` runs a command every time a session changes attention state while streaming (it cannot be combined with `--once`). The command runs through your shell, so pipelines and quoting work as usual. Session context is passed as environment variables, never interpolated into the command string:
+
+| Variable | Value |
+| --- | --- |
+| `DISPATCH_SESSION_ID` | Full session ID |
+| `DISPATCH_SESSION_STATE` | New attention state (`waiting`, `working`, `gone`, ...) |
+| `DISPATCH_SESSION_PREV_STATE` | Prior state, or `none` for a newly seen session |
+| `DISPATCH_SESSION_REPO` | Repository |
+| `DISPATCH_SESSION_BRANCH` | Branch |
+| `DISPATCH_SESSION_FOLDER` | Working directory |
+| `DISPATCH_SESSION_SUMMARY` | Session summary |
+
+Hook output and non-zero exits are written to stderr, and a slow or failing command never stops the watch loop. Example that posts to a webhook when a session starts waiting for input:
+
+```sh
+dispatch watch --exec '[ "$DISPATCH_SESSION_STATE" = waiting ] && \
+  curl -s -X POST "$WEBHOOK_URL" -d "session=$DISPATCH_SESSION_ID needs input"'
+```
 
 ### Search (JSON)
 
@@ -423,10 +451,12 @@ Query the session store from scripts without opening the TUI. `dispatch search` 
 dispatch search auth
 dispatch search --query "fix login" --repo jongio/dispatch
 dispatch search --branch main --since 2026-01-01 --limit 20
+dispatch search --sort turns --order desc --limit 10
 dispatch search --deep refactor --json
 dispatch search auth --format ids
 dispatch search auth --ids
 dispatch search auth --table
+dispatch search auth --csv
 ```
 
 The query can be passed as a positional argument or with `--query`. Filters mirror the interactive search and the `stats` command:
@@ -434,10 +464,11 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--repo`, `--branch`, `--folder`, `--host` narrow by session metadata.
 - `--since` / `--until` accept `YYYY-MM-DD` or full RFC3339 timestamps.
 - `--deep` also searches turns, checkpoints, touched files, and refs.
+- `--sort updated|created|turns|name|folder` and `--order asc|desc` control result order.
 - `--limit <n>` caps the result count (default 50, `0` for no limit).
-- `--format json|ids|table` chooses JSON output, one session ID per line, or a readable table. `--ids` and `--table` are shortcuts.
+- `--format json|csv|ids|table` chooses JSON output, CSV output, one session ID per line, or a readable table. `--csv`, `--ids`, and `--table` are shortcuts.
 
-Each JSON result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. Both exit 0. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+Each JSON or CSV result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. CSV always prints a header row. Invalid flags or an unreadable store exit non-zero with a message on stderr.
 
 ### Man
 
@@ -643,12 +674,13 @@ dispatch config path            # print the config file path
 | `default_shell` | string | `""` | Preferred shell (`bash`, `zsh`, `pwsh`, `cmd.exe`). Empty = auto-detect |
 | `default_terminal` | string | `""` | Terminal emulator. Empty = auto-detect |
 | `default_time_range` | string | `"1d"` | Time filter: `1h`, `1d`, `7d`, `all` |
-| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
+| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder`, `frecency` |
 | `default_sort_order` | string | `"desc"` | Sort direction: `asc`, `desc` |
-| `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date` |
+| `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date`, `host` |
 | `default_collapsed` | bool | `false` | Start group headers collapsed (single-line) |
 | `show_preview` | bool | `true` | Show preview pane on startup |
 | `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |
+| `redact_preview_secrets` | bool | `false` | Mask common secret patterns (bearer tokens, GitHub PATs, connection strings, `.env` secrets) with `[redacted]` in the preview pane. Rendering only; stored session data is never modified |
 | `conversation_newest_first` | bool | `true` | Show newest conversation turns first in preview |
 | `max_sessions` | int | `100` | Maximum sessions to load |
 | `yoloMode` | bool | `false` | Pass `--allow-all` to Copilot CLI (auto-confirm commands) |
@@ -759,18 +791,18 @@ named keys (`up`, `down`, `left`, `right`, `enter`, `esc`, `tab`, `space`,
 
 Available action names:
 
-`up`, `down`, `left`, `right`, `enter`, `space`, `quit`, `force_quit`,
-`search`, `escape`, `filter`, `sort`, `sort_order`, `pivot`,
-`preview`, `reindex`, `help`, `config`, `time_range_1`, `time_range_2`,
-`time_range_3`, `time_range_4`, `hide`, `toggle_hidden`, `star`,
-`launch_window`, `launch_tab`, `launch_pane`, `preview_scroll_up`,
-`preview_scroll_down`, `jump_next_attention`, `filter_attention`, `launch_all`,
-`select_all`, `deselect_all`, `conversation_sort`, `preview_position`,
-`resume_interrupted`, `view_plan`, `copy_id`, `copy_path`,
-`copy_resume_command`, `copy_preview`, `expand_collapse_all`,
-`scan_work_status`, `export`, `note`, `shift_up`, `shift_down`, `view_switch`,
-`open_file`, `open_dir`, `open_ref`, `timeline`, `compare`, `git_status`,
-`cmd_palette`.
+`up`, `down`, `jump_top`, `jump_bottom`, `left`, `right`, `enter`, `space`,
+`quit`, `force_quit`, `search`, `escape`, `filter`, `sort`, `sort_order`,
+`pivot`, `pivot_order`, `preview`, `preview_fullscreen`, `reindex`, `help`,
+`config`, `time_range_1`, `time_range_2`, `time_range_3`, `time_range_4`,
+`hide`, `toggle_hidden`, `star`, `launch_window`, `launch_tab`, `launch_pane`,
+`preview_scroll_up`, `preview_scroll_down`, `jump_next_attention`,
+`filter_attention`, `launch_all`, `select_all`, `deselect_all`,
+`conversation_sort`, `preview_position`, `resume_interrupted`, `view_plan`,
+`copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
+`expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,
+`shift_up`, `shift_down`, `view_switch`, `open_file`, `open_dir`, `open_ref`,
+`timeline`, `compare`, `git_status`, `cmd_palette`.
 
 ## Themes
 
@@ -822,6 +854,7 @@ Unknown flags print an error message with usage help and exit with code 1.
 |---|---|
 | `DISPATCH_CONFIG` | Override the path to the config file. Must be an absolute, non-UNC path; a relative or UNC value is ignored and the default location is used |
 | `DISPATCH_DB` | Override the path to the Copilot CLI session store database |
+| `DISPATCH_SESSION_STATE` | Override the path to the Copilot CLI session state directory |
 | `DISPATCH_LOG` | Path to a log file (enables debug logging) |
 | `DISPATCH_NO_UPDATE_CHECK` | Skip the background release check when set to `1`, `true`, `yes`, or `on` |
 

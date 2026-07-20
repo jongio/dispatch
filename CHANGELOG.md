@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - **`dispatch alias`**: set, reassign, clear (`--clear`), or remove (`--remove`) a session alias from the command line, completing the CLI parity that `tag` and `notes` already have. Supports `--json`.
+- **`dispatch watch --exec <cmd>`**: run a command on each session attention transition while streaming. Session context is passed through `DISPATCH_SESSION_ID`, `DISPATCH_SESSION_STATE`, `DISPATCH_SESSION_PREV_STATE`, `DISPATCH_SESSION_REPO`, `DISPATCH_SESSION_BRANCH`, `DISPATCH_SESSION_FOLDER`, and `DISPATCH_SESSION_SUMMARY` environment variables. Hook output goes to stderr and a failing hook never stops the watch loop.
 
 ## [v0.14.0] — 2026-07-18
 

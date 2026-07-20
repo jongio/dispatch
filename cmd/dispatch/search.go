@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,11 +32,13 @@ const (
 	searchFormatJSON  searchOutputFormat = "json"
 	searchFormatIDs   searchOutputFormat = "ids"
 	searchFormatTable searchOutputFormat = "table"
+	searchFormatCSV   searchOutputFormat = "csv"
 )
 
 // searchOptions holds the parsed flags for the search command.
 type searchOptions struct {
 	filter data.FilterOptions
+	sort   data.SortOptions
 	limit  int
 	format searchOutputFormat
 }
@@ -72,7 +75,7 @@ func runSearch(w io.Writer, args []string) error {
 		limit = searchAllLimit
 	}
 
-	sessions, err := searchListSessionsFn(opts.filter, limit)
+	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
 	if err != nil {
 		return err
 	}
@@ -82,6 +85,9 @@ func runSearch(w io.Writer, args []string) error {
 	}
 	if opts.format == searchFormatTable {
 		return writeSearchTable(w, sessions)
+	}
+	if opts.format == searchFormatCSV {
+		return writeSearchCSV(w, sessions)
 	}
 
 	results := make([]searchSession, 0, len(sessions))
@@ -135,6 +141,30 @@ func writeSearchTable(w io.Writer, sessions []data.Session) error {
 	return tw.Flush()
 }
 
+func writeSearchCSV(w io.Writer, sessions []data.Session) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"id", "summary", "cwd", "repository", "branch", "created_at", "updated_at", "turn_count", "file_count"}); err != nil {
+		return err
+	}
+	for _, s := range sessions {
+		if err := cw.Write([]string{
+			s.ID,
+			s.Summary,
+			s.Cwd,
+			s.Repository,
+			s.Branch,
+			s.CreatedAt,
+			s.UpdatedAt,
+			strconv.Itoa(s.TurnCount),
+			strconv.Itoa(s.FileCount),
+		}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
 func shortSearchID(id string) string {
 	if len(id) <= 12 {
 		return id
@@ -165,7 +195,11 @@ func searchTableCell(v string) string {
 // "search". A single leading token that does not start with "-" is treated as
 // the search query, matching how the TUI seeds its search box.
 func parseSearchArgs(args []string) (searchOptions, error) {
-	opts := searchOptions{limit: searchDefaultLimit, format: searchFormatJSON}
+	opts := searchOptions{
+		sort:   defaultSearchSort(),
+		limit:  searchDefaultLimit,
+		format: searchFormatJSON,
+	}
 
 	rest := args
 	if len(rest) > 0 {
@@ -194,6 +228,8 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 			opts.format = searchFormatIDs
 		case name == "--table":
 			opts.format = searchFormatTable
+		case name == "--csv":
+			opts.format = searchFormatCSV
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -264,6 +300,28 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 			}
 			opts.filter.Until = &t
 			i = ni
+		case name == "--sort":
+			v, ni, err := takeValue(i, "--sort", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return searchOptions{}, err
+			}
+			field, err := parseSearchSortField(v)
+			if err != nil {
+				return searchOptions{}, err
+			}
+			opts.sort.Field = field
+			i = ni
+		case name == "--order":
+			v, ni, err := takeValue(i, "--order", inlineOrEmpty(inline, hasInline))
+			if err != nil {
+				return searchOptions{}, err
+			}
+			order, err := parseSearchSortOrder(v)
+			if err != nil {
+				return searchOptions{}, err
+			}
+			opts.sort.Order = order
+			i = ni
 		case name == "--limit" || name == "-n":
 			v, ni, err := takeValue(i, "--limit", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -289,6 +347,38 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 	return opts, nil
 }
 
+func defaultSearchSort() data.SortOptions {
+	return data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+}
+
+func parseSearchSortField(v string) (data.SortField, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "updated":
+		return data.SortByUpdated, nil
+	case "created":
+		return data.SortByCreated, nil
+	case "turns":
+		return data.SortByTurns, nil
+	case "name":
+		return data.SortByName, nil
+	case "folder":
+		return data.SortByFolder, nil
+	default:
+		return "", fmt.Errorf("invalid --sort value %q (want updated, created, turns, name, or folder)", v)
+	}
+}
+
+func parseSearchSortOrder(v string) (data.SortOrder, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "asc":
+		return data.Ascending, nil
+	case "desc":
+		return data.Descending, nil
+	default:
+		return "", fmt.Errorf("invalid --order value %q (want asc or desc)", v)
+	}
+}
+
 func parseSearchFormat(v string) (searchOutputFormat, error) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case string(searchFormatJSON):
@@ -297,8 +387,10 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 		return searchFormatIDs, nil
 	case string(searchFormatTable):
 		return searchFormatTable, nil
+	case string(searchFormatCSV):
+		return searchFormatCSV, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json, ids, or table)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, ids, table, or csv)", v)
 	}
 }
 
@@ -313,15 +405,17 @@ func parseSearchLimit(v string) (int, error) {
 }
 
 // defaultSearchListSessions loads sessions matching the filter from the default
-// session store, ordered by most recent activity first.
-func defaultSearchListSessions(filter data.FilterOptions, limit int) ([]data.Session, error) {
+// session store.
+func defaultSearchListSessions(filter data.FilterOptions, sortOpts data.SortOptions, limit int) ([]data.Session, error) {
 	store, err := data.Open()
 	if err != nil {
 		return nil, fmt.Errorf("opening session store: %w", err)
 	}
 	defer store.Close() //nolint:errcheck // read-only, best-effort close
 
-	sortOpts := data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+	if sortOpts.Field == "" {
+		sortOpts = defaultSearchSort()
+	}
 	sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
 	if err != nil {
 		return nil, fmt.Errorf("listing sessions: %w", err)

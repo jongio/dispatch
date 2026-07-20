@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Copilot Dispatch, please report it
+If you discover a security vulnerability in Dispatch, please report it
 responsibly. **Do not open a public GitHub issue.**
 
 Instead, please use [GitHub's private vulnerability reporting](https://github.com/jongio/dispatch/security/advisories/new)
@@ -29,7 +29,7 @@ or email the maintainer directly through their GitHub profile.
 
 ## Security Model
 
-Copilot Dispatch is a **local-first** tool that reads from your Copilot CLI
+Dispatch is a **local-first** tool that reads from your Copilot CLI
 session store (`~/.copilot/session-store.db`) in **read-only mode**. It makes
 network requests in the following scenarios:
 
