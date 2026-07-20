@@ -284,10 +284,11 @@ dispatch notes
 dispatch notes --json
 dispatch notes get 0a1b2c3d
 dispatch notes set 0a1b2c3d "follow up after review"
+printf 'line one\nline two\n' | dispatch notes set 0a1b2c3d --stdin
 dispatch notes clear 0a1b2c3d
 ```
 
-`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview.
+`dispatch notes` lists notes for sessions that still exist in the session store. `set`, `get`, and `clear` operate on one session ID and use the same notes shown in the TUI preview. Use `--stdin` to set a multiline note without shell quoting.
 
 ### Named Views
 

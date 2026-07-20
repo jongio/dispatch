@@ -204,7 +204,8 @@ Config commands:
 Notes commands:
   notes [list] [--json]    List notes attached to current sessions
   notes get <id>           Print one session note
-  notes set <id> <text>    Set one session note
+  notes set <id> <text...> Set one session note
+  notes set <id> --stdin   Read one session note from stdin
   notes clear <id>         Clear one session note
 
 Export flags:
