@@ -299,7 +299,7 @@ func TestRunSearchCSVOutput(t *testing.T) {
 			FileCount:  3,
 		},
 	}
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return sessions, nil
 	})
 
@@ -320,7 +320,7 @@ func TestRunSearchCSVOutput(t *testing.T) {
 }
 
 func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
-	withSearchList(t, func(data.FilterOptions, int) ([]data.Session, error) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, nil
 	})
 
