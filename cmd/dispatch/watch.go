@@ -90,13 +90,15 @@ func fireWatchHook(command, id, state, prevState string, meta data.Session) {
 
 // watchOptions holds parsed flags for the watch command.
 type watchOptions struct {
-	once     bool
-	json     bool
-	interval time.Duration
-	repo     string
-	branch   string
-	folder   string
-	exec     string
+	once      bool
+	json      bool
+	interval  time.Duration
+	repo      string
+	branch    string
+	folder    string
+	exec      string
+	hasStatus bool
+	status    data.AttentionStatus
 }
 
 // watchSnapshot is the JSON representation of attention state at a point in time.
@@ -193,6 +195,17 @@ func parseWatchArgs(args []string) (watchOptions, error) {
 				return watchOptions{}, fmt.Errorf("--exec requires a command")
 			}
 			opts.exec = rest[i]
+		case arg == "--status":
+			i++
+			if i >= len(rest) {
+				return watchOptions{}, fmt.Errorf("--status requires a value")
+			}
+			status, sErr := parseWatchStatus(rest[i])
+			if sErr != nil {
+				return watchOptions{}, sErr
+			}
+			opts.status = status
+			opts.hasStatus = true
 		case strings.HasPrefix(arg, "-"):
 			return watchOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
@@ -206,6 +219,29 @@ func parseWatchArgs(args []string) (watchOptions, error) {
 	}
 
 	return opts, nil
+}
+
+func parseWatchStatus(value string) (data.AttentionStatus, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "waiting":
+		return data.AttentionWaiting, nil
+	case "working":
+		return data.AttentionWorking, nil
+	case "thinking":
+		return data.AttentionThinking, nil
+	case "active":
+		return data.AttentionActive, nil
+	case "stale":
+		return data.AttentionStale, nil
+	case "compacting":
+		return data.AttentionCompacting, nil
+	case "interrupted":
+		return data.AttentionInterrupted, nil
+	case "idle":
+		return data.AttentionIdle, nil
+	default:
+		return data.AttentionIdle, fmt.Errorf("invalid --status value %q (want waiting, working, thinking, active, stale, compacting, interrupted, or idle)", value)
+	}
 }
 
 // runWatchOnce prints a single attention snapshot and exits.
@@ -290,21 +326,23 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 				}
 			}
 			// Detect sessions that disappeared.
-			for id := range prev {
-				if _, ok := current[id]; !ok {
-					ts := time.Now().Format("15:04:05")
-					if opts.json {
-						enc := json.NewEncoder(w)
-						_ = enc.Encode(map[string]string{
-							"time":   ts,
-							"id":     id,
-							"status": "gone",
-						})
-					} else {
-						fmt.Fprintf(w, "[%s] %s  gone\n", ts, shortID(id))
-					}
-					if opts.exec != "" {
-						fireWatchHook(opts.exec, id, "gone", prev[id].String(), meta[id])
+			if !opts.hasStatus {
+				for id := range prev {
+					if _, ok := current[id]; !ok {
+						ts := time.Now().Format("15:04:05")
+						if opts.json {
+							enc := json.NewEncoder(w)
+							_ = enc.Encode(map[string]string{
+								"time":   ts,
+								"id":     id,
+								"status": "gone",
+							})
+						} else {
+							fmt.Fprintf(w, "[%s] %s  gone\n", ts, shortID(id))
+						}
+						if opts.exec != "" {
+							fireWatchHook(opts.exec, id, "gone", prev[id].String(), meta[id])
+						}
 					}
 				}
 			}
@@ -319,7 +357,7 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 	attention := watchScanAttentionFn(threshold)
 
 	if opts.repo == "" && opts.branch == "" && opts.folder == "" {
-		return attention
+		return filterAttentionByStatus(attention, opts)
 	}
 
 	sessions, err := watchListSessionsFn(data.FilterOptions{
@@ -328,7 +366,7 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 		Folder:     opts.folder,
 	})
 	if err != nil {
-		return attention
+		return filterAttentionByStatus(attention, opts)
 	}
 
 	allowed := make(map[string]bool, len(sessions))
@@ -339,6 +377,19 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 	filtered := make(map[string]data.AttentionStatus, len(attention))
 	for id, status := range attention {
 		if allowed[id] {
+			filtered[id] = status
+		}
+	}
+	return filterAttentionByStatus(filtered, opts)
+}
+
+func filterAttentionByStatus(attention map[string]data.AttentionStatus, opts watchOptions) map[string]data.AttentionStatus {
+	if !opts.hasStatus {
+		return attention
+	}
+	filtered := make(map[string]data.AttentionStatus, len(attention))
+	for id, status := range attention {
+		if status == opts.status {
 			filtered[id] = status
 		}
 	}
@@ -408,7 +459,8 @@ func buildWatchSnapshot(opts watchOptions) (watchSnapshot, error) {
 			snap.Idle++
 		}
 
-		if status == data.AttentionWaiting || status == data.AttentionInterrupted ||
+		if opts.hasStatus ||
+			status == data.AttentionWaiting || status == data.AttentionInterrupted ||
 			status == data.AttentionWorking || status == data.AttentionThinking ||
 			status == data.AttentionActive {
 			entries = append(entries, watchSessionEntry{
