@@ -367,6 +367,19 @@ dispatch aliases --json
 
 Each entry shows the alias, the target session ID, summary, and repository. Aliases whose target session is no longer in the store are marked as orphaned. Use `--json` for scripting.
 
+### Alias
+
+Set or remove a single session alias from the command line, completing the parity that `tag` and `notes` already have:
+
+```sh
+dispatch alias <id> review    # assign or reassign an alias
+dispatch alias <id> --clear   # remove the alias on a session
+dispatch alias --remove review # remove an alias by its name
+dispatch alias <id> review --json
+```
+
+The `<id>` accepts the same short prefix that `dispatch open` does. Alias names are lowercased and must be unique, so `dispatch open <alias>` keeps resolving to one session.
+
 ### Tag
 
 Manage tags on a single session from the command line:
