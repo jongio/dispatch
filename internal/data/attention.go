@@ -317,6 +317,40 @@ func findSessionPID(dir string) pidResult {
 	return pidResult{hasStale: hasStale}
 }
 
+// FindSessionPID returns the live PID for the given session ID, or 0 if
+// no live process is found. This is an exported wrapper used by the TUI
+// to focus a session's terminal window.
+func FindSessionPID(sessionID string) int {
+	stateDir := sessionStatePath()
+	if stateDir == "" {
+		return 0
+	}
+	dir := filepath.Join(stateDir, sessionID)
+	result := findSessionPID(dir)
+	return result.pid
+}
+
+// SessionEvent represents the last event observed for a session.
+type SessionEvent struct {
+	Type      string
+	Timestamp string
+}
+
+// LastSessionEvent returns the most recent event type and timestamp for
+// the given session ID. Returns an empty struct if no events are found.
+func LastSessionEvent(sessionID string) SessionEvent {
+	stateDir := sessionStatePath()
+	if stateDir == "" {
+		return SessionEvent{}
+	}
+	eventsPath := filepath.Join(stateDir, sessionID, "events.jsonl")
+	evt, err := readLastEvent(eventsPath)
+	if err != nil {
+		return SessionEvent{}
+	}
+	return SessionEvent{Type: evt.Type, Timestamp: evt.Timestamp}
+}
+
 // readLastEvent reads the last complete JSON line from an events.jsonl file
 // using an O(1) seek-from-end strategy. It never reads the entire file.
 func readLastEvent(path string) (sessionEvent, error) {

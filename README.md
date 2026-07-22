@@ -41,7 +41,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
 - **Session tags** (`#`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
 - **Session aliases** (`A`) — give a session a short, memorable alias and resume it from the CLI with `dispatch open <alias>` instead of the full session ID
-- **Settings panel** (`,`) — 19 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting, and column toggles for Repo, Folder, Turns, and Host
+- **Settings panel** (`,`) — 20 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Resume Session Command, New Session Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting, and column toggles for Repo, Folder, Turns, and Host
 - **Configurable list columns** (`,` settings) — choose which optional columns (repo, folder, turns, host) appear in the session list. Defaults show every column, and the session name and attention indicator are always visible
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -706,7 +706,8 @@ dispatch config path            # print the config file path
 | `model` | string | `""` | Pass `--model <name>` to Copilot CLI |
 | `launch_mode` | string | `"tab"` | How to open sessions: `in-place`, `tab`, `window`, `pane` |
 | `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` (see note below) |
-| `custom_command` | string | `""` | Custom launch command (`{sessionId}` is replaced) |
+| `resume_session_command` | string | `""` | Custom resume command (`{sessionId}` is replaced). Defaults to `copilot --resume` |
+| `new_session_command` | string | `""` | Command to launch new sessions (`{cwd}` is replaced). Defaults to `copilot` |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
@@ -767,7 +768,8 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "model": "",
   "launch_mode": "tab",
   "pane_direction": "auto",
-  "custom_command": "",
+  "resume_session_command": "",
+  "new_session_command": "",
   "excluded_dirs": [],
   "theme": "auto",
   "workspace_recovery": true,
@@ -779,12 +781,20 @@ The split starts in the session's working directory (`-c`) and runs the resume c
 }
 ```
 
-### Custom Command
+### Resume Session Command
 
-Set `custom_command` to replace the default Copilot CLI launch entirely. Use `{sessionId}` as the placeholder. When set, Agent, Model, and Yolo Mode fields are ignored.
+Set `resume_session_command` to replace the default Copilot CLI resume command. Use `{sessionId}` as the placeholder for the session to resume. When set, Agent, Model, and Yolo Mode fields are ignored.
 
 ```json
-"custom_command": "my-tool resume {sessionId}"
+"resume_session_command": "my-tool resume {sessionId}"
+```
+
+### New Session Command
+
+Set `new_session_command` to customize the command used when launching a brand new session from dispatch (the `+` keybinding). Use `{cwd}` as the placeholder for the working directory. When empty, defaults to `copilot`.
+
+```json
+"new_session_command": "copilot --agent workspace"
 ```
 
 ### Customizing Keybindings

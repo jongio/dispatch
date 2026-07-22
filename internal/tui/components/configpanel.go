@@ -27,7 +27,8 @@ const (
 	cfgPaneDirection
 	cfgTerminal
 	cfgShell
-	cfgCustomCommand
+	cfgResumeSessionCommand
+	cfgNewSessionCommand
 	cfgTheme
 	cfgWorkspaceRecovery
 	cfgPreviewPosition
@@ -47,27 +48,28 @@ const themeAuto = "auto"
 
 // ConfigPanel presents an overlay that lets users edit session-resume
 // settings (yolo mode, agent, model, launch-in-place, terminal, shell,
-// custom command).
+// resume session command, new session command).
 type ConfigPanel struct {
-	yoloMode          bool
-	agent             string
-	model             string
-	launchMode        string // "in-place", "tab", "window", or "pane"
-	paneDirection     string // "auto", "right", "down", "left", "up"
-	terminal          string
-	shell             string
-	customCommand     string
-	theme             string // active color scheme name ("auto" or a scheme name)
-	workspaceRecovery bool
-	previewPosition   string // "right", "bottom", "left", "top"
-	redactSecrets     bool
-	excludedWords     string // comma-separated list of filter words
-	autoRefresh       string // session-list auto-refresh seconds ("" default, "0" off)
-	notifyOnWaiting   bool
-	colRepo           bool // show the repository column in the session list
-	colFolder         bool // show the folder column in the session list
-	colTurns          bool // show the turn-count column in the session list
-	colHost           bool // show the host indicator in the session list
+	yoloMode             bool
+	agent                string
+	model                string
+	launchMode           string // "in-place", "tab", "window", or "pane"
+	paneDirection        string // "auto", "right", "down", "left", "up"
+	terminal             string
+	shell                string
+	resumeSessionCommand string
+	newSessionCommand    string
+	theme                string // active color scheme name ("auto" or a scheme name)
+	workspaceRecovery    bool
+	previewPosition      string // "right", "bottom", "left", "top"
+	redactSecrets        bool
+	excludedWords        string // comma-separated list of filter words
+	autoRefresh          string // session-list auto-refresh seconds ("" default, "0" off)
+	notifyOnWaiting      bool
+	colRepo              bool // show the repository column in the session list
+	colFolder            bool // show the folder column in the session list
+	colTurns             bool // show the turn-count column in the session list
+	colHost              bool // show the host indicator in the session list
 
 	// Available options for cycling.
 	terminals  []string
@@ -100,25 +102,26 @@ func NewConfigPanel() ConfigPanel {
 // ConfigValues bundles the editable fields exchanged between the config
 // panel and the rest of the application.
 type ConfigValues struct {
-	YoloMode          bool
-	Agent             string
-	Model             string
-	LaunchMode        string
-	PaneDirection     string
-	Terminal          string
-	Shell             string
-	CustomCommand     string
-	Theme             string
-	WorkspaceRecovery bool
-	PreviewPosition   string
-	RedactSecrets     bool
-	ExcludedWords     string // comma-separated filter words
-	AutoRefresh       string // auto-refresh seconds ("" default, "0" off)
-	NotifyOnWaiting   bool
-	ShowRepoColumn    bool
-	ShowFolderColumn  bool
-	ShowTurnsColumn   bool
-	ShowHostColumn    bool
+	YoloMode             bool
+	Agent                string
+	Model                string
+	LaunchMode           string
+	PaneDirection        string
+	Terminal             string
+	Shell                string
+	ResumeSessionCommand string
+	NewSessionCommand    string
+	Theme                string
+	WorkspaceRecovery    bool
+	PreviewPosition      string
+	RedactSecrets        bool
+	ExcludedWords        string // comma-separated filter words
+	AutoRefresh          string // auto-refresh seconds ("" default, "0" off)
+	NotifyOnWaiting      bool
+	ShowRepoColumn       bool
+	ShowFolderColumn     bool
+	ShowTurnsColumn      bool
+	ShowHostColumn       bool
 }
 
 // SetValues loads the config panel state from external values.
@@ -130,7 +133,8 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 	c.paneDirection = v.PaneDirection
 	c.terminal = v.Terminal
 	c.shell = v.Shell
-	c.customCommand = v.CustomCommand
+	c.resumeSessionCommand = v.ResumeSessionCommand
+	c.newSessionCommand = v.NewSessionCommand
 	c.theme = v.Theme
 	c.workspaceRecovery = v.WorkspaceRecovery
 	c.previewPosition = v.PreviewPosition
@@ -147,25 +151,26 @@ func (c *ConfigPanel) SetValues(v ConfigValues) {
 // Values returns the current state of all editable fields.
 func (c *ConfigPanel) Values() ConfigValues {
 	return ConfigValues{
-		YoloMode:          c.yoloMode,
-		Agent:             c.agent,
-		Model:             c.model,
-		LaunchMode:        c.launchMode,
-		PaneDirection:     c.paneDirection,
-		Terminal:          c.terminal,
-		Shell:             c.shell,
-		CustomCommand:     c.customCommand,
-		Theme:             c.theme,
-		WorkspaceRecovery: c.workspaceRecovery,
-		PreviewPosition:   c.previewPosition,
-		RedactSecrets:     c.redactSecrets,
-		ExcludedWords:     c.excludedWords,
-		AutoRefresh:       c.autoRefresh,
-		NotifyOnWaiting:   c.notifyOnWaiting,
-		ShowRepoColumn:    c.colRepo,
-		ShowFolderColumn:  c.colFolder,
-		ShowTurnsColumn:   c.colTurns,
-		ShowHostColumn:    c.colHost,
+		YoloMode:             c.yoloMode,
+		Agent:                c.agent,
+		Model:                c.model,
+		LaunchMode:           c.launchMode,
+		PaneDirection:        c.paneDirection,
+		Terminal:             c.terminal,
+		Shell:                c.shell,
+		ResumeSessionCommand: c.resumeSessionCommand,
+		NewSessionCommand:    c.newSessionCommand,
+		Theme:                c.theme,
+		WorkspaceRecovery:    c.workspaceRecovery,
+		PreviewPosition:      c.previewPosition,
+		RedactSecrets:        c.redactSecrets,
+		ExcludedWords:        c.excludedWords,
+		AutoRefresh:          c.autoRefresh,
+		NotifyOnWaiting:      c.notifyOnWaiting,
+		ShowRepoColumn:       c.colRepo,
+		ShowFolderColumn:     c.colFolder,
+		ShowTurnsColumn:      c.colTurns,
+		ShowHostColumn:       c.colHost,
 	}
 }
 
@@ -215,7 +220,7 @@ func (c *ConfigPanel) MoveDown() {
 // a text field. Returns a tea.Cmd when a text input needs focus.
 func (c *ConfigPanel) HandleEnter() tea.Cmd {
 	// When a custom command is set, YOLO/Agent/Model are irrelevant — skip them.
-	if c.customCommand != "" {
+	if c.resumeSessionCommand != "" {
 		switch c.cursor {
 		case cfgYoloMode, cfgAgent, cfgModel:
 			return nil
@@ -245,9 +250,14 @@ func (c *ConfigPanel) HandleEnter() tea.Cmd {
 		c.terminal = c.cycleOption(c.terminal, c.terminals)
 	case cfgShell:
 		c.shell = c.cycleOption(c.shell, c.shellNames())
-	case cfgCustomCommand:
+	case cfgResumeSessionCommand:
 		c.editing = true
-		c.textInput.SetValue(c.customCommand)
+		c.textInput.SetValue(c.resumeSessionCommand)
+		c.textInput.CharLimit = 256
+		return c.textInput.Focus()
+	case cfgNewSessionCommand:
+		c.editing = true
+		c.textInput.SetValue(c.newSessionCommand)
 		c.textInput.CharLimit = 256
 		return c.textInput.Focus()
 	case cfgExcludedWords:
@@ -295,8 +305,10 @@ func (c *ConfigPanel) ConfirmEdit() {
 		c.agent = val
 	case cfgModel:
 		c.model = val
-	case cfgCustomCommand:
-		c.customCommand = val
+	case cfgResumeSessionCommand:
+		c.resumeSessionCommand = val
+	case cfgNewSessionCommand:
+		c.newSessionCommand = val
 	case cfgExcludedWords:
 		c.excludedWords = val
 	case cfgAutoRefresh:
@@ -335,7 +347,7 @@ func (c ConfigPanel) View() string {
 
 	// hasCustom indicates that copilot-specific fields (Yolo, Agent, Model)
 	// are irrelevant because a custom command overrides them.
-	hasCustom := c.customCommand != ""
+	hasCustom := c.resumeSessionCommand != ""
 
 	type field struct {
 		label  string
@@ -350,7 +362,8 @@ func (c ConfigPanel) View() string {
 		{"Pane Direction", paneDirectionDisplay(c.paneDirection), c.launchMode != config.LaunchModePane},
 		{"Terminal", stringDisplay(c.terminal), false},
 		{"Shell", stringDisplay(c.shell), false},
-		{"Custom Command", stringDisplay(c.customCommand), false},
+		{"Resume Command", stringDisplay(c.resumeSessionCommand), false},
+		{"New Session Cmd", stringDisplay(c.newSessionCommand), false},
 		{"Theme", themeDisplay(c.theme), false},
 		{"Crash Recovery", boolDisplay(c.workspaceRecovery), false},
 		{"Preview Position", previewPositionDisplay(c.previewPosition), false},
@@ -395,7 +408,7 @@ func (c ConfigPanel) View() string {
 	}
 
 	// Contextual help when the Custom Command field is focused.
-	if c.cursor == cfgCustomCommand {
+	if c.cursor == cfgResumeSessionCommand {
 		body.WriteString("\n")
 		body.WriteString(styles.DimmedStyle.Render("  {sessionId} is replaced with the session ID at launch.") + "\n")
 		body.WriteString(styles.DimmedStyle.Render("  Overrides Yolo, Agent, and Model when set.") + "\n")

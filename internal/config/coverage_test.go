@@ -101,22 +101,22 @@ func TestConfigJSONRoundTrip_AllFields(t *testing.T) {
 	t.Parallel()
 	// Verifies all fields survive JSON marshaling/unmarshaling
 	cfg := &Config{
-		DefaultShell:     "zsh",
-		DefaultTerminal:  "kitty",
-		DefaultTimeRange: "7d",
-		DefaultSort:      "created",
-		DefaultPivot:     "repo",
-		ShowPreview:      false,
-		MaxSessions:      50,
-		YoloMode:         true,
-		Agent:            "coder",
-		Model:            "gpt-4",
-		LaunchMode:       "window",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/tmp"},
-		CustomCommand:    "my-cli {sessionId}",
-		HiddenSessions:   []string{"sess1", "sess2"},
-		Theme:            "One Half Dark",
+		DefaultShell:         "zsh",
+		DefaultTerminal:      "kitty",
+		DefaultTimeRange:     "7d",
+		DefaultSort:          "created",
+		DefaultPivot:         "repo",
+		ShowPreview:          false,
+		MaxSessions:          50,
+		YoloMode:             true,
+		Agent:                "coder",
+		Model:                "gpt-4",
+		LaunchMode:           "window",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/tmp"},
+		ResumeSessionCommand: "my-cli {sessionId}",
+		HiddenSessions:       []string{"sess1", "sess2"},
+		Theme:                "One Half Dark",
 	}
 
 	// Verify effective launch mode with explicit LaunchMode

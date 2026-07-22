@@ -401,6 +401,11 @@ type Model struct {
 	// DB watcher — monitors session-store.db for external modifications.
 	dbWatcher *data.DBWatcher
 	dbWatchCh chan struct{} // receives pings from the watcher callback
+
+	// Event watcher — push-based fsnotify watcher for session-state changes.
+	eventWatcher   *data.EventWatcher
+	eventWatchCh   chan eventWatcherUpdateMsg // receives push updates from the watcher
+	sessionTracker *data.SessionTracker       // tracks PIDs of dispatch-launched sessions
 }
 
 // NewModel creates the root Model with default configuration.
@@ -429,24 +434,25 @@ func NewModel() Model {
 
 	cp := components.NewConfigPanel()
 	cp.SetValues(components.ConfigValues{
-		YoloMode:          cfg.YoloMode,
-		Agent:             cfg.Agent,
-		Model:             cfg.Model,
-		LaunchMode:        cfg.EffectiveLaunchMode(),
-		Terminal:          cfg.DefaultTerminal,
-		Shell:             cfg.DefaultShell,
-		CustomCommand:     cfg.CustomCommand,
-		Theme:             cfg.Theme,
-		WorkspaceRecovery: cfg.WorkspaceRecovery,
-		PreviewPosition:   cfg.EffectivePreviewPosition(),
-		RedactSecrets:     cfg.RedactPreviewSecrets,
-		ExcludedWords:     strings.Join(cfg.ExcludedWords, ", "),
-		AutoRefresh:       autoRefreshFieldValue(cfg.AutoRefreshSeconds),
-		NotifyOnWaiting:   cfg.NotifyOnWaiting,
-		ShowRepoColumn:    cfg.ColumnVisible(config.ColumnRepo),
-		ShowFolderColumn:  cfg.ColumnVisible(config.ColumnFolder),
-		ShowTurnsColumn:   cfg.ColumnVisible(config.ColumnTurns),
-		ShowHostColumn:    cfg.ColumnVisible(config.ColumnHost),
+		YoloMode:             cfg.YoloMode,
+		Agent:                cfg.Agent,
+		Model:                cfg.Model,
+		LaunchMode:           cfg.EffectiveLaunchMode(),
+		Terminal:             cfg.DefaultTerminal,
+		Shell:                cfg.DefaultShell,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
+		NewSessionCommand:    cfg.NewSessionCommand,
+		Theme:                cfg.Theme,
+		WorkspaceRecovery:    cfg.WorkspaceRecovery,
+		PreviewPosition:      cfg.EffectivePreviewPosition(),
+		RedactSecrets:        cfg.RedactPreviewSecrets,
+		ExcludedWords:        strings.Join(cfg.ExcludedWords, ", "),
+		AutoRefresh:          autoRefreshFieldValue(cfg.AutoRefreshSeconds),
+		NotifyOnWaiting:      cfg.NotifyOnWaiting,
+		ShowRepoColumn:       cfg.ColumnVisible(config.ColumnRepo),
+		ShowFolderColumn:     cfg.ColumnVisible(config.ColumnFolder),
+		ShowTurnsColumn:      cfg.ColumnVisible(config.ColumnTurns),
+		ShowHostColumn:       cfg.ColumnVisible(config.ColumnHost),
 	})
 
 	// Build the list of available theme names for the config panel.
@@ -530,6 +536,19 @@ func NewModel() Model {
 	if interval, enabled := cfg.EffectiveAutoRefreshInterval(); enabled {
 		m.dbWatcher.SetInterval(interval)
 		m.dbWatcher.SetActive(true)
+	}
+
+	// Event watcher — push-based attention updates via fsnotify.
+	m.eventWatchCh = make(chan eventWatcherUpdateMsg, 16)
+	m.sessionTracker = data.NewSessionTracker()
+	m.eventWatcher = data.NewEventWatcher(func(id string, status data.AttentionStatus) {
+		select {
+		case m.eventWatchCh <- eventWatcherUpdateMsg{sessionID: id, status: status}:
+		default:
+		}
+	}, cfg.EffectiveAttentionThreshold(), cfg.WorkspaceRecovery)
+	if err := m.eventWatcher.Start(); err != nil {
+		slog.Debug("eventwatcher: failed to start", "error", err)
 	}
 
 	m.filter.Since = timeRangeToSince(m.timeRange)
@@ -625,6 +644,7 @@ func (m Model) Init() tea.Cmd {
 		m.spinner.Tick,
 		tea.RequestBackgroundColor,
 		m.waitForDBChangeCmd(),
+		m.waitForEventWatcherCmd(),
 	)
 }
 
@@ -660,6 +680,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- DB watcher (external session store changes) --------------------
 	case sessionsChangedMsg:
 		return m.handleSessionsChanged()
+
+	// ----- Event watcher push updates ------------------------------------
+	case eventWatcherUpdateMsg:
+		return m.handleEventWatcherUpdate(msg)
+
+	case newSessionLaunchedMsg:
+		return m.handleNewSessionLaunched(msg)
+
+	case focusWindowResultMsg:
+		return m.handleFocusWindowResult(msg)
 
 	// ----- Export done -----------------------------------------------------
 	case exportDoneMsg:
@@ -1313,25 +1343,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Config):
 		m.configPanel.SetValues(components.ConfigValues{
-			YoloMode:          m.cfg.YoloMode,
-			Agent:             m.cfg.Agent,
-			Model:             m.cfg.Model,
-			LaunchMode:        m.cfg.EffectiveLaunchMode(),
-			PaneDirection:     m.cfg.EffectivePaneDirection(),
-			Terminal:          m.cfg.DefaultTerminal,
-			Shell:             m.cfg.DefaultShell,
-			CustomCommand:     m.cfg.CustomCommand,
-			Theme:             m.cfg.Theme,
-			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
-			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
-			RedactSecrets:     m.cfg.RedactPreviewSecrets,
-			ExcludedWords:     strings.Join(m.cfg.ExcludedWords, ", "),
-			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
-			NotifyOnWaiting:   m.cfg.NotifyOnWaiting,
-			ShowRepoColumn:    m.cfg.ColumnVisible(config.ColumnRepo),
-			ShowFolderColumn:  m.cfg.ColumnVisible(config.ColumnFolder),
-			ShowTurnsColumn:   m.cfg.ColumnVisible(config.ColumnTurns),
-			ShowHostColumn:    m.cfg.ColumnVisible(config.ColumnHost),
+			YoloMode:             m.cfg.YoloMode,
+			Agent:                m.cfg.Agent,
+			Model:                m.cfg.Model,
+			LaunchMode:           m.cfg.EffectiveLaunchMode(),
+			PaneDirection:        m.cfg.EffectivePaneDirection(),
+			Terminal:             m.cfg.DefaultTerminal,
+			Shell:                m.cfg.DefaultShell,
+			ResumeSessionCommand: m.cfg.ResumeSessionCommand,
+			NewSessionCommand:    m.cfg.NewSessionCommand,
+			Theme:                m.cfg.Theme,
+			WorkspaceRecovery:    m.cfg.WorkspaceRecovery,
+			PreviewPosition:      m.cfg.EffectivePreviewPosition(),
+			RedactSecrets:        m.cfg.RedactPreviewSecrets,
+			ExcludedWords:        strings.Join(m.cfg.ExcludedWords, ", "),
+			AutoRefresh:          autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
+			NotifyOnWaiting:      m.cfg.NotifyOnWaiting,
+			ShowRepoColumn:       m.cfg.ColumnVisible(config.ColumnRepo),
+			ShowFolderColumn:     m.cfg.ColumnVisible(config.ColumnFolder),
+			ShowTurnsColumn:      m.cfg.ColumnVisible(config.ColumnTurns),
+			ShowHostColumn:       m.cfg.ColumnVisible(config.ColumnHost),
 		})
 		m.state = stateConfigPanel
 		return m, nil
@@ -1649,6 +1680,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.LaunchAll):
 		cmd := m.launchMultiple()
 		return m, cmd
+
+	case key.Matches(msg, keys.NewSession):
+		return m.handleNewSessionKey()
+
+	case key.Matches(msg, keys.FocusWindow):
+		return m.handleFocusWindowKey()
 
 	case key.Matches(msg, keys.ResumeInterrupted):
 		return m.handleResumeInterrupted()
@@ -2223,7 +2260,8 @@ func (m *Model) saveConfigFromPanel() {
 	m.cfg.PaneDirection = v.PaneDirection
 	m.cfg.DefaultTerminal = v.Terminal
 	m.cfg.DefaultShell = v.Shell
-	m.cfg.CustomCommand = v.CustomCommand
+	m.cfg.ResumeSessionCommand = v.ResumeSessionCommand
+	m.cfg.NewSessionCommand = v.NewSessionCommand
 	m.cfg.Theme = v.Theme
 	m.cfg.WorkspaceRecovery = v.WorkspaceRecovery
 	m.cfg.PreviewPosition = v.PreviewPosition
@@ -3862,13 +3900,13 @@ func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchS
 
 func (m Model) resumeConfigForSession(cwd string) platform.ResumeConfig {
 	return platform.ResumeConfig{
-		YoloMode:      m.cfg.YoloMode,
-		Agent:         m.cfg.Agent,
-		Model:         m.cfg.Model,
-		Terminal:      m.cfg.DefaultTerminal,
-		CustomCommand: m.cfg.CustomCommand,
-		Cwd:           cwd,
-		PaneDirection: m.cfg.EffectivePaneDirection(),
+		YoloMode:             m.cfg.YoloMode,
+		Agent:                m.cfg.Agent,
+		Model:                m.cfg.Model,
+		Terminal:             m.cfg.DefaultTerminal,
+		ResumeSessionCommand: m.cfg.ResumeSessionCommand,
+		Cwd:                  cwd,
+		PaneDirection:        m.cfg.EffectivePaneDirection(),
 	}
 }
 
@@ -3920,6 +3958,13 @@ func (m *Model) closeStore() {
 		close(m.dbWatchCh)
 		m.dbWatchCh = nil
 	}
+	if m.eventWatcher != nil {
+		m.eventWatcher.Stop()
+	}
+	if m.eventWatchCh != nil {
+		close(m.eventWatchCh)
+		m.eventWatchCh = nil
+	}
 	if m.copilotClient != nil {
 		m.copilotClient.Close()
 		m.copilotClient = nil
@@ -3957,6 +4002,23 @@ func (m Model) waitForDBChangeCmd() tea.Cmd {
 			return nil // channel closed — watcher stopped
 		}
 		return sessionsChangedMsg{}
+	}
+}
+
+// waitForEventWatcherCmd blocks on the eventWatchCh channel until the
+// fsnotify-based EventWatcher pushes an update, then returns the message
+// to the TUI for processing.
+func (m Model) waitForEventWatcherCmd() tea.Cmd {
+	ch := m.eventWatchCh
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return msg
 	}
 }
 
@@ -4023,8 +4085,9 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 }
 
 // attentionRefreshInterval controls how often the attention scanner polls
-// the session-state directories.
-const attentionRefreshInterval = 30 * time.Second
+// the session-state directories as a fallback when the EventWatcher misses
+// events. The primary mechanism is push-based via fsnotify.
+const attentionRefreshInterval = 120 * time.Second
 
 // scanAttentionQuickCmd runs a fast first-pass scan that only checks lock
 // files for live sessions. Dead sessions get AttentionIdle without reading

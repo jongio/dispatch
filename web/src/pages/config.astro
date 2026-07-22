@@ -43,7 +43,8 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'model', type: 'string', default: '""', description: 'Pass --model <name> to Copilot CLI.' },
         { key: 'launch_mode', type: 'string', default: '"tab"', description: 'How to open sessions: in-place, tab, window, pane.' },
         { key: 'pane_direction', type: 'string', default: '"auto"', description: 'Split direction for pane mode: auto, right, down, left, up (see Pane Direction Semantics below).' },
-        { key: 'custom_command', type: 'string', default: '""', description: 'Custom launch command. {sessionId} is replaced with the session ID.' },
+        { key: 'resume_session_command', type: 'string', default: '""', description: 'Resume session command ({sessionId} is replaced). Defaults to copilot --resume.' },
+        { key: 'new_session_command', type: 'string', default: '""', description: 'Command to launch new sessions ({cwd} is replaced). Defaults to copilot.' },
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
         { key: 'excluded_words', type: 'array', default: '[]', description: 'Words to filter sessions by. Sessions whose name or turn content contains any word (case-insensitive) are hidden.' },
         { key: 'attention_threshold', type: 'string', default: '"15m"', description: 'Duration after which an inactive running session is marked stale instead of waiting/active.' },
@@ -76,7 +77,7 @@ import ConfigTable from '../components/ConfigTable.astro';
   "model": "",
   "launch_mode": "tab",
   "pane_direction": "auto",
-  "custom_command": "",
+  "resume_session_command": "",
   "excluded_dirs": [],
   "excluded_words": [],
   "favoriteSessions": [],
@@ -121,10 +122,10 @@ import ConfigTable from '../components/ConfigTable.astro';
 
   <section class="section">
     <div class="container">
-      <h2>Custom Command</h2>
-      <p>Set <code>custom_command</code> to replace the default Copilot CLI launch command entirely. Use <code>{'{sessionId}'}</code> as a placeholder for the session ID.</p>
-      <p>When a custom command is set, the Agent, Model, and Yolo Mode fields are ignored (dimmed in the settings panel).</p>
-      <pre><code>"custom_command": "my-tool resume {'{sessionId}'}"</code></pre>
+      <h2>Resume Session Command</h2>
+      <p>Set <code>resume_session_command</code> to replace the default Copilot CLI launch command entirely. Use <code>{'{sessionId}'}</code> as a placeholder for the session ID.</p>
+      <p>When a Resume Session Command is set, the Agent, Model, and Yolo Mode fields are ignored (dimmed in the settings panel).</p>
+      <pre><code>"resume_session_command": "my-tool resume {'{sessionId}'}"</code></pre>
     </div>
   </section>
 
