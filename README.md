@@ -667,7 +667,7 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
-Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
+Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`/`export`/`import`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
 
 ### From the command line
 
@@ -681,9 +681,11 @@ dispatch config set launch_mode window
 dispatch config unset launch_mode # reset one setting to its default
 dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
+dispatch config export --out dispatch-config.json
+dispatch config import --in dispatch-config.json
 ```
 
-`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. `export` prints the full JSON config to stdout, or writes it to `--out <file>`. `import` reads JSON from stdin, or from `--in <file>`, then saves it through the normal config path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
 
 ### Options
 

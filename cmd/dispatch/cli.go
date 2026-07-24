@@ -430,7 +430,7 @@ _dispatch_completion() {
       ;;
     config)
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "list get set unset edit path" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "list get set unset edit path export import" -- "${cur}") )
       elif [[ "${COMP_WORDS[2]}" == "get" || "${COMP_WORDS[2]}" == "set" || "${COMP_WORDS[2]}" == "unset" ]]; then
         COMPREPLY=( $(compgen -W "$("${bin}" __complete config-keys)" -- "${cur}") )
       fi
@@ -446,7 +446,7 @@ _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys openflags newflags
   local bin=${words[1]}
   commands=(help version open new doctor update completion stats search tags notes views aliases alias compare prune tag watch config export info path man)
-  configsubs=(list get set unset edit path)
+  configsubs=(list get set unset edit path export import)
   openflags=(--mode --last --print --agent --model --yolo)
   newflags=(--mode --agent --model --yolo)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
@@ -527,7 +527,7 @@ end
 const powershellCompletionScript = `# PowerShell completion for dispatch
 $script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
-$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path', 'export', 'import')
 $script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
 $script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
 
