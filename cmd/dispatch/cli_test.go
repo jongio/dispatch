@@ -196,10 +196,15 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 	t.Setenv("DISPATCH_DB", db)
 	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
-	origCount, origVer := doctorSessionCountFn, doctorCopilotVersionFn
+	origCount, origVer, origWorkspaces := doctorSessionCountFn, doctorCopilotVersionFn, doctorWorkspacesFn
 	doctorSessionCountFn = func() int { return 7 }
 	doctorCopilotVersionFn = func(string) string { return "1.2.3" }
-	t.Cleanup(func() { doctorSessionCountFn, doctorCopilotVersionFn = origCount, origVer })
+	doctorWorkspacesFn = func() workspaceReport {
+		return workspaceReport{Total: 3, Missing: 1, Samples: []string{filepath.Join(stateDir, "missing")}}
+	}
+	t.Cleanup(func() {
+		doctorSessionCountFn, doctorCopilotVersionFn, doctorWorkspacesFn = origCount, origVer, origWorkspaces
+	})
 
 	var buf bytes.Buffer
 	runDoctor(&buf)
@@ -213,6 +218,7 @@ func TestRunDoctor_PrintsDiagnostics(t *testing.T) {
 		"Session state: found",
 		"Copilot CLI:",
 		"Stored sessions: 7",
+		"Missing workspaces: 1 of 3 folders",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output missing %q:\n%s", want, out)
@@ -229,9 +235,10 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	t.Setenv("DISPATCH_DB", db)
 	t.Setenv("DISPATCH_SESSION_STATE", stateDir)
 
-	origCount := doctorSessionCountFn
+	origCount, origWorkspaces := doctorSessionCountFn, doctorWorkspacesFn
 	doctorSessionCountFn = func() int { return 3 }
-	t.Cleanup(func() { doctorSessionCountFn = origCount })
+	doctorWorkspacesFn = func() workspaceReport { return workspaceReport{Total: 2, Missing: 1, Samples: []string{"missing-dir"}} }
+	t.Cleanup(func() { doctorSessionCountFn, doctorWorkspacesFn = origCount, origWorkspaces })
 
 	var buf bytes.Buffer
 	if err := runDoctorJSON(&buf); err != nil {
@@ -257,8 +264,19 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	if r.SessionCount != 3 {
 		t.Errorf("session_count = %d, want 3", r.SessionCount)
 	}
+	if r.Workspaces.Missing != 1 || len(r.Workspaces.Samples) != 1 {
+		t.Errorf("workspaces = %+v, want one missing sample", r.Workspaces)
+	}
 	if !strings.HasSuffix(buf.String(), "}\n") {
 		t.Errorf("JSON output should end with a single newline, got:\n%q", buf.String())
+	}
+}
+
+func TestWriteWorkspaceLine_Error(t *testing.T) {
+	var buf bytes.Buffer
+	writeWorkspaceLine(&buf, workspaceReport{Error: "store unavailable"})
+	if !strings.Contains(buf.String(), "Missing workspaces: unknown") {
+		t.Fatalf("workspace line = %q, want unknown status", buf.String())
 	}
 }
 
