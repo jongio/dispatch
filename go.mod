@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/creack/pty v1.1.24
-	github.com/github/copilot-sdk/go v1.0.7
+	github.com/github/copilot-sdk/go v1.0.8
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
@@ -51,8 +51,8 @@ require (
 	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
-	github.com/mattn/go-isatty v0.0.23 // indirect
-	github.com/mattn/go-runewidth v0.0.24 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
