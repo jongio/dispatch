@@ -105,6 +105,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 		args []string
 	}{
 		{name: "ids shortcut", args: []string{"search", "--ids"}},
+		{name: "jsonl shortcut", args: []string{"search", "--jsonl"}},
+		{name: "format jsonl separate", args: []string{"search", "--format", "jsonl"}},
+		{name: "format jsonl inline", args: []string{"search", "--format=jsonl"}},
 		{name: "format ids separate", args: []string{"search", "--format", "ids"}},
 		{name: "format ids inline", args: []string{"search", "--format=ids"}},
 		{name: "table shortcut", args: []string{"search", "--table"}},
@@ -121,6 +124,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 				t.Fatalf("parseSearchArgs returned error: %v", err)
 			}
 			want := searchFormatIDs
+			if strings.Contains(strings.Join(tc.args, " "), "jsonl") {
+				want = searchFormatJSONL
+			}
 			if strings.Contains(strings.Join(tc.args, " "), "table") {
 				want = searchFormatTable
 			}
@@ -357,6 +363,64 @@ func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
 	}
 	if got, want := buf.String(), "id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count\n"; got != want {
 		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunSearchJSONLOutput(t *testing.T) {
+	sessions := []data.Session{
+		{
+			ID:         "session-a",
+			Summary:    "fix auth bug",
+			Cwd:        "/code/app",
+			Repository: "jongio/dispatch",
+			Branch:     "main",
+			CreatedAt:  "2026-01-05T10:00:00Z",
+			UpdatedAt:  "2026-01-06T10:00:00Z",
+			TurnCount:  5,
+			FileCount:  3,
+		},
+		{ID: "session-b"},
+	}
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--jsonl"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("got %d JSONL lines, want 2: %q", len(lines), buf.String())
+	}
+	var first searchSession
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatalf("first line is not valid JSON: %v\n%s", err, lines[0])
+	}
+	if first.ID != "session-a" || first.Repository != "jongio/dispatch" || first.TurnCount != 5 {
+		t.Errorf("first line = %+v", first)
+	}
+	var second searchSession
+	if err := json.Unmarshal([]byte(lines[1]), &second); err != nil {
+		t.Fatalf("second line is not valid JSON: %v\n%s", err, lines[1])
+	}
+	if second.ID != "session-b" {
+		t.Errorf("second line ID = %q, want session-b", second.ID)
+	}
+}
+
+func TestRunSearchJSONLEmptyIsEmpty(t *testing.T) {
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return nil, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--format", "jsonl"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+	if got := buf.String(); got != "" {
+		t.Errorf("output = %q, want empty", got)
 	}
 }
 
