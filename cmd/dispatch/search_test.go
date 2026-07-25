@@ -10,6 +10,7 @@ import (
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 )
 
 // withSearchList swaps the search command's session loader for a test double
@@ -113,6 +114,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 		{name: "csv shortcut", args: []string{"search", "--csv"}},
 		{name: "format csv separate", args: []string{"search", "--format", "csv"}},
 		{name: "format csv inline", args: []string{"search", "--format=csv"}},
+		{name: "commands shortcut", args: []string{"search", "--commands"}},
+		{name: "format commands separate", args: []string{"search", "--format", "commands"}},
+		{name: "format commands inline", args: []string{"search", "--format=commands"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,6 +130,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 			}
 			if strings.Contains(strings.Join(tc.args, " "), "csv") {
 				want = searchFormatCSV
+			}
+			if strings.Contains(strings.Join(tc.args, " "), "commands") {
+				want = searchFormatCommands
 			}
 			if opts.format != want {
 				t.Errorf("format = %q, want %s", opts.format, want)
@@ -356,6 +363,41 @@ func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
 		t.Fatalf("runSearch returned error: %v", err)
 	}
 	if got, want := buf.String(), "id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunSearchCommandsOutput(t *testing.T) {
+	sessions := []data.Session{
+		{ID: "session-a", Cwd: "/code/app"},
+		{ID: "session-b", Cwd: "/code/other"},
+	}
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+	prevConfig := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		cfg := config.Default()
+		cfg.Model = "gpt-test"
+		return cfg, nil
+	}
+	prevResume := openResumeCmdFn
+	openResumeCmdFn = func(id string, rc platform.ResumeConfig) (string, error) {
+		return "copilot --resume " + id + " --cwd " + rc.Cwd + " --model " + rc.Model, nil
+	}
+	t.Cleanup(func() {
+		configLoadFn = prevConfig
+		openResumeCmdFn = prevResume
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--commands"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	want := "copilot --resume session-a --cwd /code/app --model gpt-test\n" +
+		"copilot --resume session-b --cwd /code/other --model gpt-test\n"
+	if got := buf.String(); got != want {
 		t.Errorf("output = %q, want %q", got, want)
 	}
 }
