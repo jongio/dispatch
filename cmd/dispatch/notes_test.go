@@ -82,6 +82,29 @@ func TestRunNotesListJSON(t *testing.T) {
 	}
 }
 
+func TestRunNotesListCSV(t *testing.T) {
+	withConfigSeams(t, notedConfig())
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return notedSessions(), nil })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "--csv"}); err != nil {
+		t.Fatalf("runNotes csv shortcut: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"id,summary,note",
+		"a,Auth fix,follow up",
+		"b,Build command,ready to ship",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("CSV output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "orphan note") {
+		t.Fatalf("orphan note should not appear:\n%s", out)
+	}
+}
+
 func TestRunNotesGetSetClear(t *testing.T) {
 	cfg := withConfigSeams(t, config.Default())
 
@@ -143,6 +166,7 @@ func TestRunNotesErrors(t *testing.T) {
 		{"notes", "set", "ses-1", "--stdin", "extra"},
 		{"notes", "clear"},
 		{"notes", "list", "extra"},
+		{"notes", "list", "--json", "--csv"},
 	} {
 		if err := runNotes(&bytes.Buffer{}, args); err == nil {
 			t.Fatalf("expected error for args %v", args)
