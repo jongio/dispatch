@@ -58,17 +58,31 @@ func runNotes(w io.Writer, args []string) error {
 
 func runNotesList(w io.Writer, args []string) error {
 	jsonOut := false
+	tag := ""
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
 	}
-	for _, arg := range args {
-		switch arg {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, inline, hasInline := splitFlag(arg)
+		switch name {
 		case "--json":
 			jsonOut = true
+		case "--tag":
+			if hasInline {
+				tag = inline
+				continue
+			}
+			if i+1 >= len(args) {
+				return fmt.Errorf("--tag requires a value")
+			}
+			tag = args[i+1]
+			i++
 		default:
 			return fmt.Errorf("notes list does not take arguments, got %q", arg)
 		}
 	}
+	tag = normalizeNotesTag(tag)
 
 	cfg, err := configLoadFn()
 	if err != nil {
@@ -78,6 +92,9 @@ func runNotesList(w io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
+	if tag != "" {
+		sessions = filterNotesSessionsByTag(cfg, sessions, tag)
+	}
 	report := buildNotesReport(cfg, sessions)
 	if jsonOut {
 		enc := json.NewEncoder(w)
@@ -86,6 +103,27 @@ func runNotesList(w io.Writer, args []string) error {
 	}
 	writeNotesText(w, report)
 	return nil
+}
+
+func normalizeNotesTag(tag string) string {
+	parts := config.ParseTags(tag)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func filterNotesSessionsByTag(cfg *config.Config, sessions []data.Session, tag string) []data.Session {
+	if cfg == nil || tag == "" {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if cfg.HasTag(s.ID, tag) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
 }
 
 func runNotesGet(w io.Writer, args []string) error {

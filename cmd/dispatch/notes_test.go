@@ -33,6 +33,10 @@ func notedConfig() *config.Config {
 		"b": "ready to ship",
 		"z": "orphan note",
 	}
+	cfg.SessionTags = map[string][]string{
+		"a": {"bug", "work"},
+		"b": {"docs"},
+	}
 	return cfg
 }
 
@@ -79,6 +83,40 @@ func TestRunNotesListJSON(t *testing.T) {
 	}
 	if report.TotalNotes != 2 || len(report.Notes) != 2 {
 		t.Fatalf("report = %+v, want 2 notes", report)
+	}
+}
+
+func TestRunNotesListTagFilterText(t *testing.T) {
+	withConfigSeams(t, notedConfig())
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return notedSessions(), nil })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "list", "--tag", "bug"}); err != nil {
+		t.Fatalf("runNotes tag filter: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "follow up") {
+		t.Fatalf("tagged note missing:\n%s", out)
+	}
+	if strings.Contains(out, "ready to ship") {
+		t.Fatalf("untagged note should be filtered out:\n%s", out)
+	}
+}
+
+func TestRunNotesListTagFilterJSON(t *testing.T) {
+	withConfigSeams(t, notedConfig())
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return notedSessions(), nil })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "--json", "--tag=missing"}); err != nil {
+		t.Fatalf("runNotes json tag filter: %v", err)
+	}
+	var report notesReport
+	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, buf.String())
+	}
+	if report.TotalNotes != 0 || len(report.Notes) != 0 {
+		t.Fatalf("report = %+v, want no notes", report)
 	}
 }
 
@@ -143,6 +181,7 @@ func TestRunNotesErrors(t *testing.T) {
 		{"notes", "set", "ses-1", "--stdin", "extra"},
 		{"notes", "clear"},
 		{"notes", "list", "extra"},
+		{"notes", "list", "--tag"},
 	} {
 		if err := runNotes(&bytes.Buffer{}, args); err == nil {
 			t.Fatalf("expected error for args %v", args)
