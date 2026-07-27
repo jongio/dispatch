@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,7 +41,7 @@ func runNotes(w io.Writer, args []string) error {
 	if len(rest) > 0 {
 		rest = rest[1:]
 	}
-	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" {
+	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" {
 		return runNotesList(w, rest)
 	}
 
@@ -58,17 +59,37 @@ func runNotes(w io.Writer, args []string) error {
 
 func runNotesList(w io.Writer, args []string) error {
 	jsonOut := false
+	csvOut := false
+	tag := ""
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
 	}
-	for _, arg := range args {
-		switch arg {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, inline, hasInline := splitFlag(arg)
+		switch name {
 		case "--json":
 			jsonOut = true
+		case "--csv":
+			csvOut = true
+		case "--tag":
+			if hasInline {
+				tag = inline
+				continue
+			}
+			if i+1 >= len(args) {
+				return fmt.Errorf("--tag requires a value")
+			}
+			tag = args[i+1]
+			i++
 		default:
 			return fmt.Errorf("notes list does not take arguments, got %q", arg)
 		}
 	}
+	if jsonOut && csvOut {
+		return fmt.Errorf("--json and --csv cannot be combined")
+	}
+	tag = normalizeNotesTag(tag)
 
 	cfg, err := configLoadFn()
 	if err != nil {
@@ -78,14 +99,41 @@ func runNotesList(w io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
+	if tag != "" {
+		sessions = filterNotesSessionsByTag(cfg, sessions, tag)
+	}
 	report := buildNotesReport(cfg, sessions)
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(report)
 	}
+	if csvOut {
+		return writeNotesCSV(w, report)
+	}
 	writeNotesText(w, report)
 	return nil
+}
+
+func normalizeNotesTag(tag string) string {
+	parts := config.ParseTags(tag)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func filterNotesSessionsByTag(cfg *config.Config, sessions []data.Session, tag string) []data.Session {
+	if cfg == nil || tag == "" {
+		return sessions
+	}
+	filtered := make([]data.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if cfg.HasTag(s.ID, tag) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
 }
 
 func runNotesGet(w io.Writer, args []string) error {
@@ -215,10 +263,25 @@ func writeNotesText(w io.Writer, report notesReport) {
 			idWidth = len(entry.ID)
 		}
 	}
+
 	for _, entry := range report.Notes {
 		fmt.Fprintf(w, "  %-*s  %s\n", idWidth, entry.ID, entry.Note)
 		if entry.Summary != "" {
 			fmt.Fprintf(w, "  %-*s  %s\n", idWidth, "", entry.Summary)
 		}
 	}
+}
+
+func writeNotesCSV(w io.Writer, report notesReport) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"id", "summary", "note"}); err != nil {
+		return err
+	}
+	for _, entry := range report.Notes {
+		if err := cw.Write([]string{entry.ID, csvSafe(entry.Summary), csvSafe(entry.Note)}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }

@@ -57,23 +57,25 @@ func TestParseInfoArgs(t *testing.T) {
 		name     string
 		args     []string
 		wantID   string
-		wantJSON bool
+		wantFmt  infoOutputFormat
 		wantRefs bool
 		wantErr  bool
 	}{
-		{name: "id only", args: []string{"info", "abc"}, wantID: "abc"},
-		{name: "id with json", args: []string{"info", "abc", "--json"}, wantID: "abc", wantJSON: true},
-		{name: "json before id", args: []string{"info", "--json", "abc"}, wantID: "abc", wantJSON: true},
-		{name: "id with refs", args: []string{"info", "abc", "--refs"}, wantID: "abc", wantRefs: true},
-		{name: "json with refs", args: []string{"info", "--json", "--refs", "abc"}, wantID: "abc", wantJSON: true, wantRefs: true},
+		{name: "id only", args: []string{"info", "abc"}, wantID: "abc", wantFmt: infoFormatText},
+		{name: "id with json", args: []string{"info", "abc", "--json"}, wantID: "abc", wantFmt: infoFormatJSON},
+		{name: "json before id", args: []string{"info", "--json", "abc"}, wantID: "abc", wantFmt: infoFormatJSON},
+		{name: "id with markdown", args: []string{"info", "abc", "--markdown"}, wantID: "abc", wantFmt: infoFormatMarkdown},
+		{name: "id with refs", args: []string{"info", "abc", "--refs"}, wantID: "abc", wantFmt: infoFormatText, wantRefs: true},
+		{name: "json with refs", args: []string{"info", "--json", "--refs", "abc"}, wantID: "abc", wantFmt: infoFormatJSON, wantRefs: true},
 		{name: "missing id", args: []string{"info"}, wantErr: true},
 		{name: "two ids", args: []string{"info", "a", "b"}, wantErr: true},
 		{name: "unknown flag", args: []string{"info", "abc", "--nope"}, wantErr: true},
+		{name: "json markdown conflict", args: []string{"info", "abc", "--json", "--markdown"}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			id, asJSON, includeRefs, err := parseInfoArgs(tt.args)
+			id, format, includeRefs, err := parseInfoArgs(tt.args)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected an error")
@@ -86,8 +88,8 @@ func TestParseInfoArgs(t *testing.T) {
 			if id != tt.wantID {
 				t.Errorf("id = %q, want %q", id, tt.wantID)
 			}
-			if asJSON != tt.wantJSON {
-				t.Errorf("asJSON = %v, want %v", asJSON, tt.wantJSON)
+			if format != tt.wantFmt {
+				t.Errorf("format = %q, want %q", format, tt.wantFmt)
 			}
 			if includeRefs != tt.wantRefs {
 				t.Errorf("includeRefs = %v, want %v", includeRefs, tt.wantRefs)
@@ -267,6 +269,29 @@ func TestRunInfo_JSONWithRefs(t *testing.T) {
 	}
 	if strings.Join(got.Refs.Issues, ",") != "7" {
 		t.Errorf("issues = %+v", got.Refs.Issues)
+	}
+}
+
+func TestRunInfo_MarkdownWithRefs(t *testing.T) {
+	withInfoDetail(t, func(string) (*data.SessionDetail, error) {
+		return infoSampleDetail(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runInfo(&buf, []string{"info", "ses-info-1", "--markdown", "--refs"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"## Session `ses-info-1`",
+		"| Summary | Fix the widget |",
+		"| Repository | jongio/dispatch |",
+		"| Turns | 5 |",
+		"| PRs | 42, 43 |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("markdown output missing %q, got:\n%s", want, out)
+		}
 	}
 }
 
