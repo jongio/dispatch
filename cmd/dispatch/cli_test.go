@@ -234,7 +234,7 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	t.Cleanup(func() { doctorSessionCountFn = origCount })
 
 	var buf bytes.Buffer
-	if err := runDoctorJSON(&buf); err != nil {
+	if _, err := runDoctorJSON(&buf); err != nil {
 		t.Fatalf("runDoctorJSON: %v", err)
 	}
 
@@ -259,6 +259,19 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	}
 	if !strings.HasSuffix(buf.String(), "}\n") {
 		t.Errorf("JSON output should end with a single newline, got:\n%q", buf.String())
+	}
+}
+
+func TestParseDoctorArgs(t *testing.T) {
+	opts, err := parseDoctorArgs([]string{"doctor", "--json", "--strict"})
+	if err != nil {
+		t.Fatalf("parseDoctorArgs: %v", err)
+	}
+	if !opts.JSON || !opts.Strict {
+		t.Fatalf("opts = %+v, want json and strict", opts)
+	}
+	if _, err := parseDoctorArgs([]string{"doctor", "--bogus"}); err == nil {
+		t.Fatal("expected error for unknown flag")
 	}
 }
 
