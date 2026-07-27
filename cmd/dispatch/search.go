@@ -31,6 +31,7 @@ type searchOutputFormat string
 
 const (
 	searchFormatJSON     searchOutputFormat = "json"
+	searchFormatJSONL    searchOutputFormat = "jsonl"
 	searchFormatIDs      searchOutputFormat = "ids"
 	searchFormatTable    searchOutputFormat = "table"
 	searchFormatCSV      searchOutputFormat = "csv"
@@ -97,6 +98,9 @@ func runSearch(w io.Writer, args []string) error {
 	if opts.format == searchFormatCSV {
 		return writeSearchCSV(w, sessions)
 	}
+	if opts.format == searchFormatJSONL {
+		return writeSearchJSONL(w, sessions)
+	}
 	if opts.format == searchFormatPaths {
 		return writeSearchPaths(w, sessions)
 	}
@@ -110,22 +114,36 @@ func runSearch(w io.Writer, args []string) error {
 
 	results := make([]searchSession, 0, len(sessions))
 	for _, s := range sessions {
-		results = append(results, searchSession{
-			ID:         s.ID,
-			Summary:    s.Summary,
-			Cwd:        s.Cwd,
-			Repository: s.Repository,
-			Branch:     s.Branch,
-			CreatedAt:  s.CreatedAt,
-			UpdatedAt:  s.UpdatedAt,
-			TurnCount:  s.TurnCount,
-			FileCount:  s.FileCount,
-		})
+		results = append(results, newSearchSession(s))
 	}
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(results)
+}
+
+func writeSearchJSONL(w io.Writer, sessions []data.Session) error {
+	enc := json.NewEncoder(w)
+	for _, s := range sessions {
+		if err := enc.Encode(newSearchSession(s)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func newSearchSession(s data.Session) searchSession {
+	return searchSession{
+		ID:         s.ID,
+		Summary:    s.Summary,
+		Cwd:        s.Cwd,
+		Repository: s.Repository,
+		Branch:     s.Branch,
+		CreatedAt:  s.CreatedAt,
+		UpdatedAt:  s.UpdatedAt,
+		TurnCount:  s.TurnCount,
+		FileCount:  s.FileCount,
+	}
 }
 
 func writeSearchIDs(w io.Writer, sessions []data.Session) error {
@@ -273,6 +291,8 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 		switch {
 		case name == "--json":
 			opts.format = searchFormatJSON
+		case name == "--jsonl":
+			opts.format = searchFormatJSONL
 		case name == "--ids":
 			opts.format = searchFormatIDs
 		case name == "--table":
@@ -447,6 +467,8 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case string(searchFormatJSON):
 		return searchFormatJSON, nil
+	case string(searchFormatJSONL):
+		return searchFormatJSONL, nil
 	case string(searchFormatIDs):
 		return searchFormatIDs, nil
 	case string(searchFormatTable):
@@ -458,7 +480,7 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 	case string(searchFormatCommands):
 		return searchFormatCommands, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json, ids, table, csv, paths, or commands)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, jsonl, ids, table, csv, paths, or commands)", v)
 	}
 }
 
