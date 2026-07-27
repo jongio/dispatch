@@ -126,7 +126,7 @@ Commands:
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
-  search [query] [flags]  Print matching sessions as JSON, CSV, IDs, paths, or a table
+  search [query] [flags]  Print matching sessions as JSON, CSV, IDs, paths, commands, or a table
   tags [--json]           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
   alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
@@ -181,8 +181,9 @@ Search flags:
   --json                  Print results as JSON (default)
   --ids                   Print one session ID per line
   --paths                 Print one working directory per line
+  --commands              Print one resume command per line
   --table                 Print a readable table
-  --format json|csv|ids|paths|table
+  --format json|csv|ids|paths|commands|table
                           Choose the output format
   --query <text>          Text to match (also accepted as a positional argument)
   --deep                  Search turns, checkpoints, files, and refs too
