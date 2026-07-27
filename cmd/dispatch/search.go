@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -29,10 +30,13 @@ const searchAllLimit = 100_000
 type searchOutputFormat string
 
 const (
-	searchFormatJSON  searchOutputFormat = "json"
-	searchFormatIDs   searchOutputFormat = "ids"
-	searchFormatTable searchOutputFormat = "table"
-	searchFormatCSV   searchOutputFormat = "csv"
+	searchFormatJSON     searchOutputFormat = "json"
+	searchFormatJSONL    searchOutputFormat = "jsonl"
+	searchFormatIDs      searchOutputFormat = "ids"
+	searchFormatTable    searchOutputFormat = "table"
+	searchFormatCSV      searchOutputFormat = "csv"
+	searchFormatPaths    searchOutputFormat = "paths"
+	searchFormatCommands searchOutputFormat = "commands"
 )
 
 // searchOptions holds the parsed flags for the search command.
@@ -94,25 +98,52 @@ func runSearch(w io.Writer, args []string) error {
 	if opts.format == searchFormatCSV {
 		return writeSearchCSV(w, sessions)
 	}
+	if opts.format == searchFormatJSONL {
+		return writeSearchJSONL(w, sessions)
+	}
+	if opts.format == searchFormatPaths {
+		return writeSearchPaths(w, sessions)
+	}
+	if opts.format == searchFormatCommands {
+		cfg, err := configLoadFn()
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
+		}
+		return writeSearchCommands(w, sessions, cfg)
+	}
 
 	results := make([]searchSession, 0, len(sessions))
 	for _, s := range sessions {
-		results = append(results, searchSession{
-			ID:         s.ID,
-			Summary:    s.Summary,
-			Cwd:        s.Cwd,
-			Repository: s.Repository,
-			Branch:     s.Branch,
-			CreatedAt:  s.CreatedAt,
-			UpdatedAt:  s.UpdatedAt,
-			TurnCount:  s.TurnCount,
-			FileCount:  s.FileCount,
-		})
+		results = append(results, newSearchSession(s))
 	}
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(results)
+}
+
+func writeSearchJSONL(w io.Writer, sessions []data.Session) error {
+	enc := json.NewEncoder(w)
+	for _, s := range sessions {
+		if err := enc.Encode(newSearchSession(s)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func newSearchSession(s data.Session) searchSession {
+	return searchSession{
+		ID:         s.ID,
+		Summary:    s.Summary,
+		Cwd:        s.Cwd,
+		Repository: s.Repository,
+		Branch:     s.Branch,
+		CreatedAt:  s.CreatedAt,
+		UpdatedAt:  s.UpdatedAt,
+		TurnCount:  s.TurnCount,
+		FileCount:  s.FileCount,
+	}
 }
 
 func writeSearchIDs(w io.Writer, sessions []data.Session) error {
@@ -168,6 +199,37 @@ func writeSearchCSV(w io.Writer, sessions []data.Session) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func writeSearchPaths(w io.Writer, sessions []data.Session) error {
+	seen := map[string]struct{}{}
+	for _, s := range sessions {
+		path := strings.TrimSpace(s.Cwd)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		if _, err := fmt.Fprintln(w, path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeSearchCommands(w io.Writer, sessions []data.Session, cfg *config.Config) error {
+	for _, s := range sessions {
+		cmdStr, err := openResumeCmdFn(s.ID, openResumeConfig(cfg, &s))
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, cmdStr); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func shortSearchID(id string) string {
@@ -229,12 +291,18 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 		switch {
 		case name == "--json":
 			opts.format = searchFormatJSON
+		case name == "--jsonl":
+			opts.format = searchFormatJSONL
 		case name == "--ids":
 			opts.format = searchFormatIDs
 		case name == "--table":
 			opts.format = searchFormatTable
 		case name == "--csv":
 			opts.format = searchFormatCSV
+		case name == "--paths":
+			opts.format = searchFormatPaths
+		case name == "--commands":
+			opts.format = searchFormatCommands
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -399,14 +467,20 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case string(searchFormatJSON):
 		return searchFormatJSON, nil
+	case string(searchFormatJSONL):
+		return searchFormatJSONL, nil
 	case string(searchFormatIDs):
 		return searchFormatIDs, nil
 	case string(searchFormatTable):
 		return searchFormatTable, nil
 	case string(searchFormatCSV):
 		return searchFormatCSV, nil
+	case string(searchFormatPaths):
+		return searchFormatPaths, nil
+	case string(searchFormatCommands):
+		return searchFormatCommands, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json, ids, table, or csv)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, jsonl, ids, table, csv, paths, or commands)", v)
 	}
 }
 

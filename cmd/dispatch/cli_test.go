@@ -241,7 +241,7 @@ func TestRunDoctorJSON_Shape(t *testing.T) {
 	t.Cleanup(func() { doctorSessionCountFn, doctorWorkspacesFn = origCount, origWorkspaces })
 
 	var buf bytes.Buffer
-	if err := runDoctorJSON(&buf); err != nil {
+	if _, err := runDoctorJSON(&buf); err != nil {
 		t.Fatalf("runDoctorJSON: %v", err)
 	}
 
@@ -277,6 +277,19 @@ func TestWriteWorkspaceLine_Error(t *testing.T) {
 	writeWorkspaceLine(&buf, workspaceReport{Error: "store unavailable"})
 	if !strings.Contains(buf.String(), "Missing workspaces: unknown") {
 		t.Fatalf("workspace line = %q, want unknown status", buf.String())
+	}
+}
+
+func TestParseDoctorArgs(t *testing.T) {
+	opts, err := parseDoctorArgs([]string{"doctor", "--json", "--strict"})
+	if err != nil {
+		t.Fatalf("parseDoctorArgs: %v", err)
+	}
+	if !opts.JSON || !opts.Strict {
+		t.Fatalf("opts = %+v, want json and strict", opts)
+	}
+	if _, err := parseDoctorArgs([]string{"doctor", "--bogus"}); err == nil {
+		t.Fatal("expected error for unknown flag")
 	}
 }
 
