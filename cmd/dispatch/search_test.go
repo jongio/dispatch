@@ -113,6 +113,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 		{name: "csv shortcut", args: []string{"search", "--csv"}},
 		{name: "format csv separate", args: []string{"search", "--format", "csv"}},
 		{name: "format csv inline", args: []string{"search", "--format=csv"}},
+		{name: "paths shortcut", args: []string{"search", "--paths"}},
+		{name: "format paths separate", args: []string{"search", "--format", "paths"}},
+		{name: "format paths inline", args: []string{"search", "--format=paths"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,6 +129,9 @@ func TestParseSearchArgsIDFormats(t *testing.T) {
 			}
 			if strings.Contains(strings.Join(tc.args, " "), "csv") {
 				want = searchFormatCSV
+			}
+			if strings.Contains(strings.Join(tc.args, " "), "paths") {
+				want = searchFormatPaths
 			}
 			if opts.format != want {
 				t.Errorf("format = %q, want %s", opts.format, want)
@@ -356,6 +362,27 @@ func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
 		t.Fatalf("runSearch returned error: %v", err)
 	}
 	if got, want := buf.String(), "id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunSearchPathsOutput(t *testing.T) {
+	sessions := []data.Session{
+		{ID: "session-a", Cwd: "/code/app"},
+		{ID: "session-b", Cwd: "  "},
+		{ID: "session-c", Cwd: "/code/app"},
+		{ID: "session-d", Cwd: "/code/other"},
+	}
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--paths"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	if got, want := buf.String(), "/code/app\n/code/other\n"; got != want {
 		t.Errorf("output = %q, want %q", got, want)
 	}
 }
