@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,7 +41,7 @@ func runNotes(w io.Writer, args []string) error {
 	if len(rest) > 0 {
 		rest = rest[1:]
 	}
-	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" {
+	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" {
 		return runNotesList(w, rest)
 	}
 
@@ -58,6 +59,7 @@ func runNotes(w io.Writer, args []string) error {
 
 func runNotesList(w io.Writer, args []string) error {
 	jsonOut := false
+	csvOut := false
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
 	}
@@ -65,9 +67,14 @@ func runNotesList(w io.Writer, args []string) error {
 		switch arg {
 		case "--json":
 			jsonOut = true
+		case "--csv":
+			csvOut = true
 		default:
 			return fmt.Errorf("notes list does not take arguments, got %q", arg)
 		}
+	}
+	if jsonOut && csvOut {
+		return fmt.Errorf("--json and --csv cannot be combined")
 	}
 
 	cfg, err := configLoadFn()
@@ -83,6 +90,9 @@ func runNotesList(w io.Writer, args []string) error {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(report)
+	}
+	if csvOut {
+		return writeNotesCSV(w, report)
 	}
 	writeNotesText(w, report)
 	return nil
@@ -215,10 +225,25 @@ func writeNotesText(w io.Writer, report notesReport) {
 			idWidth = len(entry.ID)
 		}
 	}
+
 	for _, entry := range report.Notes {
 		fmt.Fprintf(w, "  %-*s  %s\n", idWidth, entry.ID, entry.Note)
 		if entry.Summary != "" {
 			fmt.Fprintf(w, "  %-*s  %s\n", idWidth, "", entry.Summary)
 		}
 	}
+}
+
+func writeNotesCSV(w io.Writer, report notesReport) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"id", "summary", "note"}); err != nil {
+		return err
+	}
+	for _, entry := range report.Notes {
+		if err := cw.Write([]string{entry.ID, csvSafe(entry.Summary), csvSafe(entry.Note)}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
