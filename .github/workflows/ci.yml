@@ -58,7 +58,7 @@ jobs:
 
       - name: Check strict formatting (gofumpt)
         run: |
-          go install mvdan.cc/gofumpt@v0.10.0 || { echo "gofumpt install failed, skipping"; exit 0; }
+          go install mvdan.cc/gofumpt@v0.11.0 || { echo "gofumpt install failed, skipping"; exit 0; }
           unformatted=$(gofumpt -l .)
           if [ -n "$unformatted" ]; then
             echo "::error::Files need strict formatting (gofumpt):"
