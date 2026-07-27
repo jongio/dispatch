@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -29,11 +30,13 @@ const searchAllLimit = 100_000
 type searchOutputFormat string
 
 const (
-	searchFormatJSON  searchOutputFormat = "json"
-	searchFormatJSONL searchOutputFormat = "jsonl"
-	searchFormatIDs   searchOutputFormat = "ids"
-	searchFormatTable searchOutputFormat = "table"
-	searchFormatCSV   searchOutputFormat = "csv"
+	searchFormatJSON     searchOutputFormat = "json"
+	searchFormatJSONL    searchOutputFormat = "jsonl"
+	searchFormatIDs      searchOutputFormat = "ids"
+	searchFormatTable    searchOutputFormat = "table"
+	searchFormatCSV      searchOutputFormat = "csv"
+	searchFormatPaths    searchOutputFormat = "paths"
+	searchFormatCommands searchOutputFormat = "commands"
 )
 
 // searchOptions holds the parsed flags for the search command.
@@ -97,6 +100,16 @@ func runSearch(w io.Writer, args []string) error {
 	}
 	if opts.format == searchFormatJSONL {
 		return writeSearchJSONL(w, sessions)
+	}
+	if opts.format == searchFormatPaths {
+		return writeSearchPaths(w, sessions)
+	}
+	if opts.format == searchFormatCommands {
+		cfg, err := configLoadFn()
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
+		}
+		return writeSearchCommands(w, sessions, cfg)
 	}
 
 	results := make([]searchSession, 0, len(sessions))
@@ -188,6 +201,37 @@ func writeSearchCSV(w io.Writer, sessions []data.Session) error {
 	return cw.Error()
 }
 
+func writeSearchPaths(w io.Writer, sessions []data.Session) error {
+	seen := map[string]struct{}{}
+	for _, s := range sessions {
+		path := strings.TrimSpace(s.Cwd)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		if _, err := fmt.Fprintln(w, path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeSearchCommands(w io.Writer, sessions []data.Session, cfg *config.Config) error {
+	for _, s := range sessions {
+		cmdStr, err := openResumeCmdFn(s.ID, openResumeConfig(cfg, &s))
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, cmdStr); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func shortSearchID(id string) string {
 	if len(id) <= 12 {
 		return id
@@ -255,6 +299,10 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 			opts.format = searchFormatTable
 		case name == "--csv":
 			opts.format = searchFormatCSV
+		case name == "--paths":
+			opts.format = searchFormatPaths
+		case name == "--commands":
+			opts.format = searchFormatCommands
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -427,8 +475,12 @@ func parseSearchFormat(v string) (searchOutputFormat, error) {
 		return searchFormatTable, nil
 	case string(searchFormatCSV):
 		return searchFormatCSV, nil
+	case string(searchFormatPaths):
+		return searchFormatPaths, nil
+	case string(searchFormatCommands):
+		return searchFormatCommands, nil
 	default:
-		return "", fmt.Errorf("invalid --format value %q (want json, jsonl, ids, table, or csv)", v)
+		return "", fmt.Errorf("invalid --format value %q (want json, jsonl, ids, table, csv, paths, or commands)", v)
 	}
 }
 

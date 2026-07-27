@@ -47,6 +47,14 @@ type infoRefs struct {
 	Issues  []string `json:"issues"`
 }
 
+type infoOutputFormat string
+
+const (
+	infoFormatText     infoOutputFormat = "text"
+	infoFormatJSON     infoOutputFormat = "json"
+	infoFormatMarkdown infoOutputFormat = "markdown"
+)
+
 // runInfo prints a concise summary of a single session as text, or as JSON
 // with --json. The --refs flag adds linked reference values.
 func runInfo(w io.Writer, args []string) error {
@@ -54,7 +62,7 @@ func runInfo(w io.Writer, args []string) error {
 		w = io.Discard
 	}
 
-	id, asJSON, includeRefs, err := parseInfoArgs(args)
+	id, format, includeRefs, err := parseInfoArgs(args)
 	if err != nil {
 		return err
 	}
@@ -76,29 +84,42 @@ func runInfo(w io.Writer, args []string) error {
 	if includeRefs {
 		addInfoRefs(&info, detail.Refs)
 	}
-	if asJSON {
+	switch format {
+	case infoFormatJSON:
 		return writeInfoJSON(w, info)
+	case infoFormatMarkdown:
+		return writeInfoMarkdown(w, info)
+	default:
+		return writeInfoText(w, info)
 	}
-	return writeInfoText(w, info)
 }
 
 // parseInfoArgs extracts the session ID and flags from the info
 // subcommand arguments. args[0] is expected to be "info".
-func parseInfoArgs(args []string) (id string, asJSON, includeRefs bool, err error) {
+func parseInfoArgs(args []string) (id string, format infoOutputFormat, includeRefs bool, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "info" token
 	}
 
+	format = infoFormatText
 	var positionals []string
 	for _, arg := range rest {
 		switch {
 		case arg == "--json":
-			asJSON = true
+			if format == infoFormatMarkdown {
+				return "", "", false, errors.New("--json and --markdown cannot be combined")
+			}
+			format = infoFormatJSON
+		case arg == "--markdown":
+			if format == infoFormatJSON {
+				return "", "", false, errors.New("--json and --markdown cannot be combined")
+			}
+			format = infoFormatMarkdown
 		case arg == "--refs":
 			includeRefs = true
 		case strings.HasPrefix(arg, "-"):
-			return "", false, false, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", false, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
@@ -106,11 +127,11 @@ func parseInfoArgs(args []string) (id string, asJSON, includeRefs bool, err erro
 
 	switch len(positionals) {
 	case 0:
-		return "", false, false, errors.New("info requires a session ID")
+		return "", "", false, errors.New("info requires a session ID")
 	case 1:
-		return positionals[0], asJSON, includeRefs, nil
+		return positionals[0], format, includeRefs, nil
 	default:
-		return "", false, false, fmt.Errorf("info accepts a single session ID, got %d arguments", len(positionals))
+		return "", "", false, fmt.Errorf("info accepts a single session ID, got %d arguments", len(positionals))
 	}
 }
 
@@ -217,6 +238,45 @@ func writeInfoText(w io.Writer, info sessionInfo) error {
 		fmt.Fprintf(&b, "  %-12s %s\n", "Commits:", formatRefList(info.Refs.Commits))
 		fmt.Fprintf(&b, "  %-12s %s\n", "PRs:", formatRefList(info.Refs.PRs))
 		fmt.Fprintf(&b, "  %-12s %s\n", "Issues:", formatRefList(info.Refs.Issues))
+	}
+
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+func writeInfoMarkdown(w io.Writer, info sessionInfo) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Session `%s`\n\n", markdownCell(info.ID))
+
+	writeRow := func(label, value string) {
+		if value != "" {
+			fmt.Fprintf(&b, "| %s | %s |\n", label, markdownCell(value))
+		}
+	}
+
+	fmt.Fprintln(&b, "| Field | Value |")
+	fmt.Fprintln(&b, "|---|---|")
+	writeRow("Summary", info.Summary)
+	writeRow("Repository", info.Repository)
+	writeRow("Branch", info.Branch)
+	writeRow("Directory", info.Directory)
+	writeRow("Host", info.HostType)
+	writeRow("Alias", info.Alias)
+	if len(info.Tags) > 0 {
+		writeRow("Tags", strings.Join(info.Tags, ", "))
+	}
+	writeRow("Note", oneLine(info.Note))
+	writeRow("Created", info.CreatedAt)
+	writeRow("Updated", info.UpdatedAt)
+	writeRow("Last active", info.LastActiveAt)
+	fmt.Fprintf(&b, "| Turns | %d |\n", info.Turns)
+	fmt.Fprintf(&b, "| Files | %d |\n", info.Files)
+	fmt.Fprintf(&b, "| Checkpoints | %d |\n", info.Checkpoints)
+	writeRow("Refs", formatRefCounts(info))
+	if info.Refs != nil {
+		writeRow("Commits", formatRefList(info.Refs.Commits))
+		writeRow("PRs", formatRefList(info.Refs.PRs))
+		writeRow("Issues", formatRefList(info.Refs.Issues))
 	}
 
 	_, err := io.WriteString(w, b.String())
