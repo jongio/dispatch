@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -117,13 +116,26 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "doctor":
-			if slices.Contains(args, "--json") {
-				if jErr := runDoctorJSON(os.Stdout); jErr != nil {
+			opts, dErr := parseDoctorArgs(args[i:])
+			if dErr != nil {
+				fmt.Fprintf(os.Stderr, "doctor: %v\n", dErr)
+				return true, cleanup, startupOptions{}, dErr
+			}
+			var report doctorReport
+			if opts.JSON {
+				var jErr error
+				report, jErr = runDoctorJSON(os.Stdout)
+				if jErr != nil {
 					fmt.Fprintf(os.Stderr, "doctor: %v\n", jErr)
 					return true, cleanup, startupOptions{}, jErr
 				}
 			} else {
-				runDoctor(os.Stdout)
+				report = runDoctor(os.Stdout)
+			}
+			if opts.Strict && !report.OK {
+				err := errors.New("health checks failed")
+				fmt.Fprintf(os.Stderr, "doctor: %v\n", err)
+				return true, cleanup, startupOptions{}, err
 			}
 			showUpdateNotification(origStderr, updateCh)
 			return true, cleanup, startupOptions{}, nil
@@ -578,6 +590,7 @@ type doctorEntry struct {
 type doctorReport struct {
 	Version        string      `json:"version"`
 	OS             string      `json:"os"`
+	OK             bool        `json:"ok"`
 	Config         doctorEntry `json:"config"`
 	SessionStore   doctorEntry `json:"session_store"`
 	SessionState   doctorEntry `json:"session_state"`
@@ -620,8 +633,43 @@ func collectDoctorReport() doctorReport {
 	}
 
 	r.SessionCount = doctorSessionCountFn()
+	r.OK = doctorEntryOK(r.Config) &&
+		doctorEntryOK(r.SessionStore) &&
+		doctorEntryOK(r.SessionState) &&
+		doctorEntryOK(r.CopilotCLI)
 
 	return r
+}
+
+type doctorOptions struct {
+	JSON   bool
+	Strict bool
+}
+
+func parseDoctorArgs(args []string) (doctorOptions, error) {
+	var opts doctorOptions
+	rest := args
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	for _, arg := range rest {
+		switch arg {
+		case "--json":
+			opts.JSON = true
+		case "--strict":
+			opts.Strict = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return opts, fmt.Errorf("unknown flag: %s", arg)
+			}
+			return opts, fmt.Errorf("doctor does not take positional arguments, got %q", arg)
+		}
+	}
+	return opts, nil
+}
+
+func doctorEntryOK(e doctorEntry) bool {
+	return e.err == nil && e.Status == statusFound
 }
 
 // defaultCopilotVersion runs the Copilot CLI binary with --version and returns
@@ -677,7 +725,7 @@ func pathStatus(path string, wantDir bool) string {
 	return statusFound
 }
 
-func runDoctor(w io.Writer) {
+func runDoctor(w io.Writer) doctorReport {
 	if w == nil {
 		w = io.Discard
 	}
@@ -700,20 +748,23 @@ func runDoctor(w io.Writer) {
 		fmt.Fprintf(w, "Copilot CLI version: not detected\n")
 	}
 	fmt.Fprintf(w, "Stored sessions: %d\n", r.SessionCount)
+	fmt.Fprintf(w, "OK: %t\n", r.OK)
+	return r
 }
 
 // runDoctorJSON writes the diagnostics as a single JSON object followed by a
 // newline.
-func runDoctorJSON(w io.Writer) error {
+func runDoctorJSON(w io.Writer) (doctorReport, error) {
 	if w == nil {
 		w = io.Discard
 	}
-	b, err := json.MarshalIndent(collectDoctorReport(), "", "  ")
+	r := collectDoctorReport()
+	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return err
+		return r, err
 	}
 	fmt.Fprintf(w, "%s\n", b)
-	return nil
+	return r, nil
 }
 
 // writeDoctorLine renders one diagnostic entry as human-readable text.
