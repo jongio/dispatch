@@ -20,9 +20,9 @@ import (
 // the config read/write path, matching the seam pattern used elsewhere in this
 // package (see cli.go and stats.go).
 var (
-	configLoadFn = config.Load
-	configSaveFn = config.Save
-	configPathFn = config.ConfigPath
+	configLoadFn           = config.Load
+	configSaveFn           = config.Save
+	configPathFn           = config.ConfigPath
 	configStdin  io.Reader = os.Stdin
 )
 
@@ -492,7 +492,7 @@ func runConfigImport(w io.Writer, args []string) error {
 		}
 	}
 
-	var r io.Reader = configStdin
+	r := configStdin
 	if inPath != "" {
 		f, err := os.Open(inPath)
 		if err != nil {
