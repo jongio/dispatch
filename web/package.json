@@ -10,7 +10,7 @@
     "test": "astro check && astro build"
   },
   "dependencies": {
-    "astro": "^7.1.4",
+    "astro": "^7.1.6",
     "marked": "^18.0.7"
   },
   "devDependencies": {
