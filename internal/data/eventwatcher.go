@@ -31,12 +31,20 @@ type EventWatcher struct {
 	stop     chan struct{}
 	stopped  bool
 
+	// wg tracks the background goroutines started by Start so that Stop can
+	// wait for them. This guarantees onChange is never invoked after Stop
+	// returns, which callers rely on to safely tear down the channel the
+	// callback writes to.
+	wg sync.WaitGroup
+
 	// Configuration for attention classification.
 	threshold         time.Duration
 	workspaceRecovery bool
 
-	// Debounce tracking: maps session ID to the last scheduled fire time.
-	pending map[string]*time.Timer
+	// dirty holds session IDs awaiting re-classification. wake nudges the
+	// debounce goroutine; it is buffered so producers never block.
+	dirty map[string]struct{}
+	wake  chan struct{}
 }
 
 // NewEventWatcher creates a watcher that monitors session-state directories
@@ -48,7 +56,8 @@ func NewEventWatcher(onChange func(id string, status AttentionStatus), threshold
 		stop:              make(chan struct{}),
 		threshold:         threshold,
 		workspaceRecovery: workspaceRecovery,
-		pending:           make(map[string]*time.Timer),
+		dirty:             make(map[string]struct{}),
+		wake:              make(chan struct{}, 1),
 	}
 }
 
@@ -99,29 +108,31 @@ func (ew *EventWatcher) Start() error {
 	}
 
 	ew.watcher = w
+	ew.wg.Add(2)
 	go ew.loop(stateDir)
+	go ew.debounceLoop(stateDir)
 	return nil
 }
 
-// Stop permanently stops the watcher and releases resources.
+// Stop permanently stops the watcher and releases resources. It blocks until
+// the background goroutines have exited, so no onChange callback can be in
+// flight once Stop returns. Stop is idempotent.
 func (ew *EventWatcher) Stop() {
 	ew.mu.Lock()
-	defer ew.mu.Unlock()
-
 	if ew.stopped {
+		ew.mu.Unlock()
 		return
 	}
 	ew.stopped = true
 	close(ew.stop)
+	w := ew.watcher
+	ew.mu.Unlock()
 
-	if ew.watcher != nil {
-		ew.watcher.Close()
+	if w != nil {
+		w.Close()
 	}
 
-	// Cancel any pending debounce timers.
-	for _, t := range ew.pending {
-		t.Stop()
-	}
+	ew.wg.Wait()
 }
 
 // SetThreshold updates the attention threshold used for classification.
@@ -133,6 +144,8 @@ func (ew *EventWatcher) SetThreshold(d time.Duration) {
 
 // loop is the main event processing goroutine.
 func (ew *EventWatcher) loop(stateDir string) {
+	defer ew.wg.Done()
+
 	for {
 		select {
 		case <-ew.stop:
@@ -189,7 +202,7 @@ func (ew *EventWatcher) handleEvent(event fsnotify.Event, stateDir string) {
 		return
 	}
 
-	ew.scheduleClassify(sessionID, stateDir)
+	ew.scheduleClassify(sessionID)
 }
 
 // maybeWatchNewDir adds a newly created session directory to the watcher.
@@ -214,38 +227,72 @@ func (ew *EventWatcher) maybeWatchNewDir(path string) {
 	}
 }
 
-// scheduleClassify debounces classification for a session. If a timer is
-// already pending for this session, it is reset.
-func (ew *EventWatcher) scheduleClassify(sessionID string, stateDir string) {
+// scheduleClassify marks a session as needing re-classification and nudges the
+// debounce goroutine. Rapid successive writes to the same session collapse
+// into a single classification.
+func (ew *EventWatcher) scheduleClassify(sessionID string) {
 	ew.mu.Lock()
-	defer ew.mu.Unlock()
-
 	if ew.stopped {
+		ew.mu.Unlock()
 		return
 	}
-
-	if t, ok := ew.pending[sessionID]; ok {
-		t.Reset(eventWatcherDebounce)
-		return
-	}
-
-	ew.pending[sessionID] = time.AfterFunc(eventWatcherDebounce, func() {
-		ew.classify(sessionID, stateDir)
-	})
-}
-
-// classify re-classifies a single session and fires the callback.
-func (ew *EventWatcher) classify(sessionID string, stateDir string) {
-	ew.mu.Lock()
-	delete(ew.pending, sessionID)
-	threshold := ew.threshold
-	wr := ew.workspaceRecovery
+	ew.dirty[sessionID] = struct{}{}
 	ew.mu.Unlock()
 
-	dir := filepath.Join(stateDir, sessionID)
-	status := classifySession(dir, threshold, wr)
+	select {
+	case ew.wake <- struct{}{}:
+	default: // a wake is already queued
+	}
+}
 
-	if ew.onChange != nil {
-		ew.onChange(sessionID, status)
+// debounceLoop waits for change notifications, lets them settle for the
+// debounce interval, then classifies every session that changed and fires the
+// callback. Running the callbacks on this single goroutine (rather than on
+// per-session timers) means Stop can deterministically wait for them via wg.
+func (ew *EventWatcher) debounceLoop(stateDir string) {
+	defer ew.wg.Done()
+
+	timer := time.NewTimer(eventWatcherDebounce)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ew.stop:
+			return
+		case <-ew.wake:
+		}
+
+		timer.Reset(eventWatcherDebounce)
+		select {
+		case <-ew.stop:
+			return
+		case <-timer.C:
+		}
+
+		ew.mu.Lock()
+		ids := make([]string, 0, len(ew.dirty))
+		for id := range ew.dirty {
+			ids = append(ids, id)
+		}
+		clear(ew.dirty)
+		threshold := ew.threshold
+		wr := ew.workspaceRecovery
+		ew.mu.Unlock()
+
+		for _, id := range ids {
+			select {
+			case <-ew.stop:
+				return
+			default:
+			}
+
+			status := classifySession(filepath.Join(stateDir, id), threshold, wr)
+			if ew.onChange != nil {
+				ew.onChange(id, status)
+			}
+		}
 	}
 }

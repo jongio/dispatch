@@ -1,5 +1,3 @@
-//go:build windows
-
 package platform
 
 import (
@@ -19,13 +17,16 @@ func TestIsProcessAlive_CurrentProcess(t *testing.T) {
 	}
 }
 
-func TestIsProcessAlive_InvalidPID(t *testing.T) {
+func TestIsProcessAlive_NonPositivePID(t *testing.T) {
 	t.Parallel()
-	// PID 0 is the system idle process on Windows — not openable with
-	// PROCESS_QUERY_LIMITED_INFORMATION by normal users.
-	if IsProcessAlive(0) {
-		// On some systems, PID 0 may succeed — skip rather than fail.
-		t.Log("PID 0 returned alive (system-dependent)")
+	// Non-positive PIDs are not valid process identifiers on any platform.
+	// On Unix, syscall.Kill treats 0 as "the caller's process group" and
+	// negative values as other process groups, so these must be rejected
+	// before reaching the syscall.
+	for _, pid := range []int{0, -1, -1234} {
+		if IsProcessAlive(pid) {
+			t.Errorf("IsProcessAlive(%d) = true, want false for non-positive PID", pid)
+		}
 	}
 }
 
