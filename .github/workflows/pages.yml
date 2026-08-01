@@ -1,6 +1,11 @@
 name: Deploy website to GitHub Pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
   workflow_call:
 
