@@ -12,10 +12,15 @@ import (
 	"github.com/jongio/dispatch/internal/validate"
 )
 
-// eventWatcherDebounce is the minimum interval between re-classifications
-// of the same session after a file change. Rapid writes (e.g. multiple
-// events.jsonl appends in quick succession) are collapsed into one callback.
+// eventWatcherDebounce is how long the watcher waits for changes to stop
+// arriving before re-classifying. Rapid writes (e.g. multiple events.jsonl
+// appends in quick succession) are collapsed into one callback.
 const eventWatcherDebounce = 50 * time.Millisecond
+
+// eventWatcherMaxDelay caps how long classification can be deferred while
+// changes keep arriving. Without it, a continuously active session would
+// reset the debounce window forever and never refresh in the UI.
+const eventWatcherMaxDelay = 500 * time.Millisecond
 
 // EventWatcher monitors the Copilot CLI session-state directory for changes
 // using OS-level file system notifications (fsnotify). When events.jsonl or
@@ -265,11 +270,33 @@ func (ew *EventWatcher) debounceLoop(stateDir string) {
 		case <-ew.wake:
 		}
 
+		// Trailing debounce: keep extending the window while changes are
+		// still arriving, but never past eventWatcherMaxDelay.
+		deadline := time.Now().Add(eventWatcherMaxDelay)
 		timer.Reset(eventWatcherDebounce)
-		select {
-		case <-ew.stop:
-			return
-		case <-timer.C:
+
+	settle:
+		for {
+			select {
+			case <-ew.stop:
+				return
+
+			case <-ew.wake:
+				if !timer.Stop() {
+					<-timer.C
+				}
+				wait := eventWatcherDebounce
+				if remaining := time.Until(deadline); remaining < wait {
+					wait = remaining
+				}
+				if wait <= 0 {
+					break settle
+				}
+				timer.Reset(wait)
+
+			case <-timer.C:
+				break settle
+			}
 		}
 
 		ew.mu.Lock()
