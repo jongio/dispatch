@@ -1,6 +1,7 @@
 package data
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -90,9 +91,47 @@ func TestFilterBuilder_QueryDeepSearch(t *testing.T) {
 	var fb filterBuilder
 	fb.apply(FilterOptions{Query: "test", DeepSearch: true})
 
-	// Deep search: 9 LIKE patterns
-	if len(fb.args) != 9 {
-		t.Errorf("expected 9 args for deep search, got %d", len(fb.args))
+	// Deep search without FTS5: 4 session fields + user_message + 2 checkpoint
+	// fields + files + refs + assistant_response = 10 LIKE patterns.
+	if len(fb.args) != 10 {
+		t.Errorf("expected 10 args for deep search, got %d", len(fb.args))
+	}
+	if !strings.Contains(fb.whereSQL(), "assistant_response") {
+		t.Error("deep search without FTS5 should scan turns.assistant_response")
+	}
+}
+
+func TestFilterBuilder_QueryDeepSearchFTS(t *testing.T) {
+	fb := filterBuilder{hasFTS: true}
+	fb.apply(FilterOptions{Query: "test", DeepSearch: true})
+
+	// Deep search with FTS5: 9 LIKE patterns + 1 MATCH = 10 args.
+	if len(fb.args) != 10 {
+		t.Errorf("expected 10 args for FTS deep search, got %d", len(fb.args))
+	}
+	where := fb.whereSQL()
+	if !strings.Contains(where, "search_index WHERE content MATCH ?") {
+		t.Errorf("FTS deep search should use the search_index table, got: %s", where)
+	}
+	if !strings.Contains(where, "t2.user_message LIKE") {
+		t.Error("FTS deep search should keep the LIKE clauses for substring matches")
+	}
+	if fb.args[len(fb.args)-1] != `"test"` {
+		t.Errorf("FTS arg should be the escaped phrase, got %v", fb.args[len(fb.args)-1])
+	}
+}
+
+func TestFilterBuilder_QueryDeepSearchFTSBlankQuery(t *testing.T) {
+	fb := filterBuilder{hasFTS: true}
+	fb.apply(FilterOptions{Query: "   ", DeepSearch: true})
+
+	// A whitespace-only query has no FTS terms, so it falls back to LIKE
+	// rather than issuing an empty MATCH.
+	if strings.Contains(fb.whereSQL(), "MATCH") {
+		t.Error("blank query should not produce an FTS MATCH clause")
+	}
+	if len(fb.args) != 10 {
+		t.Errorf("expected 10 args for LIKE fallback, got %d", len(fb.args))
 	}
 }
 
@@ -186,9 +225,9 @@ func TestFilterBuilder_AllFilters(t *testing.T) {
 	if where == "" {
 		t.Error("whereSQL should be non-empty for all filters")
 	}
-	// 9 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) + 1 (since) + 1 (until) + 1 (excluded) = 15
-	if len(fb.args) != 15 {
-		t.Errorf("expected 15 args for all filters, got %d", len(fb.args))
+	// 10 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) + 1 (since) + 1 (until) + 1 (excluded) = 16
+	if len(fb.args) != 16 {
+		t.Errorf("expected 16 args for all filters, got %d", len(fb.args))
 	}
 }
 

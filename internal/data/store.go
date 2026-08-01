@@ -309,6 +309,11 @@ type filterBuilder struct {
 	joins  []string
 	wheres []string
 	args   []any
+
+	// hasFTS reports whether the FTS5 search_index table is available. When
+	// true, deep search resolves turn and checkpoint text through the index
+	// instead of scanning those tables with LIKE.
+	hasFTS bool
 }
 
 func (fb *filterBuilder) apply(f FilterOptions) {
@@ -325,13 +330,32 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 		pattern := "%" + escapeLIKE(f.Query) + "%"
 		if f.DeepSearch {
 			// Deep mode: search session fields + related tables.
-			fb.wheres = append(fb.wheres,
-				`(s.summary LIKE ? ESCAPE '\' OR s.branch LIKE ? ESCAPE '\' OR s.repository LIKE ? ESCAPE '\' OR s.cwd LIKE ? ESCAPE '\'`+
-					` OR EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = s.id AND t2.user_message LIKE ? ESCAPE '\')`+
-					` OR EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s.id AND (cp.title LIKE ? ESCAPE '\' OR cp.overview LIKE ? ESCAPE '\'))`+
-					` OR EXISTS (SELECT 1 FROM session_files sf2 WHERE sf2.session_id = s.id AND sf2.file_path LIKE ? ESCAPE '\')`+
-					` OR EXISTS (SELECT 1 FROM session_refs sr2 WHERE sr2.session_id = s.id AND sr2.ref_value LIKE ? ESCAPE '\'))`)
+			clauses := []string{
+				`s.summary LIKE ? ESCAPE '\'`,
+				`s.branch LIKE ? ESCAPE '\'`,
+				`s.repository LIKE ? ESCAPE '\'`,
+				`s.cwd LIKE ? ESCAPE '\'`,
+				`EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = s.id AND t2.user_message LIKE ? ESCAPE '\')`,
+				`EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s.id AND (cp.title LIKE ? ESCAPE '\' OR cp.overview LIKE ? ESCAPE '\'))`,
+				`EXISTS (SELECT 1 FROM session_files sf2 WHERE sf2.session_id = s.id AND sf2.file_path LIKE ? ESCAPE '\')`,
+				`EXISTS (SELECT 1 FROM session_refs sr2 WHERE sr2.session_id = s.id AND sr2.ref_value LIKE ? ESCAPE '\')`,
+			}
 			fb.args = append(fb.args, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
+
+			// The FTS5 index covers assistant replies and every checkpoint text
+			// field, none of which the LIKE clauses above reach. It is additive
+			// rather than a replacement: LIKE still catches substrings inside a
+			// token (bug "1137" within "PR1137") that the tokenizer splits away.
+			if ftsTerms := escapeFTS5Terms(f.Query); fb.hasFTS && ftsTerms != "" {
+				clauses = append(clauses, `s.id IN (SELECT session_id FROM search_index WHERE content MATCH ?)`)
+				fb.args = append(fb.args, ftsTerms)
+			} else {
+				// Without the index, assistant replies are only reachable by scan.
+				clauses = append(clauses,
+					`EXISTS (SELECT 1 FROM turns t4 WHERE t4.session_id = s.id AND t4.assistant_response LIKE ? ESCAPE '\')`)
+				fb.args = append(fb.args, pattern)
+			}
+			fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " OR ")+")")
 		} else {
 			// Quick mode: search only session-level fields (no JOINs).
 			fb.wheres = append(fb.wheres,
@@ -524,6 +548,7 @@ func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
 // specified. TurnCount and FileCount are computed via subqueries.
 func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
 	var fb filterBuilder
+	fb.hasFTS = s.hasFTS5
 	fb.apply(s.withAutoExclusions(filter))
 
 	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + fb.joinSQL() + fb.whereSQL()
@@ -928,9 +953,19 @@ func mergeSearchResults(primary, secondary []SearchResult, limit int) []SearchRe
 // FTS5 special characters (-, *, OR, AND, NOT, NEAR, etc.) are treated as
 // literals. Returns the escaped query suitable for MATCH.
 func escapeFTS5(query string) string {
+	if terms := escapeFTS5Terms(query); terms != "" {
+		return terms
+	}
+	return `""`
+}
+
+// escapeFTS5Terms is escapeFTS5 without the empty-query placeholder: it
+// returns "" when the query has no terms, letting callers skip the MATCH
+// clause entirely rather than issuing an empty phrase query.
+func escapeFTS5Terms(query string) string {
 	terms := strings.Fields(query)
 	if len(terms) == 0 {
-		return `""`
+		return ""
 	}
 	quoted := make([]string, len(terms))
 	for i, t := range terms {
@@ -1110,6 +1145,7 @@ func (s *Store) ResolveIDPrefix(ctx context.Context, prefix string) (string, err
 // given filter and sort order within each group.
 func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
 	var fb filterBuilder
+	fb.hasFTS = s.hasFTS5
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
