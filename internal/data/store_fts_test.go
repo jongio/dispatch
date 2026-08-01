@@ -636,3 +636,123 @@ func BenchmarkSearchSessionsLIKEvsNTS(b *testing.B) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Deep list filtering via FTS5
+// ---------------------------------------------------------------------------
+
+// TestListSessionsDeepSearchFTSMatchesAssistantResponse covers the case where a
+// term (a bug number, for example) appears only in the assistant half of a
+// turn. The LIKE fallback scans user_message only, so the FTS index is what
+// makes these sessions findable from the session list.
+func TestListSessionsDeepSearchFTSMatchesAssistantResponse(t *testing.T) {
+	s := newFTSTestStore(t)
+	db := s.db
+
+	seedSession(t, db, "asst-1", "/home/user/project", "owner/repo", "main",
+		"Investigate crash", "2024-01-10T10:00:00Z", "2024-01-10T12:00:00Z")
+	seedTurn(t, db, "asst-1", 0, "what is going on", "This is tracked in bug 1137.",
+		"2024-01-10T10:00:00Z")
+	seedSearchIndex(t, db, "what is going on\nThis is tracked in bug 1137.", "asst-1", "turn", "0")
+
+	sessions, err := s.ListSessions(context.Background(),
+		FilterOptions{Query: "1137", DeepSearch: true},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].ID != "asst-1" {
+		t.Fatalf("expected [asst-1], got %v", sessionIDs(sessions))
+	}
+}
+
+// TestListSessionsDeepSearchFTSMatchesCheckpointBody verifies that checkpoint
+// text beyond title and overview (history, technical details, files) is
+// reachable through the index.
+func TestListSessionsDeepSearchFTSMatchesCheckpointBody(t *testing.T) {
+	s := newFTSTestStore(t)
+	db := s.db
+
+	seedSession(t, db, "cp-1", "/home/user/project", "owner/repo", "main",
+		"Ship release", "2024-01-10T10:00:00Z", "2024-01-10T12:00:00Z")
+	seedTurn(t, db, "cp-1", 0, "ship it", "Shipped.", "2024-01-10T10:00:00Z")
+	seedSearchIndex(t, db, "Reverted the regression from PR 8842", "cp-1", "checkpoint_history", "1")
+
+	sessions, err := s.ListSessions(context.Background(),
+		FilterOptions{Query: "8842", DeepSearch: true},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].ID != "cp-1" {
+		t.Fatalf("expected [cp-1], got %v", sessionIDs(sessions))
+	}
+}
+
+// TestListSessionsDeepSearchFTSNoMatch guards against the index clause
+// matching everything when the term is absent.
+func TestListSessionsDeepSearchFTSNoMatch(t *testing.T) {
+	s := newFTSTestStore(t)
+	populateFTSData(t, s)
+
+	sessions, err := s.ListSessions(context.Background(),
+		FilterOptions{Query: "zzz_nothing_matches_zzz", DeepSearch: true},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 0 {
+		t.Fatalf("expected no matches, got %v", sessionIDs(sessions))
+	}
+}
+
+// TestListSessionsDeepSearchFTSPunctuationQuery ensures a query made only of
+// FTS5 operator characters is treated as a literal and never produces a
+// syntax error that would break the whole session list.
+func TestListSessionsDeepSearchFTSPunctuationQuery(t *testing.T) {
+	s := newFTSTestStore(t)
+	populateFTSData(t, s)
+
+	for _, q := range []string{"-", "*", "^", "NEAR(", `"`, "AND OR NOT"} {
+		if _, err := s.ListSessions(context.Background(),
+			FilterOptions{Query: q, DeepSearch: true},
+			SortOptions{Field: SortByUpdated, Order: Descending}, 50); err != nil {
+			t.Errorf("ListSessions(%q): %v", q, err)
+		}
+	}
+}
+
+// TestGroupSessionsDeepSearchFTS verifies the grouped list path uses the same
+// index-backed predicate as the flat list.
+func TestGroupSessionsDeepSearchFTS(t *testing.T) {
+	s := newFTSTestStore(t)
+	db := s.db
+
+	seedSession(t, db, "grp-1", "/home/user/project", "owner/repo", "main",
+		"Investigate crash", "2024-01-10T10:00:00Z", "2024-01-10T12:00:00Z")
+	seedTurn(t, db, "grp-1", 0, "what is going on", "Tracked in bug 1137.", "2024-01-10T10:00:00Z")
+	seedSearchIndex(t, db, "what is going on\nTracked in bug 1137.", "grp-1", "turn", "0")
+
+	groups, err := s.GroupSessions(context.Background(), PivotByRepo,
+		FilterOptions{Query: "1137", DeepSearch: true},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+	if err != nil {
+		t.Fatalf("GroupSessions: %v", err)
+	}
+	var total int
+	for _, g := range groups {
+		total += len(g.Sessions)
+	}
+	if total != 1 {
+		t.Fatalf("expected 1 grouped session, got %d", total)
+	}
+}
+
+// sessionIDs extracts IDs for readable test failure output.
+func sessionIDs(sessions []Session) []string {
+	ids := make([]string, len(sessions))
+	for i, s := range sessions {
+		ids[i] = s.ID
+	}
+	return ids
+}
