@@ -403,9 +403,8 @@ type Model struct {
 	dbWatchCh chan struct{} // receives pings from the watcher callback
 
 	// Event watcher — push-based fsnotify watcher for session-state changes.
-	eventWatcher   *data.EventWatcher
-	eventWatchCh   chan eventWatcherUpdateMsg // receives push updates from the watcher
-	sessionTracker *data.SessionTracker       // tracks PIDs of dispatch-launched sessions
+	eventWatcher *data.EventWatcher
+	eventWatchCh chan eventWatcherUpdateMsg // receives push updates from the watcher
 }
 
 // NewModel creates the root Model with default configuration.
@@ -540,7 +539,6 @@ func NewModel() Model {
 
 	// Event watcher — push-based attention updates via fsnotify.
 	m.eventWatchCh = make(chan eventWatcherUpdateMsg, 16)
-	m.sessionTracker = data.NewSessionTracker()
 	m.eventWatcher = data.NewEventWatcher(func(id string, status data.AttentionStatus) {
 		select {
 		case m.eventWatchCh <- eventWatcherUpdateMsg{sessionID: id, status: status}:

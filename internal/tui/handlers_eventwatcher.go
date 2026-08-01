@@ -103,15 +103,10 @@ func (m Model) launchNewSessionCmd(cwd string) tea.Cmd {
 }
 
 // focusSessionWindowCmd creates a tea.Cmd that brings the terminal window
-// of a tracked session to the foreground.
-func (m Model) focusSessionWindowCmd(sessionID string) tea.Cmd {
-	tracker := m.sessionTracker
+// owning the given PID to the foreground.
+func focusSessionWindowCmd(pid int) tea.Cmd {
 	return func() tea.Msg {
-		ts, ok := tracker.Lookup(sessionID)
-		if !ok {
-			return focusWindowResultMsg{err: fmt.Errorf("no tracked process for session")}
-		}
-		err := platform.FocusSessionWindow(ts.PID)
+		err := platform.FocusSessionWindow(pid)
 		return focusWindowResultMsg{err: err}
 	}
 }
@@ -155,20 +150,12 @@ func (m Model) handleFocusWindowKey() (Model, tea.Cmd) {
 		return m, clearStatusAfter(3 * time.Second)
 	}
 
-	// Try the session tracker first (dispatch-launched sessions).
-	if m.sessionTracker.HasLive(sessionID) {
-		return m, m.focusSessionWindowCmd(sessionID)
-	}
-
-	// Fallback: try to find the PID from the lock file.
+	// Locate the session's process via its lock file.
 	pid := data.FindSessionPID(sessionID)
 	if pid <= 0 {
 		m.statusInfo = "Cannot locate session window"
 		return m, clearStatusAfter(3 * time.Second)
 	}
 
-	return m, func() tea.Msg {
-		err := platform.FocusSessionWindow(pid)
-		return focusWindowResultMsg{err: err}
-	}
+	return m, focusSessionWindowCmd(pid)
 }
