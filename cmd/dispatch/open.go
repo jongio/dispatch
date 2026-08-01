@@ -212,11 +212,11 @@ func readSessionIDs(r io.Reader) ([]string, error) {
 // omitted because they affect terminal placement, not the copilot invocation.
 func openResumeConfig(cfg *config.Config, sess *data.Session) platform.ResumeConfig {
 	return platform.ResumeConfig{
-		YoloMode:      cfg.YoloMode,
-		Agent:         cfg.Agent,
-		Model:         cfg.Model,
-		CustomCommand: cfg.CustomCommand,
-		Cwd:           sess.Cwd,
+		YoloMode:             cfg.YoloMode,
+		Agent:                cfg.Agent,
+		Model:                cfg.Model,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
+		Cwd:                  sess.Cwd,
 	}
 }
 
@@ -471,14 +471,14 @@ func defaultOpenLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode
 		return errors.New("no shell detected on this system")
 	}
 	rc := platform.ResumeConfig{
-		YoloMode:      cfg.YoloMode,
-		Agent:         cfg.Agent,
-		Model:         cfg.Model,
-		Terminal:      cfg.DefaultTerminal,
-		CustomCommand: cfg.CustomCommand,
-		Cwd:           sess.Cwd,
-		LaunchStyle:   launchStyleForOpenMode(mode),
-		PaneDirection: cfg.EffectivePaneDirection(),
+		YoloMode:             cfg.YoloMode,
+		Agent:                cfg.Agent,
+		Model:                cfg.Model,
+		Terminal:             cfg.DefaultTerminal,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
+		Cwd:                  sess.Cwd,
+		LaunchStyle:          launchStyleForOpenMode(mode),
+		PaneDirection:        cfg.EffectivePaneDirection(),
 	}
 	if err := platform.LaunchSession(shell, sess.ID, rc); err != nil {
 		return err

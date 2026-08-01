@@ -53,8 +53,8 @@ func TestDefaultValues(t *testing.T) {
 	if cfg.LaunchInPlace {
 		t.Error("LaunchInPlace should default to false")
 	}
-	if cfg.CustomCommand != "" {
-		t.Errorf("CustomCommand = %q, want empty", cfg.CustomCommand)
+	if cfg.ResumeSessionCommand != "" {
+		t.Errorf("ResumeSessionCommand = %q, want empty", cfg.ResumeSessionCommand)
 	}
 	if len(cfg.ExcludedDirs) != 0 {
 		t.Errorf("ExcludedDirs = %v, want empty", cfg.ExcludedDirs)
@@ -77,22 +77,22 @@ func TestDefaultValues(t *testing.T) {
 func TestConfigJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 	original := &Config{
-		DefaultShell:     "zsh",
-		DefaultTerminal:  "alacritty",
-		DefaultTimeRange: "7d",
-		DefaultSort:      "created",
-		DefaultSortOrder: "asc",
-		DefaultPivot:     "repo",
-		ShowPreview:      false,
-		MaxSessions:      50,
-		YoloMode:         true,
-		Agent:            "coder",
-		Model:            "gpt-4",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/tmp", "/var"},
-		CustomCommand:    "ghcs --resume {sessionId} --custom",
-		HiddenSessions:   []string{"sess-1", "sess-2"},
-		PreviewPosition:  "bottom",
+		DefaultShell:         "zsh",
+		DefaultTerminal:      "alacritty",
+		DefaultTimeRange:     "7d",
+		DefaultSort:          "created",
+		DefaultSortOrder:     "asc",
+		DefaultPivot:         "repo",
+		ShowPreview:          false,
+		MaxSessions:          50,
+		YoloMode:             true,
+		Agent:                "coder",
+		Model:                "gpt-4",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/tmp", "/var"},
+		ResumeSessionCommand: "ghcs --resume {sessionId} --custom",
+		HiddenSessions:       []string{"sess-1", "sess-2"},
+		PreviewPosition:      "bottom",
 	}
 
 	data, err := json.Marshal(original)
@@ -141,8 +141,8 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	if restored.LaunchInPlace != original.LaunchInPlace {
 		t.Errorf("LaunchInPlace = %v, want %v", restored.LaunchInPlace, original.LaunchInPlace)
 	}
-	if restored.CustomCommand != original.CustomCommand {
-		t.Errorf("CustomCommand = %q, want %q", restored.CustomCommand, original.CustomCommand)
+	if restored.ResumeSessionCommand != original.ResumeSessionCommand {
+		t.Errorf("ResumeSessionCommand = %q, want %q", restored.ResumeSessionCommand, original.ResumeSessionCommand)
 	}
 	if len(restored.ExcludedDirs) != len(original.ExcludedDirs) {
 		t.Fatalf("ExcludedDirs len = %d, want %d", len(restored.ExcludedDirs), len(original.ExcludedDirs))
@@ -303,20 +303,20 @@ func TestSaveAndLoad(t *testing.T) {
 	withTempConfigDir(t)
 
 	original := &Config{
-		DefaultShell:     "bash",
-		DefaultTerminal:  "alacritty",
-		DefaultTimeRange: "30d",
-		DefaultSort:      "turns",
-		DefaultPivot:     "repo",
-		ShowPreview:      false,
-		MaxSessions:      200,
-		YoloMode:         true,
-		Agent:            "reviewer",
-		Model:            "claude-3",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/opt/scratch"},
-		CustomCommand:    "my-cli --resume {sessionId}",
-		HiddenSessions:   []string{"hidden-1"},
+		DefaultShell:         "bash",
+		DefaultTerminal:      "alacritty",
+		DefaultTimeRange:     "30d",
+		DefaultSort:          "turns",
+		DefaultPivot:         "repo",
+		ShowPreview:          false,
+		MaxSessions:          200,
+		YoloMode:             true,
+		Agent:                "reviewer",
+		Model:                "claude-3",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/opt/scratch"},
+		ResumeSessionCommand: "my-cli --resume {sessionId}",
+		HiddenSessions:       []string{"hidden-1"},
 	}
 
 	if err := Save(original); err != nil {
@@ -352,8 +352,8 @@ func TestSaveAndLoad(t *testing.T) {
 	if loaded.LaunchInPlace != original.LaunchInPlace {
 		t.Errorf("LaunchInPlace = %v, want %v", loaded.LaunchInPlace, original.LaunchInPlace)
 	}
-	if loaded.CustomCommand != original.CustomCommand {
-		t.Errorf("CustomCommand = %q, want %q", loaded.CustomCommand, original.CustomCommand)
+	if loaded.ResumeSessionCommand != original.ResumeSessionCommand {
+		t.Errorf("ResumeSessionCommand = %q, want %q", loaded.ResumeSessionCommand, original.ResumeSessionCommand)
 	}
 }
 
@@ -535,20 +535,20 @@ func TestSaveAndLoadPreservesAllFields(t *testing.T) {
 	withTempConfigDir(t)
 
 	cfg := &Config{
-		DefaultShell:     "fish",
-		DefaultTerminal:  "wezterm",
-		DefaultTimeRange: "all",
-		DefaultSort:      "name",
-		DefaultPivot:     "date",
-		ShowPreview:      false,
-		MaxSessions:      500,
-		YoloMode:         true,
-		Agent:            "developer",
-		Model:            "o1-preview",
-		LaunchInPlace:    true,
-		ExcludedDirs:     []string{"/a", "/b", "/c"},
-		CustomCommand:    "custom-cli {sessionId} --flag",
-		HiddenSessions:   []string{"h1", "h2", "h3"},
+		DefaultShell:         "fish",
+		DefaultTerminal:      "wezterm",
+		DefaultTimeRange:     "all",
+		DefaultSort:          "name",
+		DefaultPivot:         "date",
+		ShowPreview:          false,
+		MaxSessions:          500,
+		YoloMode:             true,
+		Agent:                "developer",
+		Model:                "o1-preview",
+		LaunchInPlace:        true,
+		ExcludedDirs:         []string{"/a", "/b", "/c"},
+		ResumeSessionCommand: "custom-cli {sessionId} --flag",
+		HiddenSessions:       []string{"h1", "h2", "h3"},
 	}
 
 	if err := Save(cfg); err != nil {
@@ -594,8 +594,8 @@ func TestSaveAndLoadPreservesAllFields(t *testing.T) {
 	if loaded.LaunchInPlace != cfg.LaunchInPlace {
 		t.Errorf("LaunchInPlace = %v, want %v", loaded.LaunchInPlace, cfg.LaunchInPlace)
 	}
-	if loaded.CustomCommand != cfg.CustomCommand {
-		t.Errorf("CustomCommand = %q, want %q", loaded.CustomCommand, cfg.CustomCommand)
+	if loaded.ResumeSessionCommand != cfg.ResumeSessionCommand {
+		t.Errorf("ResumeSessionCommand = %q, want %q", loaded.ResumeSessionCommand, cfg.ResumeSessionCommand)
 	}
 	if len(loaded.ExcludedDirs) != len(cfg.ExcludedDirs) {
 		t.Fatalf("ExcludedDirs len = %d, want %d", len(loaded.ExcludedDirs), len(cfg.ExcludedDirs))
@@ -830,8 +830,8 @@ func TestDefaultFieldTypes(t *testing.T) {
 	if cfg.Model != "" {
 		t.Errorf("Model = %q, want empty", cfg.Model)
 	}
-	if cfg.CustomCommand != "" {
-		t.Errorf("CustomCommand = %q, want empty", cfg.CustomCommand)
+	if cfg.ResumeSessionCommand != "" {
+		t.Errorf("ResumeSessionCommand = %q, want empty", cfg.ResumeSessionCommand)
 	}
 	if len(cfg.ExcludedDirs) != 0 {
 		t.Errorf("ExcludedDirs should be nil or empty, got %v", cfg.ExcludedDirs)

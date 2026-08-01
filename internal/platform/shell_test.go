@@ -367,10 +367,10 @@ func TestBuildCustomCmd(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// validateCustomCommand
+// validateResumeCommand
 // ---------------------------------------------------------------------------
 
-func TestValidateCustomCommand(t *testing.T) {
+func TestValidateResumeCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		cmd     string
@@ -389,9 +389,9 @@ func TestValidateCustomCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateCustomCommand(tt.cmd)
+			err := validateResumeCommand(tt.cmd)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateCustomCommand(%q) error = %v, wantErr %v", tt.cmd, err, tt.wantErr)
+				t.Errorf("validateResumeCommand(%q) error = %v, wantErr %v", tt.cmd, err, tt.wantErr)
 			}
 		})
 	}
@@ -404,22 +404,22 @@ func TestBuildCustomCmd_RejectsNewlines(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_RejectsNewlinesInCustomCommand(t *testing.T) {
+func TestBuildResumeCommandString_RejectsNewlinesInResumeSessionCommand(t *testing.T) {
 	_, err := buildResumeCommandString("valid-session", ResumeConfig{
-		CustomCommand: "my-cli\n--evil-flag",
+		ResumeSessionCommand: "my-cli\n--evil-flag",
 	})
 	if err == nil {
-		t.Fatal("buildResumeCommandString should reject custom commands with embedded newlines")
+		t.Fatal("buildResumeCommandString should reject resume session commands with embedded newlines")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// buildResumeCommandString — custom command path
+// buildResumeCommandString — resume session command path
 // ---------------------------------------------------------------------------
 
-func TestBuildResumeCommandString_CustomCommand(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommand(t *testing.T) {
 	cmd, err := buildResumeCommandString("test-session", ResumeConfig{
-		CustomCommand: "my-cli --resume {sessionId} --flag",
+		ResumeSessionCommand: "my-cli --resume {sessionId} --flag",
 	})
 	if err != nil {
 		t.Fatalf("buildResumeCommandString: %v", err)
@@ -429,18 +429,18 @@ func TestBuildResumeCommandString_CustomCommand(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_CustomCommandEmpty(t *testing.T) {
+func TestBuildResumeCommandString_ResumeSessionCommandEmpty(t *testing.T) {
 	_, err := buildResumeCommandString("test-session", ResumeConfig{
-		CustomCommand: "   ",
+		ResumeSessionCommand: "   ",
 	})
 	if err == nil {
-		t.Fatal("should error on empty custom command")
+		t.Fatal("should error on empty resume session command")
 	}
 }
 
 func TestBuildResumeCommandString_InvalidSessionID(t *testing.T) {
 	_, err := buildResumeCommandString("; rm -rf /", ResumeConfig{
-		CustomCommand: "my-cli {sessionId}",
+		ResumeSessionCommand: "my-cli {sessionId}",
 	})
 	if err == nil {
 		t.Fatal("should reject invalid session ID")
@@ -448,12 +448,12 @@ func TestBuildResumeCommandString_InvalidSessionID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// NewResumeCmd — custom command path
+// NewResumeCmd — resume session command path
 // ---------------------------------------------------------------------------
 
-func TestNewResumeCmd_CustomCommand(t *testing.T) {
+func TestNewResumeCmd_ResumeSessionCommand(t *testing.T) {
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
+		ResumeSessionCommand: "echo {sessionId}",
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)
@@ -479,12 +479,12 @@ func TestNewResumeCmd_EmptySessionIDStartsNewSession(t *testing.T) {
 	}
 }
 
-func TestNewResumeCmd_CustomCommandEmptyTemplate(t *testing.T) {
+func TestNewResumeCmd_ResumeSessionCommandEmptyTemplate(t *testing.T) {
 	_, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "   ",
+		ResumeSessionCommand: "   ",
 	})
 	if err == nil {
-		t.Fatal("should error on whitespace-only custom command")
+		t.Fatal("should error on whitespace-only resume session command")
 	}
 }
 
@@ -531,8 +531,8 @@ func TestResolvedCwd_FileNotDir(t *testing.T) {
 func TestNewResumeCmd_SetsDirFromCwd(t *testing.T) {
 	dir := t.TempDir()
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
-		Cwd:           dir,
+		ResumeSessionCommand: "echo {sessionId}",
+		Cwd:                  dir,
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)
@@ -544,8 +544,8 @@ func TestNewResumeCmd_SetsDirFromCwd(t *testing.T) {
 
 func TestNewResumeCmd_IgnoresInvalidCwd(t *testing.T) {
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
-		Cwd:           "/no/such/path/here",
+		ResumeSessionCommand: "echo {sessionId}",
+		Cwd:                  "/no/such/path/here",
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)

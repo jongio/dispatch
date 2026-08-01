@@ -153,21 +153,21 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 
 	case "settings":
 		m.configPanel.SetValues(components.ConfigValues{
-			YoloMode:          m.cfg.YoloMode,
-			Agent:             m.cfg.Agent,
-			Model:             m.cfg.Model,
-			LaunchMode:        m.cfg.EffectiveLaunchMode(),
-			PaneDirection:     m.cfg.EffectivePaneDirection(),
-			Terminal:          m.cfg.DefaultTerminal,
-			Shell:             m.cfg.DefaultShell,
-			CustomCommand:     m.cfg.CustomCommand,
-			Theme:             m.cfg.Theme,
-			WorkspaceRecovery: m.cfg.WorkspaceRecovery,
-			PreviewPosition:   m.cfg.EffectivePreviewPosition(),
-			RedactSecrets:     m.cfg.RedactPreviewSecrets,
-			ExcludedWords:     joinExcludedWords(m.cfg.ExcludedWords),
-			AutoRefresh:       autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
-			NotifyOnWaiting:   m.cfg.NotifyOnWaiting,
+			YoloMode:             m.cfg.YoloMode,
+			Agent:                m.cfg.Agent,
+			Model:                m.cfg.Model,
+			LaunchMode:           m.cfg.EffectiveLaunchMode(),
+			PaneDirection:        m.cfg.EffectivePaneDirection(),
+			Terminal:             m.cfg.DefaultTerminal,
+			Shell:                m.cfg.DefaultShell,
+			ResumeSessionCommand: m.cfg.ResumeSessionCommand,
+			Theme:                m.cfg.Theme,
+			WorkspaceRecovery:    m.cfg.WorkspaceRecovery,
+			PreviewPosition:      m.cfg.EffectivePreviewPosition(),
+			RedactSecrets:        m.cfg.RedactPreviewSecrets,
+			ExcludedWords:        joinExcludedWords(m.cfg.ExcludedWords),
+			AutoRefresh:          autoRefreshFieldValue(m.cfg.AutoRefreshSeconds),
+			NotifyOnWaiting:      m.cfg.NotifyOnWaiting,
 		})
 		m.state = stateConfigPanel
 		return m, nil

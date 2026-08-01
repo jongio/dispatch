@@ -57,6 +57,7 @@ func SetTheme(t *Theme) {
 	DimmedStyle = t.DimmedStyle
 	HiddenStyle = t.HiddenStyle
 	FavoritedStyle = t.FavoritedStyle
+	WaitingRowStyle = t.WaitingRowStyle
 	GroupHeaderStyle = t.GroupHeaderStyle
 
 	BadgeStyle = t.BadgeStyle
@@ -162,6 +163,9 @@ var (
 
 	// FavoritedStyle renders sessions the user has starred as favorites.
 	FavoritedStyle lipgloss.Style
+
+	// WaitingRowStyle renders sessions that are waiting for user input.
+	WaitingRowStyle lipgloss.Style
 
 	// GroupHeaderStyle renders collapsible folder/group headers in tree view.
 	GroupHeaderStyle lipgloss.Style
@@ -326,6 +330,7 @@ func applyLegacyDefaults(isDark bool) {
 	DimmedStyle = lipgloss.NewStyle().Foreground(dimmed)
 	HiddenStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	FavoritedStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
+	WaitingRowStyle = lipgloss.NewStyle().Foreground(lp).Bold(true).Background(ls)
 	GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
 
 	BadgeStyle = lipgloss.NewStyle().Foreground(lbdg).Background(lbbg).Padding(0, 1)
@@ -373,7 +378,7 @@ func applyLegacyDefaults(isDark bool) {
 	ChatAssistantLabelStyle = lipgloss.NewStyle().Foreground(dimmed).Bold(true)
 
 	// Attention dot styles — legacy adaptive defaults.
-	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
+	AttentionWaitingStyle = lipgloss.NewStyle().Foreground(lp).Bold(true).Blink(true)
 	AttentionActiveStyle = lipgloss.NewStyle().Foreground(lk)
 	AttentionStaleStyle = lipgloss.NewStyle().Foreground(lightDark(c("#C19C00"), c("#C19C00")))
 	AttentionIdleStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)

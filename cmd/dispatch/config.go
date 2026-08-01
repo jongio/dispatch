@@ -74,7 +74,7 @@ func configFields() []configField {
 			config.LaunchModeInPlace, config.LaunchModeTab, config.LaunchModeWindow, config.LaunchModePane),
 		enumField("pane_direction", func(c *config.Config) *string { return &c.PaneDirection },
 			config.PaneDirectionAuto, config.PaneDirectionRight, config.PaneDirectionDown, config.PaneDirectionLeft, config.PaneDirectionUp),
-		strField("custom_command", func(c *config.Config) *string { return &c.CustomCommand }),
+		strField("resume_session_command", func(c *config.Config) *string { return &c.ResumeSessionCommand }),
 		boolField("ai_search", func(c *config.Config) *bool { return &c.AISearch }),
 		durationField("attention_threshold", func(c *config.Config) *string { return &c.AttentionThreshold }),
 		strField("theme", func(c *config.Config) *string { return &c.Theme }),

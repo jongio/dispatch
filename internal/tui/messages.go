@@ -172,6 +172,30 @@ type exportDoneMsg struct {
 }
 
 // ---------------------------------------------------------------------------
+// Event watcher messages (push-based attention updates)
+// ---------------------------------------------------------------------------
+
+// eventWatcherUpdateMsg is pushed by the fsnotify-based EventWatcher when a
+// single session's attention status changes. This enables near-instant UI
+// updates without waiting for the 30-second polling interval.
+type eventWatcherUpdateMsg struct {
+	sessionID string
+	status    data.AttentionStatus
+}
+
+// newSessionLaunchedMsg reports that a new session launch command completed.
+type newSessionLaunchedMsg struct {
+	cwd string
+	err error
+}
+
+// focusWindowResultMsg reports the result of attempting to focus a session's
+// terminal window.
+type focusWindowResultMsg struct {
+	err error
+}
+
+// ---------------------------------------------------------------------------
 // Git workspace state messages
 // ---------------------------------------------------------------------------
 

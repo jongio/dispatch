@@ -81,10 +81,10 @@ func TestCovValidateSessionID_TableDriven(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// validateCustomCommand — table driven
+// validateResumeCommand — table driven
 // ---------------------------------------------------------------------------
 
-func TestCovValidateCustomCommand_TableDriven(t *testing.T) {
+func TestCovValidateResumeCommand_TableDriven(t *testing.T) {
 	valid := []string{
 		"echo hello",
 		"my-cli --resume {sessionId}",
@@ -92,15 +92,15 @@ func TestCovValidateCustomCommand_TableDriven(t *testing.T) {
 		strings.Repeat("a", 1000),
 	}
 	for _, cmd := range valid {
-		if err := validateCustomCommand(cmd); err != nil {
-			t.Errorf("validateCustomCommand(%q) unexpected error: %v", cmd, err)
+		if err := validateResumeCommand(cmd); err != nil {
+			t.Errorf("validateResumeCommand(%q) unexpected error: %v", cmd, err)
 		}
 	}
 
 	invalid := []string{"", "   ", "\t", "cmd\nflag", "cmd\rflag", "cmd\r\nflag"}
 	for _, cmd := range invalid {
-		if err := validateCustomCommand(cmd); err == nil {
-			t.Errorf("validateCustomCommand(%q) should error", cmd)
+		if err := validateResumeCommand(cmd); err == nil {
+			t.Errorf("validateResumeCommand(%q) should error", cmd)
 		}
 	}
 }
@@ -144,11 +144,11 @@ func TestCovBuildCustomCmd_NoPlaceholder(t *testing.T) {
 // buildResumeCommandString — additional branches
 // ---------------------------------------------------------------------------
 
-func TestCovBuildResumeCommandString_CustomCommandEmptyAfterExpand(t *testing.T) {
+func TestCovBuildResumeCommandString_ResumeSessionCommandEmptyAfterExpand(t *testing.T) {
 	// Template "{sessionId}" with empty sessionID: passes validation,
 	// but expanded is empty → error
 	_, err := buildResumeCommandString("", ResumeConfig{
-		CustomCommand: "  {sessionId}  ",
+		ResumeSessionCommand: "  {sessionId}  ",
 	})
 	if err == nil {
 		t.Error("expected error for command empty after expansion")
@@ -156,7 +156,7 @@ func TestCovBuildResumeCommandString_CustomCommandEmptyAfterExpand(t *testing.T)
 }
 
 func TestCovBuildResumeCommandString_NoCLIBinary(t *testing.T) {
-	// Without custom command, depends on CLI binary presence
+	// Without resume session command, depends on CLI binary presence
 	_, err := buildResumeCommandString("test-session", ResumeConfig{})
 	// May succeed or fail depending on PATH
 	t.Logf("buildResumeCommandString (no custom cmd): err=%v", err)
@@ -472,7 +472,7 @@ func TestCovNewResumeCmd_InvalidSessionID(t *testing.T) {
 }
 
 func TestCovNewResumeCmd_EmptySessionCustomCmd(t *testing.T) {
-	cmd, err := NewResumeCmd("", ResumeConfig{CustomCommand: "echo hello"})
+	cmd, err := NewResumeCmd("", ResumeConfig{ResumeSessionCommand: "echo hello"})
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -484,8 +484,8 @@ func TestCovNewResumeCmd_EmptySessionCustomCmd(t *testing.T) {
 func TestCovNewResumeCmd_CustomCmdWithCwd(t *testing.T) {
 	dir := t.TempDir()
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
-		Cwd:           dir,
+		ResumeSessionCommand: "echo {sessionId}",
+		Cwd:                  dir,
 	})
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -497,8 +497,8 @@ func TestCovNewResumeCmd_CustomCmdWithCwd(t *testing.T) {
 
 func TestCovNewResumeCmd_CustomCmdInvalidCwd(t *testing.T) {
 	cmd, err := NewResumeCmd("valid-session", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
-		Cwd:           "C:\\nonexistent\\path",
+		ResumeSessionCommand: "echo {sessionId}",
+		Cwd:                  "C:\\nonexistent\\path",
 	})
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -799,19 +799,19 @@ func TestCovDetectWindowsTerminals(t *testing.T) {
 
 func TestCovLaunchSession_InvalidSessionID(t *testing.T) {
 	err := LaunchSession(ShellInfo{}, "; evil", ResumeConfig{
-		CustomCommand: "echo {sessionId}",
+		ResumeSessionCommand: "echo {sessionId}",
 	})
 	if err == nil {
 		t.Error("expected error for invalid session ID")
 	}
 }
 
-func TestCovLaunchSession_EmptyCustomCommand(t *testing.T) {
+func TestCovLaunchSession_EmptyResumeSessionCommand(t *testing.T) {
 	err := LaunchSession(ShellInfo{}, "valid-session", ResumeConfig{
-		CustomCommand: "   ",
+		ResumeSessionCommand: "   ",
 	})
 	if err == nil {
-		t.Error("expected error for empty custom command")
+		t.Error("expected error for empty resume session command")
 	}
 }
 
@@ -853,19 +853,19 @@ func TestCovDefaultWindowsShell_WindowsPowerShell(t *testing.T) {
 
 func TestCovLaunchSession_SetupWithTerminalDefault(t *testing.T) {
 	// Call with Terminal="" to trigger DefaultTerminal() assignment,
-	// but use a custom command that fails validation to avoid opening windows.
+	// but use a resume session command that fails validation to avoid opening windows.
 	err := LaunchSession(ShellInfo{}, "valid-session", ResumeConfig{
-		CustomCommand: "cmd\n--evil",
+		ResumeSessionCommand: "cmd\n--evil",
 	})
 	if err == nil {
-		t.Error("expected error for newline in custom command")
+		t.Error("expected error for newline in resume session command")
 	}
 }
 
 func TestCovLaunchSession_SetupWithShellDefault(t *testing.T) {
 	// Shell.Path="" triggers DefaultShell(), Terminal="" triggers DefaultTerminal()
 	err := LaunchSession(ShellInfo{}, "", ResumeConfig{
-		CustomCommand: "   {sessionId}   ",
+		ResumeSessionCommand: "   {sessionId}   ",
 	})
 	if err == nil {
 		t.Error("expected error for empty command after expansion")
@@ -951,7 +951,7 @@ func TestCovDefaultTerminal_WindowsTerminal(t *testing.T) {
 
 // ===========================================================================
 // LaunchSession — cover the resolvedCwd + switch "windows" path
-// Uses cmd.exe as the shell with a harmless "exit 0" custom command
+// Uses cmd.exe as the shell with a harmless "exit 0" resume session command
 // so the spawned window closes immediately without error dialogs.
 // ===========================================================================
 
