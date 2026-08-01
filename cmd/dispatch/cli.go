@@ -43,6 +43,7 @@ var (
 	// seams so tests can substitute them without touching the environment.
 	doctorCopilotVersionFn = defaultCopilotVersion
 	doctorSessionCountFn   = defaultSessionCount
+	doctorWorkspacesFn     = defaultDoctorWorkspaces
 )
 
 type versionOutput struct {
@@ -588,15 +589,25 @@ type doctorEntry struct {
 // Both the text and JSON renderers consume this struct so their outputs stay
 // in sync.
 type doctorReport struct {
-	Version        string      `json:"version"`
-	OS             string      `json:"os"`
-	OK             bool        `json:"ok"`
-	Config         doctorEntry `json:"config"`
-	SessionStore   doctorEntry `json:"session_store"`
-	SessionState   doctorEntry `json:"session_state"`
-	CopilotCLI     doctorEntry `json:"copilot_cli"`
-	CopilotVersion string      `json:"copilot_version"`
-	SessionCount   int         `json:"session_count"`
+	Version        string          `json:"version"`
+	OS             string          `json:"os"`
+	OK             bool            `json:"ok"`
+	Config         doctorEntry     `json:"config"`
+	SessionStore   doctorEntry     `json:"session_store"`
+	SessionState   doctorEntry     `json:"session_state"`
+	CopilotCLI     doctorEntry     `json:"copilot_cli"`
+	CopilotVersion string          `json:"copilot_version"`
+	SessionCount   int             `json:"session_count"`
+	Workspaces     workspaceReport `json:"workspaces"`
+}
+
+// workspaceReport summarizes whether stored session working directories still
+// exist on disk.
+type workspaceReport struct {
+	Total   int      `json:"total"`
+	Missing int      `json:"missing"`
+	Samples []string `json:"samples,omitempty"`
+	Error   string   `json:"error,omitempty"`
 }
 
 // collectDoctorReport gathers the environment diagnostics once so they can be
@@ -633,6 +644,7 @@ func collectDoctorReport() doctorReport {
 	}
 
 	r.SessionCount = doctorSessionCountFn()
+	r.Workspaces = doctorWorkspacesFn()
 	r.OK = doctorEntryOK(r.Config) &&
 		doctorEntryOK(r.SessionStore) &&
 		doctorEntryOK(r.SessionState) &&
@@ -712,6 +724,35 @@ func defaultSessionCount() int {
 	return n
 }
 
+func defaultDoctorWorkspaces() workspaceReport {
+	store, err := data.Open()
+	if err != nil {
+		return workspaceReport{Error: err.Error()}
+	}
+	defer store.Close() //nolint:errcheck // read-only, best-effort close
+
+	folders, err := store.ListFolders(context.Background())
+	if err != nil {
+		return workspaceReport{Error: err.Error()}
+	}
+
+	r := workspaceReport{Total: len(folders)}
+	for _, folder := range folders {
+		if strings.TrimSpace(folder) == "" {
+			continue
+		}
+		if _, err := os.Stat(folder); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				r.Missing++
+				if len(r.Samples) < 5 {
+					r.Samples = append(r.Samples, folder)
+				}
+			}
+		}
+	}
+	return r
+}
+
 // pathStatus stats a path and reports whether it is found, missing, or the
 // wrong type (a file where a directory is expected, or vice versa).
 func pathStatus(path string, wantDir bool) string {
@@ -748,6 +789,7 @@ func runDoctor(w io.Writer) doctorReport {
 		fmt.Fprintf(w, "Copilot CLI version: not detected\n")
 	}
 	fmt.Fprintf(w, "Stored sessions: %d\n", r.SessionCount)
+	writeWorkspaceLine(w, r.Workspaces)
 	fmt.Fprintf(w, "OK: %t\n", r.OK)
 	return r
 }
@@ -788,6 +830,17 @@ func writeDoctorLine(w io.Writer, label string, e doctorEntry, wantDir bool) {
 		}
 	default:
 		fmt.Fprintf(w, "%s: found (%s)\n", label, e.Path)
+	}
+}
+
+func writeWorkspaceLine(w io.Writer, r workspaceReport) {
+	if r.Error != "" {
+		fmt.Fprintf(w, "Missing workspaces: unknown (%s)\n", r.Error)
+		return
+	}
+	fmt.Fprintf(w, "Missing workspaces: %d of %d folders\n", r.Missing, r.Total)
+	for _, sample := range r.Samples {
+		fmt.Fprintf(w, "  - %s\n", sample)
 	}
 }
 
