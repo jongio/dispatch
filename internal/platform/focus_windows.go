@@ -64,7 +64,7 @@ func FocusSessionWindow(pid int) error {
 	// Restore if minimized, then bring to foreground.
 	visible, _, _ := procIsWindowVisible.Call(hwnd)
 	if visible == 0 {
-		procShowWindow.Call(hwnd, uintptr(swRestore))
+		_, _, _ = procShowWindow.Call(hwnd, uintptr(swRestore))
 	}
 	ret, _, _ := procSetForegroundWindow.Call(hwnd)
 	if ret == 0 {
@@ -80,7 +80,7 @@ func buildAncestorSet(targetPID uint32) map[uint32]struct{} {
 	if snapshot == uintptr(windows.InvalidHandle) {
 		return nil
 	}
-	defer windows.CloseHandle(windows.Handle(snapshot))
+	defer func() { _ = windows.CloseHandle(windows.Handle(snapshot)) }()
 
 	// Build a child->parent map.
 	parentMap := make(map[uint32]uint32)
@@ -123,7 +123,7 @@ func findWindowForPIDs(pids map[uint32]struct{}) uintptr {
 	// The callback receives each top-level window handle.
 	cb := windows.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
 		var winPID uint32
-		procGetWindowThreadPID.Call(hwnd, uintptr(unsafe.Pointer(&winPID)))
+		_, _, _ = procGetWindowThreadPID.Call(hwnd, uintptr(unsafe.Pointer(&winPID)))
 		if _, ok := pids[winPID]; ok {
 			visible, _, _ := procIsWindowVisible.Call(hwnd)
 			if visible != 0 {
@@ -134,6 +134,6 @@ func findWindowForPIDs(pids map[uint32]struct{}) uintptr {
 		return 1 // continue
 	})
 
-	procEnumWindows.Call(cb, 0)
+	_, _, _ = procEnumWindows.Call(cb, 0)
 	return found
 }

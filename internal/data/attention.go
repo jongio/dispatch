@@ -348,7 +348,7 @@ func LastSessionEvent(sessionID string) SessionEvent {
 	if err != nil {
 		return SessionEvent{}
 	}
-	return SessionEvent{Type: evt.Type, Timestamp: evt.Timestamp}
+	return SessionEvent(evt)
 }
 
 // readLastEvent reads the last complete JSON line from an events.jsonl file
