@@ -28,12 +28,14 @@ type PreviewPanel struct {
 	redactSecrets    bool                  // mask common secret patterns in turn text
 	convHeaderLine   int                   // content line where "Conversation" label is rendered (-1 = none)
 	idFieldLine      int                   // content line where "ID: ..." is rendered (-1 = none)
+	relatedRows      map[int]string        // content line -> related session ID for click handling
 	planContent      string                // plan.md content (empty when no plan)
 	planViewMode     bool                  // when true, render plan instead of session detail
 	hasPlan          bool                  // whether the session has a plan.md file
 	workStatus       data.WorkStatusResult // current session's work status
 	workspaceMissing bool                  // true when the session cwd no longer exists on disk
 	gitStatus        platform.GitStatus    // detailed git status for the current session's folder
+	relatedSessions  []RelatedSessionItem  // ranked nearby sessions for jump navigation
 
 	timelineMode bool // when true, render activity timeline instead of session detail
 
@@ -55,10 +57,54 @@ type PreviewPanel struct {
 	matchCount  int
 }
 
+// HitRelatedSession returns the related session rendered at contentRow.
+func (p *PreviewPanel) HitRelatedSession(contentRow int) (string, bool) {
+	if p.relatedRows == nil {
+		return "", false
+	}
+	id, ok := p.relatedRows[contentRow]
+	return id, ok
+}
+
+// RelatedSessionIDAt returns the ID of the 0-based related-session shortcut.
+func (p *PreviewPanel) RelatedSessionIDAt(index int) (string, bool) {
+	if index < 0 || index >= len(p.relatedSessions) {
+		return "", false
+	}
+	id := p.relatedSessions[index].ID
+	return id, id != ""
+}
+
+// ContentLineForViewportRow maps a rendered preview row to the underlying
+// content line, accounting for the search match status row.
+func (p *PreviewPanel) ContentLineForViewportRow(viewportRow int) int {
+	if viewportRow < 0 {
+		return -1
+	}
+	if p.matchCount > 0 {
+		if viewportRow == 0 {
+			return -1
+		}
+		viewportRow--
+	}
+	return viewportRow + p.scroll
+}
+
 type previewMatch struct {
 	line  int
 	start int
 	end   int
+}
+
+// RelatedSessionItem is the compact preview representation of a nearby session.
+type RelatedSessionItem struct {
+	ID                string
+	Summary           string
+	Repository        string
+	Branch            string
+	Cwd               string
+	LastActiveAt      string
+	DisplayRepository string
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -138,6 +184,12 @@ func (p *PreviewPanel) SetWorkspaceMissing(missing bool) {
 // preview can render a git section (branch/upstream, push/pull, change counts).
 func (p *PreviewPanel) SetGitStatus(status platform.GitStatus) {
 	p.gitStatus = status
+	p.updateTotalLines()
+}
+
+// SetRelatedSessions updates the ranked nearby sessions shown in the preview.
+func (p *PreviewPanel) SetRelatedSessions(related []RelatedSessionItem) {
+	p.relatedSessions = append([]RelatedSessionItem(nil), related...)
 	p.updateTotalLines()
 }
 
@@ -525,6 +577,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.renderedLines = nil
 		p.plainLines = nil
 		p.matches = nil
@@ -538,6 +591,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.recomputeMatches()
 		return
 	}
@@ -548,6 +602,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.recomputeMatches()
 		return
 	}
@@ -555,6 +610,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.renderedLines = nil
 		p.plainLines = nil
 		p.matches = nil
@@ -860,7 +916,10 @@ func (p PreviewPanel) View() string {
 // shown before truncation with a "… N more" indicator.
 const maxPreviewItems = 5
 
-func (p PreviewPanel) renderContent() (string, int, int) {
+// maxRelatedSessionItems is the maximum number of related sessions rendered.
+const maxRelatedSessionItems = 5
+
+func (p *PreviewPanel) renderContent() (string, int, int) {
 	if p.detail == nil {
 		// Use height-2 to account for the border added by View().
 		return lipgloss.Place(
@@ -875,6 +934,7 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 
 	var b strings.Builder
 	convLine := -1
+	relatedRows := make(map[int]string)
 
 	// ── Title ──
 	b.WriteString(styles.PreviewTitleStyle.Render(styles.IconSession()+"Session Detail") + "\n")
@@ -993,6 +1053,22 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		}
 	}
 
+	// ── Related sessions ──
+	if len(p.relatedSessions) > 0 {
+		b.WriteString("\n")
+		sep := styles.SeparatorStyle.Render(strings.Repeat("─", max(1, contentW)))
+		b.WriteString(sep + "\n")
+		b.WriteString(styles.PreviewLabelStyle.Render("Related sessions") + "\n")
+		for i, related := range p.relatedSessions {
+			if i >= maxRelatedSessionItems {
+				break
+			}
+			line := strings.Count(b.String(), "\n")
+			relatedRows[line] = related.ID
+			b.WriteString(p.renderRelatedSessionRow(i, related, contentW) + "\n")
+		}
+	}
+
 	// ── Conversation ──
 	if len(p.detail.Turns) > 0 {
 		b.WriteString("\n")
@@ -1077,7 +1153,38 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		}
 	}
 
+	p.relatedRows = relatedRows
 	return b.String(), convLine, idLine
+}
+
+func (p *PreviewPanel) renderRelatedSessionRow(i int, related RelatedSessionItem, contentW int) string {
+	summary := CleanSummary(related.Summary)
+	if summary == "" {
+		summary = related.ID
+	}
+	context := related.DisplayRepository
+	if context == "" {
+		context = p.displayRepository(related.Repository)
+	}
+	if related.Branch != "" {
+		if context != "" {
+			context += "@" + related.Branch
+		} else {
+			context = related.Branch
+		}
+	}
+	if context == "" {
+		context = AbbrevPath(related.Cwd)
+	}
+	if context == "" {
+		context = "–"
+	}
+	meta := context + " · " + FormatTimestamp(related.LastActiveAt)
+	prefix := fmt.Sprintf("  %d. ", i+1)
+	available := max(1, contentW-lipgloss.Width(prefix)-lipgloss.Width(meta)-3)
+	return styles.DimmedStyle.Render(prefix) +
+		styles.PreviewValueStyle.Render(Truncate(summary, available)) +
+		styles.DimmedStyle.Render(" — "+meta)
 }
 
 // renderPlanContent renders the plan.md content as styled markdown using

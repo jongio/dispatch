@@ -296,6 +296,13 @@
      - Behavior: Jumps the preview pane to the previous highlighted free-text search match and updates the match counter
      - Condition: Only when preview panel is visible and the active search query has preview matches
 
+22c. **Alt+1** through **Alt+5** → Jump to Related Session
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("alt+1", "alt+2", "alt+3", "alt+4", "alt+5"), key.WithHelp("Alt+1-5", "jump related"))
+     - Handler: internal\tui\model.go
+     - Behavior: Moves focus to the corresponding row in the preview pane's Related sessions section and loads that session's preview
+     - Condition: Only when preview panel is visible and the selected number exists in the Related sessions section
+
 ### Session Management
 23. **r** → Rebuild Index
     - File: internal\tui\keys.go

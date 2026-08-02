@@ -630,6 +630,44 @@ func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session,
 	return result, nil
 }
 
+// SessionRefsBySessionIDs returns refs for the requested sessions, grouped by
+// session ID. IDs not found in session_refs are omitted.
+func (s *Store) SessionRefsBySessionIDs(ctx context.Context, ids []string) (map[string][]SessionRef, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if len(ids) > maxIDsPerQuery {
+		ids = ids[:maxIDsPerQuery]
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := `SELECT session_id, COALESCE(ref_type,''), COALESCE(ref_value,''), turn_index, COALESCE(created_at,'')
+		FROM session_refs WHERE session_id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY session_id, turn_index`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying session refs: %w", err)
+	}
+	defer closeRows(rows)
+
+	refs := make(map[string][]SessionRef)
+	for rows.Next() {
+		var r SessionRef
+		if err := rows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning session ref row: %w", err)
+		}
+		refs[r.SessionID] = append(refs[r.SessionID], r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating session refs: %w", err)
+	}
+	return refs, nil
+}
+
 // AllSessionIDs returns the IDs of every session in the store, including
 // "empty" sessions (no turns/files/checkpoints/refs) that ListSessions filters
 // out. Callers that need to know whether a session still exists on disk — such

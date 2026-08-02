@@ -23,6 +23,7 @@ type (
 	groupsLoadedMsg   struct{ groups []data.SessionGroup }
 	sessionDetailMsg  struct {
 		detail  *data.SessionDetail
+		related []components.RelatedSessionItem
 		version int // matches Model.detailVersion to discard stale results
 	}
 )

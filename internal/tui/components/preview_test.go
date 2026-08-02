@@ -383,6 +383,92 @@ func TestPreviewPanelViewWithDetail(t *testing.T) {
 	}
 }
 
+func TestPreviewPanelRelatedSessionsShownWithRowsAndHits(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(120, 80)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "current", Summary: "Current session"},
+	})
+	p.SetRelatedSessions([]RelatedSessionItem{
+		{
+			ID:                "related-1",
+			Summary:           "Fix related preview",
+			Repository:        "stored/repo",
+			DisplayRepository: "live/repo",
+			Branch:            "fix/related",
+			LastActiveAt:      "2026-08-01T12:00:00Z",
+		},
+	})
+
+	got := ansi.Strip(p.View())
+	for _, want := range []string{"Related sessions", "Fix related preview", "live/repo@fix/related", "Aug"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("related section should contain %q, got:\n%s", want, got)
+		}
+	}
+	found := false
+	for row := 0; row < p.totalLines; row++ {
+		if id, ok := p.HitRelatedSession(row); ok {
+			found = true
+			if id != "related-1" {
+				t.Errorf("HitRelatedSession(%d) = %q, want related-1", row, id)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected a clickable related session row")
+	}
+	if id, ok := p.RelatedSessionIDAt(0); !ok || id != "related-1" {
+		t.Fatalf("RelatedSessionIDAt(0) = %q, %v; want related-1, true", id, ok)
+	}
+}
+
+func TestPreviewPanelRelatedSessionsHiddenWhenEmpty(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(120, 80)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "current", Summary: "Current session"},
+	})
+	if got := ansi.Strip(p.View()); strings.Contains(got, "Related sessions") {
+		t.Errorf("related heading should be hidden with no related sessions, got:\n%s", got)
+	}
+}
+
+func TestPreviewPanelRelatedSessionsParticipateInSearchLineAccounting(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(120, 12)
+	p.SetSearchTerms([]string{"related"})
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "current", Summary: "Current session"},
+	})
+	p.SetRelatedSessions([]RelatedSessionItem{
+		{ID: "related-1", Summary: "related alpha", LastActiveAt: "2026-08-01T12:00:00Z"},
+	})
+	if p.MatchCount() == 0 {
+		t.Fatal("related rows should be included in preview search matches")
+	}
+	relatedLine := -1
+	for row := 0; row < p.totalLines; row++ {
+		if _, ok := p.HitRelatedSession(row); ok {
+			relatedLine = row
+			break
+		}
+	}
+	if relatedLine < 0 {
+		t.Fatal("expected related row")
+	}
+	p.scroll = relatedLine
+	if got := p.ContentLineForViewportRow(0); got != -1 {
+		t.Fatalf("ContentLineForViewportRow(0) with match status = %d, want -1", got)
+	}
+	if got := p.ContentLineForViewportRow(1); got != p.ScrollOffset() {
+		t.Fatalf("ContentLineForViewportRow(1) = %d, want scroll offset %d", got, p.ScrollOffset())
+	}
+}
+
 func TestPreviewPanelViewWorkspaceMissingBadge(t *testing.T) {
 	t.Parallel()
 	p := NewPreviewPanel()

@@ -48,6 +48,7 @@ type keyMap struct {
 	PreviewScrollDown key.Binding
 	PreviewNextMatch  key.Binding
 	PreviewPrevMatch  key.Binding
+	OpenRelated       key.Binding
 	JumpNextAttention key.Binding
 	FilterAttention   key.Binding
 	LaunchAll         key.Binding
@@ -134,7 +135,7 @@ var keybindingHelpGroups = []keybindingHelpGroup{
 	{"Multi-Select", []string{"space", "launch_all", "launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete", "select_all", "deselect_all", "shift_up", "shift_down"}},
 	{"Search & Filter", []string{"search", "escape", "filter"}},
 	{"View", []string{"sort", "sort_order", "pivot", "pivot_order", "expand_collapse_all", "view_switch"}},
-	{"Preview & Details", []string{"preview", "preview_fullscreen", "preview_position", "preview_scroll_up", "preview_scroll_down", "preview_next_match", "preview_prev_match", "conversation_sort", "view_plan", "timeline", "compare", "git_status", "copy_id", "copy_path", "copy_resume_command", "copy_preview", "export", "open_file", "open_dir", "open_ref", "reindex", "scan_work_status", "config"}},
+	{"Preview & Details", []string{"preview", "preview_fullscreen", "preview_position", "preview_scroll_up", "preview_scroll_down", "preview_next_match", "preview_prev_match", "open_related", "conversation_sort", "view_plan", "timeline", "compare", "git_status", "copy_id", "copy_path", "copy_resume_command", "copy_preview", "export", "open_file", "open_dir", "open_ref", "reindex", "scan_work_status", "config"}},
 	{"Session Status", []string{"hide", "toggle_hidden", "star", "note", "tags", "alias", "jump_next_attention", "filter_attention", "resume_interrupted"}},
 	{"Time Range", []string{"time_range_1", "time_range_2", "time_range_3", "time_range_4"}},
 	{"General", []string{"help", "cmd_palette", "quit", "force_quit"}},
@@ -182,6 +183,7 @@ func defaultKeyMap() keyMap {
 		PreviewScrollDown: key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("PgDn", "preview ↓")),
 		PreviewNextMatch:  key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("Ctrl+N", "next preview match")),
 		PreviewPrevMatch:  key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("Ctrl+P", "previous preview match")),
+		OpenRelated:       key.NewBinding(key.WithKeys("alt+1", "alt+2", "alt+3", "alt+4", "alt+5"), key.WithHelp("Alt+1-5", "jump related")),
 		JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
 		FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "filter by status")),
 		LaunchAll:         key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "launch selected")),
@@ -266,6 +268,7 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 		{"preview_scroll_down", &km.PreviewScrollDown},
 		{"preview_next_match", &km.PreviewNextMatch},
 		{"preview_prev_match", &km.PreviewPrevMatch},
+		{"open_related", &km.OpenRelated},
 		{"jump_next_attention", &km.JumpNextAttention},
 		{"filter_attention", &km.FilterAttention},
 		{"launch_all", &km.LaunchAll},
