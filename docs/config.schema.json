@@ -248,6 +248,12 @@
       ],
       "type": "string"
     },
+    "project_roots": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "redact_preview_secrets": {
       "type": "boolean"
     },

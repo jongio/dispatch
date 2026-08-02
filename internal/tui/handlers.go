@@ -411,7 +411,8 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	m.sortByFrecency(m.sessions)
 	m.groups = nil
 	m.syncSessionListStatuses()
-	m.sessionList.SetSessions(m.sessions)
+	m.quickStarts = nil
+	m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
 	// Restore cursor to the previously selected session if possible.
 	if prevID != "" {
 		m.sessionList.SelectByID(prevID)
@@ -426,7 +427,12 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
+	return m, tea.Batch(
+		m.loadSelectedDetailCmd(),
+		m.scanPlansCmd(),
+		m.scanGitStatesCmd(),
+		discoverProjectQuickStartsCmd(m.cfg.ProjectRoots, m.sessions),
+	)
 }
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
@@ -439,7 +445,8 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	m.sessions = nil
 	m.syncSessionListStatuses()
 	m.sessionList.SetPivotField(m.pivot)
-	m.sessionList.SetGroups(m.groups)
+	m.quickStarts = nil
+	m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
 	if prevID != "" {
 		m.sessionList.SelectByID(prevID)
 	}
@@ -451,7 +458,28 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
-	return m, tea.Batch(m.loadSelectedDetailCmd(), m.scanPlansCmd(), m.scanGitStatesCmd())
+	return m, tea.Batch(
+		m.loadSelectedDetailCmd(),
+		m.scanPlansCmd(),
+		m.scanGitStatesCmd(),
+		discoverProjectQuickStartsCmd(m.cfg.ProjectRoots, sessionsFromGroups(m.groups)),
+	)
+}
+
+func (m Model) handleProjectQuickStarts(msg projectQuickStartsMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusErr = "project scan: " + msg.err.Error()
+		return m, clearStatusAfter(3 * time.Second)
+	}
+	m.quickStarts = msg.quickStarts
+	if m.groups != nil {
+		m.sessionList.SetPivotField(m.pivot)
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
+	} else {
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
+	}
+	m.searchBar.SetResultCount(m.sessionList.SessionCount())
+	return m, nil
 }
 
 func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
@@ -829,13 +857,13 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 		m.sessions = m.applySessionFilters(msg.sessions)
 		m.groups = nil
 		m.syncSessionListStatuses()
-		m.sessionList.SetSessions(m.sessions)
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
 	} else if msg.groups != nil {
 		m.groups = m.applyGroupFilters(msg.groups)
 		m.sessions = nil
 		m.syncSessionListStatuses()
 		m.sessionList.SetPivotField(m.pivot)
-		m.sessionList.SetGroups(m.groups)
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
 	}
 	if m.state == stateLoading {
 		m.state = stateSessionList
@@ -944,7 +972,7 @@ func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) 
 		m.sortByAttention(m.sessions)
 		m.sortByFrecency(m.sessions)
 		m.syncSessionListStatuses()
-		m.sessionList.SetSessions(m.sessions)
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
 		m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	}
 	return m, nil

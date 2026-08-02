@@ -16,11 +16,21 @@ import (
 // ---------------------------------------------------------------------------
 
 type displayItem struct {
-	isFolder   bool
-	folderPath string       // non-empty for folder items
-	count      int          // session count for folder items
-	session    data.Session // populated for session items
+	isFolder     bool
+	isQuickStart bool
+	folderPath   string       // non-empty for folder items
+	count        int          // session count for folder items
+	session      data.Session // populated for session items
+	quickStart   QuickStart   // populated for quick-start items
 }
+
+// QuickStart describes a git repository row that starts a new session.
+type QuickStart struct {
+	Name string
+	Path string
+}
+
+const quickStartGroupLabel = "New sessions"
 
 // ---------------------------------------------------------------------------
 // SessionList is a scrollable, cursor-navigable list with tree-view support.
@@ -75,11 +85,18 @@ func (s *SessionList) pad() string {
 
 // SetSessions replaces the list content with a flat slice of sessions.
 func (s *SessionList) SetSessions(sessions []data.Session) {
+	s.SetSessionsWithQuickStarts(sessions, nil)
+}
+
+// SetSessionsWithQuickStarts replaces the list content with flat sessions and
+// optional "New session" rows for repositories without recent sessions.
+func (s *SessionList) SetSessionsWithQuickStarts(sessions []data.Session, quickStarts []QuickStart) {
 	s.allItems = make([]displayItem, len(sessions))
 	s.selected = make(map[string]struct{})
 	for i, sess := range sessions {
 		s.allItems[i] = displayItem{session: sess}
 	}
+	s.appendQuickStarts(quickStarts)
 	s.treeMode = false
 	s.rebuildVisible()
 }
@@ -87,6 +104,12 @@ func (s *SessionList) SetSessions(sessions []data.Session) {
 // SetGroups replaces the list content with grouped sessions (tree mode).
 // Folders are collapsible; initial state is expanded.
 func (s *SessionList) SetGroups(groups []data.SessionGroup) {
+	s.SetGroupsWithQuickStarts(groups, nil)
+}
+
+// SetGroupsWithQuickStarts replaces the list content with grouped sessions and
+// optional "New session" rows under a dedicated group.
+func (s *SessionList) SetGroupsWithQuickStarts(groups []data.SessionGroup, quickStarts []QuickStart) {
 	s.allItems = nil
 	s.selected = make(map[string]struct{})
 	if s.expanded == nil {
@@ -106,8 +129,24 @@ func (s *SessionList) SetGroups(groups []data.SessionGroup) {
 			s.allItems = append(s.allItems, displayItem{session: sess})
 		}
 	}
+	if len(quickStarts) > 0 {
+		s.allItems = append(s.allItems, displayItem{isFolder: true, folderPath: quickStartGroupLabel, count: len(quickStarts)})
+		if _, ok := s.expanded[quickStartGroupLabel]; !ok {
+			s.expanded[quickStartGroupLabel] = struct{}{}
+		}
+		s.appendQuickStarts(quickStarts)
+	}
 	s.treeMode = true
 	s.rebuildVisible()
+}
+
+func (s *SessionList) appendQuickStarts(quickStarts []QuickStart) {
+	for _, qs := range quickStarts {
+		if qs.Path == "" {
+			continue
+		}
+		s.allItems = append(s.allItems, displayItem{isQuickStart: true, quickStart: qs})
+	}
 }
 
 // SetPivotField stores the current pivot mode so that group header icons
@@ -308,7 +347,7 @@ func (s *SessionList) AllSessions() []data.Session {
 	out := make([]data.Session, 0, len(s.visItems))
 	for _, idx := range s.visItems {
 		item := s.allItems[idx]
-		if !item.isFolder {
+		if !item.isFolder && !item.isQuickStart {
 			out = append(out, item.session)
 		}
 	}
@@ -321,7 +360,7 @@ func (s *SessionList) VisibleSessionIDs() []string {
 	out := make([]string, 0, len(s.visItems))
 	for _, idx := range s.visItems {
 		item := s.allItems[idx]
-		if !item.isFolder {
+		if !item.isFolder && !item.isQuickStart {
 			out = append(out, item.session.ID)
 		}
 	}
@@ -333,7 +372,7 @@ func (s *SessionList) VisibleSessionIDs() []string {
 func (s *SessionList) SelectByID(id string) bool {
 	for i, idx := range s.visItems {
 		item := s.allItems[idx]
-		if !item.isFolder && item.session.ID == id {
+		if !item.isFolder && !item.isQuickStart && item.session.ID == id {
 			s.MoveTo(i)
 			return true
 		}
@@ -352,7 +391,7 @@ func (s *SessionList) FindNextWaiting(attentionMap map[string]data.AttentionStat
 	for i := 1; i <= n; i++ {
 		vi := (s.cursor + i) % n
 		item := s.allItems[s.visItems[vi]]
-		if item.isFolder {
+		if item.isFolder || item.isQuickStart {
 			continue
 		}
 		if status, ok := attentionMap[item.session.ID]; ok && status == data.AttentionWaiting {
@@ -468,6 +507,9 @@ func (s *SessionList) SelectedFolderCwd() string {
 	if !item.isFolder {
 		return ""
 	}
+	if item.folderPath == quickStartGroupLabel {
+		return ""
+	}
 	switch s.pivotField {
 	case "folder":
 		return item.folderPath
@@ -493,17 +535,29 @@ func (s *SessionList) Selected() (data.Session, bool) {
 		return data.Session{}, false
 	}
 	item := s.allItems[s.visItems[s.cursor]]
-	if item.isFolder {
+	if item.isFolder || item.isQuickStart {
 		return data.Session{}, false
 	}
 	return item.session, true
+}
+
+// SelectedQuickStart returns the currently highlighted quick-start row.
+func (s *SessionList) SelectedQuickStart() (QuickStart, bool) {
+	if s.cursor < 0 || s.cursor >= len(s.visItems) {
+		return QuickStart{}, false
+	}
+	item := s.allItems[s.visItems[s.cursor]]
+	if !item.isQuickStart {
+		return QuickStart{}, false
+	}
+	return item.quickStart, true
 }
 
 // SessionCount returns the number of (non-folder) items across all items.
 func (s *SessionList) SessionCount() int {
 	n := 0
 	for _, it := range s.allItems {
-		if !it.isFolder {
+		if !it.isFolder && !it.isQuickStart {
 			n++
 		}
 	}
@@ -517,7 +571,7 @@ func (s *SessionList) ToggleSelected() bool {
 		return false
 	}
 	item := s.allItems[s.visItems[s.cursor]]
-	if item.isFolder {
+	if item.isFolder || item.isQuickStart {
 		return false
 	}
 	id := item.session.ID
@@ -533,7 +587,7 @@ func (s *SessionList) ToggleSelected() bool {
 func (s *SessionList) SelectAll() {
 	for _, vi := range s.visItems {
 		item := s.allItems[vi]
-		if !item.isFolder {
+		if !item.isFolder && !item.isQuickStart {
 			s.selected[item.session.ID] = struct{}{}
 		}
 	}
@@ -568,7 +622,7 @@ func (s *SessionList) SelectRange(from, to int) {
 			continue
 		}
 		item := s.allItems[s.visItems[i]]
-		if !item.isFolder {
+		if !item.isFolder && !item.isQuickStart {
 			s.selected[item.session.ID] = struct{}{}
 		}
 	}
@@ -627,7 +681,7 @@ func (s *SessionList) SelectedSessions() []data.Session {
 	var result []data.Session
 	for _, vi := range s.visItems {
 		item := s.allItems[vi]
-		if !item.isFolder {
+		if !item.isFolder && !item.isQuickStart {
 			if _, ok := s.selected[item.session.ID]; ok {
 				result = append(result, item.session)
 			}
@@ -654,6 +708,9 @@ func (s *SessionList) FolderSessions() []data.Session {
 		if s.allItems[i].isFolder {
 			break // next folder starts
 		}
+		if s.allItems[i].isQuickStart {
+			continue
+		}
 		result = append(result, s.allItems[i].session)
 	}
 	return result
@@ -675,6 +732,8 @@ func (s SessionList) View() string {
 
 		if item.isFolder {
 			lines = append(lines, s.renderFolderRow(item, selected))
+		} else if item.isQuickStart {
+			lines = append(lines, s.renderQuickStartRow(item.quickStart, selected))
 		} else {
 			_, hidden := s.hiddenSet[item.session.ID]
 			_, aiFound := s.aiSet[item.session.ID]
@@ -963,6 +1022,49 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	}
 
 	return s.applyRowStyle(b.String(), selected, hidden, favorited)
+}
+
+func (s SessionList) renderQuickStartRow(qs QuickStart, selected bool) string {
+	w := s.width
+	if w <= 0 {
+		return ""
+	}
+	indent := ""
+	if s.treeMode {
+		indent = "  "
+		w -= 2
+	}
+	selector := "  "
+	if selected {
+		selector = " " + styles.IconPointer()
+	}
+	label := "New session"
+	if qs.Name != "" {
+		label += ": " + qs.Name
+	}
+	path := AbbrevPath(qs.Path)
+	const selectorW = 2
+	const spacing = 2
+	pathW := 0
+	if w >= 70 {
+		pathW = 32
+	}
+	labelW := w - selectorW - spacing
+	if pathW > 0 {
+		labelW -= pathW + spacing
+	}
+	if labelW < 12 {
+		labelW = 12
+	}
+	var b strings.Builder
+	b.WriteString(indent)
+	b.WriteString(selector)
+	b.WriteString(PadRight(label, labelW))
+	if pathW > 0 {
+		b.WriteString("  ")
+		b.WriteString(PadRight(path, pathW))
+	}
+	return s.applyRowStyle(b.String(), selected, false, false)
 }
 
 // applyRowStyle renders a row line with the appropriate style based on state.

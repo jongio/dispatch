@@ -59,6 +59,9 @@ func TestDefaultValues(t *testing.T) {
 	if len(cfg.ExcludedDirs) != 0 {
 		t.Errorf("ExcludedDirs = %v, want empty", cfg.ExcludedDirs)
 	}
+	if len(cfg.ProjectRoots) != 0 {
+		t.Errorf("ProjectRoots = %v, want empty", cfg.ProjectRoots)
+	}
 	if len(cfg.HiddenSessions) != 0 {
 		t.Errorf("HiddenSessions = %v, want empty", cfg.HiddenSessions)
 	}
@@ -95,7 +98,8 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		LaunchSets: []LaunchSet{
 			{Name: "Feature", SessionIDs: []string{"sess-1", "sess-2"}},
 		},
-		PreviewPosition:  "bottom",
+		ProjectRoots:    []string{filepath.Join(string(filepath.Separator), "code")},
+		PreviewPosition: "bottom",
 	}
 
 	data, err := json.Marshal(original)
@@ -174,6 +178,9 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	}
 	if got := restored.LaunchSets[0].SessionIDs; len(got) != 2 || got[0] != "sess-1" || got[1] != "sess-2" {
 		t.Errorf("LaunchSets[0].SessionIDs = %v, want [sess-1 sess-2]", got)
+	}
+	if len(restored.ProjectRoots) != 1 || restored.ProjectRoots[0] != original.ProjectRoots[0] {
+		t.Errorf("ProjectRoots = %v, want %v", restored.ProjectRoots, original.ProjectRoots)
 	}
 }
 
@@ -1746,6 +1753,20 @@ func TestValidateFile_DuplicateLaunchSet(t *testing.T) {
 	assertDiagnosticPath(t, result.Diagnostics, "launch_sets[1].name")
 }
 
+func TestValidateFile_InvalidProjectRoots(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"project_roots": ["", "relative"]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid project roots")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "project_roots[0]")
+	assertDiagnosticPath(t, result.Diagnostics, "project_roots[1]")
+}
+
 func TestValidateFile_KeybindingCollision(t *testing.T) {
 	t.Parallel()
 	path := writeConfigValidationFixture(t, `{"keybindings": {"search": "q"}}`)
@@ -1779,6 +1800,9 @@ func TestJSONSchema_CoversNestedConfig(t *testing.T) {
 	}
 	if _, ok := props["launch_sets"]; !ok {
 		t.Fatal("schema missing launch_sets")
+	}
+	if _, ok := props["project_roots"]; !ok {
+		t.Fatal("schema missing project_roots")
 	}
 	keybindings := props["keybindings"].(map[string]any)
 	propertyNames := keybindings["propertyNames"].(map[string]any)
