@@ -244,7 +244,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 
 ### Statistics
 
-Run `dispatch stats` to print session totals and breakdowns by repository, branch, and host type.
+Run `dispatch stats` to print session totals and breakdowns by repository, branch, folder, and host type.
 
 ```sh
 dispatch stats
