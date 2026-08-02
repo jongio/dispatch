@@ -20,11 +20,12 @@ import (
 // the config read/write path, matching the seam pattern used elsewhere in this
 // package (see cli.go and stats.go).
 var (
-	configLoadFn         = config.Load
-	configSaveFn         = config.Save
-	configPathFn         = config.ConfigPath
-	configValidateFileFn = config.ValidateFile
-	configSchemaBytesFn  = config.JSONSchemaBytes
+	configLoadFn                   = config.Load
+	configSaveFn                   = config.Save
+	configPathFn                   = config.ConfigPath
+	configValidateFileFn           = config.ValidateFile
+	configSchemaBytesFn            = config.JSONSchemaBytes
+	configStdin          io.Reader = os.Stdin
 )
 
 // editorLauncher opens the given file in the user's editor and waits for it to
@@ -76,7 +77,7 @@ func configFields() []configField {
 			config.LaunchModeInPlace, config.LaunchModeTab, config.LaunchModeWindow, config.LaunchModePane),
 		enumField("pane_direction", func(c *config.Config) *string { return &c.PaneDirection },
 			config.PaneDirectionAuto, config.PaneDirectionRight, config.PaneDirectionDown, config.PaneDirectionLeft, config.PaneDirectionUp),
-		strField("custom_command", func(c *config.Config) *string { return &c.CustomCommand }),
+		strField("resume_session_command", func(c *config.Config) *string { return &c.ResumeSessionCommand }),
 		boolField("ai_search", func(c *config.Config) *bool { return &c.AISearch }),
 		durationField("attention_threshold", func(c *config.Config) *string { return &c.AttentionThreshold }),
 		strField("theme", func(c *config.Config) *string { return &c.Theme }),
@@ -263,8 +264,12 @@ func runConfig(w io.Writer, args []string) error {
 		return runConfigValidate(w, rest)
 	case "schema":
 		return runConfigSchema(w, rest)
+	case "export":
+		return runConfigExport(w, rest)
+	case "import":
+		return runConfigImport(w, rest)
 	default:
-		return fmt.Errorf("unknown config subcommand %q (want list, get, set, unset, edit, path, validate, or schema)", sub)
+		return fmt.Errorf("unknown config subcommand %q (want list, get, set, unset, edit, path, validate, schema, export, or import)", sub)
 	}
 }
 
@@ -505,6 +510,83 @@ func runConfigEdit(w io.Writer, args []string) error {
 	}
 
 	fmt.Fprintf(w, "Saved %s\n", path)
+	return nil
+}
+
+func runConfigExport(w io.Writer, args []string) error {
+	outPath := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			i++
+			if i >= len(args) || strings.TrimSpace(args[i]) == "" {
+				return fmt.Errorf("config export --out requires a file path")
+			}
+			outPath = args[i]
+		default:
+			return fmt.Errorf("config export: unknown argument %q", args[i])
+		}
+	}
+
+	cfg, err := configLoadFn()
+	if err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling config: %w", err)
+	}
+	b = append(b, '\n')
+
+	if outPath == "" {
+		_, err = w.Write(b)
+		return err
+	}
+	if err := os.WriteFile(outPath, b, 0o600); err != nil {
+		return fmt.Errorf("writing config export: %w", err)
+	}
+	fmt.Fprintf(w, "Exported %s\n", outPath)
+	return nil
+}
+
+func runConfigImport(w io.Writer, args []string) error {
+	inPath := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--in":
+			i++
+			if i >= len(args) || strings.TrimSpace(args[i]) == "" {
+				return fmt.Errorf("config import --in requires a file path")
+			}
+			inPath = args[i]
+		default:
+			return fmt.Errorf("config import: unknown argument %q", args[i])
+		}
+	}
+
+	r := configStdin
+	if inPath != "" {
+		f, err := os.Open(inPath)
+		if err != nil {
+			return fmt.Errorf("opening config import: %w", err)
+		}
+		defer f.Close() //nolint:errcheck // read-only file close
+		r = f
+	}
+
+	cfg := config.Default()
+	dec := json.NewDecoder(r)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(cfg); err != nil {
+		return fmt.Errorf("parsing config import: %w", err)
+	}
+	if err := configSaveFn(cfg); err != nil {
+		return err
+	}
+	if _, err := configLoadFn(); err != nil {
+		return fmt.Errorf("validating imported config: %w", err)
+	}
+	fmt.Fprintln(w, "Imported config")
 	return nil
 }
 

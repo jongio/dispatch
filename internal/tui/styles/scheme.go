@@ -53,6 +53,7 @@ type Theme struct {
 	DimmedStyle       lipgloss.Style
 	HiddenStyle       lipgloss.Style
 	FavoritedStyle    lipgloss.Style
+	WaitingRowStyle   lipgloss.Style
 	GroupHeaderStyle  lipgloss.Style
 	BadgeStyle        lipgloss.Style
 	ActiveBadgeStyle  lipgloss.Style
@@ -191,6 +192,7 @@ func (t *Theme) buildStyles() {
 	t.DimmedStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed))
 	t.HiddenStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
 	t.FavoritedStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
+	t.WaitingRowStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true).Background(c(t.Selected))
 	t.GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(c(t.Primary))
 
 	// Filter badges.
@@ -250,7 +252,7 @@ func (t *Theme) buildStyles() {
 		Foreground(c(t.Dimmed)).Bold(true)
 
 	// Attention dot styles — colored dots for session attention status.
-	t.AttentionWaitingStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
+	t.AttentionWaitingStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true).Blink(true)
 	t.AttentionActiveStyle = lipgloss.NewStyle().Foreground(c(t.Success))
 	t.AttentionStaleStyle = lipgloss.NewStyle().Foreground(c(t.ANSIPalette[3])) // Yellow
 	t.AttentionIdleStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)

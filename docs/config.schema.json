@@ -188,7 +188,9 @@
           "timeline",
           "compare",
           "git_status",
-          "cmd_palette"
+          "cmd_palette",
+          "new_session",
+          "focus_window"
         ]
       },
       "type": "object"
@@ -229,6 +231,9 @@
     "model": {
       "type": "string"
     },
+    "new_session_command": {
+      "type": "string"
+    },
     "notify_on_waiting": {
       "type": "boolean"
     },
@@ -259,6 +264,9 @@
     },
     "redact_preview_secrets": {
       "type": "boolean"
+    },
+    "resume_session_command": {
+      "type": "string"
     },
     "schemes": {
       "items": {

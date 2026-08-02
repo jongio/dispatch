@@ -87,18 +87,18 @@ func TestBuildResumeArgs_MaliciousAgentModel(t *testing.T) {
 	}
 }
 
-func TestNewResumeCmd_CustomCommand_EmptyAfterExpansion(t *testing.T) {
-	// If custom command resolves to empty/whitespace, must error.
-	_, err := NewResumeCmd("sess-1", ResumeConfig{CustomCommand: "   "})
+func TestNewResumeCmd_ResumeSessionCommand_EmptyAfterExpansion(t *testing.T) {
+	// If resume session command resolves to empty/whitespace, must error.
+	_, err := NewResumeCmd("sess-1", ResumeConfig{ResumeSessionCommand: "   "})
 	if err == nil {
-		t.Fatal("NewResumeCmd should error on empty custom command")
+		t.Fatal("NewResumeCmd should error on empty resume session command")
 	}
 }
 
-func TestNewResumeCmd_CustomCommand_SessionIDReplacement(t *testing.T) {
+func TestNewResumeCmd_ResumeSessionCommand_SessionIDReplacement(t *testing.T) {
 	// Verify {sessionId} is replaced correctly with a valid session ID.
 	cmd, err := NewResumeCmd("abc-123", ResumeConfig{
-		CustomCommand: "my-cli --resume {sessionId} --flag",
+		ResumeSessionCommand: "my-cli --resume {sessionId} --flag",
 	})
 	if err != nil {
 		t.Fatalf("NewResumeCmd: %v", err)
@@ -141,7 +141,7 @@ func TestNewResumeCmd_RejectsInjectionPayloads(t *testing.T) {
 	for _, payload := range payloads {
 		t.Run(truncateForTestName(payload), func(t *testing.T) {
 			_, err := NewResumeCmd(payload, ResumeConfig{
-				CustomCommand: "my-cli --resume {sessionId}",
+				ResumeSessionCommand: "my-cli --resume {sessionId}",
 			})
 			if err == nil {
 				t.Errorf("NewResumeCmd should reject malicious session ID %q", payload)
@@ -164,7 +164,7 @@ func TestNewResumeCmd_AcceptsValidSessionIDs(t *testing.T) {
 	for _, id := range valid {
 		t.Run(id, func(t *testing.T) {
 			_, err := NewResumeCmd(id, ResumeConfig{
-				CustomCommand: "my-cli --resume {sessionId}",
+				ResumeSessionCommand: "my-cli --resume {sessionId}",
 			})
 			if err != nil {
 				t.Errorf("NewResumeCmd should accept valid session ID %q: %v", id, err)
@@ -518,7 +518,7 @@ func TestBuildResumeCommandString_RejectsInjectionPayloads(t *testing.T) {
 	for _, payload := range payloads {
 		t.Run(truncateForTestName(payload), func(t *testing.T) {
 			_, err := buildResumeCommandString(payload, ResumeConfig{
-				CustomCommand: "my-cli --resume {sessionId}",
+				ResumeSessionCommand: "my-cli --resume {sessionId}",
 			})
 			if err == nil {
 				t.Errorf("buildResumeCommandString should reject malicious session ID %q", payload)
@@ -530,7 +530,7 @@ func TestBuildResumeCommandString_RejectsInjectionPayloads(t *testing.T) {
 func TestBuildResumeCommandString_AcceptsValidSessionID(t *testing.T) {
 	// Valid session IDs should produce a valid command string.
 	cmd, err := buildResumeCommandString("valid-session.123", ResumeConfig{
-		CustomCommand: "my-cli --resume {sessionId}",
+		ResumeSessionCommand: "my-cli --resume {sessionId}",
 	})
 	if err != nil {
 		t.Fatalf("buildResumeCommandString: %v", err)
@@ -540,11 +540,11 @@ func TestBuildResumeCommandString_AcceptsValidSessionID(t *testing.T) {
 	}
 }
 
-func TestBuildResumeCommandString_EmptyCustomCommand(t *testing.T) {
-	// With a valid session ID and a custom command that has only the
+func TestBuildResumeCommandString_EmptyResumeSessionCommand(t *testing.T) {
+	// With a valid session ID and a resume session command that has only the
 	// placeholder, replacement produces just the session ID.
 	cmd, err := buildResumeCommandString("sess-1", ResumeConfig{
-		CustomCommand: "   {sessionId}   ",
+		ResumeSessionCommand: "   {sessionId}   ",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -554,9 +554,9 @@ func TestBuildResumeCommandString_EmptyCustomCommand(t *testing.T) {
 	}
 
 	// Empty string as session ID is rejected by validation, not by the
-	// custom command expansion logic.
+	// resume session command expansion logic.
 	_, err = buildResumeCommandString("", ResumeConfig{
-		CustomCommand: "   {sessionId}   ",
+		ResumeSessionCommand: "   {sessionId}   ",
 	})
 	if err == nil {
 		t.Fatal("expected error when session ID is empty")
@@ -596,7 +596,7 @@ func TestBuildStartCmdLine_DefaultPathEscapesMetachars(t *testing.T) {
 	shell := ShellInfo{Name: "WSL", Path: `C:\Windows\System32\wsl.exe`}
 	// Simulate a resume command containing cmd.exe metacharacters
 	// (this wouldn't normally happen with validated session IDs, but
-	// is a defense-in-depth test for custom commands).
+	// is a defense-in-depth test for resume session commands).
 	resumeCmd := `ghcs --resume safe-id & echo injected`
 	got := buildStartCmdLine(shell, resumeCmd)
 

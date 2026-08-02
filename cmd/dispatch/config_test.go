@@ -78,7 +78,6 @@ func TestRunConfigList_JSON(t *testing.T) {
 	if err := runConfig(&buf, []string{"config", "list", "--json"}); err != nil {
 		t.Fatalf("runConfig list --json: %v", err)
 	}
-
 	var obj map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
@@ -92,6 +91,89 @@ func TestRunConfigList_JSON(t *testing.T) {
 	// auto_refresh_seconds is unset by default and should serialize as null.
 	if v, present := obj["auto_refresh_seconds"]; !present || v != nil {
 		t.Errorf("auto_refresh_seconds = %v, want null", v)
+	}
+}
+
+func TestRunConfigExport_Stdout(t *testing.T) {
+	cfg := config.Default()
+	cfg.Theme = "campbell"
+	withConfigSeams(t, cfg)
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "export"}); err != nil {
+		t.Fatalf("runConfig export: %v", err)
+	}
+	var got config.Config
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("export output is not JSON: %v\n%s", err, buf.String())
+	}
+	if got.Theme != "campbell" {
+		t.Fatalf("exported theme = %q, want campbell", got.Theme)
+	}
+}
+
+func TestRunConfigExport_File(t *testing.T) {
+	cfg := config.Default()
+	cfg.Model = "gpt-5"
+	withConfigSeams(t, cfg)
+
+	out := filepath.Join(t.TempDir(), "dispatch-config.json")
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "export", "--out", out}); err != nil {
+		t.Fatalf("runConfig export --out: %v", err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading export: %v", err)
+	}
+	if !strings.Contains(string(b), `"model": "gpt-5"`) {
+		t.Fatalf("export file missing model:\n%s", string(b))
+	}
+	if !strings.Contains(buf.String(), "Exported") {
+		t.Fatalf("export confirmation = %q, want Exported", buf.String())
+	}
+}
+
+func TestRunConfigImport_Stdin(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	var imported *config.Config
+	configSaveFn = func(c *config.Config) error {
+		imported = c
+		return nil
+	}
+	prevStdin := configStdin
+	configStdin = strings.NewReader(`{"theme":"one-half-light","max_sessions":42}`)
+	t.Cleanup(func() { configStdin = prevStdin })
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "import"}); err != nil {
+		t.Fatalf("runConfig import: %v", err)
+	}
+	if imported == nil || imported.Theme != "one-half-light" || imported.MaxSessions != 42 {
+		t.Fatalf("imported config = %+v, want theme one-half-light max 42", imported)
+	}
+	if !strings.Contains(buf.String(), "Imported config") {
+		t.Fatalf("import confirmation = %q", buf.String())
+	}
+}
+
+func TestRunConfigImport_File(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	var imported *config.Config
+	configSaveFn = func(c *config.Config) error {
+		imported = c
+		return nil
+	}
+	in := filepath.Join(t.TempDir(), "dispatch-config.json")
+	if err := os.WriteFile(in, []byte(`{"agent":"coder","show_preview":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "import", "--in", in}); err != nil {
+		t.Fatalf("runConfig import --in: %v", err)
+	}
+	if imported == nil || imported.Agent != "coder" || imported.ShowPreview {
+		t.Fatalf("imported config = %+v, want agent coder and show_preview false", imported)
 	}
 }
 

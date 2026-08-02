@@ -18,6 +18,7 @@ import (
 type PreviewPanel struct {
 	detail           *data.SessionDetail
 	attentionStatus  data.AttentionStatus
+	lastEvent        data.SessionEvent
 	note             string // user note for the current session
 	alias            string // user-chosen alias for the current session
 	width            int
@@ -170,6 +171,12 @@ func (p *PreviewPanel) SetAlias(alias string) {
 // SetAttentionStatus updates the attention status shown in the preview.
 func (p *PreviewPanel) SetAttentionStatus(status data.AttentionStatus) {
 	p.attentionStatus = status
+	p.updateTotalLines()
+}
+
+// SetLastEvent updates the last event shown in the preview details.
+func (p *PreviewPanel) SetLastEvent(evt data.SessionEvent) {
+	p.lastEvent = evt
 	p.updateTotalLines()
 }
 
@@ -995,6 +1002,16 @@ func (p *PreviewPanel) renderContent() (string, int, int) {
 	l := styles.PreviewLabelStyle.Render("Status: ")
 	b.WriteString(l + statusStyle.Render(statusIcon+" "+statusLabel) + "\n")
 
+	// ── Last Event ──
+	if p.lastEvent.Type != "" {
+		evtLabel := styles.PreviewLabelStyle.Render("Last Event: ")
+		evtValue := p.lastEvent.Type
+		if p.lastEvent.Timestamp != "" {
+			evtValue += "  " + styles.DimmedStyle.Render(formatEventTimestamp(p.lastEvent.Timestamp))
+		}
+		b.WriteString(evtLabel + evtValue + "\n")
+	}
+
 	// ── Plan indicator ──
 	if p.hasPlan {
 		planLabel := styles.PreviewLabelStyle.Render("Plan: ")
@@ -1469,4 +1486,9 @@ func attentionStatusDisplay(status data.AttentionStatus) (icon, label string, st
 	default:
 		return styles.IconAttentionIdle(), "Idle", styles.PreviewValueStyle
 	}
+}
+
+// formatEventTimestamp returns a relative time string for an event timestamp.
+func formatEventTimestamp(timestamp string) string {
+	return RelativeTime(timestamp)
 }

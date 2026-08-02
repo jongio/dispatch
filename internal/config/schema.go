@@ -45,6 +45,7 @@ var KeybindingActions = []string{
 	"copy_preview", "expand_collapse_all", "scan_work_status", "export", "note", "tags",
 	"alias", "shift_up", "shift_down", "view_switch", "open_file", "open_dir",
 	"open_ref", "timeline", "compare", "git_status", "cmd_palette",
+	"new_session", "focus_window",
 }
 
 var defaultKeybindings = map[string][]string{
@@ -67,6 +68,7 @@ var defaultKeybindings = map[string][]string{
 	"alias": {"A"}, "shift_up": {"shift+up"}, "shift_down": {"shift+down"}, "view_switch": {"V"},
 	"open_file": {"F"}, "open_dir": {"O"}, "open_ref": {"b"}, "timeline": {"T"},
 	"compare": {"D"}, "git_status": {"i"}, "cmd_palette": {":"},
+	"new_session": {"+"}, "focus_window": {"W"},
 }
 
 var keyNamePattern = regexp.MustCompile(`^[^\s,]+$`)

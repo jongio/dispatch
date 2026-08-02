@@ -41,7 +41,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
 - **Session tags** (`#`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
 - **Session aliases** (`A`) — give a session a short, memorable alias and resume it from the CLI with `dispatch open <alias>` instead of the full session ID
-- **Settings panel** (`,`) — 19 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Custom Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting, and column toggles for Repo, Folder, Turns, and Host
+- **Settings panel** (`,`) — 20 fields: Yolo Mode, Agent, Model, Launch Mode, Pane Direction, Terminal, Shell, Resume Session Command, New Session Command, Theme, Crash Recovery, Preview Position, Redact Secrets, Excluded Words, Auto Refresh, Notify On Waiting, and column toggles for Repo, Folder, Turns, and Host
 - **Configurable list columns** (`,` settings) — choose which optional columns (repo, folder, turns, host) appear in the session list. Defaults show every column, and the session name and attention indicator are always visible
 - **Shell picker** — auto-detects installed shells, modal picker when multiple available
 - **5 built-in themes** — Dispatch Dark, Dispatch Light, Campbell, One Half Dark, One Half Light + custom via Windows Terminal JSON
@@ -677,7 +677,7 @@ Configuration is stored in the platform-specific config directory:
 - **macOS**: `~/Library/Application Support/dispatch/config.json`
 - **Windows**: `%APPDATA%\dispatch\config.json`
 
-Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
+Set `DISPATCH_CONFIG` to an absolute file path to use a different config file, for example to keep separate work and personal profiles. `config path`, `config get`/`set`/`edit`/`export`/`import`, and `doctor` all follow the override. A relative or UNC value is ignored and the default location is used.
 
 ### From the command line
 
@@ -694,9 +694,11 @@ dispatch config path            # print the config file path
 dispatch config validate        # validate config.json before launching the TUI
 dispatch config validate --json # machine-readable diagnostics for CI/scripts
 dispatch config schema          # print the JSON Schema for editor integration
+dispatch config export --out dispatch-config.json
+dispatch config import --in dispatch-config.json
 ```
 
-`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+`set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. `export` prints the full JSON config to stdout, or writes it to `--out <file>`. `import` reads JSON from stdin, or from `--in <file>`, then saves it through the normal config path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
 
 Use `dispatch config validate --path <file>` to check another config file without changing your active profile. The generated schema is published at [`docs/config.schema.json`](docs/config.schema.json); point your editor's JSON Schema integration at that file, or run `dispatch config schema` to emit the same schema from your installed binary.
 
@@ -721,7 +723,8 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `model` | string | `""` | Pass `--model <name>` to Copilot CLI |
 | `launch_mode` | string | `"tab"` | How to open sessions: `in-place`, `tab`, `window`, `pane` |
 | `pane_direction` | string | `"auto"` | Split direction for pane mode: `auto`, `right`, `down`, `left`, `up` (see note below) |
-| `custom_command` | string | `""` | Custom launch command (`{sessionId}` is replaced) |
+| `resume_session_command` | string | `""` | Custom resume command (`{sessionId}` is replaced). Defaults to `copilot --resume` |
+| `new_session_command` | string | `""` | Command to launch new sessions (`{cwd}` is replaced). Defaults to `copilot` |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
 | `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
@@ -784,7 +787,8 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "model": "",
   "launch_mode": "tab",
   "pane_direction": "auto",
-  "custom_command": "",
+  "resume_session_command": "",
+  "new_session_command": "",
   "excluded_dirs": [],
   "theme": "auto",
   "workspace_recovery": true,
@@ -798,12 +802,20 @@ The split starts in the session's working directory (`-c`) and runs the resume c
 }
 ```
 
-### Custom Command
+### Resume Session Command
 
-Set `custom_command` to replace the default Copilot CLI launch entirely. Use `{sessionId}` as the placeholder. When set, Agent, Model, and Yolo Mode fields are ignored.
+Set `resume_session_command` to replace the default Copilot CLI resume command. Use `{sessionId}` as the placeholder for the session to resume. When set, Agent, Model, and Yolo Mode fields are ignored.
 
 ```json
-"custom_command": "my-tool resume {sessionId}"
+"resume_session_command": "my-tool resume {sessionId}"
+```
+
+### New Session Command
+
+Set `new_session_command` to customize the command used when launching a brand new session from dispatch (the `+` keybinding). Use `{cwd}` as the placeholder for the working directory. When empty, defaults to `copilot`.
+
+```json
+"new_session_command": "copilot --agent workspace"
 ```
 
 ### Customizing Keybindings

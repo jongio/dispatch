@@ -1,0 +1,830 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - navigation [ref=e4]:
+      - link ">_ dispatch" [ref=e5] [cursor=pointer]:
+        - /url: /dispatch/
+        - generic [ref=e6]: ">_"
+        - generic [ref=e7]: dispatch
+      - generic [ref=e8]:
+        - link "Features" [ref=e9] [cursor=pointer]:
+          - /url: /dispatch/features/
+        - link "Install" [ref=e10] [cursor=pointer]:
+          - /url: /dispatch/install/
+        - link "CLI" [ref=e11] [cursor=pointer]:
+          - /url: /dispatch/cli/
+        - link "Config" [ref=e12] [cursor=pointer]:
+          - /url: /dispatch/config/
+        - link "Keys" [ref=e13] [cursor=pointer]:
+          - /url: /dispatch/keys/
+        - link "Changelog" [ref=e14] [cursor=pointer]:
+          - /url: /dispatch/changelog/
+        - link "GitHub" [ref=e15] [cursor=pointer]:
+          - /url: https://github.com/jongio/dispatch
+          - img [ref=e16]
+  - main [ref=e18]:
+    - generic [ref=e20]:
+      - heading "Changelog" [level=1] [ref=e21]
+      - paragraph [ref=e22]: All notable changes to Dispatch.
+    - generic [ref=e24]:
+      - heading "Unreleased" [level=2] [ref=e25]:
+        - generic [ref=e26]: Unreleased
+      - heading "Added" [level=3] [ref=e27]
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - text: ›
+          - strong [ref=e30]: Word filtering
+          - text: — new
+          - code [ref=e31]: excluded_words
+          - text: config option and Settings panel field. Enter a comma-separated list of words; sessions whose name or turn content contains any word (case-insensitive) are hidden from the list
+      - heading "v0.11.1 2026-06-21" [level=2] [ref=e32]:
+        - generic [ref=e33]: v0.11.1
+        - generic [ref=e34]: 2026-06-21
+      - heading "Changed" [level=3] [ref=e35]
+      - list [ref=e36]:
+        - listitem [ref=e37]: › Updated all Go dependencies to latest (copilot-sdk v1.0.2, sqlite v1.53.0, lipgloss v2.0.4, x/sync v0.21.0, x/sys v0.46.0, and others)
+        - listitem [ref=e38]: › Updated astro to v6.4.8 in website
+        - listitem [ref=e39]: › Bumped actions/checkout from v6 to v7.0.0 in CI workflows
+        - listitem [ref=e40]: › Applied npm audit fixes (postcss, vite)
+      - heading "v0.11.0 2026-06-08" [level=2] [ref=e41]:
+        - generic [ref=e42]: v0.11.0
+        - generic [ref=e43]: 2026-06-08
+      - heading "Added" [level=3] [ref=e44]
+      - list [ref=e45]:
+        - listitem [ref=e46]:
+          - text: ›
+          - strong [ref=e47]: View-state persistence
+          - text: — sort field, sort order, pivot/grouping, time range, and preview visibility are now saved to
+          - code [ref=e48]: config.json
+          - text: on every change and restored on next launch
+        - listitem [ref=e49]:
+          - text: ›
+          - code [ref=e50]: default_sort_order
+          - text: config field (
+          - code [ref=e51]: "\"asc\""
+          - text: /
+          - code [ref=e52]: "\"desc\""
+          - text: ) for persisting sort direction
+        - listitem [ref=e53]:
+          - text: › Config versioning and migration system (
+          - code [ref=e54]: config_version
+          - text: field) to safely evolve settings across dispatch updates
+        - listitem [ref=e55]:
+          - text: "› Migration v0→v1: auto-converts deprecated"
+          - code [ref=e56]: launchInPlace
+          - text: boolean to
+          - code [ref=e57]: launch_mode
+          - text: string
+      - heading "Documentation" [level=3] [ref=e58]
+      - list [ref=e59]:
+        - listitem [ref=e60]:
+          - text: › Added
+          - code [ref=e61]: default_sort_order
+          - text: to README config options table
+        - listitem [ref=e62]: › Noted persistence behavior on sort, sort order, pivot, and preview toggle in keybindings docs
+      - heading "v0.10.9 2026-06-07" [level=2] [ref=e63]:
+        - generic [ref=e64]: v0.10.9
+        - generic [ref=e65]: 2026-06-07
+      - heading "Fixed" [level=3] [ref=e66]
+      - list [ref=e67]:
+        - listitem [ref=e68]: › Release workflow changelog gate now uses inline grep (mage not available in CI runner)
+      - heading "v0.10.8 2026-06-07" [level=2] [ref=e69]:
+        - generic [ref=e70]: v0.10.8
+        - generic [ref=e71]: 2026-06-07
+      - heading "Fixed" [level=3] [ref=e72]
+      - list [ref=e73]:
+        - listitem [ref=e74]: › Added changelog entries for v0.10.0-v0.10.7 (were missing from release archives)
+        - listitem [ref=e75]:
+          - text: › Documented
+          - code [ref=e76]: DISPATCH_SESSION_STATE
+          - text: environment variable in CLI help and website
+        - listitem [ref=e77]:
+          - text: › Fixed absolute machine-specific paths in
+          - code [ref=e78]: docs/keybindings.md
+        - listitem [ref=e79]: › Updated CONTRIBUTING.md Go version (1.26.4) and project structure
+      - heading "CI" [level=3] [ref=e80]
+      - list [ref=e81]:
+        - listitem [ref=e82]:
+          - text: › Release workflow now verifies CHANGELOG.md has an entry before tagging (
+          - code [ref=e83]: mage changelogCheck
+          - text: )
+      - heading "v0.10.7 2026-06-07" [level=2] [ref=e84]:
+        - generic [ref=e85]: v0.10.7
+        - generic [ref=e86]: 2026-06-07
+      - heading "Changed" [level=3] [ref=e87]
+      - list [ref=e88]:
+        - listitem [ref=e89]:
+          - text: › Moved
+          - code [ref=e90]: ColorScheme
+          - text: type from
+          - code [ref=e91]: tui/styles
+          - text: to
+          - code [ref=e92]: config
+          - text: package (fixes upward dependency)
+        - listitem [ref=e93]:
+          - text: › Decoupled
+          - code [ref=e94]: copilot
+          - text: package from
+          - code [ref=e95]: data
+          - text: via
+          - code [ref=e96]: SessionQuerier
+          - text: interface
+        - listitem [ref=e97]:
+          - text: › Moved
+          - code [ref=e98]: Version
+          - text: to dedicated
+          - code [ref=e99]: internal/version
+          - text: package
+        - listitem [ref=e100]:
+          - text: › Extracted
+          - code [ref=e101]: applySessionFilters
+          - text: /
+          - code [ref=e102]: applyGroupFilters
+          - text: helpers (eliminates 6 repeated filter chains)
+        - listitem [ref=e103]:
+          - text: › Added
+          - code [ref=e104]: closeRows
+          - text: helper to eliminate
+          - code [ref=e105]: nolint:errcheck
+          - text: in store.go
+        - listitem [ref=e106]:
+          - text: › Added
+          - code [ref=e107]: sdkContext
+          - text: helper for Copilot SDK operations
+        - listitem [ref=e108]:
+          - text: › Replaced
+          - code [ref=e109]: FormatInt
+          - text: wrapper with direct
+          - code [ref=e110]: strconv.Itoa
+          - text: calls
+        - listitem [ref=e111]:
+          - text: › Replaced
+          - code [ref=e112]: time.Sleep
+          - text: with timer+select in
+          - code [ref=e113]: waitForLog
+          - text: for clean shutdown
+        - listitem [ref=e114]: › Used typed SQLite errors instead of string matching in store.go
+        - listitem [ref=e115]:
+          - text: › Added
+          - code [ref=e116]: context.Context
+          - text: parameter to
+          - code [ref=e117]: Maintain()
+      - heading "Fixed" [level=3] [ref=e118]
+      - list [ref=e119]:
+        - listitem [ref=e120]: › Deep search and AI session results now show attention/plan/work status indicators immediately
+        - listitem [ref=e121]:
+          - text: ›
+          - code [ref=e122]: io.LimitReader
+          - text: added to GitHub API response decoding (1 MB cap)
+        - listitem [ref=e123]:
+          - text: › Improved
+          - code [ref=e124]: ChronicleReindex
+          - text: output matching reliability
+        - listitem [ref=e125]:
+          - text: › Removed 4 dead functions (
+          - code [ref=e126]: hiddenCount
+          - text: ","
+          - code [ref=e127]: launchNewSession
+          - text: ","
+          - code [ref=e128]: IconHidden
+          - text: ","
+          - code [ref=e129]: IconList
+          - text: )
+      - heading "CI" [level=3] [ref=e130]
+      - list [ref=e131]:
+        - listitem [ref=e132]:
+          - text: › Pinned golangci-lint to v2.12.2 (was
+          - code [ref=e133]: latest
+          - text: )
+        - listitem [ref=e134]: › Cross-compile job now runs on pushes to main (was PR-only)
+        - listitem [ref=e135]: › Added 60% coverage threshold enforcement
+      - heading "Tests" [level=3] [ref=e136]
+      - list [ref=e137]:
+        - listitem [ref=e138]: "› Added 740+ lines of new tests: handler coverage, components, platform, chronicle, copilot"
+        - listitem [ref=e139]:
+          - text: › Fixed timing-dependent
+          - code [ref=e140]: TestStop_TerminatesLoop
+          - text: in dbwatch
+        - listitem [ref=e141]: › Removed trivial constant-value tests
+      - heading "v0.10.6 2026-06-06" [level=2] [ref=e142]:
+        - generic [ref=e143]: v0.10.6
+        - generic [ref=e144]: 2026-06-06
+      - heading "Fixed" [level=3] [ref=e145]
+      - list [ref=e146]:
+        - listitem [ref=e147]: › Go 1.26.4 stdlib CVE mitigations
+        - listitem [ref=e148]: › DBWatcher concurrency fixes
+      - heading "Dependencies" [level=3] [ref=e149]
+      - list [ref=e150]:
+        - listitem [ref=e151]: › Updated indirect dependencies
+      - heading "v0.10.5 2026-06-05" [level=2] [ref=e152]:
+        - generic [ref=e153]: v0.10.5
+        - generic [ref=e154]: 2026-06-05
+      - heading "Dependencies" [level=3] [ref=e155]
+      - list [ref=e156]:
+        - listitem [ref=e157]: › Updated all Go dependencies to latest
+      - heading "v0.10.4 2026-06-05" [level=2] [ref=e158]:
+        - generic [ref=e159]: v0.10.4
+        - generic [ref=e160]: 2026-06-05
+      - heading "Changed" [level=3] [ref=e161]
+      - list [ref=e162]:
+        - listitem [ref=e163]:
+          - text: › Session refresh uses
+          - code [ref=e164]: PRAGMA data_version
+          - text: for efficient change detection
+        - listitem [ref=e165]: › Simplified reindex flow
+      - heading "v0.10.3 2026-05-21" [level=2] [ref=e166]:
+        - generic [ref=e167]: v0.10.3
+        - generic [ref=e168]: 2026-05-21
+      - heading "Fixed" [level=3] [ref=e169]
+      - list [ref=e170]:
+        - listitem [ref=e171]: "› Quality sweep: code review, security, and docs fixes (#115)"
+        - listitem [ref=e172]: › Installer uses unauthenticated redirect for version resolution
+      - heading "v0.10.1 2026-05-18" [level=2] [ref=e173]:
+        - generic [ref=e174]: v0.10.1
+        - generic [ref=e175]: 2026-05-18
+      - heading "Fixed" [level=3] [ref=e176]
+      - list [ref=e177]:
+        - listitem [ref=e178]: › Authenticate GitHub API requests in update command (#104)
+      - heading "v0.10.0 2026-05-18" [level=2] [ref=e179]:
+        - generic [ref=e180]: v0.10.0
+        - generic [ref=e181]: 2026-05-18
+      - heading "Changed" [level=3] [ref=e182]
+      - list [ref=e183]:
+        - listitem [ref=e184]: › Decomposed Model struct into focused sub-models (#78)
+        - listitem [ref=e185]: › Extracted Update method into per-message handler functions (#77)
+        - listitem [ref=e186]: › Consolidated filter methods with shared predicate helper (#34)
+        - listitem [ref=e187]:
+          - text: › Consolidated dot-rendering with shared
+          - code [ref=e188]: renderDot
+          - text: helper (#40)
+        - listitem [ref=e189]:
+          - text: › Deduplicated
+          - code [ref=e190]: ScanAttention
+          - text: preamble with shared scanner helper (#39)
+        - listitem [ref=e191]: › Deduplicated Nerd Font detection into shared helper (#80)
+        - listitem [ref=e192]: › Extracted hardcoded model name to package-level constant (#81)
+        - listitem [ref=e193]:
+          - text: › Parallelized sequential queries in
+          - code [ref=e194]: GetSession
+          - text: with errgroup
+        - listitem [ref=e195]: › Replaced correlated COUNT subqueries with JOIN-based aggregation
+      - heading "Fixed" [level=3] [ref=e196]
+      - list [ref=e197]:
+        - listitem [ref=e198]:
+          - text: › Goroutine leak in
+          - code [ref=e199]: waitForDBChangeCmd
+          - text: when channel is nil (#57)
+        - listitem [ref=e200]:
+          - text: › Protected mutable style variables with
+          - code [ref=e201]: sync.RWMutex
+          - text: (#51)
+        - listitem [ref=e202]:
+          - text: › Prefer
+          - code [ref=e203]: errors.Is/As
+          - text: over string-based error matching (#50)
+        - listitem [ref=e204]: › Propagated context in copilot client where safe (#52)
+        - listitem [ref=e205]: "› Reused HTTP client and propagated context in update command (#64, #65)"
+        - listitem [ref=e206]:
+          - text: › Handled
+          - code [ref=e207]: os.UserHomeDir
+          - text: error in store initialization (#79)
+      - heading "Performance" [level=3] [ref=e208]
+      - list [ref=e209]:
+        - listitem [ref=e210]:
+          - text: › Added missing index on
+          - code [ref=e211]: session_files.session_id
+          - text: (#60)
+        - listitem [ref=e212]: › Cached padding string in session list render loop (#62)
+      - heading "CI" [level=3] [ref=e213]
+      - list [ref=e214]:
+        - listitem [ref=e215]: › Added Dependabot config for Go, Actions, and npm (#71)
+        - listitem [ref=e216]: › Pinned Go dev tool versions to prevent supply chain attacks (#76)
+        - listitem [ref=e217]: › Added coverage profiling and artifact upload (#69)
+        - listitem [ref=e218]: › Used PR workflow instead of direct push in release (#75)
+        - listitem [ref=e219]: › Aligned pages.yml action versions with other workflows (#68)
+      - heading "Tests" [level=3] [ref=e220]
+      - list [ref=e221]:
+        - listitem [ref=e222]: › Added coverage for self-update binary replacement (#85)
+        - listitem [ref=e223]: › Added coverage for doAnalyze completion analysis (#84)
+        - listitem [ref=e224]: › Added coverage for work status scanning pipeline (#83)
+        - listitem [ref=e225]: › Added coverage for session launch and terminal detection (#82)
+        - listitem [ref=e226]: › Added coverage for Windows chronicle PTY and dbwatch (#86)
+        - listitem [ref=e227]: › Added meaningful assertions to TUI view and launch tests (#56)
+      - heading "Documentation" [level=3] [ref=e228]
+      - list [ref=e229]:
+        - listitem [ref=e230]: › Documented all network-facing features in SECURITY.md (#72)
+        - listitem [ref=e231]: › Documented glamour/lipgloss dual-dependency (#59)
+      - heading "Dependencies" [level=3] [ref=e232]
+      - list [ref=e233]:
+        - listitem [ref=e234]: › Updated indirect dependencies to latest stable versions (#44)
+        - listitem [ref=e235]: › Bumped Astro to 6.3.3, TypeScript to 6.0.3
+        - listitem [ref=e236]: "› Bumped CI actions: golangci-lint-action 9.2.0, goreleaser-action 7.2.1, setup-node 6.4.0"
+      - heading "v0.9.0 2026-05-14" [level=2] [ref=e237]:
+        - generic [ref=e238]: v0.9.0
+        - generic [ref=e239]: 2026-05-14
+      - heading "Added" [level=3] [ref=e240]
+      - list [ref=e241]:
+        - listitem [ref=e242]: › FTS5 full-text search with BM25 ranking (falls back to LIKE for older CLI versions)
+        - listitem [ref=e243]: "› Session refs integration: searching numbers matches PR/issue/commit references"
+        - listitem [ref=e244]: "› Incremental auto-refresh: session list updates within 2 seconds when Copilot CLI writes new data"
+        - listitem [ref=e245]: "› Finer attention classification: Working, Thinking, and Compacting states"
+        - listitem [ref=e246]: "› Host type icons: distinct icons for CLI, Cloud, and Actions sessions"
+      - heading "Changed" [level=3] [ref=e247]
+      - list [ref=e248]:
+        - listitem [ref=e249]: › Reindex renamed to "Rebuild Index" — now a manual repair action
+        - listitem [ref=e250]: › Normal session refresh is automatic via DB change detection (no reindex needed)
+      - heading "Fixed" [level=3] [ref=e251]
+      - list [ref=e252]:
+        - listitem [ref=e253]: › Time filter showing sessions from wrong hours due to timezone offset in SQLite comparison
+        - listitem [ref=e254]: › Expand/collapse badge icons confused with sort direction controls (now uses distinct symbols)
+      - heading "Dependencies" [level=3] [ref=e255]
+      - list [ref=e256]:
+        - listitem [ref=e257]: › Updated all Go dependencies to latest (38 packages)
+        - listitem [ref=e258]: "› github.com/github/copilot-sdk/go: v0.2.0 → v0.3.0 (breaking change handled)"
+        - listitem [ref=e259]: "› charm.land/bubbletea/v2: v2.0.2 → v2.0.6"
+        - listitem [ref=e260]: "› charm.land/bubbles/v2: v2.0.0 → v2.1.0"
+        - listitem [ref=e261]: "› modernc.org/sqlite: v1.47.0 → v1.50.1"
+        - listitem [ref=e262]: "› go.opentelemetry.io/otel: v1.35.0 → v1.43.0"
+      - heading "v0.8.0 2026-04-08" [level=2] [ref=e263]:
+        - generic [ref=e264]: v0.8.0
+        - generic [ref=e265]: 2026-04-08
+      - heading "Added" [level=3] [ref=e266]
+      - list [ref=e267]:
+        - listitem [ref=e268]:
+          - text: ›
+          - strong [ref=e269]: Work status detection
+          - text: — analyze
+          - code [ref=e270]: plan.md
+          - text: files to identify sessions with incomplete planned work (#32)
+          - list [ref=e271]:
+            - listitem [ref=e272]:
+              - text: › New
+              - code [ref=e273]: WorkStatus
+              - text: "type: Unknown, Complete, Incomplete, NoPlan, Analyzing, Error"
+            - listitem [ref=e274]: › Plan parsing to detect incomplete tasks (unchecked checkboxes, pending items)
+            - listitem [ref=e275]:
+              - text: › Copilot SDK
+              - code [ref=e276]: analyze_completion
+              - text: tool for AI-powered completion analysis
+            - listitem [ref=e277]: › Colored dot indicators in session list showing work completion status
+            - listitem [ref=e278]: › Work status display in the preview panel metadata
+            - listitem [ref=e279]:
+              - text: › Work status filtering via
+              - code [ref=e280]: "!"
+              - text: status picker (incomplete, complete)
+            - listitem [ref=e281]: › Status bar shows scan progress and completion summary
+        - listitem [ref=e282]:
+          - text: ›
+          - strong [ref=e283]: Shift+arrow range selection
+          - text: (
+          - code [ref=e284]: Shift+↑
+          - text: /
+          - code [ref=e285]: Shift+↓
+          - text: ) — select a contiguous range of sessions using Shift+Up/Down arrow keys, matching standard OS file manager behavior (#33). Anchor is set on first shift-press; plain arrow resets. Correctly skips folder nodes in tree mode
+        - listitem [ref=e286]:
+          - text: ›
+          - strong [ref=e287]: Conversation sort default
+          - text: — preview pane conversation now defaults to newest-first (descending). Toggle with
+          - code [ref=e288]: o
+          - text: key or click the sort arrow next to "Conversation"
+        - listitem [ref=e289]:
+          - text: ›
+          - strong [ref=e290]: Interrupted sessions in demo mode
+          - text: —
+          - code [ref=e291]: dispatch --demo
+          - text: now shows orange ⚡ interrupted sessions alongside waiting, active, stale, and idle states
+        - listitem [ref=e292]:
+          - text: ›
+          - strong [ref=e293]: ANSI-clean preview selection
+          - text: — copying text from the preview pane now strips ANSI escape codes for clean clipboard content
+      - heading "Changed" [level=3] [ref=e294]
+      - list [ref=e295]:
+        - listitem [ref=e296]:
+          - text: ›
+          - code [ref=e297]: "!"
+          - text: status picker now includes "Incomplete work", "Complete work", and "Favorites only" rows
+        - listitem [ref=e298]:
+          - text: › Work status scan no longer runs on startup — press
+          - code [ref=e299]: R
+          - text: to scan explicitly
+        - listitem [ref=e300]: › Conversation sort click target enlarged — clicking anywhere on the "Conversation" header zone (separator, label, or gap) toggles sort order
+        - listitem [ref=e301]:
+          - text: ›
+          - code [ref=e302]: conversation_newest_first
+          - text: config now defaults to
+          - code [ref=e303]: "true"
+          - text: ; explicit
+          - code [ref=e304]: "false"
+          - text: preserved when saved
+      - heading "Breaking — Keybinding Overhaul" [level=3] [ref=e305]
+      - list [ref=e306]:
+        - listitem [ref=e307]:
+          - text: ›
+          - strong [ref=e308]:
+            - code [ref=e309]: O
+            - text: →
+            - code [ref=e310]: L
+          - text: ": \"Open selected\" renamed to \"Launch selected\" and moved to"
+          - code [ref=e311]: L
+          - text: (frees
+          - code [ref=e312]: O
+          - text: so
+          - code [ref=e313]: o
+          - text: /
+          - code [ref=e314]: O
+          - text: are no longer an unrelated pair)
+        - listitem [ref=e315]:
+          - text: ›
+          - strong [ref=e316]:
+            - code [ref=e317]: F
+            - text: removed
+          - text: ": \"Filter favorites\" absorbed into"
+          - code [ref=e318]: "!"
+          - text: status picker as "Favorites only" row
+        - listitem [ref=e319]:
+          - text: ›
+          - strong [ref=e320]:
+            - code [ref=e321]: M
+            - text: removed
+          - text: ": \"Filter plans\" absorbed into"
+          - code [ref=e322]: "!"
+          - text: status picker as "Has plan" row
+        - listitem [ref=e323]:
+          - text: ›
+          - strong [ref=e324]:
+            - code [ref=e325]: R
+            - text: →
+            - code [ref=e326]: "N"
+          - text: ": \"Resume interrupted\" moved to"
+          - code [ref=e327]: "N"
+          - text: (uppercase;
+          - code [ref=e328]: "n"
+          - text: = next waiting — related concepts)
+        - listitem [ref=e329]:
+          - text: ›
+          - strong [ref=e330]:
+            - code [ref=e331]: R
+            - text: = Scan work status
+          - text: "(new): Explicitly scans all sessions with plans for work completion status"
+      - heading "Security" [level=3] [ref=e332]
+      - list [ref=e333]:
+        - listitem [ref=e334]:
+          - text: › Eliminate TOCTOU race in
+          - code [ref=e335]: readFileIfExists
+          - text: and
+          - code [ref=e336]: WriteContinuationPlan
+          - text: — replaced Lstat-then-operate with open-then-Fstat pattern
+        - listitem [ref=e337]:
+          - text: › Harden
+          - code [ref=e338]: stripDelimiters
+          - text: against spaced delimiter variant bypass in prompt injection defense
+        - listitem [ref=e339]: › Add cancellable context to AI work status scan with 10-minute timeout
+      - heading "Fixed" [level=3] [ref=e340]
+      - list [ref=e341]:
+        - listitem [ref=e342]:
+          - text: ›
+          - code [ref=e343]: AttentionInterrupted
+          - text: missing from sort priority — now correctly sorted at priority 2
+        - listitem [ref=e344]: › Deep search results and AI session loads now apply full filter chain (attention, plan, work status)
+        - listitem [ref=e345]: › AI work status fallback for sessions without AI results — continuation plans preserved
+        - listitem [ref=e346]:
+          - text: › Symlink overwrite vulnerability in
+          - code [ref=e347]: WriteContinuationPlan
+          - text: — added Lstat safety check
+        - listitem [ref=e348]:
+          - text: › Auto-generated section feedback loop in plan parser —
+          - code [ref=e349]: stripAutoGeneratedSection
+          - text: now prevents re-parsing cycles
+        - listitem [ref=e350]: › Blocking I/O moved off UI thread for work status scanning
+        - listitem [ref=e351]:
+          - text: ›
+          - code [ref=e352]: R
+          - text: key now re-scans plans before work status for fresh data
+        - listitem [ref=e353]:
+          - text: › Race detector guard in
+          - code [ref=e354]: mage preflight
+          - text: — step 8 now skips gracefully when CGO/gcc unavailable
+        - listitem [ref=e355]:
+          - text: › Flaky test timing in copilot search lock test — replaced
+          - code [ref=e356]: time.Sleep
+          - text: with channel-based synchronization
+      - heading "[v0.7.0] - 2026-03-23" [level=2] [ref=e357]
+      - heading "Fixed" [level=3] [ref=e358]
+      - list [ref=e359]:
+        - listitem [ref=e360]: "› Release workflow: move contributor notes to temp dir before goreleaser to avoid archive contamination"
+      - heading "[v0.6.0] - 2026-03-23" [level=2] [ref=e361]
+      - heading "Fixed" [level=3] [ref=e362]
+      - list [ref=e363]:
+        - listitem [ref=e364]: "› CI: add rebase before push in release workflow to prevent non-fast-forward failures"
+      - heading "[v0.5.0] - 2026-03-23" [level=2] [ref=e365]
+      - paragraph [ref=e366]: Re-release of v0.4.0 — no functional changes. Tag correction.
+      - heading "[v0.4.0] - 2026-03-23" [level=2] [ref=e367]
+      - heading "Added" [level=3] [ref=e368]
+      - list [ref=e369]:
+        - listitem [ref=e370]:
+          - text: ›
+          - strong [ref=e371]: Expand/collapse all toggle
+          - text: — collapse or expand all folder groups in tree view with a single key (#31). New
+          - code [ref=e372]: default_collapsed
+          - text: config option
+        - listitem [ref=e373]:
+          - text: ›
+          - strong [ref=e374]: Copy session ID
+          - text: (
+          - code [ref=e375]: c
+          - text: ) — copy the selected session's ID to the system clipboard. Click the ID row in the preview pane for the same effect (#27)
+        - listitem [ref=e376]:
+          - text: ›
+          - strong [ref=e377]: "\"Has plan\" status filter"
+          - text: — the
+          - code [ref=e378]: "!"
+          - text: attention status picker now includes a "Has plan" row to filter sessions with
+          - code [ref=e379]: plan.md
+          - text: files (#29)
+        - listitem [ref=e380]:
+          - text: ›
+          - strong [ref=e381]: Plan indicator in preview
+          - text: — sessions with a
+          - code [ref=e382]: plan.md
+          - text: "file show \"Plan: Yes\" in the preview pane metadata (#22)"
+        - listitem [ref=e383]:
+          - text: ›
+          - strong [ref=e384]: Configurable preview position
+          - text: — move the preview pane to right, bottom, left, or top (#18)
+        - listitem [ref=e385]:
+          - text: ›
+          - strong [ref=e386]: Conversation sort toggle
+          - text: (
+          - code [ref=e387]: o
+          - text: ) — toggle between oldest-first and newest-first conversation display in the preview pane; also clickable via the sort arrow in the conversation header
+        - listitem [ref=e388]:
+          - text: ›
+          - strong [ref=e389]: Contributor recognition
+          - text: — automated contributor attribution in releases (#24)
+          - list [ref=e390]:
+            - listitem [ref=e391]:
+              - text: ›
+              - code [ref=e392]: mage contributors
+              - text: target regenerates CONTRIBUTORS.md from git history
+            - listitem [ref=e393]:
+              - text: ›
+              - code [ref=e394]: go run ./cmd/contributors/
+              - text: CLI tool for release-time contributor extraction
+            - listitem [ref=e395]: › Co-authored-by trailer parsing (recognizes AI pair programming)
+            - listitem [ref=e396]: › Bot filtering (excludes CI bots, keeps Copilot co-authorship)
+            - listitem [ref=e397]: › First-time contributor detection and highlighting
+        - listitem [ref=e398]:
+          - text: ›
+          - strong [ref=e399]: Charm ecosystem v2
+          - text: — upgraded bubbletea, bubbles, lipgloss, glamour, and copilot-sdk to v2 (#26)
+      - heading "Changed" [level=3] [ref=e400]
+      - list [ref=e401]:
+        - listitem [ref=e402]:
+          - text: › Copy session ID keybinding changed from
+          - code [ref=e403]: "y"
+          - text: (yank) to
+          - code [ref=e404]: c
+          - text: (copy) for better discoverability
+        - listitem [ref=e405]: › CI skips runs for non-code changes (docs, markdown); pages actions pinned to SHA
+      - heading "Fixed" [level=3] [ref=e406]
+      - list [ref=e407]:
+        - listitem [ref=e408]: "› Git Bash MinTTY detection and path quoting (#15, #16)"
+        - listitem [ref=e409]:
+          - text: › Windows Terminal split-pane flags corrected (
+          - code [ref=e410]: "-H"
+          - text: /
+          - code [ref=e411]: "-V"
+          - text: instead of invalid
+          - code [ref=e412]: "--direction"
+          - text: ) (#20)
+        - listitem [ref=e413]: › Worktree PATH shadowing, session ID validation, folder launch constant extraction
+        - listitem [ref=e414]: › M-03 and M-05 security findings from red team audit
+        - listitem [ref=e415]:
+          - text: › LF line endings enforced via
+          - code [ref=e416]: .gitattributes
+          - text: (
+          - code [ref=e417]: eol=lf
+          - text: )
+        - listitem [ref=e418]: › TestLaunchSession no longer spawns zombie terminal processes (#28)
+        - listitem [ref=e419]: › gofmt formatting stabilized across doc comments
+      - heading "[v0.3.0] - 2026-03-19" [level=2] [ref=e420]
+      - heading "Added" [level=3] [ref=e421]
+      - list [ref=e422]:
+        - listitem [ref=e423]:
+          - text: ›
+          - strong [ref=e424]: Session favorites
+          - text: (
+          - code [ref=e425]: "*"
+          - text: /
+          - code [ref=e426]: F
+          - text: ) — star sessions with
+          - code [ref=e427]: "*"
+          - text: key, filter to show only favorites with
+          - code [ref=e428]: F
+          - text: ", persistent in config"
+        - listitem [ref=e429]:
+          - text: ›
+          - strong [ref=e430]: Multi-session open
+          - text: — select multiple sessions with
+          - code [ref=e431]: Space
+          - text: ", open all at once with"
+          - code [ref=e432]: O
+          - list [ref=e433]:
+            - listitem [ref=e434]:
+              - text: ›
+              - code [ref=e435]: a
+              - text: /
+              - code [ref=e436]: d
+              - text: to select all / deselect all
+            - listitem [ref=e437]: › Ctrl+click for mouse selection, Shift+click for range select
+            - listitem [ref=e438]: › Selection count displayed in footer
+            - listitem [ref=e439]: › ✓ indicator on selected sessions
+        - listitem [ref=e440]:
+          - text: ›
+          - strong [ref=e441]: Attention indicators
+          - text: — colored dots showing real-time session AI activity status
+          - list [ref=e442]:
+            - listitem [ref=e443]: "› Five states: waiting (purple), active (green), stale (yellow), interrupted (orange ⚡), idle (gray)"
+            - listitem [ref=e444]: › Determined by scanning session-state lock files and event logs
+            - listitem [ref=e445]:
+              - text: ›
+              - code [ref=e446]: "n"
+              - text: to jump to next waiting session
+            - listitem [ref=e447]:
+              - text: ›
+              - code [ref=e448]: "!"
+              - text: to open attention status filter picker
+            - listitem [ref=e449]: › Auto-refreshes on every reindex
+        - listitem [ref=e450]:
+          - text: ›
+          - strong [ref=e451]: Workspace recovery
+          - text: — detect sessions interrupted by crash/reboot and resume them
+          - list [ref=e452]:
+            - listitem [ref=e453]: › New "interrupted" attention status (orange ⚡) for sessions killed mid-work
+            - listitem [ref=e454]: › Stale lock file detection with 72-hour window (covers weekend crashes)
+            - listitem [ref=e455]:
+              - text: ›
+              - code [ref=e456]: R
+              - text: to batch-resume all interrupted sessions
+            - listitem [ref=e457]:
+              - text: ›
+              - code [ref=e458]: workspace_recovery
+              - text: "config toggle (default: on)"
+            - listitem [ref=e459]: › Defensive lock file parsing with graceful degradation
+        - listitem [ref=e460]:
+          - text: ›
+          - strong [ref=e461]: Self-update
+          - text: (
+          - code [ref=e462]: dispatch update
+          - text: ) — downloads latest release from GitHub and replaces in-place
+          - list [ref=e463]:
+            - listitem [ref=e464]: › SHA-256 checksum verification
+            - listitem [ref=e465]: › Interprocess lock prevents concurrent updates
+            - listitem [ref=e466]: › Background version check on every launch with 24-hour cache
+            - listitem [ref=e467]: › Post-exit notification when a new version is available
+        - listitem [ref=e468]: › Preview pane shows absolute local timestamps with timezone
+        - listitem [ref=e469]: › Preview pane shows full session ID (no longer truncated)
+        - listitem [ref=e470]: › Demo mode enhancements (fake attention data, realistic timestamps)
+        - listitem [ref=e471]:
+          - text: › WSL cross-testing (
+          - code [ref=e472]: mage testWSL
+          - text: ) for Unix code path coverage
+        - listitem [ref=e473]: › Race detection as separate preflight step
+        - listitem [ref=e474]: › Install verification as preflight step
+      - heading "Changed" [level=3] [ref=e475]
+      - list [ref=e476]:
+        - listitem [ref=e477]: › Auto-version release workflow with patch/minor/major dropdown
+      - heading "Fixed" [level=3] [ref=e478]
+      - list [ref=e479]:
+        - listitem [ref=e480]: › Demo mode timestamp format mismatch — timestamps now use RFC3339 format (fixes 1h range showing no sessions)
+        - listitem [ref=e481]: "› Date pivot now groups sessions by local timezone instead of UTC (fixes #5)"
+        - listitem [ref=e482]: › Reindex cancel crash — stale log pump messages discarded after cancel
+        - listitem [ref=e483]: › Reindex overlay log text left-alignment fixed
+        - listitem [ref=e484]: › Removed excluded directory count from header badges
+        - listitem [ref=e485]: › Removed hidden session count from footer
+      - heading "[v0.1.0] - 2026-03-10" [level=2] [ref=e486]
+      - heading "Added" [level=3] [ref=e487]
+      - list [ref=e488]:
+        - listitem [ref=e489]:
+          - text: ›
+          - paragraph [ref=e490]:
+            - text: Full chronicle reindex via Copilot CLI pseudo-terminal (
+            - code [ref=e491]: r
+            - text: key or
+            - code [ref=e492]: "--reindex"
+            - text: )
+          - list [ref=e493]:
+            - listitem [ref=e494]: › Launches copilot.exe in ConPTY (Windows) or creack/pty (Unix)
+            - listitem [ref=e495]:
+              - text: › Sends
+              - code [ref=e496]: /chronicle reindex
+              - text: for complete ETL rebuild (sessions, turns, checkpoints, files, refs)
+            - listitem [ref=e497]: › Streaming log overlay shows real-time progress
+            - listitem [ref=e498]: › Falls back to FTS5 index maintenance if Copilot CLI binary is not found
+            - listitem [ref=e499]:
+              - text: › Footer shows last reindex time and
+              - code [ref=e500]: r reindex
+              - text: hint
+        - listitem [ref=e501]:
+          - text: ›
+          - paragraph [ref=e502]: Terminal UI for browsing GitHub Copilot CLI sessions
+        - listitem [ref=e503]:
+          - text: ›
+          - paragraph [ref=e504]: Full-text search across session summaries, conversations, checkpoints, and file references
+        - listitem [ref=e505]:
+          - text: ›
+          - paragraph [ref=e506]: "Two-tier search: quick (session fields) and deep (turns, checkpoints, files, refs) with debounce"
+        - listitem [ref=e507]:
+          - text: ›
+          - paragraph [ref=e508]: Filter panel with time range (1h, 1d, 7d, all) and sort options
+        - listitem [ref=e509]:
+          - text: ›
+          - paragraph [ref=e510]: Sortable by updated, created, turns, name, or folder
+        - listitem [ref=e511]:
+          - text: ›
+          - paragraph [ref=e512]: "Grouping/pivot modes: folder, repository, branch, date, or flat list"
+        - listitem [ref=e513]:
+          - text: ›
+          - paragraph [ref=e514]: Preview pane with chat-style conversation display (side-border formatting)
+        - listitem [ref=e515]:
+          - text: ›
+          - paragraph [ref=e516]: Pane-aware mouse scrolling (scroll the pane under cursor)
+        - listitem [ref=e517]:
+          - text: ›
+          - paragraph [ref=e518]: Clickable header elements (search, filters, sort, pivot)
+        - listitem [ref=e519]:
+          - text: ›
+          - paragraph [ref=e520]: Click to select, double-click folders to launch new session
+        - listitem [ref=e521]:
+          - text: ›
+          - paragraph [ref=e522]: "Four launch modes: in-place, new tab, new window, split pane"
+        - listitem [ref=e523]:
+          - text: ›
+          - paragraph [ref=e524]: Split pane launch mode for Windows Terminal with configurable direction (auto, right, down, left, up)
+        - listitem [ref=e525]:
+          - text: ›
+          - paragraph [ref=e526]: Configurable shell, terminal, agent, model, and custom commands
+        - listitem [ref=e527]:
+          - text: ›
+          - paragraph [ref=e528]: Session hiding with per-session toggle
+        - listitem [ref=e529]:
+          - text: ›
+          - paragraph [ref=e530]: Directory exclusion via configuration
+        - listitem [ref=e531]:
+          - text: ›
+          - paragraph [ref=e532]: Cross-platform support (Windows, macOS, Linux)
+        - listitem [ref=e533]:
+          - text: ›
+          - paragraph [ref=e534]: Windows Terminal theme detection and inheritance
+        - listitem [ref=e535]:
+          - text: ›
+          - paragraph [ref=e536]: Nerd Font detection with fallback icons
+        - listitem [ref=e537]:
+          - text: ›
+          - paragraph [ref=e538]: Vim-style navigation (j/k) alongside arrow keys
+        - listitem [ref=e539]:
+          - text: ›
+          - paragraph [ref=e540]: Configuration persistence in platform-specific config directory
+        - listitem [ref=e541]:
+          - text: ›
+          - paragraph [ref=e542]:
+            - code [ref=e543]: disp
+            - text: shorthand alias created by installer
+        - listitem [ref=e544]:
+          - text: ›
+          - paragraph [ref=e545]: Read-only database access with parameterized queries
+        - listitem [ref=e546]:
+          - text: ›
+          - paragraph [ref=e547]: Session ID validation and shell command escaping
+  - contentinfo [ref=e548]:
+    - generic [ref=e550]:
+      - generic [ref=e551]:
+        - paragraph [ref=e552]: ">_ dispatch"
+        - paragraph [ref=e553]: MIT License
+      - navigation [ref=e554]:
+        - link "Install" [ref=e555] [cursor=pointer]:
+          - /url: /dispatch/install/
+        - link "CLI" [ref=e556] [cursor=pointer]:
+          - /url: /dispatch/cli/
+        - link "Keys" [ref=e557] [cursor=pointer]:
+          - /url: /dispatch/keys/
+        - link "Changelog" [ref=e558] [cursor=pointer]:
+          - /url: /dispatch/changelog/
+      - generic [ref=e559]:
+        - link "Star on GitHub" [ref=e560] [cursor=pointer]:
+          - /url: https://github.com/jongio/dispatch
+          - img [ref=e561]
+          - text: Star on GitHub
+        - paragraph [ref=e563]: A terminal UI for your Copilot CLI sessions
+  - generic [ref=e566]:
+    - button "Menu" [ref=e567]:
+      - img [ref=e569]
+      - generic: Menu
+    - button "Inspect" [ref=e573]:
+      - img [ref=e575]
+      - generic: Inspect
+    - button "Audit" [ref=e577]:
+      - img [ref=e579]
+      - generic: Audit
+    - button "Settings" [ref=e582]:
+      - img [ref=e584]
+      - generic: Settings

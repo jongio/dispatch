@@ -136,11 +136,11 @@ func resolveNewDir(dir string) (string, error) {
 func defaultNewLaunch(w io.Writer, cfg *config.Config, dir string, mode string) error {
 	if mode == config.LaunchModeInPlace {
 		rc := platform.ResumeConfig{
-			YoloMode:      cfg.YoloMode,
-			Agent:         cfg.Agent,
-			Model:         cfg.Model,
-			CustomCommand: cfg.CustomCommand,
-			Cwd:           dir,
+			YoloMode:             cfg.YoloMode,
+			Agent:                cfg.Agent,
+			Model:                cfg.Model,
+			ResumeSessionCommand: cfg.ResumeSessionCommand,
+			Cwd:                  dir,
 		}
 		cmd, err := platform.NewResumeCmd("", rc)
 		if err != nil {
@@ -157,14 +157,14 @@ func defaultNewLaunch(w io.Writer, cfg *config.Config, dir string, mode string) 
 		return errors.New("no shell detected on this system")
 	}
 	rc := platform.ResumeConfig{
-		YoloMode:      cfg.YoloMode,
-		Agent:         cfg.Agent,
-		Model:         cfg.Model,
-		Terminal:      cfg.DefaultTerminal,
-		CustomCommand: cfg.CustomCommand,
-		Cwd:           dir,
-		LaunchStyle:   launchStyleForOpenMode(mode),
-		PaneDirection: cfg.EffectivePaneDirection(),
+		YoloMode:             cfg.YoloMode,
+		Agent:                cfg.Agent,
+		Model:                cfg.Model,
+		Terminal:             cfg.DefaultTerminal,
+		ResumeSessionCommand: cfg.ResumeSessionCommand,
+		Cwd:                  dir,
+		LaunchStyle:          launchStyleForOpenMode(mode),
+		PaneDirection:        cfg.EffectivePaneDirection(),
 	}
 	if err := platform.LaunchSession(shell, "", rc); err != nil {
 		return err

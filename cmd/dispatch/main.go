@@ -134,7 +134,7 @@ Commands:
   alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
-  config [get|set|list|edit|path]
+  config [get|set|list|edit|path|export|import]
                           Read or change preferences (see Config commands)
   export <id> [flags]     Export a session as Markdown, JSON, or HTML
   export --repo R [flags] Export all sessions matching a scope filter (batch mode)
@@ -212,6 +212,8 @@ Config commands:
   config unset <key>      Reset one setting to its default
   config edit             Open the config file in your editor
   config path             Print the config file path
+  config export [--out F] Print config JSON or write it to a file
+  config import [--in F]  Read config JSON from stdin or a file
 
 Notes commands:
   notes [list] [--json]    List notes attached to current sessions

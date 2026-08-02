@@ -250,7 +250,7 @@ func TestLoadMalformedJSON_HugeArray(t *testing.T) {
 // Config content safety — hostile values that could affect downstream use
 // ---------------------------------------------------------------------------
 
-func TestConfig_CustomCommandWithShellMetachars(t *testing.T) {
+func TestConfig_ResumeSessionCommandWithShellMetachars(t *testing.T) {
 	t.Parallel()
 	// Verify that custom commands with shell metacharacters round-trip
 	// through JSON without corruption.
@@ -266,7 +266,7 @@ func TestConfig_CustomCommandWithShellMetachars(t *testing.T) {
 
 	for _, cmd := range hostile {
 		cfg := Default()
-		cfg.CustomCommand = cmd
+		cfg.ResumeSessionCommand = cmd
 
 		data, err := json.Marshal(cfg)
 		if err != nil {
@@ -281,8 +281,8 @@ func TestConfig_CustomCommandWithShellMetachars(t *testing.T) {
 		// The value must survive JSON round-trip exactly — we're not
 		// sanitising at the config layer (that's the launcher's job),
 		// but we must not corrupt it.
-		if restored.CustomCommand != cmd {
-			t.Errorf("CustomCommand round-trip: got %q, want %q", restored.CustomCommand, cmd)
+		if restored.ResumeSessionCommand != cmd {
+			t.Errorf("ResumeSessionCommand round-trip: got %q, want %q", restored.ResumeSessionCommand, cmd)
 		}
 	}
 }
