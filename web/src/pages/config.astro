@@ -19,6 +19,14 @@ import ConfigTable from '../components/ConfigTable.astro';
         <li><strong>macOS</strong> — <code>~/Library/Application Support/dispatch/config.json</code></li>
         <li><strong>Windows</strong> — <code>%APPDATA%\dispatch\config.json</code></li>
       </ul>
+      <p>
+        Validate hand-edited files with <code>dispatch config validate</code>, or
+        <code>dispatch config validate --json</code> for CI-friendly diagnostics.
+        Use <code>dispatch config validate --path &lt;file&gt;</code> for alternate
+        profiles. Editor completions are available from
+        <a href="https://github.com/jongio/dispatch/blob/main/docs/config.schema.json"><code>docs/config.schema.json</code></a>, and
+        <code>dispatch config schema</code> prints the same generated JSON Schema.
+      </p>
     </div>
   </section>
 

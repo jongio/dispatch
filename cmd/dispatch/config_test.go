@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -25,11 +27,13 @@ func withConfigSeams(t *testing.T, initial *config.Config) *config.Config {
 		initial = config.Default()
 	}
 	prevLoad, prevSave, prevPath := configLoadFn, configSaveFn, configPathFn
+	prevValidate, prevSchema := configValidateFileFn, configSchemaBytesFn
 	configLoadFn = func() (*config.Config, error) { return initial, nil }
 	configSaveFn = func(c *config.Config) error { initial = c; return nil }
 	configPathFn = func() (string, error) { return "/tmp/dispatch/config.json", nil }
 	t.Cleanup(func() {
 		configLoadFn, configSaveFn, configPathFn = prevLoad, prevSave, prevPath
+		configValidateFileFn, configSchemaBytesFn = prevValidate, prevSchema
 	})
 	return initial
 }
@@ -352,6 +356,99 @@ func TestRunConfig_UnknownSubcommand(t *testing.T) {
 	}
 }
 
+func TestRunConfigValidate_Success(t *testing.T) {
+	path := writeCLIConfigFixture(t, `{"default_sort": "updated"}`)
+	withConfigSeams(t, config.Default())
+
+	var buf bytes.Buffer
+	err := runConfig(&buf, []string{"config", "validate", "--path", path})
+	if err != nil {
+		t.Fatalf("runConfig validate: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Config OK") {
+		t.Fatalf("validate output = %q, want Config OK", buf.String())
+	}
+}
+
+func TestRunConfigValidate_InvalidJSON(t *testing.T) {
+	path := writeCLIConfigFixture(t, `{"default_sort":`)
+	withConfigSeams(t, config.Default())
+
+	var buf bytes.Buffer
+	err := runConfig(&buf, []string{"config", "validate", "--path=" + path})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(buf.String(), "invalid JSON") {
+		t.Fatalf("validate output = %q, want invalid JSON diagnostic", buf.String())
+	}
+}
+
+func TestRunConfigValidate_JSONDiagnostics(t *testing.T) {
+	path := writeCLIConfigFixture(t, `{"default_time_range": "forever"}`)
+	withConfigSeams(t, config.Default())
+
+	var buf bytes.Buffer
+	err := runConfig(&buf, []string{"config", "validate", "--json", "--path", path})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	var result config.ValidationResult
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("validate --json output invalid: %v\n%s", err, buf.String())
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false")
+	}
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Path != "default_time_range" {
+		t.Fatalf("diagnostics = %#v, want default_time_range", result.Diagnostics)
+	}
+}
+
+func TestRunConfigValidate_DefaultPath(t *testing.T) {
+	path := writeCLIConfigFixture(t, `{"default_sort": "updated"}`)
+	withConfigSeams(t, config.Default())
+	configPathFn = func() (string, error) { return path, nil }
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "validate"}); err != nil {
+		t.Fatalf("runConfig validate default path: %v", err)
+	}
+	if !strings.Contains(buf.String(), path) {
+		t.Fatalf("validate output = %q, want path %q", buf.String(), path)
+	}
+}
+
+func TestRunConfigValidate_KeybindingCollision(t *testing.T) {
+	path := writeCLIConfigFixture(t, `{"keybindings": {"search": "q"}}`)
+	withConfigSeams(t, config.Default())
+
+	var buf bytes.Buffer
+	err := runConfig(&buf, []string{"config", "validate", "--path", path})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(buf.String(), "keybindings.search") {
+		t.Fatalf("validate output = %q, want keybindings path", buf.String())
+	}
+}
+
+func TestRunConfigSchema(t *testing.T) {
+	withConfigSeams(t, config.Default())
+
+	var buf bytes.Buffer
+	if err := runConfig(&buf, []string{"config", "schema"}); err != nil {
+		t.Fatalf("runConfig schema: %v", err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &schema); err != nil {
+		t.Fatalf("schema output invalid: %v\n%s", err, buf.String())
+	}
+	if schema["$schema"] == "" {
+		t.Fatalf("schema missing $schema: %#v", schema)
+	}
+}
+
 // withEditorLauncher substitutes the editor-launch seam for a test.
 func withEditorLauncher(t *testing.T, fn func(string) error) {
 	t.Helper()
@@ -478,4 +575,13 @@ func TestHandleArgs_ConfigError(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for unknown config key")
 	}
+}
+
+func writeCLIConfigFixture(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	return path
 }
