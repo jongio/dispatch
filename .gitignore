@@ -46,6 +46,9 @@ web/dist/
 web/.astro/
 
 # ── Screenshots tool (Playwright) ──────────────────────────
+.screenshots-check/
+web/.screenshots-check/
+web/public/screenshots/**/*.html
 cmd/screenshots/node_modules/
 cmd/screenshots/package.json
 cmd/screenshots/package-lock.json

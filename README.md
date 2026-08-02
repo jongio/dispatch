@@ -844,6 +844,22 @@ Five built-in color schemes:
 |---|---|
 | ![One Half Dark](web/public/screenshots/one-half-dark/hero-main.png) | ![One Half Light](web/public/screenshots/one-half-light/hero-main.png) |
 
+### Regenerating Website Screenshots
+
+Run this after changing TUI visual states, themes, or website screenshot docs:
+
+```sh
+npm --prefix web ci
+npm --prefix web exec playwright install chromium
+npm --prefix web run screenshots
+```
+
+The command captures deterministic states from `internal/data/testdata/fake_sessions.db`,
+renders PNGs into `web/public/screenshots`, and removes intermediate HTML. Review
+the resulting image diffs with `git diff -- web/public/screenshots`. For a fast
+CI-style capture check without rendering PNGs, run `mage screenshotsCheck` or
+`npm --prefix web run screenshots:check`.
+
 Set `theme` to `"auto"` (default) for automatic light/dark detection based on your terminal background. Or set it to any built-in scheme name.
 
 ### Custom Themes

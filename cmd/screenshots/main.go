@@ -6,7 +6,7 @@
 //
 // Usage:
 //
-//	go run ./cmd/screenshots [--out DIR]
+//	go run -tags screenshots ./cmd/screenshots [--out DIR] [--check]
 //
 // The companion render.mjs script converts the HTML files to PNG:
 //
@@ -32,12 +32,15 @@ const (
 )
 
 func main() {
-	outDir := defaultOutDir
-
-	for i, arg := range os.Args[1:] {
-		if arg == "--out" && i+2 < len(os.Args) {
-			outDir = os.Args[i+2]
-		}
+	opts, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usage())
+		os.Exit(2)
+	}
+	if opts.help {
+		fmt.Println(usage())
+		return
 	}
 
 	// Force terminal color environment.
@@ -58,15 +61,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(opts.outDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "creating output dir: %v\n", err)
 		os.Exit(1)
 	}
 
 	for _, s := range shots {
-		dir := outDir
+		dir := opts.outDir
 		if s.SubDir != "" {
-			dir = filepath.Join(outDir, s.SubDir)
+			dir = filepath.Join(opts.outDir, s.SubDir)
 		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			fmt.Fprintf(os.Stderr, "creating dir %s: %v\n", dir, err)
@@ -80,8 +83,58 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Wrote %d HTML files to %s\n", len(shots), outDir)
-	fmt.Println("Run: node cmd/screenshots/render.mjs")
+	fmt.Printf("Wrote %d HTML files to %s\n", len(shots), opts.outDir)
+	if opts.check {
+		fmt.Println("Screenshot capture check passed.")
+	} else {
+		fmt.Printf("Run: node cmd/screenshots/render.mjs %s\n", opts.outDir)
+	}
+}
+
+type options struct {
+	outDir string
+	check  bool
+	help   bool
+}
+
+func parseArgs(args []string) (options, error) {
+	opts := options{outDir: cleanOutputDir(defaultOutDir)}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--help" || arg == "-h":
+			opts.help = true
+		case arg == "--check":
+			opts.check = true
+		case arg == "--out":
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "-") {
+				return opts, fmt.Errorf("--out requires a directory")
+			}
+			i++
+			opts.outDir = cleanOutputDir(args[i])
+		case strings.HasPrefix(arg, "--out="):
+			value := strings.TrimPrefix(arg, "--out=")
+			if value == "" {
+				return opts, fmt.Errorf("--out requires a directory")
+			}
+			opts.outDir = cleanOutputDir(value)
+		default:
+			return opts, fmt.Errorf("unknown argument %q", arg)
+		}
+	}
+	opts.outDir = cleanOutputDir(opts.outDir)
+	return opts, nil
+}
+
+func cleanOutputDir(dir string) string {
+	if dir == "" {
+		return filepath.Clean(defaultOutDir)
+	}
+	return filepath.Clean(dir)
+}
+
+func usage() string {
+	return "Usage: go run -tags screenshots ./cmd/screenshots [--out DIR] [--check]"
 }
 
 // ansiToHTML converts ANSI-escaped terminal output to a self-contained
@@ -368,9 +421,18 @@ func ansi256CSS(n int, palette [16]string) string {
 }
 
 func findDemoDB() string {
-	if _, err := os.Stat(demoDBRel); err == nil {
-		abs, _ := filepath.Abs(demoDBRel)
-		return abs
+	if cwd, err := os.Getwd(); err == nil {
+		for dir := cwd; ; dir = filepath.Dir(dir) {
+			p := filepath.Join(dir, demoDBRel)
+			if _, err := os.Stat(p); err == nil {
+				abs, _ := filepath.Abs(p)
+				return abs
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+		}
 	}
 	if exe, err := os.Executable(); err == nil {
 		p := filepath.Join(filepath.Dir(exe), demoDBRel)
