@@ -101,7 +101,7 @@ var manCommands = []manEntry{
 	{"new [dir] [--mode M]", "Start a new session in a directory (default: current)."},
 	{"completion <shell>", "Print a shell completion script (bash, zsh, fish, powershell)."},
 	{"doctor [--json]", "Print environment diagnostics."},
-	{"stats [flags]", "Print session totals and breakdowns."},
+	{"stats [flags]", "Print session totals and breakdowns by repository, branch, folder, and host type."},
 	{"search [query] [flags]", "Print matching sessions without the TUI."},
 	{"tags [--json|--csv]", "List tags in use with per-tag session counts."},
 	{"aliases [--json]", "List session aliases with orphan detection."},

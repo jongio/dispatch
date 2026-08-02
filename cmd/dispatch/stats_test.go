@@ -22,6 +22,7 @@ func sampleSessions() []data.Session {
 	return []data.Session{
 		{
 			ID:           "a",
+			Cwd:          `C:\code\dispatch`,
 			Repository:   "jongio/dispatch",
 			Branch:       "main",
 			HostType:     "github",
@@ -32,6 +33,7 @@ func sampleSessions() []data.Session {
 		},
 		{
 			ID:           "b",
+			Cwd:          `C:\code\dispatch`,
 			Repository:   "jongio/dispatch",
 			Branch:       "feature",
 			HostType:     "github",
@@ -42,6 +44,7 @@ func sampleSessions() []data.Session {
 		},
 		{
 			ID:         "c",
+			Cwd:        "",
 			Repository: "",
 			Branch:     "",
 			HostType:   "",
@@ -86,6 +89,15 @@ func TestBuildStatsReportGrouping(t *testing.T) {
 	if report.ByRepository[1].Label != "(none)" || report.ByRepository[1].Count != 1 {
 		t.Errorf("ByRepository[1] = %+v, want (none)=1", report.ByRepository[1])
 	}
+	if len(report.ByFolder) != 2 {
+		t.Fatalf("ByFolder len = %d, want 2", len(report.ByFolder))
+	}
+	if report.ByFolder[0].Label != `C:\code\dispatch` || report.ByFolder[0].Count != 2 {
+		t.Errorf("ByFolder[0] = %+v, want C:\\code\\dispatch=2", report.ByFolder[0])
+	}
+	if report.ByFolder[1].Label != "(none)" || report.ByFolder[1].Count != 1 {
+		t.Errorf("ByFolder[1] = %+v, want (none)=1", report.ByFolder[1])
+	}
 
 	var host string
 	for _, e := range report.ByHostType {
@@ -106,7 +118,7 @@ func TestBuildStatsReportEmpty(t *testing.T) {
 	if report.Earliest != "" || report.Latest != "" {
 		t.Errorf("expected empty range, got %q..%q", report.Earliest, report.Latest)
 	}
-	if report.ByRepository == nil || report.ByBranch == nil || report.ByHostType == nil {
+	if report.ByRepository == nil || report.ByBranch == nil || report.ByFolder == nil || report.ByHostType == nil {
 		t.Errorf("group slices should be non-nil for JSON output")
 	}
 }
@@ -192,6 +204,9 @@ func TestApplyStatsTopLimit(t *testing.T) {
 	if len(report.ByBranch) != 1 {
 		t.Fatalf("ByBranch len = %d, want 1", len(report.ByBranch))
 	}
+	if len(report.ByFolder) != 1 || report.ByFolder[0].Label != `C:\code\dispatch` {
+		t.Fatalf("ByFolder = %+v, want only C:\\code\\dispatch", report.ByFolder)
+	}
 	if report.TotalSessions != 3 {
 		t.Errorf("TotalSessions = %d, want unchanged total 3", report.TotalSessions)
 	}
@@ -207,7 +222,7 @@ func TestRunStatsText(t *testing.T) {
 		t.Fatalf("runStats: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Sessions: 3", "Turns:    16", "Files:    5", "By repository", "jongio/dispatch", "By host type"} {
+	for _, want := range []string{"Sessions: 3", "Turns:    16", "Files:    5", "By repository", "jongio/dispatch", "By folder", `C:\code\dispatch`, "By host type"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q\n%s", want, out)
 		}
@@ -230,6 +245,9 @@ func TestRunStatsTextTop(t *testing.T) {
 	if strings.Contains(out, "feature") {
 		t.Errorf("top 1 should hide lower branch rows\n%s", out)
 	}
+	if strings.Contains(out, "\nBy folder\n  (none)") {
+		t.Errorf("top 1 should hide lower folder fallback row\n%s", out)
+	}
 }
 
 func TestRunStatsJSON(t *testing.T) {
@@ -248,6 +266,9 @@ func TestRunStatsJSON(t *testing.T) {
 	if report.TotalSessions != 3 || report.TotalTurns != 16 {
 		t.Errorf("unexpected report: %+v", report)
 	}
+	if len(report.ByFolder) != 2 || report.ByFolder[0].Label != `C:\code\dispatch` {
+		t.Errorf("JSON missing folder breakdown: %+v", report.ByFolder)
+	}
 }
 
 func TestRunStatsJSONTop(t *testing.T) {
@@ -263,7 +284,7 @@ func TestRunStatsJSONTop(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &report); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, buf.String())
 	}
-	if len(report.ByRepository) != 1 || len(report.ByBranch) != 1 || len(report.ByHostType) != 1 {
+	if len(report.ByRepository) != 1 || len(report.ByBranch) != 1 || len(report.ByFolder) != 1 || len(report.ByHostType) != 1 {
 		t.Errorf("top did not cap breakdown arrays: %+v", report)
 	}
 	if report.TotalSessions != 3 {
@@ -370,6 +391,9 @@ func TestRunStatsCSV(t *testing.T) {
 	if !strings.Contains(out, "repository,jongio/dispatch,2") {
 		t.Errorf("CSV missing repo breakdown, got:\n%s", out)
 	}
+	if !strings.Contains(out, "folder,C:\\code\\dispatch,2") {
+		t.Errorf("CSV missing folder breakdown, got:\n%s", out)
+	}
 }
 
 // TestRunStatsCSV_FormulaInjection verifies a repo/branch label starting with a
@@ -378,8 +402,8 @@ func TestRunStatsCSV(t *testing.T) {
 func TestRunStatsCSV_FormulaInjection(t *testing.T) {
 	withStatsList(t, func(data.FilterOptions) ([]data.Session, error) {
 		return []data.Session{
-			{ID: "s1", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
-			{ID: "s2", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
+			{ID: "s1", Cwd: "=folder", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
+			{ID: "s2", Cwd: "=folder", Repository: "=cmd|' /c calc'!A1", Branch: "main"},
 		}, nil
 	})
 
@@ -393,6 +417,9 @@ func TestRunStatsCSV_FormulaInjection(t *testing.T) {
 	}
 	if !strings.Contains(out, "'=cmd") {
 		t.Errorf("CSV should prefix a formula-triggering label with a quote, got:\n%s", out)
+	}
+	if !strings.Contains(out, "'=folder") {
+		t.Errorf("CSV should prefix a formula-triggering folder with a quote, got:\n%s", out)
 	}
 }
 
@@ -424,7 +451,7 @@ func TestRunStatsMarkdown(t *testing.T) {
 		t.Fatalf("runStats --markdown: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"# Dispatch stats", "| Metric | Value |", "| Sessions | 3 |", "## By repository", "| jongio/dispatch | 2 |"} {
+	for _, want := range []string{"# Dispatch stats", "| Metric | Value |", "| Sessions | 3 |", "## By repository", "| jongio/dispatch | 2 |", "## By folder", "| C:\\\\code\\\\dispatch | 2 |"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Markdown output missing %q, got:\n%s", want, out)
 		}
@@ -443,6 +470,9 @@ func TestRunStatsMarkdownTop(t *testing.T) {
 	out := buf.String()
 	if strings.Contains(out, "| feature |") {
 		t.Errorf("top 1 should hide lower branch rows\n%s", out)
+	}
+	if strings.Contains(out, "## By folder\n\n| Label | Count |\n|---|---:|\n| (none) |") {
+		t.Errorf("top 1 should hide lower folder fallback row\n%s", out)
 	}
 }
 
