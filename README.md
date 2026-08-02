@@ -388,12 +388,14 @@ Set or remove a single session alias from the command line, completing the parit
 
 ```sh
 dispatch alias <id> review    # assign or reassign an alias
+dispatch alias list           # list configured aliases
+dispatch alias list --json
 dispatch alias <id> --clear   # remove the alias on a session
 dispatch alias --remove review # remove an alias by its name
 dispatch alias <id> review --json
 ```
 
-The `<id>` accepts the same short prefix that `dispatch open` does. Alias names are lowercased and must be unique, so `dispatch open <alias>` keeps resolving to one session.
+The `<id>` accepts the same short prefix that `dispatch open` does. Alias names are lowercased and must be unique, so `dispatch open <alias>` keeps resolving to one session. `dispatch alias list` uses the same output as `dispatch aliases`.
 
 ### Tag
 
