@@ -22,11 +22,11 @@ const (
 
 // LaunchSetPicker renders a modal overlay for managing named launch sets.
 type LaunchSetPicker struct {
-	sets   []config.LaunchSet
+	sets    []config.LaunchSet
 	missing map[string][]string
-	cursor int
-	width  int
-	height int
+	cursor  int
+	width   int
+	height  int
 
 	mode  launchSetPickerMode
 	input textinput.Model
