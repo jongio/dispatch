@@ -794,6 +794,8 @@ action name and each value is a comma-separated list of keys that trigger it.
 Listed actions replace their default keys; any action you do not list keeps its
 default. Unknown action names are ignored, and if a remap collides with a key
 another action already uses, that remap is dropped and the default is kept.
+The in-app `?` help overlay and short help bar show the effective shortcuts
+after these overrides are applied.
 
 ```json
 "keybindings": {

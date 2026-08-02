@@ -183,6 +183,82 @@ func TestKeybindingActionNames(t *testing.T) {
 	}
 }
 
+func TestKeybindingEntriesHaveHelpCoverage(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	valid := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		valid[entry.name] = struct{}{}
+	}
+
+	covered := make(map[string]string)
+	for _, group := range keybindingHelpGroups {
+		for _, action := range group.actions {
+			if _, ok := valid[action]; !ok {
+				t.Errorf("help group %q references unknown action %q", group.title, action)
+				continue
+			}
+			if previous, ok := covered[action]; ok {
+				t.Errorf("action %q appears in both help groups %q and %q", action, previous, group.title)
+			}
+			covered[action] = group.title
+		}
+	}
+	for action := range hiddenHelpActions {
+		if _, ok := valid[action]; !ok {
+			t.Errorf("hidden help action %q is not a keybinding entry", action)
+			continue
+		}
+		if previous, ok := covered[action]; ok {
+			t.Errorf("action %q appears in help group %q and hiddenHelpActions", action, previous)
+		}
+		covered[action] = "hiddenHelpActions"
+	}
+	for _, entry := range entries {
+		if _, ok := covered[entry.name]; !ok {
+			t.Errorf("keybinding action %q is missing from help groups or hiddenHelpActions", entry.name)
+		}
+	}
+}
+
+func TestHelpGroupsUseEffectiveBindings(t *testing.T) {
+	km, warnings := applyKeybindingOverrides(defaultKeyMap(), map[string]string{
+		"search": "ctrl+f",
+	})
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
+	}
+	found := false
+	for _, group := range km.HelpGroups() {
+		for _, binding := range group.Bindings {
+			if binding.Help().Desc == "search" && binding.Help().Key == "ctrl+f" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("help groups should include the effective remapped search binding")
+	}
+}
+
+func TestShortHelpUsesEffectiveBindings(t *testing.T) {
+	km, warnings := applyKeybindingOverrides(defaultKeyMap(), map[string]string{
+		"search": "ctrl+f",
+	})
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
+	}
+	found := false
+	for _, binding := range km.ShortHelp() {
+		if binding.Help().Desc == "search" && binding.Help().Key == "ctrl+f" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("short help should include the effective remapped search binding")
+	}
+}
+
 func TestApplyKeybindingOverrides_MatchesRemappedKey(t *testing.T) {
 	km, _ := applyKeybindingOverrides(defaultKeyMap(), map[string]string{"search": "u"})
 	if !key.Matches(tea.KeyPressMsg{Code: 'u'}, km.Search) {
