@@ -31,8 +31,9 @@ const (
 	// returns many small groups.
 	defaultGroupLimit = 10_000
 
-	// maxIDsPerQuery caps the number of IDs passed to ListSessionsByIDs to
-	// stay within SQLite's variable limit and prevent resource exhaustion.
+	// maxIDsPerQuery caps the number of IDs bound in a single ID lookup
+	// statement, to stay within SQLite's variable limit. Callers passing
+	// more IDs are served by issuing multiple batched queries.
 	maxIDsPerQuery = 500
 
 	// limitClause is the SQL fragment appended to queries with a row cap.
@@ -582,42 +583,23 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 
 // ListSessionsByIDs returns sessions matching the given IDs, preserving the
 // input order. IDs not found in the database are silently skipped.
+//
+// Callers may pass more IDs than SQLite's bound-variable limit allows in one
+// statement, so the lookup is issued in batches of maxIDsPerQuery and the
+// results merged. Truncating instead would silently drop the trailing IDs,
+// which callers cannot distinguish from "those sessions no longer exist" —
+// a large launch set would then report most of its members as missing.
 func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	// Cap to prevent oversized IN clauses that could exceed SQLite's
-	// variable limit or cause resource exhaustion.
-	if len(ids) > maxIDsPerQuery {
-		ids = ids[:maxIDsPerQuery]
-	}
-	// Build "WHERE s.id IN (?,?,...)" with one placeholder per ID.
-	placeholders := make([]string, len(ids))
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
-		strings.Join(placeholders, ",") + ")"
-
-	rows, err := s.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, fmt.Errorf("querying sessions by IDs: %w", err)
-	}
-	defer closeRows(rows)
-
 	// Index results by ID for order-preserving assembly.
 	byID := make(map[string]Session, len(ids))
-	for rows.Next() {
-		sess, err := scanSession(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scanning session row: %w", err)
+	for start := 0; start < len(ids); start += maxIDsPerQuery {
+		end := min(start+maxIDsPerQuery, len(ids))
+		if err := s.appendSessionsBatch(ctx, ids[start:end], byID); err != nil {
+			return nil, err
 		}
-		byID[sess.ID] = sess
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating session rows: %w", err)
 	}
 
 	// Assemble result in input order, skipping missing IDs.
@@ -630,15 +612,64 @@ func (s *Store) ListSessionsByIDs(ctx context.Context, ids []string) ([]Session,
 	return result, nil
 }
 
+// appendSessionsBatch runs one batched session lookup and merges the rows into
+// byID. The batch must be no larger than maxIDsPerQuery.
+func (s *Store) appendSessionsBatch(ctx context.Context, ids []string, byID map[string]Session) error {
+	// Build "WHERE s.id IN (?,?,...)" with one placeholder per ID.
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
+		strings.Join(placeholders, ",") + ")"
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("querying sessions by IDs: %w", err)
+	}
+	defer closeRows(rows)
+
+	for rows.Next() {
+		sess, err := scanSession(rows)
+		if err != nil {
+			return fmt.Errorf("scanning session row: %w", err)
+		}
+		byID[sess.ID] = sess
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterating session rows: %w", err)
+	}
+	return nil
+}
+
 // SessionRefsBySessionIDs returns refs for the requested sessions, grouped by
 // session ID. IDs not found in session_refs are omitted.
+//
+// Callers may pass more IDs than SQLite's bound-variable limit allows in one
+// statement, so the lookup is issued in batches of maxIDsPerQuery and the
+// results merged. Truncating instead would silently return no refs for the
+// dropped sessions, which callers cannot distinguish from "this session has
+// no refs" — related-session ranking would then quietly mis-rank every
+// session past the cap.
 func (s *Store) SessionRefsBySessionIDs(ctx context.Context, ids []string) (map[string][]SessionRef, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	if len(ids) > maxIDsPerQuery {
-		ids = ids[:maxIDsPerQuery]
+	refs := make(map[string][]SessionRef)
+	for start := 0; start < len(ids); start += maxIDsPerQuery {
+		end := min(start+maxIDsPerQuery, len(ids))
+		if err := s.appendSessionRefsBatch(ctx, ids[start:end], refs); err != nil {
+			return nil, err
+		}
 	}
+	return refs, nil
+}
+
+// appendSessionRefsBatch runs one batched refs query and merges the rows into
+// refs. The batch must be no larger than maxIDsPerQuery.
+func (s *Store) appendSessionRefsBatch(ctx context.Context, ids []string, refs map[string][]SessionRef) error {
 	placeholders := make([]string, len(ids))
 	args := make([]any, len(ids))
 	for i, id := range ids {
@@ -650,22 +681,21 @@ func (s *Store) SessionRefsBySessionIDs(ctx context.Context, ids []string) (map[
 		ORDER BY session_id, turn_index`
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("querying session refs: %w", err)
+		return fmt.Errorf("querying session refs: %w", err)
 	}
 	defer closeRows(rows)
 
-	refs := make(map[string][]SessionRef)
 	for rows.Next() {
 		var r SessionRef
 		if err := rows.Scan(&r.SessionID, &r.RefType, &r.RefValue, &r.TurnIndex, &r.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scanning session ref row: %w", err)
+			return fmt.Errorf("scanning session ref row: %w", err)
 		}
 		refs[r.SessionID] = append(refs[r.SessionID], r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating session refs: %w", err)
+		return fmt.Errorf("iterating session refs: %w", err)
 	}
-	return refs, nil
+	return nil
 }
 
 // AllSessionIDs returns the IDs of every session in the store, including
