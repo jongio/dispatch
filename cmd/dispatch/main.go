@@ -197,7 +197,8 @@ Search flags:
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
 
 Views commands:
-  views [list] [--json]    List configured named views
+  views [list] [--json|--csv]
+                          List configured named views
   views use <name>         Set the active named view
   views use default        Clear the active named view
 

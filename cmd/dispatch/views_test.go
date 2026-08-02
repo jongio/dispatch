@@ -67,6 +67,51 @@ func TestRunViewsListJSON(t *testing.T) {
 	}
 }
 
+func TestRunViewsListCSV(t *testing.T) {
+	withConfigSeams(t, viewsConfig())
+	var buf bytes.Buffer
+	if err := runViews(&buf, []string{"views", "list", "--csv"}); err != nil {
+		t.Fatalf("runViews list csv: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"active,name,summary",
+		"true,Work,",
+		"repo:jongio/dispatch",
+		"false,Personal,",
+		"show_hidden",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("CSV output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Broken") {
+		t.Fatalf("invalid view should not appear:\n%s", out)
+	}
+}
+
+func TestRunViewsListCSVEmpty(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	var buf bytes.Buffer
+	if err := runViews(&buf, []string{"views", "list", "--csv"}); err != nil {
+		t.Fatalf("runViews list csv: %v", err)
+	}
+	if got, want := buf.String(), "active,name,summary\n"; got != want {
+		t.Fatalf("CSV output = %q, want %q", got, want)
+	}
+}
+
+func TestRunViewsListCSVAndJSONConflict(t *testing.T) {
+	withConfigSeams(t, viewsConfig())
+	err := runViews(&bytes.Buffer{}, []string{"views", "list", "--json", "--csv"})
+	if err == nil {
+		t.Fatal("expected error for --csv + --json conflict")
+	}
+	if !strings.Contains(err.Error(), "--json and --csv cannot be combined") {
+		t.Errorf("wrong error: %v", err)
+	}
+}
+
 func TestRunViewsUse(t *testing.T) {
 	cfg := withConfigSeams(t, viewsConfig())
 	var buf bytes.Buffer
