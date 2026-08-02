@@ -51,10 +51,18 @@ func LaunchNewSession(cfg LaunchNewSessionConfig) (int, error) {
 	if cmd == "" {
 		cmd = defaultNewSessionCommand
 	}
+	if err := validateResumeCommand(cmd); err != nil {
+		return 0, err
+	}
 
-	// Replace template variables.
+	// Replace template variables. The working directory is attacker-influenced
+	// data — it comes from a stored session record or a discovered project
+	// directory, and directory names may legally contain shell metacharacters
+	// — and the expanded string is handed to a shell by the platform
+	// launchers. Quote it with the same platform quoter the resume path uses
+	// so it cannot break out of the command (CWE-78).
 	if cfg.Cwd != "" {
-		cmd = strings.ReplaceAll(cmd, "{cwd}", cfg.Cwd)
+		cmd = strings.ReplaceAll(cmd, "{cwd}", shellQuoteForOS(cfg.Cwd))
 	}
 
 	return launchNewSessionPlatform(cfg.Shell, cmd, cfg.Terminal, cfg.Cwd, cfg.LaunchStyle, cfg.PaneDirection)

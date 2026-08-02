@@ -209,10 +209,7 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 
 	// Choose quoting style: Windows uses double quotes (understood by
 	// cmd.exe and PowerShell), Unix uses POSIX single quotes.
-	quote := shellQuote
-	if runtime.GOOS == "windows" {
-		quote = cmdQuote
-	}
+	quote := shellQuoteForOS
 
 	args := BuildResumeArgs(sessionID, cfg)
 	if len(args) == 0 {
@@ -231,6 +228,18 @@ func buildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error
 // copy the same command used by the launcher.
 func BuildResumeCommandString(sessionID string, cfg ResumeConfig) (string, error) {
 	return buildResumeCommandString(sessionID, cfg)
+}
+
+// shellQuoteForOS quotes s for embedding in a command string that will be
+// handed to a shell, using the quoting style of the current platform:
+// POSIX single quotes on Unix, double quotes on Windows. It is the single
+// place that decides platform quoting so every command-string builder
+// neutralizes shell metacharacters the same way (CWE-78).
+func shellQuoteForOS(s string) string {
+	if runtime.GOOS == "windows" {
+		return cmdQuote(s)
+	}
+	return shellQuote(s)
 }
 
 // shellQuote wraps s in POSIX single quotes if it contains whitespace or
