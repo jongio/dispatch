@@ -200,6 +200,64 @@ func TestRunAlias_JSON(t *testing.T) {
 	}
 }
 
+func TestRunAlias_ListText(t *testing.T) {
+	cfg := &config.Config{
+		SessionAliases: map[string]string{
+			"ses-1": "auth",
+		},
+	}
+	withAliasesSeams(t, cfg, []data.Session{{ID: "ses-1", Summary: "Add auth", Repository: "jongio/dispatch"}})
+
+	var buf bytes.Buffer
+	if err := runAlias(&buf, []string{"alias", "list"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"auth", "ses-1", "Add auth"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunAlias_ListJSON(t *testing.T) {
+	cfg := &config.Config{
+		SessionAliases: map[string]string{
+			"ses-1": "auth",
+		},
+	}
+	withAliasesSeams(t, cfg, []data.Session{{ID: "ses-1", Summary: "Add auth", Repository: "jongio/dispatch"}})
+
+	var buf bytes.Buffer
+	if err := runAlias(&buf, []string{"alias", "list", "--json"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var got aliasesReport
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.TotalAliases != 1 {
+		t.Errorf("total_aliases = %d, want 1", got.TotalAliases)
+	}
+	if got.Aliases[0].Alias != "auth" || got.Aliases[0].ID != "ses-1" {
+		t.Errorf("alias row = %+v, want alias auth for ses-1", got.Aliases[0])
+	}
+}
+
+func TestRunAlias_ListEmpty(t *testing.T) {
+	cfg := &config.Config{}
+	withAliasesSeams(t, cfg, nil)
+
+	var buf bytes.Buffer
+	if err := runAlias(&buf, []string{"alias", "list"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out := buf.String(); !strings.Contains(out, "No aliases configured") {
+		t.Errorf("expected empty-state message, got:\n%s", out)
+	}
+}
+
 func TestRunAlias_LoadError(t *testing.T) {
 	prevLoad := configLoadFn
 	configLoadFn = func() (*config.Config, error) { return nil, errors.New("boom") }
