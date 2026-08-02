@@ -68,6 +68,8 @@ $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.
 | `mage install`   | Test, kill stale processes, build dev binary, update PATH |
 | `mage test`      | Run tests with race detector and shuffle                 |
 | `mage build`     | Compile dev binary with version info                     |
+| `mage screenshots` | Regenerate website screenshot PNGs                    |
+| `mage screenshotsCheck` | Verify screenshot capture without rendering PNGs |
 | `mage preflight` | Full 11-step CI verification (see below)                 |
 | `mage vet`       | Run `go vet ./...`                                       |
 | `mage lint`      | Run `golangci-lint` (falls back to `go vet`)             |
@@ -120,6 +122,22 @@ scripts/                Screenshot generation
 4. Add or update tests for any new functionality.
 5. Run `mage preflight` to verify everything passes.
 6. Open a pull request with a clear description of what changed and why.
+
+### Website Screenshots
+
+When you change TUI visual states, themes, or website docs that reference
+screenshots, regenerate them from the repo root:
+
+```sh
+npm --prefix web ci
+npm --prefix web exec playwright install chromium
+npm --prefix web run screenshots
+```
+
+The same npm script works from `web/` as `npm run screenshots`. PowerShell users
+can run `.\scripts\screenshots.ps1`; macOS/Linux users can run
+`./scripts/screenshots.sh`. Use `mage screenshotsCheck` for the fast CI-friendly
+capture check, and review PNG changes with `git diff -- web/public/screenshots`.
 
 ## Code Style
 

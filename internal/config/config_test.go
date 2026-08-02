@@ -59,6 +59,9 @@ func TestDefaultValues(t *testing.T) {
 	if len(cfg.ExcludedDirs) != 0 {
 		t.Errorf("ExcludedDirs = %v, want empty", cfg.ExcludedDirs)
 	}
+	if len(cfg.ProjectRoots) != 0 {
+		t.Errorf("ProjectRoots = %v, want empty", cfg.ProjectRoots)
+	}
 	if len(cfg.HiddenSessions) != 0 {
 		t.Errorf("HiddenSessions = %v, want empty", cfg.HiddenSessions)
 	}
@@ -92,7 +95,11 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		ExcludedDirs:     []string{"/tmp", "/var"},
 		CustomCommand:    "ghcs --resume {sessionId} --custom",
 		HiddenSessions:   []string{"sess-1", "sess-2"},
-		PreviewPosition:  "bottom",
+		LaunchSets: []LaunchSet{
+			{Name: "Feature", SessionIDs: []string{"sess-1", "sess-2"}},
+		},
+		ProjectRoots:    []string{filepath.Join(string(filepath.Separator), "code")},
+		PreviewPosition: "bottom",
 	}
 
 	data, err := json.Marshal(original)
@@ -163,6 +170,18 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	if restored.PreviewPosition != original.PreviewPosition {
 		t.Errorf("PreviewPosition = %q, want %q", restored.PreviewPosition, original.PreviewPosition)
 	}
+	if len(restored.LaunchSets) != 1 {
+		t.Fatalf("LaunchSets len = %d, want 1", len(restored.LaunchSets))
+	}
+	if restored.LaunchSets[0].Name != "Feature" {
+		t.Errorf("LaunchSets[0].Name = %q, want Feature", restored.LaunchSets[0].Name)
+	}
+	if got := restored.LaunchSets[0].SessionIDs; len(got) != 2 || got[0] != "sess-1" || got[1] != "sess-2" {
+		t.Errorf("LaunchSets[0].SessionIDs = %v, want [sess-1 sess-2]", got)
+	}
+	if len(restored.ProjectRoots) != 1 || restored.ProjectRoots[0] != original.ProjectRoots[0] {
+		t.Errorf("ProjectRoots = %v, want %v", restored.ProjectRoots, original.ProjectRoots)
+	}
 }
 
 func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
@@ -174,6 +193,27 @@ func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
 	}
 	if cfg.WorkspaceRecovery {
 		t.Error("WorkspaceRecovery should be false when explicitly set in JSON")
+	}
+}
+
+func TestLaunchSetsSaveLoad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("DISPATCH_CONFIG", path)
+	cfg := Default()
+	cfg.LaunchSets = []LaunchSet{{Name: "Feature", SessionIDs: []string{"sess-1", "sess-2"}}}
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(loaded.LaunchSets) != 1 {
+		t.Fatalf("LaunchSets len = %d, want 1", len(loaded.LaunchSets))
+	}
+	got := loaded.LaunchSets[0]
+	if got.Name != "Feature" || len(got.SessionIDs) != 2 || got.SessionIDs[0] != "sess-1" || got.SessionIDs[1] != "sess-2" {
+		t.Fatalf("LaunchSets[0] = %#v, want Feature [sess-1 sess-2]", got)
 	}
 }
 
@@ -1615,4 +1655,181 @@ func TestNamedView_EmptyConfig_NoViews(t *testing.T) {
 	if cfg.ActiveView != "" {
 		t.Errorf("Default ActiveView = %q, want empty", cfg.ActiveView)
 	}
+}
+
+func TestValidateFile_ValidConfig(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{
+		"default_time_range": "1d",
+		"default_sort": "updated",
+		"views": [{"name": "Work", "sort": "created"}],
+		"keybindings": {"search": "ctrl+f"}
+	}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("Valid = false, diagnostics: %#v", result.Diagnostics)
+	}
+}
+
+func TestValidateFile_MalformedConfig(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"default_sort":`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for malformed JSON")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "$")
+}
+
+func TestValidateFile_UnknownKey(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"views": [{"name": "Work", "bogus": true}], "surprise": 1}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for unknown keys")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "surprise")
+	assertDiagnosticPath(t, result.Diagnostics, "views[0].bogus")
+}
+
+func TestValidateFile_InvalidEnumValues(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_mode": "hologram"}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid enum")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_mode")
+}
+
+func TestValidateFile_InvalidNamedView(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"views": [{"name": "Bad", "sort": "random"}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid named view")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "views[0].sort")
+}
+
+func TestValidateFile_InvalidLaunchSet(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_sets": [{"name": "Feature", "session_ids": ["ok-1", "bad id"]}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid launch set")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_sets[0].session_ids[1]")
+}
+
+func TestValidateFile_DuplicateLaunchSet(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_sets": [{"name": "Feature", "session_ids": ["s1"]}, {"name": "Feature", "session_ids": ["s2"]}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for duplicate launch set")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_sets[1].name")
+}
+
+func TestValidateFile_InvalidProjectRoots(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"project_roots": ["", "relative"]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid project roots")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "project_roots[0]")
+	assertDiagnosticPath(t, result.Diagnostics, "project_roots[1]")
+}
+
+func TestValidateFile_KeybindingCollision(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"keybindings": {"search": "q"}}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for keybinding collision")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "keybindings.search")
+}
+
+func TestValidateConfig_BadDuration(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.AttentionThreshold = "soon"
+	diags := ValidateConfig(cfg)
+	assertDiagnosticPath(t, diags, "attention_threshold")
+}
+
+func TestJSONSchema_CoversNestedConfig(t *testing.T) {
+	t.Parallel()
+	schema, err := JSONSchema()
+	if err != nil {
+		t.Fatalf("JSONSchema: %v", err)
+	}
+	props := schema["properties"].(map[string]any)
+	if _, ok := props["views"]; !ok {
+		t.Fatal("schema missing views")
+	}
+	if _, ok := props["launch_sets"]; !ok {
+		t.Fatal("schema missing launch_sets")
+	}
+	if _, ok := props["project_roots"]; !ok {
+		t.Fatal("schema missing project_roots")
+	}
+	keybindings := props["keybindings"].(map[string]any)
+	propertyNames := keybindings["propertyNames"].(map[string]any)
+	enum := propertyNames["enum"].([]string)
+	if !stringIn("cmd_palette", enum) {
+		t.Fatalf("keybindings action enum missing cmd_palette: %v", enum)
+	}
+	if !stringIn("launch_set_save", enum) {
+		t.Fatalf("keybindings action enum missing launch_set_save: %v", enum)
+	}
+}
+
+func writeConfigValidationFixture(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	return path
+}
+
+func assertDiagnosticPath(t *testing.T, diags []Diagnostic, path string) {
+	t.Helper()
+	for _, diag := range diags {
+		if diag.Path == path {
+			return
+		}
+	}
+	t.Fatalf("diagnostics missing path %q: %#v", path, diags)
 }

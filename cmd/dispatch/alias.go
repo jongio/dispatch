@@ -24,6 +24,7 @@ type aliasResult struct {
 //	dispatch alias <id> <name>      assign or reassign an alias
 //	dispatch alias <id> --clear     remove the alias on a session
 //	dispatch alias --remove <name>  remove an alias by its name
+//	dispatch alias list             list configured aliases
 //
 // <id> accepts the same full ID or short prefix that `dispatch open` does, so
 // aliases resolve to exactly one session. Alias names reuse config's
@@ -32,6 +33,17 @@ type aliasResult struct {
 func runAlias(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
+	}
+
+	if list, jsonOut, err := parseAliasListArgs(args); list || err != nil {
+		if err != nil {
+			return err
+		}
+		listArgs := []string{"aliases"}
+		if jsonOut {
+			listArgs = append(listArgs, "--json")
+		}
+		return runAliases(w, listArgs)
 	}
 
 	sessionArg, name, clearFlag, remove, jsonOut, err := parseAliasArgs(args)
@@ -101,6 +113,29 @@ func runAlias(w io.Writer, args []string) error {
 		fmt.Fprintf(w, "Set alias %q for %s\n", alias, shortID(sessionID))
 	}
 	return nil
+}
+
+// parseAliasListArgs detects and validates `dispatch alias list`.
+func parseAliasListArgs(args []string) (list, jsonOut bool, err error) {
+	rest := args
+	if len(rest) > 0 {
+		rest = rest[1:]
+	}
+	if len(rest) == 0 || rest[0] != "list" {
+		return false, false, nil
+	}
+
+	for _, arg := range rest[1:] {
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case strings.HasPrefix(arg, "-"):
+			return true, false, fmt.Errorf("unknown flag: %s", arg)
+		default:
+			return true, false, fmt.Errorf("alias list does not take positional arguments, got %q", arg)
+		}
+	}
+	return true, jsonOut, nil
 }
 
 // resolveAliasSession resolves a session ID or short prefix to a full session

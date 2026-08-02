@@ -3323,6 +3323,39 @@ func TestHandleMouse_LeftClick_PreviewConversationSort(t *testing.T) {
 	}
 }
 
+func TestHandleMouse_LeftClick_PreviewRelatedSessionMovesFocus(t *testing.T) {
+	m := newTestModelWithSize(120, 60)
+	m.showPreview = true
+	m.detail = &data.SessionDetail{Session: data.Session{ID: "current"}}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetRelatedSessions([]components.RelatedSessionItem{
+		{ID: "related", Summary: "Related session", LastActiveAt: "2026-08-01T12:00:00Z"},
+	})
+	m.recalcLayout()
+	m.sessionList.SetSessions([]data.Session{{ID: "current"}, {ID: "related"}})
+
+	hitRow := -1
+	for row := 0; row < 50; row++ {
+		if _, ok := m.preview.HitRelatedSession(row); ok {
+			hitRow = row
+			break
+		}
+	}
+	if hitRow < 0 {
+		t.Fatal("could not find related session row in preview")
+	}
+
+	result, _ := m.Update(tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
+		X:      m.layout.listWidth + 5,
+		Y:      hitRow + styles.HeaderLines + 1,
+	})
+	rm := result.(Model)
+	if got := rm.selectedSessionID(); got != "related" {
+		t.Fatalf("selectedSessionID() = %q, want related", got)
+	}
+}
+
 func TestHandleMouse_LeftClick_PreviewNonConversationLine(t *testing.T) {
 	m := newTestModelWithSize(120, 60)
 	m.showPreview = true
@@ -4095,6 +4128,32 @@ func TestKeyMatchesPgUpPgDown(t *testing.T) {
 	oKey := tea.KeyPressMsg{Code: 'o', Text: "o"}
 	if !key.Matches(oKey, keys.ConversationSort) {
 		t.Error("'o' KeyPressMsg should match ConversationSort binding")
+	}
+}
+
+func TestJumpToRelatedSessionMovesFocus(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.showPreview = true
+	m.sessionList.SetSessions([]data.Session{{ID: "current"}, {ID: "related"}, {ID: "other"}})
+
+	rm, _ := m.jumpToRelatedSession("related")
+	if got := rm.selectedSessionID(); got != "related" {
+		t.Fatalf("selectedSessionID() = %q, want related", got)
+	}
+	if rm.detailVersion != m.detailVersion+1 {
+		t.Fatalf("detailVersion = %d, want %d", rm.detailVersion, m.detailVersion+1)
+	}
+}
+
+func TestRelatedIndexFromKey(t *testing.T) {
+	t.Parallel()
+	idx, ok := relatedIndexFromKey("alt+3")
+	if !ok || idx != 2 {
+		t.Fatalf("relatedIndexFromKey(alt+3) = %d, %v; want 2, true", idx, ok)
+	}
+	if _, ok := relatedIndexFromKey("ctrl+n"); ok {
+		t.Fatal("relatedIndexFromKey(ctrl+n) should not match")
 	}
 }
 

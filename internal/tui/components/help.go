@@ -3,9 +3,16 @@ package components
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/jongio/dispatch/internal/tui/styles"
 )
+
+// HelpGroup is one labeled section in the expanded help overlay.
+type HelpGroup struct {
+	Title    string
+	Bindings []key.Binding
+}
 
 // HelpOverlay renders a hand-crafted keyboard shortcut reference as a
 // centred overlay panel. It replaces the bubbles/help.Model approach
@@ -13,11 +20,13 @@ import (
 type HelpOverlay struct {
 	width  int
 	height int
+	groups []HelpGroup
+	short  []key.Binding
 }
 
-// NewHelpOverlay returns a ready-to-use HelpOverlay.
-func NewHelpOverlay() HelpOverlay {
-	return HelpOverlay{}
+// NewHelpOverlayWithBindings returns a HelpOverlay backed by effective key bindings.
+func NewHelpOverlayWithBindings(groups []HelpGroup, short []key.Binding) HelpOverlay {
+	return HelpOverlay{groups: groups, short: short}
 }
 
 // SetSize updates the overlay dimensions.
@@ -62,6 +71,15 @@ func legendRow(icon1, desc1, icon2, desc2 string) string {
 	return left
 }
 
+func bindingRow(bindings []key.Binding, start int) string {
+	left := bindings[start].Help()
+	if start+1 < len(bindings) {
+		right := bindings[start+1].Help()
+		return shortcutRow(left.Key, left.Desc, right.Key, right.Desc)
+	}
+	return shortcutRow(left.Key, left.Desc, "", "")
+}
+
 // View renders the full help overlay centred on screen.
 func (h HelpOverlay) View() string {
 	catStyle := lipgloss.NewStyle().
@@ -71,96 +89,33 @@ func (h HelpOverlay) View() string {
 
 	var sb strings.Builder
 
-	// Navigation
-	sb.WriteString(catStyle.Render("Navigation"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("↑/k", "Up", "↓/j", "Down"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("←", "Collapse", "→", "Expand"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("Enter", "Launch/Toggle", "", ""))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("w", "Open in window", "t", "Open in tab"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("e", "Open in pane", "", ""))
-
-	// Search & Filter
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.Render("Search & Filter"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("/", "Search", "Esc", "Clear"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("↑/↓", "Search history", "", ""))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("f", "Filter dirs", "Space", "Toggle item"))
-
-	// Multi-Select
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.Render("Multi-Select"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("Space", "Toggle select", "L", "Launch selected"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("a", "Select all", "d", "Deselect all"))
-
-	// View
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.Render("View"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("s", "Cycle sort", "S", "Reverse sort"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("Tab", "Cycle pivot", "S-Tab", "Reverse pivot"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("x", "Expand/collapse", "p", "Preview"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("P", "Preview position", ",", "Settings"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("h", "Hide session", "H", "Show hidden"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("*", "Toggle favorite", "", ""))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("v", "View plan", "R", "Scan work status"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("c", "Copy session ID", "y", "Copy preview"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("C", "Copy path", "", ""))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("r", "Rebuild Index", "", ""))
-
-	// Time Range
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.Render("Time Range"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("1", "1 hour", "2", "1 day"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("3", "7 days", "4", "All time"))
-
-	// Session Status (attention dot legend)
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.Render("Session Status"))
-	sb.WriteByte('\n')
-	sb.WriteString(legendRow(
-		styles.AttentionWaitingStyle.Render(styles.IconAttentionWaiting()), "Needs input",
-		styles.AttentionActiveStyle.Render(styles.IconAttentionActive()), "AI working",
-	))
-	sb.WriteByte('\n')
-	sb.WriteString(legendRow(
-		styles.AttentionStaleStyle.Render(styles.IconAttentionStale()), "Running, quiet",
-		styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()), "Not running",
-	))
-	sb.WriteByte('\n')
-	sb.WriteString(legendRow(
-		styles.AttentionInterruptedStyle.Render(styles.IconAttentionInterrupted()), "Interrupted",
-		"", "",
-	))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("n", "Next waiting", "N", "Resume interrupted"))
-	sb.WriteByte('\n')
-	sb.WriteString(shortcutRow("!", "Filter by status", "", ""))
-
-	// General
-	sb.WriteByte('\n')
-	sb.WriteString(catStyle.PaddingTop(1).Render(""))
-	sb.WriteString(shortcutRow("?", "Toggle help", "q", "Quit"))
+	for groupIndex, group := range h.groups {
+		if groupIndex > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(catStyle.Render(group.Title))
+		if group.Title == "Session Status" {
+			sb.WriteByte('\n')
+			sb.WriteString(legendRow(
+				styles.AttentionWaitingStyle.Render(styles.IconAttentionWaiting()), "Needs input",
+				styles.AttentionActiveStyle.Render(styles.IconAttentionActive()), "AI working",
+			))
+			sb.WriteByte('\n')
+			sb.WriteString(legendRow(
+				styles.AttentionStaleStyle.Render(styles.IconAttentionStale()), "Running, quiet",
+				styles.AttentionIdleStyle.Render(styles.IconAttentionIdle()), "Not running",
+			))
+			sb.WriteByte('\n')
+			sb.WriteString(legendRow(
+				styles.AttentionInterruptedStyle.Render(styles.IconAttentionInterrupted()), "Interrupted",
+				"", "",
+			))
+		}
+		for i := 0; i < len(group.Bindings); i += 2 {
+			sb.WriteByte('\n')
+			sb.WriteString(bindingRow(group.Bindings, i))
+		}
+	}
 
 	// Nerd Font hint — only shown when no Nerd Font is detected.
 	if !styles.NerdFontEnabled() {
@@ -191,19 +146,13 @@ func (h HelpOverlay) ShortView() string {
 	descStyle := lipgloss.NewStyle().Foreground(styles.ColorDimmed)
 	sep := descStyle.Render(" · ")
 
-	items := []struct{ key, desc string }{
-		{"⏎", "launch"},
-		{"/", "search"},
-		{"f", "filter"},
-		{"s", "sort"},
-		{"p", "preview"},
-		{",", "settings"},
-		{"?", "help"},
-		{"q", "quit"},
-	}
-	parts := make([]string, 0, len(items))
-	for _, it := range items {
-		parts = append(parts, keyStyle.Render(it.key)+" "+descStyle.Render(it.desc))
+	parts := make([]string, 0, len(h.short))
+	for _, binding := range h.short {
+		help := binding.Help()
+		if help.Key == "" || help.Desc == "" {
+			continue
+		}
+		parts = append(parts, keyStyle.Render(help.Key)+" "+descStyle.Render(help.Desc))
 	}
 	return strings.Join(parts, sep)
 }

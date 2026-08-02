@@ -65,6 +65,17 @@ type NamedView struct {
 	ExcludedDirs []string `json:"excluded_dirs,omitempty"`
 }
 
+// LaunchSet holds a named, ordered group of session IDs that can be launched
+// together from the TUI.
+type LaunchSet struct {
+	// Name is the unique display name for this launch set.
+	Name string `json:"name"`
+
+	// SessionIDs are launched in this order. Missing sessions are skipped by
+	// the TUI at launch time.
+	SessionIDs []string `json:"session_ids"`
+}
+
 // Validate returns an error if the view has invalid or missing fields.
 func (v *NamedView) Validate() error {
 	if v.Name == "" {
@@ -97,6 +108,17 @@ func (v *NamedView) Validate() error {
 		default:
 			return fmt.Errorf("named view %q: invalid pivot %q", v.Name, v.Pivot)
 		}
+	}
+	return nil
+}
+
+// Validate returns an error if the launch set has invalid or missing fields.
+func (s *LaunchSet) Validate() error {
+	if s.Name == "" {
+		return errors.New("launch set: name is required")
+	}
+	if len(s.SessionIDs) == 0 {
+		return fmt.Errorf("launch set %q: at least one session ID is required", s.Name)
 	}
 	return nil
 }
@@ -294,6 +316,14 @@ type Config struct {
 	// filter/sort/pivot settings that can be applied together.
 	Views []NamedView `json:"views,omitempty"`
 
+	// LaunchSets is a list of named, ordered session ID collections that can
+	// be relaunched together from the TUI.
+	LaunchSets []LaunchSet `json:"launch_sets,omitempty"`
+
+	// ProjectRoots is a list of absolute directories that Dispatch scans for
+	// git repositories to offer as quick-start "New session" rows.
+	ProjectRoots []string `json:"project_roots,omitempty"`
+
 	// ActiveView is the name of the currently active named view.
 	// Empty or "Default" means no named view is active.
 	ActiveView string `json:"active_view,omitempty"`
@@ -401,6 +431,28 @@ func (c *Config) ValidViews() []NamedView {
 	for _, v := range c.Views {
 		if v.Validate() == nil {
 			valid = append(valid, v)
+		}
+	}
+	return valid
+}
+
+// FindLaunchSet returns the named launch set with the given name, or nil if
+// not found.
+func (c *Config) FindLaunchSet(name string) *LaunchSet {
+	for i := range c.LaunchSets {
+		if c.LaunchSets[i].Name == name {
+			return &c.LaunchSets[i]
+		}
+	}
+	return nil
+}
+
+// ValidLaunchSets returns only launch sets that pass validation.
+func (c *Config) ValidLaunchSets() []LaunchSet {
+	valid := make([]LaunchSet, 0, len(c.LaunchSets))
+	for _, set := range c.LaunchSets {
+		if set.Validate() == nil {
+			valid = append(valid, set)
 		}
 	}
 	return valid

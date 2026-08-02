@@ -18,8 +18,9 @@ import (
 const staleBinaryThreshold = 30 * time.Second
 
 // deadcodeAllowlist contains functions reported by deadcode that are not
-// genuinely dead: build-tag stubs, interface implementations, and functions
-// called only from files with non-default build tags.
+// genuinely dead: build-tag stubs, interface implementations, functions
+// called only from files with non-default build tags, and exported helpers
+// that exist to let another package assert a cross-package invariant in tests.
 var deadcodeAllowlist = []string{
 	"filterEnv",                    // Unix-only helper called from launchInPlaceUnix (launch_unix.go)
 	"launchInPlaceUnix",            // build-tag stub (launch_windows.go)
@@ -32,6 +33,7 @@ var deadcodeAllowlist = []string{
 	"keyMap.ShortHelp",             // key.Map interface impl
 	"keyMap.FullHelp",              // key.Map interface impl
 	"CurrentTheme",                 // called from screenshot.go (//go:build screenshots)
+	"DefaultKeybindings",           // exported for internal/tui's config-sync drift tests
 }
 
 const (
@@ -136,6 +138,26 @@ func Build() error {
 	}
 	fmt.Printf("   Version: %s\n", version)
 	return nil
+}
+
+// Screenshots regenerates the website screenshot PNGs via the web npm script.
+func Screenshots() error {
+	fmt.Println("\n=== Regenerating website screenshots ===")
+	return run("npm", "--prefix", "web", "run", "screenshots")
+}
+
+// ScreenshotsCheck verifies the screenshot capture path without rendering PNGs.
+func ScreenshotsCheck() error {
+	fmt.Println("\n=== Checking screenshot capture ===")
+	outDir := filepath.Join(projectDir(), ".screenshots-check")
+	if err := os.RemoveAll(outDir); err != nil {
+		return fmt.Errorf("clean screenshot check dir: %w", err)
+	}
+	if err := run("go", "run", "-tags", "screenshots", "./cmd/screenshots", "--check", "--out", outDir); err != nil {
+		_ = os.RemoveAll(outDir)
+		return err
+	}
+	return os.RemoveAll(outDir)
 }
 
 // Preflight runs all pre-commit checks: format, tidy, vet, lint, WSL lint,

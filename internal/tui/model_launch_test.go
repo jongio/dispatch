@@ -2,12 +2,15 @@ package tui
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 )
 
@@ -112,6 +115,33 @@ func TestLaunchMultiple_InPlaceModeForced(t *testing.T) {
 	}
 }
 
+func TestLaunchWithMode_QuickStartRowUsesRepoRootAndLaunchSettings(t *testing.T) {
+	repoRoot := filepath.Join(t.TempDir(), "repo")
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	m.cfg.YoloMode = true
+	m.cfg.Agent = "coder"
+	m.cfg.Model = "gpt-5"
+	m.sessionList.SetSessionsWithQuickStarts(nil, []components.QuickStart{{Name: "repo", Path: repoRoot}})
+
+	if id := m.selectedSessionID(); id != "" {
+		t.Fatalf("selectedSessionID = %q, want empty for new session", id)
+	}
+	if cwd := m.selectedSessionCwd(); cwd != repoRoot {
+		t.Fatalf("selectedSessionCwd = %q, want repo root %q", cwd, repoRoot)
+	}
+	cfg := m.resumeConfigForSession(m.selectedSessionCwd())
+	if !cfg.YoloMode || cfg.Agent != "coder" || cfg.Model != "gpt-5" || cfg.Cwd != repoRoot {
+		t.Fatalf("resumeConfigForSession = %#v, want existing launch settings and repo root", cfg)
+	}
+	args := platform.BuildResumeArgs(m.selectedSessionID(), cfg)
+	for _, arg := range args {
+		if arg == "--resume" {
+			t.Fatalf("BuildResumeArgs(%q) included --resume: %v", m.selectedSessionID(), args)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // batchLaunchSessions — 0% coverage
 // ---------------------------------------------------------------------------
@@ -192,6 +222,92 @@ func TestLaunchMultipleWithMode_WithSelections(t *testing.T) {
 	// With selections, should return a non-nil batch command.
 	if cmd == nil {
 		t.Error("launchMultipleWithMode with selections should return a non-nil command")
+	}
+}
+
+func TestSaveLaunchSet_PersistsSelectedSessionsInOrder(t *testing.T) {
+	t.Setenv("DISPATCH_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	sessions := []data.Session{
+		{ID: "s1", Cwd: "/tmp/a"},
+		{ID: "s2", Cwd: "/tmp/b"},
+		{ID: "s3", Cwd: "/tmp/c"},
+	}
+	m.sessions = sessions
+	m.sessionList.SetSessions(sessions)
+	m.sessionList.ToggleSelected()
+	m.sessionList.MoveDown()
+	m.sessionList.ToggleSelected()
+
+	_ = m.saveLaunchSet("Feature")
+
+	if len(m.cfg.LaunchSets) != 1 {
+		t.Fatalf("LaunchSets len = %d, want 1", len(m.cfg.LaunchSets))
+	}
+	set := m.cfg.LaunchSets[0]
+	if set.Name != "Feature" {
+		t.Fatalf("LaunchSet name = %q, want Feature", set.Name)
+	}
+	if got := set.SessionIDs; len(got) != 2 || got[0] != "s1" || got[1] != "s2" {
+		t.Fatalf("SessionIDs = %v, want [s1 s2]", got)
+	}
+}
+
+func TestRenameLaunchSet_RejectsCollision(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	m.cfg.LaunchSets = []config.LaunchSet{
+		{Name: "A", SessionIDs: []string{"s1"}},
+		{Name: "B", SessionIDs: []string{"s2"}},
+	}
+	m.launchSetPicker.SetLaunchSets(m.cfg.LaunchSets, map[string]struct{}{"s1": {}, "s2": {}})
+
+	_ = m.renameLaunchSet("B")
+
+	if m.cfg.LaunchSets[0].Name != "A" {
+		t.Fatalf("collision rename changed first set to %q", m.cfg.LaunchSets[0].Name)
+	}
+	if !strings.Contains(m.statusErr, "already exists") {
+		t.Fatalf("statusErr = %q, want collision error", m.statusErr)
+	}
+}
+
+func TestDeleteLaunchSet_RemovesSelectedSet(t *testing.T) {
+	t.Setenv("DISPATCH_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	m.cfg.LaunchSets = []config.LaunchSet{
+		{Name: "A", SessionIDs: []string{"s1"}},
+		{Name: "B", SessionIDs: []string{"s2"}},
+	}
+	m.launchSetPicker.SetLaunchSets(m.cfg.LaunchSets, map[string]struct{}{"s1": {}, "s2": {}})
+	m.launchSetPicker.MoveDown()
+
+	_ = m.deleteLaunchSet()
+
+	if len(m.cfg.LaunchSets) != 1 || m.cfg.LaunchSets[0].Name != "A" {
+		t.Fatalf("LaunchSets = %#v, want only A", m.cfg.LaunchSets)
+	}
+}
+
+func TestLaunchSelectedLaunchSet_SkipsMissingSessions(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	m.cfg.LaunchMode = config.LaunchModeTab
+	m.sessions = []data.Session{{ID: "s1", Cwd: "/tmp/a"}}
+	m.cfg.LaunchSets = []config.LaunchSet{
+		{Name: "Feature", SessionIDs: []string{"s1", "missing"}},
+	}
+	m.launchSetPicker.SetLaunchSets(m.cfg.LaunchSets, map[string]struct{}{"s1": {}})
+
+	cmd := m.launchSelectedLaunchSet()
+
+	if cmd == nil {
+		t.Fatal("launchSelectedLaunchSet should launch existing sessions")
+	}
+	if !strings.Contains(m.statusErr, "Skipped 1 missing") {
+		t.Fatalf("statusErr = %q, want missing-session skip message", m.statusErr)
 	}
 }
 

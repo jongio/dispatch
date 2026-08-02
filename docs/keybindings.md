@@ -6,7 +6,9 @@
 > of them with the `keybindings` object in `config.json`. Each entry maps an
 > action name to a comma-separated key list, for example `"search": "/,ctrl+f"`.
 > See the "Customizing Keybindings" section of the README for the full list of
-> action names and the rules for conflict handling.
+> action names and the rules for conflict handling. The in-app `?` help overlay
+> and short help bar display your effective custom bindings after overrides are
+> applied.
 
 ## KEYBOARD SHORTCUTS - GLOBAL (Always Available)
 
@@ -106,6 +108,34 @@
     - Handler: internal\tui\model.go (multi-select handler)
     - Behavior: Launches every session that has a ✓ selection indicator. If no sessions are selected and cursor is on a folder, opens all sessions under that folder. Each session opens via the configured launch mode.
     - Condition: In session list view; requires at least one selected session OR cursor on a folder
+
+11a. **Ctrl+S** → Save Launch Set
+    - File: internal\tui\keys.go (LaunchSetSave binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+s"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Opens a name input to save the current multi-selection as a named launch set in config.json.
+    - Condition: In session list view or launch set overlay; requires at least one selected session
+
+11b. **Ctrl+L** → Open Launch Sets
+    - File: internal\tui\keys.go (LaunchSetList binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+l"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Opens the launch set overlay. Enter launches the highlighted set, visibly missing session IDs are skipped, Ctrl+R renames, and Ctrl+D asks for delete confirmation.
+    - Condition: In session list view
+
+11c. **Ctrl+R** → Rename Launch Set
+    - File: internal\tui\keys.go (LaunchSetRename binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+r"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Renames the highlighted launch set, rejecting collisions with existing set names.
+    - Condition: Launch set overlay
+
+11d. **Ctrl+D** → Delete Launch Set
+    - File: internal\tui\keys.go (LaunchSetDelete binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+d"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Shows delete confirmation for the highlighted launch set; Enter confirms, Esc cancels.
+    - Condition: Launch set overlay
 
 12. **a** → Select All Visible Sessions
     - File: internal\tui\keys.go (multi-select handler)
@@ -251,6 +281,27 @@
     - Handler: internal\tui\model.go
     - Behavior: Scrolls preview panel content down by one page
     - Condition: Only when preview panel is visible
+
+22a. **Ctrl+N** → Next Preview Search Match
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("Ctrl+N", "next preview match"))
+     - Handler: internal\tui\model.go
+     - Behavior: Jumps the preview pane to the next highlighted free-text search match and updates the match counter
+     - Condition: Only when preview panel is visible and the active search query has preview matches
+
+22b. **Ctrl+P** → Previous Preview Search Match
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("Ctrl+P", "previous preview match"))
+     - Handler: internal\tui\model.go
+     - Behavior: Jumps the preview pane to the previous highlighted free-text search match and updates the match counter
+     - Condition: Only when preview panel is visible and the active search query has preview matches
+
+22c. **Alt+1** through **Alt+5** → Jump to Related Session
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("alt+1", "alt+2", "alt+3", "alt+4", "alt+5"), key.WithHelp("Alt+1-5", "jump related"))
+     - Handler: internal\tui\model.go
+     - Behavior: Moves focus to the corresponding row in the preview pane's Related sessions section and loads that session's preview
+     - Condition: Only when preview panel is visible and the selected number exists in the Related sessions section
 
 ### Session Management
 23. **r** → Rebuild Index

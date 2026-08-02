@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -27,12 +28,14 @@ type PreviewPanel struct {
 	redactSecrets    bool                  // mask common secret patterns in turn text
 	convHeaderLine   int                   // content line where "Conversation" label is rendered (-1 = none)
 	idFieldLine      int                   // content line where "ID: ..." is rendered (-1 = none)
+	relatedRows      map[int]string        // content line -> related session ID for click handling
 	planContent      string                // plan.md content (empty when no plan)
 	planViewMode     bool                  // when true, render plan instead of session detail
 	hasPlan          bool                  // whether the session has a plan.md file
 	workStatus       data.WorkStatusResult // current session's work status
 	workspaceMissing bool                  // true when the session cwd no longer exists on disk
 	gitStatus        platform.GitStatus    // detailed git status for the current session's folder
+	relatedSessions  []RelatedSessionItem  // ranked nearby sessions for jump navigation
 
 	timelineMode bool // when true, render activity timeline instead of session detail
 
@@ -47,6 +50,61 @@ type PreviewPanel struct {
 	// plainLines stores ANSI-stripped versions of renderedLines for
 	// selection coordinate math and clipboard copy.
 	plainLines []string
+
+	searchTerms []string
+	matches     []previewMatch
+	activeMatch int
+	matchCount  int
+}
+
+// HitRelatedSession returns the related session rendered at contentRow.
+func (p *PreviewPanel) HitRelatedSession(contentRow int) (string, bool) {
+	if p.relatedRows == nil {
+		return "", false
+	}
+	id, ok := p.relatedRows[contentRow]
+	return id, ok
+}
+
+// RelatedSessionIDAt returns the ID of the 0-based related-session shortcut.
+func (p *PreviewPanel) RelatedSessionIDAt(index int) (string, bool) {
+	if index < 0 || index >= len(p.relatedSessions) {
+		return "", false
+	}
+	id := p.relatedSessions[index].ID
+	return id, id != ""
+}
+
+// ContentLineForViewportRow maps a rendered preview row to the underlying
+// content line, accounting for the search match status row.
+func (p *PreviewPanel) ContentLineForViewportRow(viewportRow int) int {
+	if viewportRow < 0 {
+		return -1
+	}
+	if p.matchCount > 0 {
+		if viewportRow == 0 {
+			return -1
+		}
+		viewportRow--
+	}
+	return viewportRow + p.scroll
+}
+
+type previewMatch struct {
+	line  int
+	start int
+	end   int
+}
+
+// RelatedSessionItem is the compact preview representation of a nearby session.
+type RelatedSessionItem struct {
+	ID                string
+	Summary           string
+	Repository        string
+	Branch            string
+	Cwd               string
+	LastActiveAt      string
+	DisplayRepository string
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -86,6 +144,14 @@ func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
 	p.ClearSelection()
+	p.activeMatch = 0
+	p.updateTotalLines()
+}
+
+// SetSearchTerms updates the free-text search terms highlighted in the preview.
+func (p *PreviewPanel) SetSearchTerms(terms []string) {
+	p.searchTerms = append([]string(nil), terms...)
+	p.activeMatch = 0
 	p.updateTotalLines()
 }
 
@@ -118,6 +184,12 @@ func (p *PreviewPanel) SetWorkspaceMissing(missing bool) {
 // preview can render a git section (branch/upstream, push/pull, change counts).
 func (p *PreviewPanel) SetGitStatus(status platform.GitStatus) {
 	p.gitStatus = status
+	p.updateTotalLines()
+}
+
+// SetRelatedSessions updates the ranked nearby sessions shown in the preview.
+func (p *PreviewPanel) SetRelatedSessions(related []RelatedSessionItem) {
+	p.relatedSessions = append([]RelatedSessionItem(nil), related...)
 	p.updateTotalLines()
 }
 
@@ -230,7 +302,7 @@ func (p *PreviewPanel) ScrollUp(n int) {
 func (p *PreviewPanel) ScrollDown(n int) {
 	p.ClearSelection()
 	p.scroll += n
-	viewportH := max(1, p.height-2)
+	viewportH := p.viewportContentHeight()
 	maxScroll := max(0, p.totalLines-viewportH)
 	if p.scroll > maxScroll {
 		p.scroll = maxScroll
@@ -239,17 +311,80 @@ func (p *PreviewPanel) ScrollDown(n int) {
 
 // PageUp scrolls up by half the viewport height.
 func (p *PreviewPanel) PageUp() {
-	p.ScrollUp(max(1, (p.height-2)/2))
+	p.ScrollUp(max(1, p.viewportContentHeight()/2))
 }
 
 // PageDown scrolls down by half the viewport height.
 func (p *PreviewPanel) PageDown() {
-	p.ScrollDown(max(1, (p.height-2)/2))
+	p.ScrollDown(max(1, p.viewportContentHeight()/2))
 }
 
 // ScrollOffset returns the current scroll position.
 func (p *PreviewPanel) ScrollOffset() int {
 	return p.scroll
+}
+
+// MatchCount returns the number of active search matches in the rendered preview.
+func (p *PreviewPanel) MatchCount() int {
+	return p.matchCount
+}
+
+// ActiveMatch returns the 1-based active match index, or 0 when there are no matches.
+func (p *PreviewPanel) ActiveMatch() int {
+	if p.matchCount == 0 {
+		return 0
+	}
+	return p.activeMatch + 1
+}
+
+// NextMatch advances to the next search match and scrolls it into view.
+func (p *PreviewPanel) NextMatch() bool {
+	p.updateTotalLines()
+	if p.matchCount == 0 {
+		return false
+	}
+	p.activeMatch = (p.activeMatch + 1) % p.matchCount
+	p.scrollToActiveMatch()
+	return true
+}
+
+// PrevMatch moves to the previous search match and scrolls it into view.
+func (p *PreviewPanel) PrevMatch() bool {
+	p.updateTotalLines()
+	if p.matchCount == 0 {
+		return false
+	}
+	p.activeMatch = (p.activeMatch - 1 + p.matchCount) % p.matchCount
+	p.scrollToActiveMatch()
+	return true
+}
+
+func (p *PreviewPanel) scrollToActiveMatch() {
+	if p.matchCount == 0 || p.activeMatch < 0 || p.activeMatch >= len(p.matches) {
+		return
+	}
+	target := p.matches[p.activeMatch].line
+	viewportH := p.viewportContentHeight()
+	if target < p.scroll {
+		p.scroll = target
+	} else if target >= p.scroll+viewportH {
+		p.scroll = target - viewportH + 1
+	}
+	maxScroll := max(0, p.totalLines-viewportH)
+	if p.scroll > maxScroll {
+		p.scroll = maxScroll
+	}
+	if p.scroll < 0 {
+		p.scroll = 0
+	}
+}
+
+func (p *PreviewPanel) viewportContentHeight() int {
+	h := max(1, p.height-2)
+	if p.matchCount > 0 && h > 1 {
+		h--
+	}
+	return h
 }
 
 // HitConversationSort reports whether contentRow (a 0-indexed line in the
@@ -442,8 +577,11 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.renderedLines = nil
 		p.plainLines = nil
+		p.matches = nil
+		p.matchCount = 0
 		return
 	}
 	if p.planViewMode && p.planContent != "" {
@@ -453,6 +591,8 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
+		p.recomputeMatches()
 		return
 	}
 	if p.timelineMode && p.detail != nil {
@@ -462,14 +602,19 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
+		p.recomputeMatches()
 		return
 	}
 	if p.detail == nil {
 		p.totalLines = 0
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.relatedRows = nil
 		p.renderedLines = nil
 		p.plainLines = nil
+		p.matches = nil
+		p.matchCount = 0
 		return
 	}
 	content, convLine, idLine := p.renderContent()
@@ -478,6 +623,7 @@ func (p *PreviewPanel) updateTotalLines() {
 	p.totalLines = len(p.renderedLines)
 	p.convHeaderLine = convLine
 	p.idFieldLine = idLine
+	p.recomputeMatches()
 }
 
 // stripLines returns a copy of lines with ANSI escape sequences removed.
@@ -487,6 +633,178 @@ func stripLines(lines []string) []string {
 		plain[i] = ansi.Strip(l)
 	}
 	return plain
+}
+
+func (p *PreviewPanel) recomputeMatches() {
+	p.matches = nil
+	p.matchCount = 0
+	if len(p.searchTerms) == 0 || len(p.plainLines) == 0 {
+		p.activeMatch = 0
+		return
+	}
+	for lineIdx, line := range p.plainLines {
+		matches := lineMatches(line, p.searchTerms)
+		for _, m := range matches {
+			m.line = lineIdx
+			p.matches = append(p.matches, m)
+		}
+	}
+	p.matchCount = len(p.matches)
+	if p.matchCount == 0 {
+		p.activeMatch = 0
+		return
+	}
+	if p.activeMatch >= p.matchCount {
+		p.activeMatch = p.matchCount - 1
+	}
+	if p.activeMatch < 0 {
+		p.activeMatch = 0
+	}
+}
+
+func lineMatches(line string, terms []string) []previewMatch {
+	runes := []rune(line)
+	if len(runes) == 0 {
+		return nil
+	}
+	var matches []previewMatch
+	for i := 0; i < len(runes); {
+		bestLen := 0
+		for _, term := range terms {
+			termRunes := []rune(term)
+			if len(termRunes) == 0 || i+len(termRunes) > len(runes) {
+				continue
+			}
+			if strings.EqualFold(string(runes[i:i+len(termRunes)]), term) && len(termRunes) > bestLen {
+				bestLen = len(termRunes)
+			}
+		}
+		if bestLen > 0 {
+			matches = append(matches, previewMatch{start: i, end: i + bestLen})
+			i += bestLen
+			continue
+		}
+		i++
+	}
+	return matches
+}
+
+func (p PreviewPanel) matchesForLine(line int) []previewMatch {
+	var out []previewMatch
+	for _, m := range p.matches {
+		if m.line == line {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func (p PreviewPanel) activeMatchIndexOnLine(line int) int {
+	if p.activeMatch < 0 || p.activeMatch >= len(p.matches) {
+		return -1
+	}
+	if p.matches[p.activeMatch].line != line {
+		return -1
+	}
+	n := 0
+	for i, m := range p.matches {
+		if m.line != line {
+			continue
+		}
+		if i == p.activeMatch {
+			return n
+		}
+		n++
+	}
+	return -1
+}
+
+func (p PreviewPanel) matchStatusLine() string {
+	return styles.DimmedStyle.Render(fmt.Sprintf(
+		"  Matches %d/%d  %s next  %s previous",
+		p.ActiveMatch(),
+		p.matchCount,
+		styles.KeyStyle.Render("Ctrl+N"),
+		styles.KeyStyle.Render("Ctrl+P"),
+	))
+}
+
+func highlightLineMatches(line string, matches []previewMatch, activeOnLine int) string {
+	if len(matches) == 0 {
+		return line
+	}
+	bounds := visibleRuneByteBounds(line)
+	if len(bounds) == 0 {
+		return line
+	}
+	normalStyle, activeStyle := previewMatchStyles()
+	var b strings.Builder
+	last := 0
+	for i, m := range matches {
+		if m.start < 0 || m.end <= m.start || m.start >= len(bounds) {
+			continue
+		}
+		endRune := min(m.end, len(bounds))
+		startByte := bounds[m.start][0]
+		endByte := bounds[endRune-1][1]
+		if startByte < last {
+			continue
+		}
+		b.WriteString(line[last:startByte])
+		style := normalStyle
+		if i == activeOnLine {
+			style = activeStyle
+		}
+		b.WriteString(style.Render(line[startByte:endByte]))
+		last = endByte
+	}
+	b.WriteString(line[last:])
+	return b.String()
+}
+
+func previewMatchStyles() (lipgloss.Style, lipgloss.Style) {
+	t := styles.CurrentTheme()
+	normal := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(t.Selected))
+	active := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(t.Primary))
+	return normal, active
+}
+
+func visibleRuneByteBounds(s string) [][2]int {
+	var bounds [][2]int
+	for i := 0; i < len(s); {
+		if s[i] == '\x1b' {
+			i = skipANSISequence(s, i)
+			continue
+		}
+		size := 1
+		if s[i] >= 0x80 {
+			_, size = utf8.DecodeRuneInString(s[i:])
+		}
+		bounds = append(bounds, [2]int{i, i + size})
+		i += size
+	}
+	return bounds
+}
+
+func skipANSISequence(s string, i int) int {
+	if i+1 >= len(s) || s[i+1] != '[' {
+		return i + 1
+	}
+	i += 2
+	for i < len(s) {
+		c := s[i]
+		i++
+		if c >= 0x40 && c <= 0x7e {
+			break
+		}
+	}
+	return i
 }
 
 // View renders the preview panel content.
@@ -513,7 +831,11 @@ func (p PreviewPanel) View() string {
 	lines := strings.Split(content, "\n")
 	scroll := p.scroll
 	totalLines := len(lines)
-	maxScroll := max(0, totalLines-innerH)
+	contentH := innerH
+	if p.matchCount > 0 && contentH > 1 {
+		contentH--
+	}
+	maxScroll := max(0, totalLines-contentH)
 	if scroll > maxScroll {
 		scroll = maxScroll
 	}
@@ -523,8 +845,8 @@ func (p PreviewPanel) View() string {
 	if scroll > 0 && scroll < len(lines) {
 		lines = lines[scroll:]
 	}
-	if len(lines) > innerH {
-		lines = lines[:innerH]
+	if len(lines) > contentH {
+		lines = lines[:contentH]
 	}
 
 	// Scroll indicators — replace first/last visible line when content extends.
@@ -533,9 +855,20 @@ func (p PreviewPanel) View() string {
 	if hasScrollUp {
 		lines[0] = styles.DimmedStyle.Render(fmt.Sprintf("  ▲ %d lines above", scroll))
 	}
-	if moreBelow := totalLines - scroll - innerH; moreBelow > 0 && len(lines) > 1 {
+	if moreBelow := totalLines - scroll - contentH; moreBelow > 0 && len(lines) > 1 {
 		hasScrollDown = true
 		lines[len(lines)-1] = styles.DimmedStyle.Render(fmt.Sprintf("  ▼ %d lines below", moreBelow))
+	}
+
+	// Highlight rendered search matches after wrapping/scrolling so layout is unchanged.
+	if p.matchCount > 0 {
+		for i := range lines {
+			if (i == 0 && hasScrollUp) || (i == len(lines)-1 && hasScrollDown) {
+				continue
+			}
+			contentLine := scroll + i
+			lines[i] = highlightLineMatches(lines[i], p.matchesForLine(contentLine), p.activeMatchIndexOnLine(contentLine))
+		}
 	}
 
 	// Apply selection highlight to lines within the active selection range.
@@ -552,6 +885,10 @@ func (p PreviewPanel) View() string {
 				lines[i] = selStyle.Render(lines[i])
 			}
 		}
+	}
+
+	if p.matchCount > 0 {
+		lines = append([]string{p.matchStatusLine()}, lines...)
 	}
 
 	viewportContent := strings.Join(lines, "\n")
@@ -579,7 +916,10 @@ func (p PreviewPanel) View() string {
 // shown before truncation with a "… N more" indicator.
 const maxPreviewItems = 5
 
-func (p PreviewPanel) renderContent() (string, int, int) {
+// maxRelatedSessionItems is the maximum number of related sessions rendered.
+const maxRelatedSessionItems = 5
+
+func (p *PreviewPanel) renderContent() (string, int, int) {
 	if p.detail == nil {
 		// Use height-2 to account for the border added by View().
 		return lipgloss.Place(
@@ -594,6 +934,7 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 
 	var b strings.Builder
 	convLine := -1
+	relatedRows := make(map[int]string)
 
 	// ── Title ──
 	b.WriteString(styles.PreviewTitleStyle.Render(styles.IconSession()+"Session Detail") + "\n")
@@ -634,8 +975,8 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		b.WriteString(wl + styles.GitMissingStyle.Render(styles.IconGitMissing()+" Missing") + "\n")
 	}
 
-	if s.Repository != "" {
-		field("Repo", s.Repository)
+	if repo := p.displayRepository(s.Repository); repo != "" {
+		field("Repo", repo)
 	}
 	if s.Branch != "" {
 		field(styles.IconGitBranch()+"Branch", s.Branch)
@@ -709,6 +1050,22 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 			b.WriteString(styles.DimmedStyle.Render(
 				"  "+styles.IconBullet()+" "+ref.RefType+": "+val,
 			) + "\n")
+		}
+	}
+
+	// ── Related sessions ──
+	if len(p.relatedSessions) > 0 {
+		b.WriteString("\n")
+		sep := styles.SeparatorStyle.Render(strings.Repeat("─", max(1, contentW)))
+		b.WriteString(sep + "\n")
+		b.WriteString(styles.PreviewLabelStyle.Render("Related sessions") + "\n")
+		for i, related := range p.relatedSessions {
+			if i >= maxRelatedSessionItems {
+				break
+			}
+			line := strings.Count(b.String(), "\n")
+			relatedRows[line] = related.ID
+			b.WriteString(p.renderRelatedSessionRow(i, related, contentW) + "\n")
 		}
 	}
 
@@ -796,7 +1153,38 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		}
 	}
 
+	p.relatedRows = relatedRows
 	return b.String(), convLine, idLine
+}
+
+func (p *PreviewPanel) renderRelatedSessionRow(i int, related RelatedSessionItem, contentW int) string {
+	summary := CleanSummary(related.Summary)
+	if summary == "" {
+		summary = related.ID
+	}
+	context := related.DisplayRepository
+	if context == "" {
+		context = p.displayRepository(related.Repository)
+	}
+	if related.Branch != "" {
+		if context != "" {
+			context += "@" + related.Branch
+		} else {
+			context = related.Branch
+		}
+	}
+	if context == "" {
+		context = AbbrevPath(related.Cwd)
+	}
+	if context == "" {
+		context = "–"
+	}
+	meta := context + " · " + FormatTimestamp(related.LastActiveAt)
+	prefix := fmt.Sprintf("  %d. ", i+1)
+	available := max(1, contentW-lipgloss.Width(prefix)-lipgloss.Width(meta)-3)
+	return styles.DimmedStyle.Render(prefix) +
+		styles.PreviewValueStyle.Render(Truncate(summary, available)) +
+		styles.DimmedStyle.Render(" — "+meta)
 }
 
 // renderPlanContent renders the plan.md content as styled markdown using
@@ -844,6 +1232,13 @@ func countUniqueRefs(refs []data.SessionRef) int {
 		seen[r.RefType+":"+r.RefValue] = struct{}{}
 	}
 	return len(seen)
+}
+
+func (p PreviewPanel) displayRepository(stored string) string {
+	if p.gitStatus.IsRepo && p.gitStatus.Repository != "" {
+		return p.gitStatus.Repository
+	}
+	return stored
 }
 
 // writeGitSection renders the git status block for the current session: upstream,

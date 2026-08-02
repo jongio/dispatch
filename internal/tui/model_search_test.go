@@ -69,6 +69,48 @@ func TestApplyInitialQuerySeedsSearchState(t *testing.T) {
 	if len(cmds) == 0 {
 		t.Error("applyInitialQuery should return commands (focus + deep-search timer)")
 	}
+	m.preview.SetSize(80, 40)
+	m.preview.SetDetail(&data.SessionDetail{Session: data.Session{ID: "auth-session"}})
+	if m.preview.MatchCount() == 0 {
+		t.Error("initial query free text should seed preview highlights")
+	}
+}
+
+func TestSearchHighlightTermsExcludeStructuredTokens(t *testing.T) {
+	sf := ParseSearchTokens(`repo:dispatch tag:bug Auth AUTH unknown:value`)
+
+	terms := searchHighlightTerms(sf)
+	want := []string{"Auth", "unknown:value"}
+	if len(terms) != len(want) {
+		t.Fatalf("terms = %v, want %v", terms, want)
+	}
+	for i := range want {
+		if terms[i] != want[i] {
+			t.Errorf("terms[%d] = %q, want %q", i, terms[i], want[i])
+		}
+	}
+}
+
+func TestTriggerSearchSeedsPreviewHighlightsForQuickAndDeepSearch(t *testing.T) {
+	m := newTestModel()
+	m.searchBar.SetValue("repo:dispatch seattle")
+
+	cmd := m.triggerSearch(nil)
+	if cmd == nil {
+		t.Fatal("triggerSearch should return quick/deep search commands")
+	}
+	if m.filter.Query != "seattle" {
+		t.Fatalf("filter.Query = %q, want %q", m.filter.Query, "seattle")
+	}
+	if !m.search.deepSearchPending {
+		t.Fatal("deep search should be pending after triggerSearch")
+	}
+
+	m.preview.SetSize(80, 40)
+	m.preview.SetDetail(&data.SessionDetail{Session: data.Session{ID: "seattle-session"}})
+	if m.preview.MatchCount() == 0 {
+		t.Error("triggerSearch free text should seed preview highlights used by quick and deep search results")
+	}
 }
 
 func TestNewModelWithQuerySetsInitialQuery(t *testing.T) {
@@ -153,6 +195,10 @@ func TestEscapeFromSessionListClearsQuery(t *testing.T) {
 	m.filter.Query = "seattle"
 	m.filter.DeepSearch = true
 	m.searchBar.SetValue("seattle")
+	m.searchFilter = ParseSearchTokens("seattle")
+	m.preview.SetSize(80, 40)
+	m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
+	m.preview.SetDetail(&data.SessionDetail{Session: data.Session{ID: "seattle-session"}})
 
 	result, _ := m.Update(escKeyMsg())
 	rm := result.(Model)
@@ -165,6 +211,9 @@ func TestEscapeFromSessionListClearsQuery(t *testing.T) {
 	}
 	if rm.searchBar.Value() != "" {
 		t.Errorf("Escape in session list should clear search bar text, got %q", rm.searchBar.Value())
+	}
+	if rm.preview.MatchCount() != 0 {
+		t.Errorf("Escape in session list should clear preview matches, got %d", rm.preview.MatchCount())
 	}
 }
 

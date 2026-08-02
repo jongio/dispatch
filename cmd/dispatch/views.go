@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ func runViews(w io.Writer, args []string) error {
 	if len(rest) > 0 {
 		rest = rest[1:]
 	}
-	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" {
+	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" {
 		return runViewsList(w, rest)
 	}
 
@@ -37,6 +38,7 @@ func runViews(w io.Writer, args []string) error {
 
 func runViewsList(w io.Writer, args []string) error {
 	jsonOut := false
+	csvOut := false
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
 	}
@@ -44,9 +46,14 @@ func runViewsList(w io.Writer, args []string) error {
 		switch arg {
 		case "--json":
 			jsonOut = true
+		case "--csv":
+			csvOut = true
 		default:
 			return fmt.Errorf("views list does not take arguments, got %q", arg)
 		}
+	}
+	if jsonOut && csvOut {
+		return fmt.Errorf("--json and --csv cannot be combined")
 	}
 
 	cfg, err := configLoadFn()
@@ -58,6 +65,9 @@ func runViewsList(w io.Writer, args []string) error {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(report)
+	}
+	if csvOut {
+		return writeViewsCSV(w, report)
 	}
 	writeViewsText(w, report)
 	return nil
@@ -127,6 +137,24 @@ func writeViewsText(w io.Writer, report viewsReport) {
 			fmt.Fprintf(w, "  %s\n", summary)
 		}
 	}
+}
+
+func writeViewsCSV(w io.Writer, report viewsReport) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"active", "name", "summary"}); err != nil {
+		return err
+	}
+	for _, v := range report.Views {
+		active := "false"
+		if v.Name == report.ActiveView {
+			active = "true"
+		}
+		if err := cw.Write([]string{active, csvSafe(v.Name), csvSafe(describeView(v))}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 func describeView(v config.NamedView) string {

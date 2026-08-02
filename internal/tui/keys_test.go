@@ -183,6 +183,132 @@ func TestKeybindingActionNames(t *testing.T) {
 	}
 }
 
+func TestDefaultKeybindingsDoNotCollide(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	seen := make(map[string]string)
+	for _, entry := range entries {
+		for _, keyName := range entry.binding.Keys() {
+			if previous, ok := seen[keyName]; ok {
+				t.Fatalf("default key %q is bound to both %q and %q", keyName, previous, entry.name)
+			}
+			seen[keyName] = entry.name
+		}
+	}
+	if seen["ctrl+n"] != "preview_next_match" {
+		t.Errorf("ctrl+n owner = %q, want preview_next_match", seen["ctrl+n"])
+	}
+	if seen["ctrl+p"] != "preview_prev_match" {
+		t.Errorf("ctrl+p owner = %q, want preview_prev_match", seen["ctrl+p"])
+	}
+	for _, keyName := range []string{"alt+1", "alt+2", "alt+3", "alt+4", "alt+5"} {
+		if seen[keyName] != "open_related" {
+			t.Errorf("%s owner = %q, want open_related", keyName, seen[keyName])
+		}
+	}
+}
+
+func TestDefaultKeyMapLaunchSetKeysDoNotCollide(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	owner := map[string]string{}
+	for _, entry := range entries {
+		for _, k := range entry.binding.Keys() {
+			if previous, ok := owner[k]; ok {
+				t.Fatalf("key %q used by both %s and %s", k, previous, entry.name)
+			}
+			owner[k] = entry.name
+		}
+	}
+	for _, action := range []string{"launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete"} {
+		found := false
+		for _, entry := range entries {
+			if entry.name == action {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing launch set action %q", action)
+		}
+	}
+}
+
+func TestKeybindingEntriesHaveHelpCoverage(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	valid := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		valid[entry.name] = struct{}{}
+	}
+
+	covered := make(map[string]string)
+	for _, group := range keybindingHelpGroups {
+		for _, action := range group.actions {
+			if _, ok := valid[action]; !ok {
+				t.Errorf("help group %q references unknown action %q", group.title, action)
+				continue
+			}
+			if previous, ok := covered[action]; ok {
+				t.Errorf("action %q appears in both help groups %q and %q", action, previous, group.title)
+			}
+			covered[action] = group.title
+		}
+	}
+	for action := range hiddenHelpActions {
+		if _, ok := valid[action]; !ok {
+			t.Errorf("hidden help action %q is not a keybinding entry", action)
+			continue
+		}
+		if previous, ok := covered[action]; ok {
+			t.Errorf("action %q appears in help group %q and hiddenHelpActions", action, previous)
+		}
+		covered[action] = "hiddenHelpActions"
+	}
+	for _, entry := range entries {
+		if _, ok := covered[entry.name]; !ok {
+			t.Errorf("keybinding action %q is missing from help groups or hiddenHelpActions", entry.name)
+		}
+	}
+}
+
+func TestHelpGroupsUseEffectiveBindings(t *testing.T) {
+	km, warnings := applyKeybindingOverrides(defaultKeyMap(), map[string]string{
+		"search": "ctrl+f",
+	})
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
+	}
+	found := false
+	for _, group := range km.HelpGroups() {
+		for _, binding := range group.Bindings {
+			if binding.Help().Desc == "search" && binding.Help().Key == "ctrl+f" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("help groups should include the effective remapped search binding")
+	}
+}
+
+func TestShortHelpUsesEffectiveBindings(t *testing.T) {
+	km, warnings := applyKeybindingOverrides(defaultKeyMap(), map[string]string{
+		"search": "ctrl+f",
+	})
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
+	}
+	found := false
+	for _, binding := range km.ShortHelp() {
+		if binding.Help().Desc == "search" && binding.Help().Key == "ctrl+f" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("short help should include the effective remapped search binding")
+	}
+}
+
 func TestApplyKeybindingOverrides_MatchesRemappedKey(t *testing.T) {
 	km, _ := applyKeybindingOverrides(defaultKeyMap(), map[string]string{"search": "u"})
 	if !key.Matches(tea.KeyPressMsg{Code: 'u'}, km.Search) {

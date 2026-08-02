@@ -82,6 +82,12 @@ jobs:
 
       - run: go vet ./...
 
+      - name: Screenshot capture check
+        run: |
+          rm -rf .screenshots-check
+          go run -tags screenshots ./cmd/screenshots --check --out .screenshots-check
+          rm -rf .screenshots-check
+
       - name: Test with coverage
         run: go test -coverprofile=coverage.out ./...
 

@@ -752,7 +752,7 @@ func TestKeyMapFullHelp(t *testing.T) {
 func testModelWithLayout() Model {
 	m := newTestModel()
 	m.preview = components.NewPreviewPanel()
-	m.help = components.NewHelpOverlay()
+	m.help = components.NewHelpOverlayWithBindings(nil, nil)
 	m.shellPicker = components.NewShellPicker()
 	m.filterPanel = components.NewFilterPanel()
 	m.configPanel = components.NewConfigPanel()

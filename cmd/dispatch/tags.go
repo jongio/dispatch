@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/jongio/dispatch/internal/data"
@@ -17,7 +19,9 @@ var tagsListSessionsFn = defaultStatsListSessions
 
 // tagsOptions holds the parsed flags for the tags command.
 type tagsOptions struct {
-	json bool
+	json     bool
+	csv      bool
+	markdown bool
 }
 
 // tagCount is one tag and the number of sessions that carry it.
@@ -56,8 +60,15 @@ func runTags(w io.Writer, args []string) error {
 	}
 
 	report := buildTagsReport(cfg.SessionTags, sessions)
+	if opts.csv {
+		return writeTagsCSV(w, report)
+	}
 	if opts.json {
 		return writeTagsJSON(w, report)
+	}
+	if opts.markdown {
+		writeTagsMarkdown(w, report)
+		return nil
 	}
 	writeTagsText(w, report)
 	return nil
@@ -77,11 +88,19 @@ func parseTagsArgs(args []string) (tagsOptions, error) {
 		switch {
 		case arg == "--json":
 			opts.json = true
+		case arg == "--csv":
+			opts.csv = true
+		case arg == "--markdown":
+			opts.markdown = true
 		case strings.HasPrefix(arg, "-"):
 			return tagsOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			return tagsOptions{}, fmt.Errorf("tags does not take positional arguments, got %q", arg)
 		}
+	}
+
+	if (opts.json && opts.csv) || (opts.json && opts.markdown) || (opts.csv && opts.markdown) {
+		return tagsOptions{}, fmt.Errorf("--json, --csv, and --markdown cannot be combined")
 	}
 
 	return opts, nil
@@ -131,6 +150,47 @@ func writeTagsJSON(w io.Writer, report tagsReport) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
+}
+
+// writeTagsCSV prints the report as RFC 4180 CSV rows.
+func writeTagsCSV(w io.Writer, report tagsReport) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"tag", "count"}); err != nil {
+		return err
+	}
+	for _, e := range report.Tags {
+		if err := cw.Write([]string{csvSafe(e.Tag), strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
+// writeTagsMarkdown prints the report as Markdown tables for pasting into
+// issues, PRs, or reports.
+func writeTagsMarkdown(w io.Writer, report tagsReport) {
+	fmt.Fprintln(w, "# Dispatch tags")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| Metric | Value |")
+	fmt.Fprintln(w, "|---|---:|")
+	fmt.Fprintf(w, "| Tags | %d |\n", report.TotalTags)
+	fmt.Fprintf(w, "| Tagged sessions | %d |\n", report.TaggedSessions)
+
+	if report.TotalTags == 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "No tags found.")
+		return
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "## Tags")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| Tag | Count |")
+	fmt.Fprintln(w, "|---|---:|")
+	for _, e := range report.Tags {
+		fmt.Fprintf(w, "| %s | %d |\n", markdownCell(e.Tag), e.Count)
+	}
 }
 
 // writeTagsText prints the report in a plain, human-readable layout.

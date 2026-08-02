@@ -84,12 +84,28 @@ func TestParseTagsArgs(t *testing.T) {
 		t.Error("--json not parsed")
 	}
 
+	opts, err = parseTagsArgs([]string{"tags", "--csv"})
+	if err != nil {
+		t.Fatalf("parseTagsArgs csv: %v", err)
+	}
+	if !opts.csv {
+		t.Error("--csv not parsed")
+	}
+
+	opts, err = parseTagsArgs([]string{"tags", "--markdown"})
+	if err != nil {
+		t.Fatalf("parseTagsArgs markdown: %v", err)
+	}
+	if !opts.markdown {
+		t.Error("--markdown not parsed")
+	}
+
 	opts, err = parseTagsArgs([]string{"tags"})
 	if err != nil {
 		t.Fatalf("parseTagsArgs bare: %v", err)
 	}
-	if opts.json {
-		t.Error("json should default to false")
+	if opts.json || opts.csv || opts.markdown {
+		t.Error("output flags should default to false")
 	}
 }
 
@@ -99,6 +115,36 @@ func TestParseTagsArgsErrors(t *testing.T) {
 	}
 	if _, err := parseTagsArgs([]string{"tags", "work"}); err == nil {
 		t.Error("expected error for positional argument")
+	}
+}
+
+func TestParseTagsArgsCSVAndJSONConflict(t *testing.T) {
+	_, err := parseTagsArgs([]string{"tags", "--csv", "--json"})
+	if err == nil {
+		t.Fatal("expected error for --csv + --json conflict")
+	}
+	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
+		t.Errorf("wrong error = %q, want %q", got, want)
+	}
+}
+
+func TestParseTagsArgsMarkdownAndJSONConflict(t *testing.T) {
+	_, err := parseTagsArgs([]string{"tags", "--markdown", "--json"})
+	if err == nil {
+		t.Fatal("expected error for --markdown + --json conflict")
+	}
+	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
+		t.Errorf("wrong error = %q, want %q", got, want)
+	}
+}
+
+func TestParseTagsArgsMarkdownAndCSVConflict(t *testing.T) {
+	_, err := parseTagsArgs([]string{"tags", "--markdown", "--csv"})
+	if err == nil {
+		t.Fatal("expected error for --markdown + --csv conflict")
+	}
+	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
+		t.Errorf("wrong error = %q, want %q", got, want)
 	}
 }
 
@@ -120,6 +166,111 @@ func TestRunTagsText(t *testing.T) {
 	}
 	if strings.Contains(out, "stale") {
 		t.Errorf("orphan tag should not appear:\n%s", out)
+	}
+}
+
+func TestRunTagsMarkdown(t *testing.T) {
+	withConfigSeams(t, taggedConfig())
+	withTagsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return taggedSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runTags(&buf, []string{"tags", "--markdown"}); err != nil {
+		t.Fatalf("runTags markdown: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{
+		"# Dispatch tags",
+		"| Metric | Value |",
+		"|---|---:|",
+		"| Tags | 3 |",
+		"| Tagged sessions | 3 |",
+		"## Tags",
+		"| Tag | Count |",
+		"| work | 2 |",
+		"| personal | 1 |",
+		"| urgent | 1 |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Markdown output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "stale") {
+		t.Errorf("orphan tag should not appear:\n%s", out)
+	}
+}
+
+func TestRunTagsMarkdownEmpty(t *testing.T) {
+	cfg := config.Default()
+	cfg.SessionTags = map[string][]string{}
+	withConfigSeams(t, cfg)
+	withTagsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return taggedSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runTags(&buf, []string{"tags", "--markdown"}); err != nil {
+		t.Fatalf("runTags empty markdown: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"# Dispatch tags",
+		"| Tags | 0 |",
+		"| Tagged sessions | 0 |",
+		"No tags found.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("empty Markdown output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "| Tag | Count |") {
+		t.Errorf("empty Markdown should not include tag count table:\n%s", out)
+	}
+}
+
+func TestRunTagsCSV(t *testing.T) {
+	withConfigSeams(t, taggedConfig())
+	withTagsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return taggedSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runTags(&buf, []string{"tags", "--csv"}); err != nil {
+		t.Fatalf("runTags csv: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{
+		"tag,count",
+		"work,2",
+		"personal,1",
+		"urgent,1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("CSV output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "stale") {
+		t.Errorf("orphan tag should not appear:\n%s", out)
+	}
+}
+
+func TestRunTagsCSVEmptyPrintsHeader(t *testing.T) {
+	cfg := config.Default()
+	cfg.SessionTags = map[string][]string{}
+	withConfigSeams(t, cfg)
+	withTagsList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return taggedSessions(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runTags(&buf, []string{"tags", "--csv"}); err != nil {
+		t.Fatalf("runTags empty csv: %v", err)
+	}
+	if got, want := buf.String(), "tag,count\n"; got != want {
+		t.Fatalf("empty CSV = %q, want %q", got, want)
 	}
 }
 

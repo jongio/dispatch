@@ -133,6 +133,7 @@ const (
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
 	stateViewPicker               // named view selection overlay
+	stateLaunchSetPicker          // saved launch set management overlay
 	stateFilePicker               // file picker overlay
 	stateCompareView              // compare two sessions overlay
 	stateCmdPalette               // command palette overlay
@@ -231,6 +232,7 @@ func (m *Model) triggerSearch(inputCmd tea.Cmd) tea.Cmd {
 	// Parse structured tokens from the input.
 	m.searchFilter = ParseSearchTokens(newQuery)
 	m.applySearchTokens()
+	m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	m.filter.DeepSearch = false
 	// Quick search fires immediately; schedule deep search.
 	m.search.deepSearchVersion++
@@ -304,9 +306,10 @@ type Model struct {
 	pivot     string // "none", "folder", "repo", "branch", "date", "host"
 
 	// Loaded data.
-	sessions []data.Session
-	groups   []data.SessionGroup
-	detail   *data.SessionDetail
+	sessions    []data.Session
+	groups      []data.SessionGroup
+	quickStarts []components.QuickStart
+	detail      *data.SessionDetail
 
 	// Detected shells and terminals for launch flow.
 	shells    []platform.ShellInfo
@@ -325,6 +328,7 @@ type Model struct {
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
 	viewPicker      components.ViewPicker
+	launchSetPicker components.LaunchSetPicker
 	filePicker      components.FilePicker
 	compareView     components.CompareView
 	gitStatusView   components.GitStatusView
@@ -415,8 +419,9 @@ func NewModel() Model {
 
 	// ── Keybinding overrides ────────────────────────────────────────
 	// Apply user remaps to the global key map before the UI reads it.
+	keys = defaultKeyMap()
 	if len(cfg.Keybindings) > 0 {
-		remapped, warnings := applyKeybindingOverrides(defaultKeyMap(), cfg.Keybindings)
+		remapped, warnings := applyKeybindingOverrides(keys, cfg.Keybindings)
 		keys = remapped
 		for _, w := range warnings {
 			slog.Warn(w)
@@ -502,12 +507,13 @@ func NewModel() Model {
 		aliasInput:      components.NewAliasInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
-		help:            components.NewHelpOverlay(),
+		help:            components.NewHelpOverlayWithBindings(keys.HelpGroups(), keys.ShortHelp()),
 		shellPicker:     components.NewShellPicker(),
 		configPanel:     cp,
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
 		viewPicker:      components.NewViewPicker(),
+		launchSetPicker: components.NewLaunchSetPicker(),
 		filePicker:      components.NewFilePicker(),
 		compareView:     components.NewCompareView(),
 		gitStatusView:   components.NewGitStatusView(),
@@ -572,6 +578,7 @@ func (m *Model) applyInitialQuery(query string) []tea.Cmd {
 	m.search.lastRawInput = query
 	m.searchFilter = ParseSearchTokens(query)
 	m.applySearchTokens()
+	m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	m.filter.DeepSearch = false
 	m.search.deepSearchVersion++
 	m.search.deepSearchPending = true
@@ -698,6 +705,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionDetailMsg:
 		return m.handleSessionDetail(msg)
 
+	case projectQuickStartsMsg:
+		return m.handleProjectQuickStarts(msg)
+
 	case dataErrorMsg:
 		return m.handleDataError(msg)
 
@@ -820,6 +830,9 @@ func (m Model) View() tea.View {
 
 		case stateViewPicker:
 			content = m.viewPicker.View()
+
+		case stateLaunchSetPicker:
+			content = m.launchSetPicker.View()
 
 		case stateFilePicker:
 			content = m.filePicker.View()
@@ -985,9 +998,52 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.showHidden = false
 				m.filter.ExcludedDirs = m.cfg.ExcludedDirs
 				m.searchBar.SetValue("")
+				m.searchFilter = SearchFilter{}
+				m.preview.SetSearchTerms(nil)
 			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateLaunchSetPicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			if m.launchSetPicker.Saving() || m.launchSetPicker.Renaming() || m.launchSetPicker.Deleting() {
+				m.launchSetPicker.CancelMode()
+			} else {
+				m.state = stateSessionList
+			}
+			return m, nil
+		case key.Matches(msg, keys.Up):
+			m.launchSetPicker.MoveUp()
+			return m, nil
+		case key.Matches(msg, keys.Down):
+			m.launchSetPicker.MoveDown()
+			return m, nil
+		case key.Matches(msg, keys.LaunchSetSave):
+			return m, m.beginSaveLaunchSet()
+		case key.Matches(msg, keys.LaunchSetRename):
+			return m, m.launchSetPicker.BeginRename()
+		case key.Matches(msg, keys.LaunchSetDelete):
+			m.launchSetPicker.BeginDelete()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			switch {
+			case m.launchSetPicker.Saving():
+				return m, m.saveLaunchSet(m.launchSetPicker.Value())
+			case m.launchSetPicker.Renaming():
+				return m, m.renameLaunchSet(m.launchSetPicker.Value())
+			case m.launchSetPicker.Deleting():
+				return m, m.deleteLaunchSet()
+			default:
+				return m, m.launchSelectedLaunchSet()
+			}
+		}
+		if m.launchSetPicker.Saving() || m.launchSetPicker.Renaming() {
+			var cmd tea.Cmd
+			m.launchSetPicker, cmd = m.launchSetPicker.Update(msg)
+			return m, cmd
 		}
 		return m, nil
 
@@ -1289,6 +1345,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.filter.Query = ""
 			m.filter.DeepSearch = false
 			m.searchFilter = SearchFilter{}
+			m.preview.SetSearchTerms(nil)
 			m.search.lastRawInput = ""
 			m.search.historyIdx = len(m.search.history)
 			m.clearSearchTokenFilters()
@@ -1505,6 +1562,30 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.PreviewNextMatch):
+		if (m.showPreview || m.previewFullscreen) && m.preview.NextMatch() {
+			m.statusInfo = fmt.Sprintf("Preview match %d/%d", m.preview.ActiveMatch(), m.preview.MatchCount())
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.PreviewPrevMatch):
+		if (m.showPreview || m.previewFullscreen) && m.preview.PrevMatch() {
+			m.statusInfo = fmt.Sprintf("Preview match %d/%d", m.preview.ActiveMatch(), m.preview.MatchCount())
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.OpenRelated):
+		if m.showPreview || m.previewFullscreen {
+			if idx, ok := relatedIndexFromKey(msg.String()); ok {
+				if id, ok := m.preview.RelatedSessionIDAt(idx); ok {
+					return m.jumpToRelatedSession(id)
+				}
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.ConversationSort):
 		if m.showPreview && m.detail != nil {
 			newVal := m.preview.ToggleConversationSort()
@@ -1622,6 +1703,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.state = stateViewPicker
 		return m, nil
 
+	case key.Matches(msg, keys.LaunchSetList):
+		m.openLaunchSetPicker()
+		return m, nil
+
 	case key.Matches(msg, keys.OpenFile):
 		if m.detail != nil && len(m.detail.Files) > 0 {
 			m.filePicker.SetFiles(m.detail.Files)
@@ -1649,6 +1734,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.LaunchAll):
 		cmd := m.launchMultiple()
 		return m, cmd
+
+	case key.Matches(msg, keys.LaunchSetSave):
+		return m, m.beginSaveLaunchSet()
 
 	case key.Matches(msg, keys.ResumeInterrupted):
 		return m.handleResumeInterrupted()
@@ -2430,7 +2518,10 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			default:
 				previewRow = mouse.Y - styles.HeaderLines - 1
 			}
-			contentRow := previewRow + m.preview.ScrollOffset()
+			contentRow := m.preview.ContentLineForViewportRow(previewRow)
+			if id, ok := m.preview.HitRelatedSession(contentRow); ok {
+				return m.jumpToRelatedSession(id)
+			}
 			if m.preview.HitConversationSort(contentRow) {
 				newVal := m.preview.ToggleConversationSort()
 				m.cfg.ConversationNewestFirst = newVal
@@ -2450,6 +2541,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+
 		itemIdx := m.sessionList.ScrollOffset() + listRow
 
 		// Detect double-click: second click on the same row while a
@@ -2539,6 +2631,30 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) jumpToRelatedSession(id string) (Model, tea.Cmd) {
+	if id == "" {
+		return m, nil
+	}
+	m.sessionList.ResetShift()
+	if !m.sessionList.SelectByID(id) {
+		m.statusErr = "Related session is not visible in the current list"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.detailVersion++
+	return m, m.loadSelectedDetailCmd()
+}
+
+func relatedIndexFromKey(keyName string) (int, bool) {
+	if !strings.HasPrefix(keyName, "alt+") || len(keyName) != len("alt+1") {
+		return 0, false
+	}
+	ch := keyName[len(keyName)-1]
+	if ch < '1' || ch > '5' {
+		return 0, false
+	}
+	return int(ch - '1'), true
 }
 
 // handleFooterClick dispatches left-clicks on the footer status bar.
@@ -3727,6 +3843,12 @@ func (m *Model) updateSelectionStatus() {
 
 // launchWithMode opens the selected session using the specified launch mode.
 func (m *Model) launchWithMode(mode string) tea.Cmd {
+	if qs, ok := m.sessionList.SelectedQuickStart(); ok {
+		if mode == config.LaunchModeInPlace {
+			return m.launchInPlace("", qs.Path)
+		}
+		return m.resolveShellAndLaunch("", qs.Path, mode)
+	}
 	sess, ok := m.sessionList.Selected()
 	if !ok {
 		return nil
@@ -3891,6 +4013,9 @@ func (m Model) selectedSessionID() string {
 }
 
 func (m Model) selectedSessionCwd() string {
+	if qs, ok := m.sessionList.SelectedQuickStart(); ok {
+		return qs.Path
+	}
 	if sess, ok := m.sessionList.Selected(); ok {
 		return sess.Cwd
 	}
@@ -4566,8 +4691,66 @@ func (m Model) loadSelectedDetailCmd() tea.Cmd {
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
-		return sessionDetailMsg{detail: detail, version: version}
+		related, err := loadRelatedSessionItems(context.Background(), store, detail, m.relatedCandidateSessions(), m.gitStatusMap)
+		if err != nil {
+			return dataErrorMsg{err: err}
+		}
+		return sessionDetailMsg{detail: detail, related: related, version: version}
 	}
+}
+
+func (m Model) relatedCandidateSessions() []data.Session {
+	return m.sessionList.AllSessions()
+}
+
+func loadRelatedSessionItems(ctx context.Context, store *data.Store, detail *data.SessionDetail, sessions []data.Session, gitStatuses map[string]platform.GitStatus) ([]components.RelatedSessionItem, error) {
+	if store == nil || detail == nil || len(sessions) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(sessions))
+	for _, sess := range sessions {
+		if sess.ID != "" && sess.ID != detail.Session.ID {
+			ids = append(ids, sess.ID)
+		}
+	}
+	refsByID, err := store.SessionRefsBySessionIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	current := RelatedSession{
+		Session:           detail.Session,
+		Refs:              detail.Refs,
+		DisplayRepository: displayRepositoryForSession(detail.Session, gitStatuses),
+	}
+	candidates := make([]RelatedSession, 0, len(sessions))
+	for _, sess := range sessions {
+		candidates = append(candidates, RelatedSession{
+			Session:           sess,
+			Refs:              refsByID[sess.ID],
+			DisplayRepository: displayRepositoryForSession(sess, gitStatuses),
+		})
+	}
+	ranked := RankRelatedSessions(current, candidates, time.Now())
+	items := make([]components.RelatedSessionItem, 0, len(ranked))
+	for _, r := range ranked {
+		items = append(items, components.RelatedSessionItem{
+			ID:                r.Session.ID,
+			Summary:           r.Session.Summary,
+			Repository:        r.Session.Repository,
+			Branch:            r.Session.Branch,
+			Cwd:               r.Session.Cwd,
+			LastActiveAt:      r.Session.LastActiveAt,
+			DisplayRepository: r.DisplayRepository,
+		})
+	}
+	return items, nil
+}
+
+func displayRepositoryForSession(sess data.Session, gitStatuses map[string]platform.GitStatus) string {
+	if st, ok := gitStatuses[sess.ID]; ok && st.IsRepo && st.Repository != "" {
+		return st.Repository
+	}
+	return sess.Repository
 }
 
 func loadFilterDataCmd(store *data.Store) tea.Cmd {
@@ -4813,6 +4996,9 @@ func (m *Model) applyNamedView(v *config.NamedView) {
 	}
 	if v.Search != "" {
 		m.searchBar.SetValue(v.Search)
+		m.searchFilter = ParseSearchTokens(v.Search)
+		m.applySearchTokens()
+		m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	}
 	m.showFavorited = v.FavoritesOnly
 	m.showHidden = v.ShowHidden

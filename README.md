@@ -24,7 +24,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Sorting** (`s` / `S`) — 7 fields (updated, created, turns, name, folder, attention, frecency) with toggleable direction. Sort applies to both sessions and group ordering
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
-- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
+- **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Active search terms are highlighted; use `Ctrl+N` / `Ctrl+P` to jump between preview matches. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
 - **Copy session ID** (`c`) — copy the selected session's ID to the system clipboard. Also available by clicking the ID row in the preview pane
 - **Copy resume command** (`Y`) — copy the selected session's full resume command to the system clipboard. With a multi-select active, copies one resume command per selected session, one per line
 - **Open working directory** (`O`) — open the selected session's working directory in the system file manager (Explorer on Windows, Finder on macOS, the default file manager on Linux)
@@ -244,7 +244,7 @@ Add `--json` (`dispatch doctor --json`) to print the same checks as a single JSO
 
 ### Statistics
 
-Run `dispatch stats` to print session totals and breakdowns by repository, branch, and host type.
+Run `dispatch stats` to print session totals and breakdowns by repository, branch, folder, and host type.
 
 ```sh
 dispatch stats
@@ -272,9 +272,11 @@ Run `dispatch tags` to list every tag in use with the number of sessions that ca
 ```sh
 dispatch tags
 dispatch tags --json
+dispatch tags --csv
+dispatch tags --markdown
 ```
 
-Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
+Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json`, `--csv`, or `--markdown` for scripting and reports.
 
 ### Notes
 
@@ -298,6 +300,7 @@ List named views and switch the active view from scripts:
 ```sh
 dispatch views
 dispatch views --json
+dispatch views --csv
 dispatch views use Work
 dispatch views use default
 ```
@@ -388,12 +391,14 @@ Set or remove a single session alias from the command line, completing the parit
 
 ```sh
 dispatch alias <id> review    # assign or reassign an alias
+dispatch alias list           # list configured aliases
+dispatch alias list --json
 dispatch alias <id> --clear   # remove the alias on a session
 dispatch alias --remove review # remove an alias by its name
 dispatch alias <id> review --json
 ```
 
-The `<id>` accepts the same short prefix that `dispatch open` does. Alias names are lowercased and must be unique, so `dispatch open <alias>` keeps resolving to one session.
+The `<id>` accepts the same short prefix that `dispatch open` does. Alias names are lowercased and must be unique, so `dispatch open <alias>` keeps resolving to one session. `dispatch alias list` uses the same output as `dispatch aliases`.
 
 ### Tag
 
@@ -529,6 +534,10 @@ The page targets section 1 (user commands) and mirrors the built-in usage: comma
 | `Shift+↑` | Extend selection upward (range select) |
 | `Shift+↓` | Extend selection downward (range select) |
 | `L` | Launch all selected sessions (or all in folder) |
+| `Ctrl+S` | Save selected sessions as a named launch set |
+| `Ctrl+L` | List, launch, rename, or delete saved launch sets |
+| `Ctrl+R` | Rename the highlighted launch set (inside launch set overlay) |
+| `Ctrl+D` | Delete the highlighted launch set (inside launch set overlay) |
 | `a` | Select all visible sessions |
 | `d` | Deselect all |
 
@@ -590,6 +599,7 @@ Dates accept `YYYY-MM-DD` or full RFC3339 timestamps (e.g. `after:2024-01-15` or
 | `c` | Copy session ID to clipboard |
 | `Y` | Copy resume command to clipboard |
 | `PgUp` / `PgDn` | Scroll preview |
+| `Ctrl+N` / `Ctrl+P` | Jump to next / previous preview search match |
 | `r` | Refresh session store |
 | `,` | Open settings panel |
 
@@ -681,9 +691,14 @@ dispatch config set launch_mode window
 dispatch config unset launch_mode # reset one setting to its default
 dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
+dispatch config validate        # validate config.json before launching the TUI
+dispatch config validate --json # machine-readable diagnostics for CI/scripts
+dispatch config schema          # print the JSON Schema for editor integration
 ```
 
 `set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+
+Use `dispatch config validate --path <file>` to check another config file without changing your active profile. The generated schema is published at [`docs/config.schema.json`](docs/config.schema.json); point your editor's JSON Schema integration at that file, or run `dispatch config schema` to emit the same schema from your installed binary.
 
 ### Options
 
@@ -721,6 +736,8 @@ dispatch config path            # print the config file path
 | `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
 | `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
 | `views` | array | `[]` | Named search, sort, pivot, and filter presets |
+| `launch_sets` | array | `[]` | Named, ordered session ID collections for repeated multi-session launches. Missing IDs are shown in the TUI and skipped |
+| `project_roots` | array | `[]` | Absolute directories to scan for git repos that should appear as `New session` rows when they have no recent session |
 | `active_view` | string | `""` | Name of the named view to apply on startup. Empty means default filters |
 | `hidden_columns` | array | `[]` | Optional session-list columns to hide (`repo`, `folder`, `turns`, `host`); empty shows all |
 
@@ -775,6 +792,8 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "ai_search": false,
   "hiddenSessions": [],
   "favoriteSessions": [],
+  "launch_sets": [],
+  "project_roots": [],
   "keybindings": {}
 }
 ```
@@ -794,6 +813,8 @@ action name and each value is a comma-separated list of keys that trigger it.
 Listed actions replace their default keys; any action you do not list keeps its
 default. Unknown action names are ignored, and if a remap collides with a key
 another action already uses, that remap is dropped and the default is kept.
+The in-app `?` help overlay and short help bar show the effective shortcuts
+after these overrides are applied.
 
 ```json
 "keybindings": {
@@ -814,8 +835,10 @@ Available action names:
 `pivot`, `pivot_order`, `preview`, `preview_fullscreen`, `reindex`, `help`,
 `config`, `time_range_1`, `time_range_2`, `time_range_3`, `time_range_4`,
 `hide`, `toggle_hidden`, `star`, `launch_window`, `launch_tab`, `launch_pane`,
-`preview_scroll_up`, `preview_scroll_down`, `jump_next_attention`,
-`filter_attention`, `launch_all`, `select_all`, `deselect_all`,
+`preview_scroll_up`, `preview_scroll_down`, `preview_next_match`,
+`preview_prev_match`, `open_related`, `jump_next_attention`, `filter_attention`,
+`launch_all`, `launch_set_save`, `launch_set_list`, `launch_set_rename`,
+`launch_set_delete`, `select_all`, `deselect_all`,
 `conversation_sort`, `preview_position`, `resume_interrupted`, `view_plan`,
 `copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
 `expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,
@@ -839,6 +862,22 @@ Five built-in color schemes:
 | One Half Dark | One Half Light |
 |---|---|
 | ![One Half Dark](web/public/screenshots/one-half-dark/hero-main.png) | ![One Half Light](web/public/screenshots/one-half-light/hero-main.png) |
+
+### Regenerating Website Screenshots
+
+Run this after changing TUI visual states, themes, or website screenshot docs:
+
+```sh
+npm --prefix web ci
+npm --prefix web exec playwright install chromium
+npm --prefix web run screenshots
+```
+
+The command captures deterministic states from `internal/data/testdata/fake_sessions.db`,
+renders PNGs into `web/public/screenshots`, and removes intermediate HTML. Review
+the resulting image diffs with `git diff -- web/public/screenshots`. For a fast
+CI-style capture check without rendering PNGs, run `mage screenshotsCheck` or
+`npm --prefix web run screenshots:check`.
 
 Set `theme` to `"auto"` (default) for automatic light/dark detection based on your terminal background. Or set it to any built-in scheme name.
 

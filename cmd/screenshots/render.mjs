@@ -7,9 +7,12 @@
 // takes a screenshot of the <pre> element, and saves it as a .png
 // alongside the .html. The .html files are deleted after conversion.
 
-import { chromium } from 'playwright';
 import { readdir, unlink } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join, relative, resolve } from 'node:path';
+
+const requireFromWeb = createRequire(new URL('../../web/package.json', import.meta.url));
+const { chromium } = requireFromWeb('playwright');
 
 const dir = resolve(process.argv[2] || 'web/public/screenshots');
 

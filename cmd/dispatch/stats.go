@@ -49,6 +49,7 @@ type statsReport struct {
 	Latest        string            `json:"latest,omitempty"`
 	ByRepository  []countEntry      `json:"by_repository"`
 	ByBranch      []countEntry      `json:"by_branch"`
+	ByFolder      []countEntry      `json:"by_folder"`
 	ByHostType    []countEntry      `json:"by_host_type"`
 	Calendar      *activityCalendar `json:"calendar,omitempty"`
 }
@@ -270,11 +271,13 @@ func buildStatsReport(sessions []data.Session) statsReport {
 	report := statsReport{
 		ByRepository: []countEntry{},
 		ByBranch:     []countEntry{},
+		ByFolder:     []countEntry{},
 		ByHostType:   []countEntry{},
 	}
 
 	repoCounts := map[string]int{}
 	branchCounts := map[string]int{}
+	folderCounts := map[string]int{}
 	hostCounts := map[string]int{}
 
 	var earliest, latest time.Time
@@ -286,6 +289,7 @@ func buildStatsReport(sessions []data.Session) statsReport {
 
 		repoCounts[labelOr(s.Repository, "(none)")]++
 		branchCounts[labelOr(s.Branch, "(none)")]++
+		folderCounts[labelOr(s.Cwd, "(none)")]++
 		hostCounts[labelOr(s.HostType, "(unknown)")]++
 
 		if t, ok := parseStatsTime(s.CreatedAt); ok {
@@ -309,6 +313,7 @@ func buildStatsReport(sessions []data.Session) statsReport {
 
 	report.ByRepository = sortedCounts(repoCounts)
 	report.ByBranch = sortedCounts(branchCounts)
+	report.ByFolder = sortedCounts(folderCounts)
 	report.ByHostType = sortedCounts(hostCounts)
 	return report
 }
@@ -319,6 +324,7 @@ func applyStatsTopLimit(report *statsReport, top int) {
 	}
 	report.ByRepository = capCountEntries(report.ByRepository, top)
 	report.ByBranch = capCountEntries(report.ByBranch, top)
+	report.ByFolder = capCountEntries(report.ByFolder, top)
 	report.ByHostType = capCountEntries(report.ByHostType, top)
 }
 
@@ -398,6 +404,11 @@ func writeStatsCSV(w io.Writer, report statsReport) error {
 			return err
 		}
 	}
+	for _, e := range report.ByFolder {
+		if err := cw.Write([]string{"folder", csvSafe(e.Label), strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
 	for _, e := range report.ByHostType {
 		if err := cw.Write([]string{"host_type", csvSafe(e.Label), strconv.Itoa(e.Count)}); err != nil {
 			return err
@@ -455,6 +466,7 @@ func writeStatsText(w io.Writer, report statsReport) {
 
 	writeCountSection(w, "By repository", report.ByRepository)
 	writeCountSection(w, "By branch", report.ByBranch)
+	writeCountSection(w, "By folder", report.ByFolder)
 	writeCountSection(w, "By host type", report.ByHostType)
 }
 
@@ -480,6 +492,7 @@ func writeStatsMarkdown(w io.Writer, report statsReport) {
 
 	writeMarkdownCountSection(w, "By repository", report.ByRepository)
 	writeMarkdownCountSection(w, "By branch", report.ByBranch)
+	writeMarkdownCountSection(w, "By folder", report.ByFolder)
 	writeMarkdownCountSection(w, "By host type", report.ByHostType)
 	if report.Calendar != nil {
 		writeMarkdownCalendar(w, *report.Calendar)

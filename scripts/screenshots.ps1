@@ -13,13 +13,19 @@
 .PARAMETER OutDir
     Override the output directory (default: web/public/screenshots).
 
+.PARAMETER Check
+    Verify the Go capture path against the fake session database without
+    rendering PNGs. Intermediate HTML is removed before the script exits.
+
 .EXAMPLE
     .\screenshots.ps1
     .\screenshots.ps1 -OutDir .\my-shots
+    .\screenshots.ps1 -Check
 #>
 
 param(
-    [string]$OutDir
+    [string]$OutDir,
+    [switch]$Check
 )
 
 Set-StrictMode -Version Latest
@@ -33,26 +39,26 @@ try {
         exit 1
     }
 
-    # Step 1: Build and run the Go screenshot capture tool.
-    Write-Host "Building screenshot generator..." -ForegroundColor Cyan
-    go build -tags screenshots -o "$env:TEMP\dispatch-screenshots.exe" ./cmd/screenshots/
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Build failed."
-        exit 1
+    $renderDir = if ($OutDir) { $OutDir } elseif ($Check) { ".screenshots-check" } else { "web\public\screenshots" }
+    if ($Check -and (Test-Path $renderDir)) {
+        Remove-Item $renderDir -Recurse -Force
     }
 
-    $goArgs = @()
-    if ($OutDir) { $goArgs += "--out", $OutDir }
+    $goArgs = @("-tags", "screenshots", "./cmd/screenshots", "--out", $renderDir)
+    if ($Check) { $goArgs += "--check" }
 
     Write-Host "Capturing TUI states as HTML..." -ForegroundColor Cyan
-    & "$env:TEMP\dispatch-screenshots.exe" @goArgs
+    & go run @goArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Capture failed."
         exit 1
     }
 
-    # Step 2: Render HTML to PNG with Playwright.
-    $renderDir = if ($OutDir) { $OutDir } else { "web\public\screenshots" }
+    if ($Check) {
+        Remove-Item $renderDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "Screenshot capture check passed." -ForegroundColor Green
+        return
+    }
 
     Write-Host "Rendering PNGs with Playwright..." -ForegroundColor Cyan
     node cmd/screenshots/render.mjs $renderDir
@@ -61,12 +67,8 @@ try {
         exit 1
     }
 
-    # Clean up the temporary binary.
-    Remove-Item "$env:TEMP\dispatch-screenshots.exe" -ErrorAction SilentlyContinue
-
     Write-Host "Done." -ForegroundColor Green
 }
 finally {
     Pop-Location
 }
-

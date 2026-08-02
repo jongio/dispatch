@@ -127,8 +127,10 @@ Commands:
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, JSONL, CSV, IDs, paths, commands, or a table
-  tags [--json]           List tags in use with per-tag session counts
+  tags [--json|--csv|--markdown]
+                          List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
+  alias list [--json]     List session aliases
   alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
@@ -197,12 +199,14 @@ Search flags:
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
 
 Views commands:
-  views [list] [--json]    List configured named views
+  views [list] [--json|--csv]
+                          List configured named views
   views use <name>         Set the active named view
   views use default        Clear the active named view
 
 Config commands:
-  config list [--json]    Print every setting and its value
+  config <get|set|list|edit|path|validate|schema>
+                          Read, change, validate, or document preferences
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
   config unset <key>      Reset one setting to its default

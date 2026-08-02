@@ -146,7 +146,8 @@ import Carousel from '../components/Carousel.astro';
             Toggle with <kbd>p</kbd>. Shows session metadata (created, updated,
             turn count, working directory), conversation history rendered as
             chat-style bubbles, checkpoints (up to 5), referenced files
-            (up to 5), and external references (up to 5). Sessions with a
+            (up to 5), external references (up to 5), and related sessions
+            (up to 5). Sessions with a
             <code>plan.md</code> file show a "Plan: Yes" indicator.
           </p>
           <ul>
@@ -156,6 +157,7 @@ import Carousel from '../components/Carousel.astro';
             <li>Responsive width: 30–40% of terminal</li>
             <li><kbd>o</kbd> to toggle conversation sort order (oldest/newest first)</li>
             <li><kbd>c</kbd> to copy session ID to clipboard (or click the ID row)</li>
+            <li><kbd>Alt+1</kbd>–<kbd>Alt+5</kbd> or click a related session to jump to it</li>
             <li><kbd>y</kbd> to copy selected preview text to clipboard</li>
           </ul>
         </div>
@@ -235,6 +237,31 @@ import Carousel from '../components/Carousel.astro';
             Launch behavior is platform-specific and adapts to the detected
             terminal. No screenshot — the result is a new Copilot CLI session
             opening in your configured terminal.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Project Quick Start -->
+    <section class="section" id="project-quick-start">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Project Quick Start</h2>
+          <p>
+            Add absolute directories to <code>project_roots</code> and Dispatch scans
+            them for git repositories. Repos without a recent Copilot session appear
+            as <strong>New session</strong> rows in the session list.
+          </p>
+          <ul>
+            <li><kbd>Enter</kbd> starts Copilot in the repo root</li>
+            <li>Uses the same launch mode, shell, terminal, agent, model, and yolo settings as existing sessions</li>
+            <li>Scanning is asynchronous and skipped when no project roots are configured</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Quick-start rows are generated locally from configured roots and are hidden
+            automatically once that repo has a recent session.
           </p>
         </div>
       </div>
