@@ -8,17 +8,31 @@ interface Props {
 const { src, alt, caption } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const imgUrl = `${base}screenshots/${src}`;
-const id = `lb-${src.replace(/[^a-zA-Z0-9]/g, '-')}`;
+const id = `preview-${src.replace(/[^a-zA-Z0-9]/g, '-')}`;
 ---
 
 <figure class="screenshot">
-  <a href={`#${id}`} class="screenshot-link">
+  <button class="screenshot-link screenshot-trigger" type="button" data-dialog={id}>
     <img src={imgUrl} alt={alt} loading="lazy" />
-  </a>
+  </button>
   {caption && <figcaption class="screenshot-caption">{caption}</figcaption>}
 </figure>
 
-<div class="lightbox" id={id}>
-  <a href="#!" class="lightbox-close" aria-label="Close">&times;</a>
+<dialog class="lightbox" id={id} aria-label="Image preview">
+  <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
   <img src={imgUrl} alt={alt} />
-</div>
+</dialog>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.screenshot .screenshot-trigger').forEach(trigger => {
+    const dialog = document.getElementById(trigger.dataset.dialog || '') as HTMLDialogElement | null;
+    if (!dialog) return;
+
+    trigger.addEventListener('click', () => dialog.showModal());
+    dialog.querySelector('.lightbox-close')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', () => trigger.focus());
+  });
+</script>

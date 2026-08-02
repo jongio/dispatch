@@ -1,8 +1,6 @@
 ---
 // Carousel.astro — displays one slotted child at a time with prev/next navigation.
 // Each direct <slot> child with class "screenshot" is treated as a slide.
-// Lightbox overlays (.lightbox) are relocated to <body> so the track's CSS
-// transform does not create a containing block that breaks position:fixed.
 ---
 
 <div class="carousel" tabindex="0" aria-roledescription="carousel" aria-label="Screenshot carousel">
@@ -155,12 +153,6 @@
 
     if (!track || !prevBtn || !nextBtn || !dotsContainer) return;
 
-    // Relocate lightbox overlays to <body> so the track's CSS transform
-    // (which creates a containing block) doesn't break position:fixed.
-    track.querySelectorAll(':scope > .lightbox').forEach(lb => {
-      document.body.appendChild(lb);
-    });
-
     const slides = Array.from(
       track.querySelectorAll(':scope > .screenshot'),
     ) as HTMLElement[];
@@ -208,6 +200,7 @@
         } else {
           slide.setAttribute('aria-hidden', 'true');
         }
+        slide.inert = i !== current;
       });
     }
 

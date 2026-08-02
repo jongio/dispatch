@@ -16,13 +16,13 @@ import CliTable from '../components/CliTable.astro';
       <div class="page-with-toc">
         <div>
           <div id="usage" class="shortcut-group">
-            <h3>Usage</h3>
+            <h2>Usage</h2>
             <pre><code>dispatch [command | flag]</code></pre>
             <p>Running <code>dispatch</code> with no arguments launches the interactive TUI.</p>
           </div>
 
           <div id="commands" class="shortcut-group">
-            <h3>Commands</h3>
+            <h2>Commands</h2>
             <CliTable rows={[
               { name: 'open <id>', description: 'Resume a session by ID, alias, or short prefix. Flags: --last, --print, --stdin, --mode, --repo, --branch, --folder, --current, --agent, --model, --yolo.' },
               { name: 'new [dir]', description: 'Start a new session from the CLI, with --mode/--agent/--model/--yolo overrides.' },
@@ -50,7 +50,7 @@ import CliTable from '../components/CliTable.astro';
           </div>
 
           <div id="flags" class="shortcut-group">
-            <h3>Flags</h3>
+            <h2>Flags</h2>
             <CliTable rows={[
               { name: '-h, --help', description: 'Show usage information and exit.' },
               { name: '-v, --version', description: 'Print the version number and exit.' },
@@ -61,7 +61,7 @@ import CliTable from '../components/CliTable.astro';
           </div>
 
           <div id="environment" class="shortcut-group">
-            <h3>Environment Variables</h3>
+            <h2>Environment Variables</h2>
             <CliTable rows={[
               { name: 'DISPATCH_DB', description: 'Path to a custom session store database.' },
               { name: 'DISPATCH_SESSION_STATE', description: 'Path to a custom session state directory.' },
@@ -72,7 +72,7 @@ import CliTable from '../components/CliTable.astro';
           </div>
 
           <div id="examples" class="shortcut-group">
-            <h3>Examples</h3>
+            <h2>Examples</h2>
             <pre><code>{`# Launch the TUI
 dispatch
 

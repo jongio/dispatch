@@ -10,14 +10,15 @@ interface Props {
 const { title, description, screenshotSrc, screenshotAlt, badge } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const hasSlot = Astro.slots.has('default');
+const id = screenshotSrc && `preview-${screenshotSrc.replace(/[^a-zA-Z0-9]/g, '-')}`;
 ---
 
 <div class="card feature-card">
   {screenshotSrc && (
     <div class="feature-card-img">
-      <a href={`#lb-${screenshotSrc.replace(/[^a-zA-Z0-9]/g, '-')}`} class="screenshot-link">
+      <button class="screenshot-link screenshot-trigger" type="button" data-dialog={id}>
         <img src={`${base}screenshots/${screenshotSrc}`} alt={screenshotAlt || title} loading="lazy" />
-      </a>
+      </button>
     </div>
   )}
   {!screenshotSrc && hasSlot && (
@@ -35,11 +36,25 @@ const hasSlot = Astro.slots.has('default');
 </div>
 
 {screenshotSrc && (
-  <div class="lightbox" id={`lb-${screenshotSrc.replace(/[^a-zA-Z0-9]/g, '-')}`}>
-    <a href="#!" class="lightbox-close" aria-label="Close">&times;</a>
+  <dialog class="lightbox" id={id} aria-label="Image preview">
+    <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
     <img src={`${base}screenshots/${screenshotSrc}`} alt={screenshotAlt || title} />
-  </div>
+  </dialog>
 )}
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.feature-card .screenshot-trigger').forEach(trigger => {
+    const dialog = document.getElementById(trigger.dataset.dialog || '') as HTMLDialogElement | null;
+    if (!dialog) return;
+
+    trigger.addEventListener('click', () => dialog.showModal());
+    dialog.querySelector('.lightbox-close')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', () => trigger.focus());
+  });
+</script>
 
 <style>
   .feature-card {

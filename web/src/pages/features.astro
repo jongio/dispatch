@@ -8,7 +8,7 @@ import Carousel from '../components/Carousel.astro';
   <div class="container">
     <div class="page-header">
       <h1>Features</h1>
-      <p>Every feature in Dispatch, demonstrated.</p>
+      <p>Explore Dispatch features and workflows.</p>
     </div>
   </div>
 
@@ -69,8 +69,8 @@ import Carousel from '../components/Carousel.astro';
         <div class="feature-text">
           <h2>Sorting</h2>
           <p>
-            Five sort fields cycled with <kbd>s</kbd>: updated, folder, name,
-            created, turns. Direction toggled with <kbd>S</kbd> (Shift+S).
+            Six sort fields cycled with <kbd>s</kbd>: updated, created, turns,
+            name, folder, frecency. Direction toggled with <kbd>S</kbd> (Shift+S).
             The active sort field and direction are shown in the header.
           </p>
           <ul>
@@ -92,8 +92,8 @@ import Carousel from '../components/Carousel.astro';
         <div class="feature-text">
           <h2>Grouping Modes</h2>
           <p>
-            Five pivot modes cycled with <kbd>Tab</kbd>: flat list, folder,
-            repository, branch, date. Grouped modes display a tree view with
+            Six pivot modes cycled with <kbd>Tab</kbd>: flat list, folder,
+            repository, branch, date, host. Grouped modes display a tree view with
             collapsible folder headers showing session counts.
           </p>
           <ul>
@@ -202,8 +202,8 @@ import Carousel from '../components/Carousel.astro';
         <div class="feature-text">
           <h2>Launch Modes</h2>
           <p>
-            Five launch modes: in-place (replaces the TUI), new tab, new
-            window, split pane (Windows Terminal only), and resume interrupted (<kbd>N</kbd>). The default is configurable via settings. Override per-session
+            Four launch modes: in-place (replaces the TUI), new tab, new
+            window, and split pane (Windows Terminal only). Resume interrupted sessions with <kbd>N</kbd>. The default is configurable via settings. Override per-session
             with <kbd>w</kbd> (window), <kbd>t</kbd> (tab), or <kbd>e</kbd> (pane).
           </p>
           <ul>
@@ -308,7 +308,7 @@ import Carousel from '../components/Carousel.astro';
           <ul>
             <li><strong>Waiting</strong> (purple ●) — AI finished, waiting for your input</li>
             <li><strong>Active</strong> (green ●) — AI is currently working</li>
-            <li><strong>Stale</strong> (yellow ●) — running but no activity for 5+ minutes</li>
+            <li><strong>Stale</strong> (yellow ●) — running but no activity for 15+ minutes</li>
             <li><strong>Interrupted</strong> (orange ⚡) — session was killed by crash/reboot mid-work</li>
             <li><strong>Idle</strong> (gray ○) — session not running</li>
             <li><kbd>n</kbd> to jump to next waiting session</li>
@@ -580,7 +580,7 @@ import Carousel from '../components/Carousel.astro';
         </div>
         <div class="feature-text">
           <p class="text-only-note">
-            Install any <a href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Nerd Font</a>
+            Install any <a href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Nerd Font <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
             and set it as your terminal font to enable rich icons.
           </p>
         </div>
@@ -774,11 +774,11 @@ import Carousel from '../components/Carousel.astro';
             content is never modified on disk — only the display is masked.
           </p>
           <ul>
-            <li>Bearer tokens → <code>Bearer ••••••••</code></li>
-            <li>GitHub PATs (<code>ghp_</code>, <code>gho_</code>, etc.) → <code>ghp_••••••••</code></li>
-            <li>Azure connection strings → <code>AccountKey=••••••••</code></li>
-            <li>.env secrets → <code>API_KEY=••••••••</code></li>
-            <li>20-character minimum for Bearer tokens to reduce false positives</li>
+            <li>Bearer tokens → <code>Bearer [redacted]</code></li>
+            <li>GitHub PATs (<code>ghp_</code>, <code>gho_</code>, etc.) → <code>[redacted]</code></li>
+            <li>Azure connection strings → <code>AccountKey=[redacted]</code></li>
+            <li>.env secrets → <code>API_KEY=[redacted]</code></li>
+            <li>Tokens must be at least 20 characters long to avoid false positives</li>
           </ul>
         </div>
         <div class="feature-screenshots">

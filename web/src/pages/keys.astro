@@ -16,7 +16,7 @@ import KeyTable from '../components/KeyTable.astro';
       <div class="page-with-toc">
         <div>
           <div id="navigation" class="shortcut-group">
-            <h3>Navigation</h3>
+            <h2>Navigation</h2>
             <KeyTable rows={[
               { keys: '↑ / k', action: 'Move up' },
               { keys: '↓ / j', action: 'Move down' },
@@ -28,17 +28,19 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="launch-keys" class="shortcut-group">
-            <h3>Launch & Session</h3>
+            <h2>Launch & Session</h2>
             <KeyTable rows={[
               { keys: 'Enter', action: 'Launch selected session (or toggle folder)' },
               { keys: 'w', action: 'Launch in new window' },
               { keys: 't', action: 'Launch in new tab' },
               { keys: 'e', action: 'Launch in split pane (Windows Terminal, or tmux inside a tmux session)' },
+              { keys: '+', action: 'Start a new session' },
+              { keys: 'W', action: 'Focus the terminal window' },
             ]} />
           </div>
 
           <div id="multi-select" class="shortcut-group">
-            <h3>Multi-Select</h3>
+            <h2>Multi-Select</h2>
             <KeyTable rows={[
               { keys: 'Space', action: 'Toggle selection on current session' },
               { keys: 'Shift+↑', action: 'Extend selection upward (range select)' },
@@ -55,7 +57,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="search-filter" class="shortcut-group">
-            <h3>Search & Filter</h3>
+            <h2>Search & Filter</h2>
             <KeyTable rows={[
               { keys: '/', action: 'Focus search bar' },
               { keys: 'Esc', action: 'Clear search / close overlay' },
@@ -64,7 +66,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="view-sort" class="shortcut-group">
-            <h3>View & Sorting</h3>
+            <h2>View & Sorting</h2>
             <KeyTable rows={[
               { keys: 's', action: 'Cycle sort field' },
               { keys: 'S', action: 'Toggle sort direction' },
@@ -81,13 +83,13 @@ import KeyTable from '../components/KeyTable.astro';
               { keys: 'Ctrl+N', action: 'Jump to next preview search match' },
               { keys: 'Ctrl+P', action: 'Jump to previous preview search match' },
               { keys: 'Alt+1–5', action: 'Jump to a related session from the preview' },
-              { keys: 'r', action: 'Refresh session store' },
+              { keys: 'r', action: 'Rebuild the session index' },
               { keys: ',', action: 'Open settings panel' },
             ]} />
           </div>
 
           <div id="session-actions" class="shortcut-group">
-            <h3>Session Actions</h3>
+            <h2>Session Actions</h2>
             <KeyTable rows={[
               { keys: 'i', action: "Show git status overlay for the session's folder" },
               { keys: 'b', action: 'Open linked PR, issue, or commit in browser' },
@@ -107,7 +109,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="time-keys" class="shortcut-group">
-            <h3>Time Range</h3>
+            <h2>Time Range</h2>
             <KeyTable rows={[
               { keys: '1', action: 'Last 1 hour' },
               { keys: '2', action: 'Last 1 day' },
@@ -118,7 +120,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="settings-keys" class="shortcut-group">
-            <h3>Attention & Status</h3>
+            <h2>Attention & Status</h2>
             <KeyTable rows={[
               { keys: 'n', action: 'Jump to next waiting session' },
               { keys: 'N', action: 'Resume all interrupted sessions' },
@@ -134,7 +136,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="general-keys" class="shortcut-group">
-            <h3>Settings & Info</h3>
+            <h2>Settings & Info</h2>
             <KeyTable rows={[
               { keys: '?', action: 'Show help overlay' },
               { keys: 'q', action: 'Quit' },
@@ -143,7 +145,7 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="overlay-keys" class="shortcut-group">
-            <h3>Overlay Navigation</h3>
+            <h2>Overlay Navigation</h2>
             <p>Keys available inside overlay panels (filter, settings, shell picker, help):</p>
             <KeyTable rows={[
               { keys: '↑ / k', action: 'Move up in list' },
@@ -157,12 +159,12 @@ import KeyTable from '../components/KeyTable.astro';
           </div>
 
           <div id="mouse-interactions" class="shortcut-group">
-            <h3>Mouse</h3>
+            <h2>Mouse</h2>
             <table>
               <thead>
                 <tr>
-                  <th>Action</th>
-                  <th>Effect</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Effect</th>
                 </tr>
               </thead>
               <tbody>
