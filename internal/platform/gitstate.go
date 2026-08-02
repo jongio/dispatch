@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -121,6 +122,8 @@ type GitStatus struct {
 	Deleted     int // entries deleted in the work tree (not staged)
 	Conflicts   int // unmerged (conflicted) entries
 
+	Repository string // normalized owner/name from the origin remote, when available
+
 	Files     []GitFileStatus // changed entries, capped at maxGitStatusFiles
 	Truncated bool            // Files was capped
 }
@@ -187,6 +190,7 @@ func DetectGitStatus(dir string) GitStatus {
 	s.Dir = dir
 	s.Exists = true
 	s.IsRepo = true
+	s.Repository = detectOriginRepository(dir)
 	return s
 }
 
@@ -197,10 +201,46 @@ func DetectGitStatus(dir string) GitStatus {
 // inline push/pull column and the preview pane use the full status.
 func ScanGitStatuses(sessions map[string]string) map[string]GitStatus {
 	results := make(map[string]GitStatus, len(sessions))
+	byDir := make(map[string]GitStatus, len(sessions))
 	for id, dir := range sessions {
-		results[id] = DetectGitStatus(dir)
+		if status, ok := byDir[dir]; ok {
+			results[id] = status
+			continue
+		}
+		status := DetectGitStatus(dir)
+		byDir[dir] = status
+		results[id] = status
 	}
 	return results
+}
+
+func detectOriginRepository(dir string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", gitSafeArgs("remote", "get-url", "origin")...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return NormalizeGitHubRemoteRepository(string(out))
+}
+
+var githubRemotePattern = regexp.MustCompile(`(?i)(?:github\.com[:/])([^/\s:]+)/([^/\s]+?)(?:\.git)?/?$`)
+
+// NormalizeGitHubRemoteRepository converts common GitHub origin URLs into the
+// owner/name form stored by Copilot CLI sessions.
+func NormalizeGitHubRemoteRepository(remote string) string {
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		return ""
+	}
+	matches := githubRemotePattern.FindStringSubmatch(remote)
+	if len(matches) != 3 {
+		return ""
+	}
+	return matches[1] + "/" + strings.TrimSuffix(matches[2], ".git")
 }
 
 // parseGitStatusV2 parses the output of `git status --porcelain=v2 --branch`

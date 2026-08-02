@@ -74,6 +74,58 @@ func TestPreviewGitSection_NoUpstream(t *testing.T) {
 	}
 }
 
+func TestPreviewSessionDetail_RepoUsesLiveOriginOverride(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{
+			ID:         "sess-1",
+			Cwd:        `C:\code\.worktrees\skills\feature-repo-ready`,
+			Repository: "vercel-labs/skills",
+		},
+	})
+	p.SetGitStatus(platform.GitStatus{
+		Exists: true, IsRepo: true, Repository: "jongio/skills",
+	})
+
+	out := p.View()
+	if !strings.Contains(out, "jongio/skills") {
+		t.Errorf("preview missing live origin repository, got:\n%s", out)
+	}
+	if strings.Contains(out, "vercel-labs/skills") {
+		t.Errorf("preview should not show stored repository when live origin is available, got:\n%s", out)
+	}
+}
+
+func TestPreviewSessionDetail_RepoFallsBackToStored(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		status platform.GitStatus
+	}{
+		{name: "missing cwd", status: platform.GitStatus{Exists: false}},
+		{name: "not git repo", status: platform.GitStatus{Exists: true, IsRepo: false}},
+		{name: "no origin", status: platform.GitStatus{Exists: true, IsRepo: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := NewPreviewPanel()
+			p.SetSize(80, 40)
+			p.SetDetail(&data.SessionDetail{
+				Session: data.Session{ID: "sess-1", Cwd: "/missing", Repository: "stored/repo"},
+			})
+			p.SetGitStatus(tt.status)
+
+			out := p.View()
+			if !strings.Contains(out, "stored/repo") {
+				t.Errorf("preview should fall back to stored repository, got:\n%s", out)
+			}
+		})
+	}
+}
+
 // TestGitPushPullText verifies the push/pull helper's branches directly.
 func TestGitPushPullText(t *testing.T) {
 	t.Parallel()
