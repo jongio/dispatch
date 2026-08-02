@@ -634,8 +634,8 @@ func (p PreviewPanel) renderContent() (string, int, int) {
 		b.WriteString(wl + styles.GitMissingStyle.Render(styles.IconGitMissing()+" Missing") + "\n")
 	}
 
-	if s.Repository != "" {
-		field("Repo", s.Repository)
+	if repo := p.displayRepository(s.Repository); repo != "" {
+		field("Repo", repo)
 	}
 	if s.Branch != "" {
 		field(styles.IconGitBranch()+"Branch", s.Branch)
@@ -844,6 +844,13 @@ func countUniqueRefs(refs []data.SessionRef) int {
 		seen[r.RefType+":"+r.RefValue] = struct{}{}
 	}
 	return len(seen)
+}
+
+func (p PreviewPanel) displayRepository(stored string) string {
+	if p.gitStatus.IsRepo && p.gitStatus.Repository != "" {
+		return p.gitStatus.Repository
+	}
+	return stored
 }
 
 // writeGitSection renders the git status block for the current session: upstream,

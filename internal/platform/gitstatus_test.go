@@ -219,6 +219,9 @@ func TestDetectGitStatus_Missing(t *testing.T) {
 	if s.IsRepo {
 		t.Errorf("IsRepo = true, want false for missing dir")
 	}
+	if s.Repository != "" {
+		t.Errorf("Repository = %q, want empty for missing dir", s.Repository)
+	}
 }
 
 // TestDetectGitStatus_NonRepo verifies a plain directory reports IsRepo=false.
@@ -232,6 +235,9 @@ func TestDetectGitStatus_NonRepo(t *testing.T) {
 	}
 	if s.IsRepo {
 		t.Error("IsRepo = true, want false for non-repo dir")
+	}
+	if s.Repository != "" {
+		t.Errorf("Repository = %q, want empty for non-repo dir", s.Repository)
 	}
 }
 
@@ -272,6 +278,60 @@ func TestDetectGitStatus_RealRepo(t *testing.T) {
 	}
 	if s.Clean() {
 		t.Error("Clean() = true, want false for a dirty tree")
+	}
+}
+
+func TestNormalizeGitHubRemoteRepository(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		remote string
+		want   string
+	}{
+		{name: "https", remote: "https://github.com/jongio/skills", want: "jongio/skills"},
+		{name: "https git suffix", remote: "https://github.com/jongio/skills.git", want: "jongio/skills"},
+		{name: "ssh", remote: "git@github.com:jongio/skills", want: "jongio/skills"},
+		{name: "ssh git suffix", remote: "git@github.com:jongio/skills.git", want: "jongio/skills"},
+		{name: "trailing newline", remote: "https://github.com/jongio/skills.git\n", want: "jongio/skills"},
+		{name: "non github", remote: "https://example.com/jongio/skills.git", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := NormalizeGitHubRemoteRepository(tt.remote); got != tt.want {
+				t.Errorf("NormalizeGitHubRemoteRepository(%q) = %q, want %q", tt.remote, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectGitStatus_OriginRepository(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := initTestRepo(t)
+	cmd := exec.Command("git", "remote", "add", "origin", "git@github.com:jongio/skills.git")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git remote add: %s\n%s", err, out)
+	}
+
+	s := DetectGitStatus(dir)
+	if s.Repository != "jongio/skills" {
+		t.Errorf("Repository = %q, want jongio/skills", s.Repository)
+	}
+}
+
+func TestDetectGitStatus_NoOriginRepositoryFallback(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	s := DetectGitStatus(initTestRepo(t))
+	if !s.IsRepo {
+		t.Fatal("expected test repo to be detected")
+	}
+	if s.Repository != "" {
+		t.Errorf("Repository = %q, want empty when origin is missing", s.Repository)
 	}
 }
 
