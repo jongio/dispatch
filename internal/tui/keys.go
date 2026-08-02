@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // keyMap holds all key bindings used by the root model.
@@ -83,19 +84,57 @@ func (k keyMap) ShortHelp() []key.Binding {
 
 // FullHelp returns grouped key bindings for the expanded help view.
 func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.JumpTop, k.JumpBottom, k.Left, k.Right, k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane},
-		{k.Space, k.LaunchAll, k.SelectAll, k.DeselectAll, k.ShiftUp, k.ShiftDown},
-		{k.Search, k.Escape, k.Filter},
-		{k.Sort, k.SortOrder, k.Pivot, k.PivotOrder, k.ExpandCollapseAll},
-		{k.Preview, k.PreviewFullscreen, k.PreviewPosition, k.PreviewScrollUp, k.PreviewScrollDown, k.ConversationSort, k.ViewPlan, k.Timeline, k.Compare, k.GitStatus, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.Reindex, k.ScanWorkStatus, k.ViewSwitch, k.Config},
-		{k.Hide, k.ToggleHidden, k.Star, k.Note, k.Tags, k.Alias, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted},
-		{k.TimeRange1, k.TimeRange2, k.TimeRange3, k.TimeRange4},
-		{k.Help, k.CmdPalette, k.Quit},
+	groups := k.HelpGroups()
+	full := make([][]key.Binding, 0, len(groups))
+	for _, group := range groups {
+		full = append(full, group.Bindings)
 	}
+	return full
+}
+
+// HelpGroups returns labeled groups for the expanded help overlay.
+func (k keyMap) HelpGroups() []components.HelpGroup {
+	byAction := k.bindingsByAction()
+	groups := make([]components.HelpGroup, 0, len(keybindingHelpGroups))
+	for _, group := range keybindingHelpGroups {
+		bindings := make([]key.Binding, 0, len(group.actions))
+		for _, action := range group.actions {
+			bindings = append(bindings, byAction[action])
+		}
+		groups = append(groups, components.HelpGroup{Title: group.title, Bindings: bindings})
+	}
+	return groups
+}
+
+func (k keyMap) bindingsByAction() map[string]key.Binding {
+	km := k
+	entries := keybindingEntries(&km)
+	byAction := make(map[string]key.Binding, len(entries))
+	for _, entry := range entries {
+		byAction[entry.name] = *entry.binding
+	}
+	return byAction
 }
 
 var keys = defaultKeyMap()
+
+type keybindingHelpGroup struct {
+	title   string
+	actions []string
+}
+
+var keybindingHelpGroups = []keybindingHelpGroup{
+	{"Navigation", []string{"up", "down", "jump_top", "jump_bottom", "left", "right", "enter", "launch_window", "launch_tab", "launch_pane"}},
+	{"Multi-Select", []string{"space", "launch_all", "select_all", "deselect_all", "shift_up", "shift_down"}},
+	{"Search & Filter", []string{"search", "escape", "filter"}},
+	{"View", []string{"sort", "sort_order", "pivot", "pivot_order", "expand_collapse_all", "view_switch"}},
+	{"Preview & Details", []string{"preview", "preview_fullscreen", "preview_position", "preview_scroll_up", "preview_scroll_down", "conversation_sort", "view_plan", "timeline", "compare", "git_status", "copy_id", "copy_path", "copy_resume_command", "copy_preview", "export", "open_file", "open_dir", "open_ref", "reindex", "scan_work_status", "config"}},
+	{"Session Status", []string{"hide", "toggle_hidden", "star", "note", "tags", "alias", "jump_next_attention", "filter_attention", "resume_interrupted"}},
+	{"Time Range", []string{"time_range_1", "time_range_2", "time_range_3", "time_range_4"}},
+	{"General", []string{"help", "cmd_palette", "quit", "force_quit"}},
+}
+
+var hiddenHelpActions = map[string]string{}
 
 // defaultKeyMap returns the built-in key bindings. It is the starting point
 // before any user overrides from config are applied.
@@ -110,7 +149,7 @@ func defaultKeyMap() keyMap {
 		Enter:             key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "launch/toggle")),
 		Space:             key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle select")),
 		Quit:              key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
-		ForceQuit:         key.NewBinding(key.WithKeys("ctrl+c")),
+		ForceQuit:         key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "force quit")),
 		Search:            key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 		Escape:            key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back / clear")),
 		Filter:            key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter panel")),

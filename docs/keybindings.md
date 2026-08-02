@@ -6,7 +6,9 @@
 > of them with the `keybindings` object in `config.json`. Each entry maps an
 > action name to a comma-separated key list, for example `"search": "/,ctrl+f"`.
 > See the "Customizing Keybindings" section of the README for the full list of
-> action names and the rules for conflict handling.
+> action names and the rules for conflict handling. The in-app `?` help overlay
+> and short help bar display your effective custom bindings after overrides are
+> applied.
 
 ## KEYBOARD SHORTCUTS - GLOBAL (Always Available)
 

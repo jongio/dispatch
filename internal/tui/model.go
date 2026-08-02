@@ -415,8 +415,9 @@ func NewModel() Model {
 
 	// ── Keybinding overrides ────────────────────────────────────────
 	// Apply user remaps to the global key map before the UI reads it.
+	keys = defaultKeyMap()
 	if len(cfg.Keybindings) > 0 {
-		remapped, warnings := applyKeybindingOverrides(defaultKeyMap(), cfg.Keybindings)
+		remapped, warnings := applyKeybindingOverrides(keys, cfg.Keybindings)
 		keys = remapped
 		for _, w := range warnings {
 			slog.Warn(w)
@@ -502,7 +503,7 @@ func NewModel() Model {
 		aliasInput:      components.NewAliasInput(),
 		filterPanel:     components.NewFilterPanel(),
 		preview:         components.NewPreviewPanel(),
-		help:            components.NewHelpOverlay(),
+		help:            components.NewHelpOverlayWithBindings(keys.HelpGroups(), keys.ShortHelp()),
 		shellPicker:     components.NewShellPicker(),
 		configPanel:     cp,
 		spinner:         s,
