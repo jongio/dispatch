@@ -107,6 +107,8 @@ var manCommands = []manEntry{
 	{"aliases [--json]", "List session aliases with orphan detection."},
 	{"alias list [--json]", "List session aliases."},
 	{"alias <id> <name>", "Set, reassign, clear (--clear), or remove (--remove) a session alias."},
+	{"views [list] [--json|--csv]", "List configured named views."},
+	{"views use <name|default>", "Set or clear the active named view."},
 	{"config <get|set|list|edit|path>", "Read or change preferences."},
 	{"export <id> [flags]", "Export a session as Markdown or JSON."},
 	{"man", "Write this man page in roff format to standard output."},

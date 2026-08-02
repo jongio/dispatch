@@ -299,6 +299,7 @@ List named views and switch the active view from scripts:
 ```sh
 dispatch views
 dispatch views --json
+dispatch views --csv
 dispatch views use Work
 dispatch views use default
 ```
