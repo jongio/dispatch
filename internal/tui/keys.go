@@ -49,6 +49,10 @@ type keyMap struct {
 	JumpNextAttention key.Binding
 	FilterAttention   key.Binding
 	LaunchAll         key.Binding
+	LaunchSetSave     key.Binding
+	LaunchSetList     key.Binding
+	LaunchSetRename   key.Binding
+	LaunchSetDelete   key.Binding
 	SelectAll         key.Binding
 	DeselectAll       key.Binding
 	ConversationSort  key.Binding
@@ -79,7 +83,7 @@ type keyMap struct {
 
 // ShortHelp returns a compact set of key bindings for the mini help bar.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.Search, k.Filter, k.Sort, k.Preview, k.PreviewFullscreen, k.ViewPlan, k.Timeline, k.Compare, k.GitStatus, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
+	return []key.Binding{k.Enter, k.LaunchWindow, k.LaunchTab, k.LaunchPane, k.LaunchAll, k.LaunchSetSave, k.LaunchSetList, k.Search, k.Filter, k.Sort, k.Preview, k.PreviewFullscreen, k.ViewPlan, k.Timeline, k.Compare, k.GitStatus, k.Hide, k.Star, k.Note, k.Tags, k.Alias, k.CopyID, k.CopyPath, k.CopyResumeCommand, k.CopyPreview, k.Export, k.OpenFile, k.OpenDir, k.OpenRef, k.JumpNextAttention, k.FilterAttention, k.ResumeInterrupted, k.ScanWorkStatus, k.ExpandCollapseAll, k.ViewSwitch, k.CmdPalette, k.Config, k.Help, k.Quit}
 }
 
 // FullHelp returns grouped key bindings for the expanded help view.
@@ -125,7 +129,7 @@ type keybindingHelpGroup struct {
 
 var keybindingHelpGroups = []keybindingHelpGroup{
 	{"Navigation", []string{"up", "down", "jump_top", "jump_bottom", "left", "right", "enter", "launch_window", "launch_tab", "launch_pane"}},
-	{"Multi-Select", []string{"space", "launch_all", "select_all", "deselect_all", "shift_up", "shift_down"}},
+	{"Multi-Select", []string{"space", "launch_all", "launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete", "select_all", "deselect_all", "shift_up", "shift_down"}},
 	{"Search & Filter", []string{"search", "escape", "filter"}},
 	{"View", []string{"sort", "sort_order", "pivot", "pivot_order", "expand_collapse_all", "view_switch"}},
 	{"Preview & Details", []string{"preview", "preview_fullscreen", "preview_position", "preview_scroll_up", "preview_scroll_down", "conversation_sort", "view_plan", "timeline", "compare", "git_status", "copy_id", "copy_path", "copy_resume_command", "copy_preview", "export", "open_file", "open_dir", "open_ref", "reindex", "scan_work_status", "config"}},
@@ -177,6 +181,10 @@ func defaultKeyMap() keyMap {
 		JumpNextAttention: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next waiting")),
 		FilterAttention:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "filter by status")),
 		LaunchAll:         key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "launch selected")),
+		LaunchSetSave:     key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save launch set")),
+		LaunchSetList:     key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl+l", "launch sets")),
+		LaunchSetRename:   key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "rename launch set")),
+		LaunchSetDelete:   key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "delete launch set")),
 		SelectAll:         key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "select all")),
 		DeselectAll:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "deselect all")),
 		ConversationSort:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "conversation order")),
@@ -255,6 +263,10 @@ func keybindingEntries(km *keyMap) []keybindingEntry {
 		{"jump_next_attention", &km.JumpNextAttention},
 		{"filter_attention", &km.FilterAttention},
 		{"launch_all", &km.LaunchAll},
+		{"launch_set_save", &km.LaunchSetSave},
+		{"launch_set_list", &km.LaunchSetList},
+		{"launch_set_rename", &km.LaunchSetRename},
+		{"launch_set_delete", &km.LaunchSetDelete},
 		{"select_all", &km.SelectAll},
 		{"deselect_all", &km.DeselectAll},
 		{"conversation_sort", &km.ConversationSort},

@@ -38,6 +38,7 @@ var KeybindingActions = []string{
 	"hide", "toggle_hidden", "star", "launch_window", "launch_tab", "launch_pane",
 	"preview_scroll_up", "preview_scroll_down", "jump_next_attention", "filter_attention",
 	"launch_all", "select_all", "deselect_all", "conversation_sort", "preview_position",
+	"launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete",
 	"resume_interrupted", "view_plan", "copy_id", "copy_path", "copy_resume_command",
 	"copy_preview", "expand_collapse_all", "scan_work_status", "export", "note", "tags",
 	"alias", "shift_up", "shift_down", "view_switch", "open_file", "open_dir",
@@ -55,6 +56,7 @@ var defaultKeybindings = map[string][]string{
 	"star": {"*"}, "launch_window": {"w"}, "launch_tab": {"t"}, "launch_pane": {"e"},
 	"preview_scroll_up": {"pgup"}, "preview_scroll_down": {"pgdown"}, "jump_next_attention": {"n"}, "filter_attention": {"!"},
 	"launch_all": {"L"}, "select_all": {"a"}, "deselect_all": {"d"}, "conversation_sort": {"o"},
+	"launch_set_save": {"ctrl+s"}, "launch_set_list": {"ctrl+l"}, "launch_set_rename": {"ctrl+r"}, "launch_set_delete": {"ctrl+d"},
 	"preview_position": {"P"}, "resume_interrupted": {"N"}, "view_plan": {"v"}, "copy_id": {"c"},
 	"copy_path": {"C"}, "copy_resume_command": {"Y"}, "copy_preview": {"y"}, "expand_collapse_all": {"x"},
 	"scan_work_status": {"R"}, "export": {"X"}, "note": {"m"}, "tags": {"#"},
@@ -146,6 +148,7 @@ func ValidateConfig(cfg *Config) []Diagnostic {
 	diags = append(diags, validateSessionKeyMap("sessionAliases", cfg.SessionAliases)...)
 	diags = append(diags, validateSessionKeyMap("sessionLaunches", cfg.SessionLaunches)...)
 	diags = append(diags, validateViews(cfg)...)
+	diags = append(diags, validateLaunchSets(cfg.LaunchSets)...)
 	diags = append(diags, validateSchemes(cfg.Schemes)...)
 	diags = append(diags, ValidateKeybindings(cfg.Keybindings)...)
 	return diags
@@ -250,6 +253,26 @@ func validateViews(cfg *Config) []Diagnostic {
 		if _, ok := names[cfg.ActiveView]; !ok {
 			diags = append(diags, errorDiagnostic("active_view", fmt.Sprintf("unknown named view %q", cfg.ActiveView)))
 		}
+	}
+	return diags
+}
+
+func validateLaunchSets(sets []LaunchSet) []Diagnostic {
+	var diags []Diagnostic
+	names := map[string]int{}
+	for i, set := range sets {
+		base := fmt.Sprintf("launch_sets[%d]", i)
+		if set.Name == "" {
+			diags = append(diags, errorDiagnostic(base+".name", "name is required"))
+		} else if first, ok := names[set.Name]; ok {
+			diags = append(diags, errorDiagnostic(base+".name", fmt.Sprintf("duplicate launch set %q (first defined at launch_sets[%d])", set.Name, first)))
+		} else {
+			names[set.Name] = i
+		}
+		if len(set.SessionIDs) == 0 {
+			diags = append(diags, errorDiagnostic(base+".session_ids", "at least one session ID is required"))
+		}
+		diags = append(diags, validateSessionIDs(base+".session_ids", set.SessionIDs)...)
 	}
 	return diags
 }

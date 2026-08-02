@@ -92,6 +92,9 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		ExcludedDirs:     []string{"/tmp", "/var"},
 		CustomCommand:    "ghcs --resume {sessionId} --custom",
 		HiddenSessions:   []string{"sess-1", "sess-2"},
+		LaunchSets: []LaunchSet{
+			{Name: "Feature", SessionIDs: []string{"sess-1", "sess-2"}},
+		},
 		PreviewPosition:  "bottom",
 	}
 
@@ -163,6 +166,15 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	if restored.PreviewPosition != original.PreviewPosition {
 		t.Errorf("PreviewPosition = %q, want %q", restored.PreviewPosition, original.PreviewPosition)
 	}
+	if len(restored.LaunchSets) != 1 {
+		t.Fatalf("LaunchSets len = %d, want 1", len(restored.LaunchSets))
+	}
+	if restored.LaunchSets[0].Name != "Feature" {
+		t.Errorf("LaunchSets[0].Name = %q, want Feature", restored.LaunchSets[0].Name)
+	}
+	if got := restored.LaunchSets[0].SessionIDs; len(got) != 2 || got[0] != "sess-1" || got[1] != "sess-2" {
+		t.Errorf("LaunchSets[0].SessionIDs = %v, want [sess-1 sess-2]", got)
+	}
 }
 
 func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
@@ -174,6 +186,27 @@ func TestWorkspaceRecoveryJSONFalse(t *testing.T) {
 	}
 	if cfg.WorkspaceRecovery {
 		t.Error("WorkspaceRecovery should be false when explicitly set in JSON")
+	}
+}
+
+func TestLaunchSetsSaveLoad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("DISPATCH_CONFIG", path)
+	cfg := Default()
+	cfg.LaunchSets = []LaunchSet{{Name: "Feature", SessionIDs: []string{"sess-1", "sess-2"}}}
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(loaded.LaunchSets) != 1 {
+		t.Fatalf("LaunchSets len = %d, want 1", len(loaded.LaunchSets))
+	}
+	got := loaded.LaunchSets[0]
+	if got.Name != "Feature" || len(got.SessionIDs) != 2 || got.SessionIDs[0] != "sess-1" || got.SessionIDs[1] != "sess-2" {
+		t.Fatalf("LaunchSets[0] = %#v, want Feature [sess-1 sess-2]", got)
 	}
 }
 
@@ -1687,6 +1720,32 @@ func TestValidateFile_InvalidNamedView(t *testing.T) {
 	assertDiagnosticPath(t, result.Diagnostics, "views[0].sort")
 }
 
+func TestValidateFile_InvalidLaunchSet(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_sets": [{"name": "Feature", "session_ids": ["ok-1", "bad id"]}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid launch set")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_sets[0].session_ids[1]")
+}
+
+func TestValidateFile_DuplicateLaunchSet(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_sets": [{"name": "Feature", "session_ids": ["s1"]}, {"name": "Feature", "session_ids": ["s2"]}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for duplicate launch set")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_sets[1].name")
+}
+
 func TestValidateFile_KeybindingCollision(t *testing.T) {
 	t.Parallel()
 	path := writeConfigValidationFixture(t, `{"keybindings": {"search": "q"}}`)
@@ -1718,11 +1777,17 @@ func TestJSONSchema_CoversNestedConfig(t *testing.T) {
 	if _, ok := props["views"]; !ok {
 		t.Fatal("schema missing views")
 	}
+	if _, ok := props["launch_sets"]; !ok {
+		t.Fatal("schema missing launch_sets")
+	}
 	keybindings := props["keybindings"].(map[string]any)
 	propertyNames := keybindings["propertyNames"].(map[string]any)
 	enum := propertyNames["enum"].([]string)
 	if !stringIn("cmd_palette", enum) {
 		t.Fatalf("keybindings action enum missing cmd_palette: %v", enum)
+	}
+	if !stringIn("launch_set_save", enum) {
+		t.Fatalf("keybindings action enum missing launch_set_save: %v", enum)
 	}
 }
 
