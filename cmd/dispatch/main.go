@@ -205,7 +205,8 @@ Views commands:
   views use default        Clear the active named view
 
 Config commands:
-  config list [--json]    Print every setting and its value
+  config <get|set|list|edit|path|validate|schema>
+                          Read, change, validate, or document preferences
   config get <key>        Print one setting value
   config set <key> <val>  Validate and save one setting
   config unset <key>      Reset one setting to its default

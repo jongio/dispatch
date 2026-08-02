@@ -1616,3 +1616,131 @@ func TestNamedView_EmptyConfig_NoViews(t *testing.T) {
 		t.Errorf("Default ActiveView = %q, want empty", cfg.ActiveView)
 	}
 }
+
+func TestValidateFile_ValidConfig(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{
+		"default_time_range": "1d",
+		"default_sort": "updated",
+		"views": [{"name": "Work", "sort": "created"}],
+		"keybindings": {"search": "ctrl+f"}
+	}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("Valid = false, diagnostics: %#v", result.Diagnostics)
+	}
+}
+
+func TestValidateFile_MalformedConfig(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"default_sort":`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for malformed JSON")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "$")
+}
+
+func TestValidateFile_UnknownKey(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"views": [{"name": "Work", "bogus": true}], "surprise": 1}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for unknown keys")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "surprise")
+	assertDiagnosticPath(t, result.Diagnostics, "views[0].bogus")
+}
+
+func TestValidateFile_InvalidEnumValues(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"launch_mode": "hologram"}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid enum")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "launch_mode")
+}
+
+func TestValidateFile_InvalidNamedView(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"views": [{"name": "Bad", "sort": "random"}]}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for invalid named view")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "views[0].sort")
+}
+
+func TestValidateFile_KeybindingCollision(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"keybindings": {"search": "q"}}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("Valid = true, want false for keybinding collision")
+	}
+	assertDiagnosticPath(t, result.Diagnostics, "keybindings.search")
+}
+
+func TestValidateConfig_BadDuration(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	cfg.AttentionThreshold = "soon"
+	diags := ValidateConfig(cfg)
+	assertDiagnosticPath(t, diags, "attention_threshold")
+}
+
+func TestJSONSchema_CoversNestedConfig(t *testing.T) {
+	t.Parallel()
+	schema, err := JSONSchema()
+	if err != nil {
+		t.Fatalf("JSONSchema: %v", err)
+	}
+	props := schema["properties"].(map[string]any)
+	if _, ok := props["views"]; !ok {
+		t.Fatal("schema missing views")
+	}
+	keybindings := props["keybindings"].(map[string]any)
+	propertyNames := keybindings["propertyNames"].(map[string]any)
+	enum := propertyNames["enum"].([]string)
+	if !stringIn("cmd_palette", enum) {
+		t.Fatalf("keybindings action enum missing cmd_palette: %v", enum)
+	}
+}
+
+func writeConfigValidationFixture(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	return path
+}
+
+func assertDiagnosticPath(t *testing.T, diags []Diagnostic, path string) {
+	t.Helper()
+	for _, diag := range diags {
+		if diag.Path == path {
+			return
+		}
+	}
+	t.Fatalf("diagnostics missing path %q: %#v", path, diags)
+}

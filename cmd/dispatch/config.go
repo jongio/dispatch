@@ -20,9 +20,11 @@ import (
 // the config read/write path, matching the seam pattern used elsewhere in this
 // package (see cli.go and stats.go).
 var (
-	configLoadFn = config.Load
-	configSaveFn = config.Save
-	configPathFn = config.ConfigPath
+	configLoadFn         = config.Load
+	configSaveFn         = config.Save
+	configPathFn         = config.ConfigPath
+	configValidateFileFn = config.ValidateFile
+	configSchemaBytesFn  = config.JSONSchemaBytes
 )
 
 // editorLauncher opens the given file in the user's editor and waits for it to
@@ -257,8 +259,12 @@ func runConfig(w io.Writer, args []string) error {
 		return runConfigEdit(w, rest)
 	case "path":
 		return runConfigPath(w, rest)
+	case "validate":
+		return runConfigValidate(w, rest)
+	case "schema":
+		return runConfigSchema(w, rest)
 	default:
-		return fmt.Errorf("unknown config subcommand %q (want list, get, set, unset, edit, or path)", sub)
+		return fmt.Errorf("unknown config subcommand %q (want list, get, set, unset, edit, path, validate, or schema)", sub)
 	}
 }
 
@@ -398,6 +404,72 @@ func runConfigPath(w io.Writer, args []string) error {
 		return err
 	}
 	fmt.Fprintln(w, path)
+	return nil
+}
+
+func runConfigValidate(w io.Writer, args []string) error {
+	jsonOut := false
+	path := ""
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case arg == "--path":
+			if i+1 >= len(args) {
+				return fmt.Errorf("config validate --path requires a file")
+			}
+			i++
+			path = args[i]
+		case strings.HasPrefix(arg, "--path="):
+			path = strings.TrimPrefix(arg, "--path=")
+			if path == "" {
+				return fmt.Errorf("config validate --path requires a file")
+			}
+		default:
+			return fmt.Errorf("config validate got unknown argument %q", arg)
+		}
+	}
+	if path == "" {
+		var err error
+		path, err = configPathFn()
+		if err != nil {
+			return err
+		}
+	}
+	result, err := configValidateFileFn(path)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(result); err != nil {
+			return err
+		}
+	} else if result.Valid {
+		fmt.Fprintf(w, "Config OK: %s\n", result.Path)
+	} else {
+		fmt.Fprintf(w, "Config invalid: %s\n", result.Path)
+		for _, d := range result.Diagnostics {
+			fmt.Fprintf(w, "- %s: %s (%s)\n", d.Path, d.Message, d.Severity)
+		}
+	}
+	if !result.Valid {
+		return fmt.Errorf("config validation failed")
+	}
+	return nil
+}
+
+func runConfigSchema(w io.Writer, args []string) error {
+	if len(args) > 0 {
+		return fmt.Errorf("config schema does not take arguments, got %q", args[0])
+	}
+	data, err := configSchemaBytesFn()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "%s\n", data)
 	return nil
 }
 

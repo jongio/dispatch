@@ -686,9 +686,14 @@ dispatch config set launch_mode window
 dispatch config unset launch_mode # reset one setting to its default
 dispatch config edit            # open the config file in your editor
 dispatch config path            # print the config file path
+dispatch config validate        # validate config.json before launching the TUI
+dispatch config validate --json # machine-readable diagnostics for CI/scripts
+dispatch config schema          # print the JSON Schema for editor integration
 ```
 
 `set` validates the value and writes through the same save path the TUI uses, so migrations and checks still run. `unset` resets one key to its default through that same save path. Unknown keys and invalid values exit non-zero with a clear message. The keys match the option names in the table below. Set `auto_refresh_seconds` to `default` to clear it back to unset. `edit` opens the file in `$VISUAL` or `$EDITOR` (falling back to a platform default) and re-checks it after you save, which is handy for list and map settings that `set` does not cover.
+
+Use `dispatch config validate --path <file>` to check another config file without changing your active profile. The generated schema is published at [`docs/config.schema.json`](docs/config.schema.json); point your editor's JSON Schema integration at that file, or run `dispatch config schema` to emit the same schema from your installed binary.
 
 ### Options
 
