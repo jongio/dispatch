@@ -201,6 +201,11 @@ func TestDefaultKeybindingsDoNotCollide(t *testing.T) {
 	if seen["ctrl+p"] != "preview_prev_match" {
 		t.Errorf("ctrl+p owner = %q, want preview_prev_match", seen["ctrl+p"])
 	}
+	for _, keyName := range []string{"alt+1", "alt+2", "alt+3", "alt+4", "alt+5"} {
+		if seen[keyName] != "open_related" {
+			t.Errorf("%s owner = %q, want open_related", keyName, seen[keyName])
+		}
+	}
 }
 
 func TestKeybindingEntriesHaveHelpCoverage(t *testing.T) {

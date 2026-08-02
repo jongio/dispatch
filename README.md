@@ -823,7 +823,7 @@ Available action names:
 `config`, `time_range_1`, `time_range_2`, `time_range_3`, `time_range_4`,
 `hide`, `toggle_hidden`, `star`, `launch_window`, `launch_tab`, `launch_pane`,
 `preview_scroll_up`, `preview_scroll_down`, `preview_next_match`,
-`preview_prev_match`, `jump_next_attention`, `filter_attention`, `launch_all`, `select_all`, `deselect_all`,
+`preview_prev_match`, `open_related`, `jump_next_attention`, `filter_attention`, `launch_all`, `select_all`, `deselect_all`,
 `conversation_sort`, `preview_position`, `resume_interrupted`, `view_plan`,
 `copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
 `expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,

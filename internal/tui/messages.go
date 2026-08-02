@@ -4,6 +4,7 @@ import (
 	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ type (
 	groupsLoadedMsg   struct{ groups []data.SessionGroup }
 	sessionDetailMsg  struct {
 		detail  *data.SessionDetail
+		related []components.RelatedSessionItem
 		version int // matches Model.detailVersion to discard stale results
 	}
 )

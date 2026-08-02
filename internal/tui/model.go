@@ -1525,6 +1525,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, keys.OpenRelated):
+		if m.showPreview || m.previewFullscreen {
+			if idx, ok := relatedIndexFromKey(msg.String()); ok {
+				if id, ok := m.preview.RelatedSessionIDAt(idx); ok {
+					return m.jumpToRelatedSession(id)
+				}
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, keys.ConversationSort):
 		if m.showPreview && m.detail != nil {
 			newVal := m.preview.ToggleConversationSort()
@@ -2450,7 +2460,10 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			default:
 				previewRow = mouse.Y - styles.HeaderLines - 1
 			}
-			contentRow := previewRow + m.preview.ScrollOffset()
+			contentRow := m.preview.ContentLineForViewportRow(previewRow)
+			if id, ok := m.preview.HitRelatedSession(contentRow); ok {
+				return m.jumpToRelatedSession(id)
+			}
 			if m.preview.HitConversationSort(contentRow) {
 				newVal := m.preview.ToggleConversationSort()
 				m.cfg.ConversationNewestFirst = newVal
@@ -2470,6 +2483,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+
 		itemIdx := m.sessionList.ScrollOffset() + listRow
 
 		// Detect double-click: second click on the same row while a
@@ -2559,6 +2573,30 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) jumpToRelatedSession(id string) (Model, tea.Cmd) {
+	if id == "" {
+		return m, nil
+	}
+	m.sessionList.ResetShift()
+	if !m.sessionList.SelectByID(id) {
+		m.statusErr = "Related session is not visible in the current list"
+		return m, clearStatusAfter(2 * time.Second)
+	}
+	m.detailVersion++
+	return m, m.loadSelectedDetailCmd()
+}
+
+func relatedIndexFromKey(keyName string) (int, bool) {
+	if !strings.HasPrefix(keyName, "alt+") || len(keyName) != len("alt+1") {
+		return 0, false
+	}
+	ch := keyName[len(keyName)-1]
+	if ch < '1' || ch > '5' {
+		return 0, false
+	}
+	return int(ch - '1'), true
 }
 
 // handleFooterClick dispatches left-clicks on the footer status bar.
@@ -4586,8 +4624,66 @@ func (m Model) loadSelectedDetailCmd() tea.Cmd {
 		if err != nil {
 			return dataErrorMsg{err: err}
 		}
-		return sessionDetailMsg{detail: detail, version: version}
+		related, err := loadRelatedSessionItems(context.Background(), store, detail, m.relatedCandidateSessions(), m.gitStatusMap)
+		if err != nil {
+			return dataErrorMsg{err: err}
+		}
+		return sessionDetailMsg{detail: detail, related: related, version: version}
 	}
+}
+
+func (m Model) relatedCandidateSessions() []data.Session {
+	return m.sessionList.AllSessions()
+}
+
+func loadRelatedSessionItems(ctx context.Context, store *data.Store, detail *data.SessionDetail, sessions []data.Session, gitStatuses map[string]platform.GitStatus) ([]components.RelatedSessionItem, error) {
+	if store == nil || detail == nil || len(sessions) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(sessions))
+	for _, sess := range sessions {
+		if sess.ID != "" && sess.ID != detail.Session.ID {
+			ids = append(ids, sess.ID)
+		}
+	}
+	refsByID, err := store.SessionRefsBySessionIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	current := RelatedSession{
+		Session:           detail.Session,
+		Refs:              detail.Refs,
+		DisplayRepository: displayRepositoryForSession(detail.Session, gitStatuses),
+	}
+	candidates := make([]RelatedSession, 0, len(sessions))
+	for _, sess := range sessions {
+		candidates = append(candidates, RelatedSession{
+			Session:           sess,
+			Refs:              refsByID[sess.ID],
+			DisplayRepository: displayRepositoryForSession(sess, gitStatuses),
+		})
+	}
+	ranked := RankRelatedSessions(current, candidates, time.Now())
+	items := make([]components.RelatedSessionItem, 0, len(ranked))
+	for _, r := range ranked {
+		items = append(items, components.RelatedSessionItem{
+			ID:                r.Session.ID,
+			Summary:           r.Session.Summary,
+			Repository:        r.Session.Repository,
+			Branch:            r.Session.Branch,
+			Cwd:               r.Session.Cwd,
+			LastActiveAt:      r.Session.LastActiveAt,
+			DisplayRepository: r.DisplayRepository,
+		})
+	}
+	return items, nil
+}
+
+func displayRepositoryForSession(sess data.Session, gitStatuses map[string]platform.GitStatus) string {
+	if st, ok := gitStatuses[sess.ID]; ok && st.IsRepo && st.Repository != "" {
+		return st.Repository
+	}
+	return sess.Repository
 }
 
 func loadFilterDataCmd(store *data.Store) tea.Cmd {

@@ -294,6 +294,7 @@ func (m Model) handleSessionDetail(msg sessionDetailMsg) (Model, tea.Cmd) {
 	}
 	m.detail = msg.detail
 	m.preview.SetDetail(m.detail)
+	m.preview.SetRelatedSessions(msg.related)
 	// Set the user note for this session (if any).
 	if m.cfg.SessionNotes != nil {
 		m.preview.SetNote(m.cfg.SessionNotes[m.detail.Session.ID])
