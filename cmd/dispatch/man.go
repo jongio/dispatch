@@ -103,7 +103,7 @@ var manCommands = []manEntry{
 	{"doctor [--json]", "Print environment diagnostics."},
 	{"stats [flags]", "Print session totals and breakdowns by repository, branch, folder, and host type."},
 	{"search [query] [flags]", "Print matching sessions without the TUI."},
-	{"tags [--json|--csv]", "List tags in use with per-tag session counts."},
+	{"tags [--json|--csv|--markdown]", "List tags in use with per-tag session counts."},
 	{"aliases [--json]", "List session aliases with orphan detection."},
 	{"alias list [--json]", "List session aliases."},
 	{"alias <id> <name>", "Set, reassign, clear (--clear), or remove (--remove) a session alias."},
