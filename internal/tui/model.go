@@ -133,6 +133,7 @@ const (
 	stateConfigPanel              // settings overlay
 	stateAttentionPicker          // attention status filter overlay
 	stateViewPicker               // named view selection overlay
+	stateLaunchSetPicker          // saved launch set management overlay
 	stateFilePicker               // file picker overlay
 	stateCompareView              // compare two sessions overlay
 	stateCmdPalette               // command palette overlay
@@ -326,6 +327,7 @@ type Model struct {
 	configPanel     components.ConfigPanel
 	attentionPicker components.AttentionPicker
 	viewPicker      components.ViewPicker
+	launchSetPicker components.LaunchSetPicker
 	filePicker      components.FilePicker
 	compareView     components.CompareView
 	gitStatusView   components.GitStatusView
@@ -510,6 +512,7 @@ func NewModel() Model {
 		spinner:         s,
 		attentionPicker: components.NewAttentionPicker(),
 		viewPicker:      components.NewViewPicker(),
+		launchSetPicker: components.NewLaunchSetPicker(),
 		filePicker:      components.NewFilePicker(),
 		compareView:     components.NewCompareView(),
 		gitStatusView:   components.NewGitStatusView(),
@@ -824,6 +827,9 @@ func (m Model) View() tea.View {
 		case stateViewPicker:
 			content = m.viewPicker.View()
 
+		case stateLaunchSetPicker:
+			content = m.launchSetPicker.View()
+
 		case stateFilePicker:
 			content = m.filePicker.View()
 
@@ -993,6 +999,47 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
+		}
+		return m, nil
+
+	case stateLaunchSetPicker:
+		switch {
+		case key.Matches(msg, keys.Escape):
+			if m.launchSetPicker.Saving() || m.launchSetPicker.Renaming() || m.launchSetPicker.Deleting() {
+				m.launchSetPicker.CancelMode()
+			} else {
+				m.state = stateSessionList
+			}
+			return m, nil
+		case key.Matches(msg, keys.Up):
+			m.launchSetPicker.MoveUp()
+			return m, nil
+		case key.Matches(msg, keys.Down):
+			m.launchSetPicker.MoveDown()
+			return m, nil
+		case key.Matches(msg, keys.LaunchSetSave):
+			return m, m.beginSaveLaunchSet()
+		case key.Matches(msg, keys.LaunchSetRename):
+			return m, m.launchSetPicker.BeginRename()
+		case key.Matches(msg, keys.LaunchSetDelete):
+			m.launchSetPicker.BeginDelete()
+			return m, nil
+		case key.Matches(msg, keys.Enter):
+			switch {
+			case m.launchSetPicker.Saving():
+				return m, m.saveLaunchSet(m.launchSetPicker.Value())
+			case m.launchSetPicker.Renaming():
+				return m, m.renameLaunchSet(m.launchSetPicker.Value())
+			case m.launchSetPicker.Deleting():
+				return m, m.deleteLaunchSet()
+			default:
+				return m, m.launchSelectedLaunchSet()
+			}
+		}
+		if m.launchSetPicker.Saving() || m.launchSetPicker.Renaming() {
+			var cmd tea.Cmd
+			m.launchSetPicker, cmd = m.launchSetPicker.Update(msg)
+			return m, cmd
 		}
 		return m, nil
 
@@ -1642,6 +1689,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.state = stateViewPicker
 		return m, nil
 
+	case key.Matches(msg, keys.LaunchSetList):
+		m.openLaunchSetPicker()
+		return m, nil
+
 	case key.Matches(msg, keys.OpenFile):
 		if m.detail != nil && len(m.detail.Files) > 0 {
 			m.filePicker.SetFiles(m.detail.Files)
@@ -1669,6 +1720,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.LaunchAll):
 		cmd := m.launchMultiple()
 		return m, cmd
+
+	case key.Matches(msg, keys.LaunchSetSave):
+		return m, m.beginSaveLaunchSet()
 
 	case key.Matches(msg, keys.ResumeInterrupted):
 		return m.handleResumeInterrupted()

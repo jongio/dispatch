@@ -160,6 +160,10 @@
           "deselect_all",
           "conversation_sort",
           "preview_position",
+          "launch_set_save",
+          "launch_set_list",
+          "launch_set_rename",
+          "launch_set_delete",
           "resume_interrupted",
           "view_plan",
           "copy_id",
@@ -197,6 +201,24 @@
         "pane"
       ],
       "type": "string"
+    },
+    "launch_sets": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
     },
     "max_sessions": {
       "type": "integer"

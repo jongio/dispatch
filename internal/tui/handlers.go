@@ -1,16 +1,19 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
 	"os"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
@@ -204,6 +207,174 @@ func (m Model) handleRefOpened(msg refOpenedMsg) (Model, tea.Cmd) {
 	}
 	m.statusInfo = "Opened " + msg.label
 	return m, clearStatusAfter(2 * time.Second)
+}
+
+// ----- Launch sets ---------------------------------------------------------
+
+func (m *Model) openLaunchSetPicker() {
+	m.launchSetPicker.SetLaunchSets(m.cfg.ValidLaunchSets(), m.launchSetExistingIDs())
+	m.launchSetPicker.SetSize(m.width, m.height)
+	m.launchSetPicker.CancelMode()
+	m.state = stateLaunchSetPicker
+}
+
+func (m *Model) beginSaveLaunchSet() tea.Cmd {
+	if len(m.selectedLaunchSetSessionIDs()) == 0 {
+		m.statusErr = "Select sessions before saving a launch set"
+		return clearStatusAfter(2 * time.Second)
+	}
+	m.launchSetPicker.SetLaunchSets(m.cfg.ValidLaunchSets(), m.launchSetExistingIDs())
+	m.launchSetPicker.SetSize(m.width, m.height)
+	m.state = stateLaunchSetPicker
+	return m.launchSetPicker.BeginSave(fmt.Sprintf("Launch set %d", len(m.cfg.LaunchSets)+1))
+}
+
+func (m *Model) saveLaunchSet(name string) tea.Cmd {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		m.statusErr = "Launch set name is required"
+		return clearStatusAfter(2 * time.Second)
+	}
+	if m.cfg.FindLaunchSet(name) != nil {
+		m.statusErr = "Launch set already exists: " + name
+		return clearStatusAfter(2 * time.Second)
+	}
+	ids := m.selectedLaunchSetSessionIDs()
+	if len(ids) == 0 {
+		m.statusErr = "Select sessions before saving a launch set"
+		return clearStatusAfter(2 * time.Second)
+	}
+	m.cfg.LaunchSets = append(m.cfg.LaunchSets, config.LaunchSet{Name: name, SessionIDs: ids})
+	m.saveConfig()
+	m.launchSetPicker.CancelMode()
+	m.openLaunchSetPicker()
+	m.statusInfo = "Saved launch set " + name
+	return clearStatusAfter(2 * time.Second)
+}
+
+func (m *Model) renameLaunchSet(name string) tea.Cmd {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		m.statusErr = "Launch set name is required"
+		return clearStatusAfter(2 * time.Second)
+	}
+	set, ok := m.launchSetPicker.Selected()
+	if !ok {
+		return nil
+	}
+	if name != set.Name && m.cfg.FindLaunchSet(name) != nil {
+		m.statusErr = "Launch set already exists: " + name
+		return clearStatusAfter(2 * time.Second)
+	}
+	if existing := m.cfg.FindLaunchSet(set.Name); existing != nil {
+		existing.Name = name
+		m.saveConfig()
+	}
+	m.launchSetPicker.CancelMode()
+	m.openLaunchSetPicker()
+	m.statusInfo = "Renamed launch set " + name
+	return clearStatusAfter(2 * time.Second)
+}
+
+func (m *Model) deleteLaunchSet() tea.Cmd {
+	set, ok := m.launchSetPicker.Selected()
+	if !ok {
+		return nil
+	}
+	for i := range m.cfg.LaunchSets {
+		if m.cfg.LaunchSets[i].Name == set.Name {
+			m.cfg.LaunchSets = append(m.cfg.LaunchSets[:i], m.cfg.LaunchSets[i+1:]...)
+			break
+		}
+	}
+	m.saveConfig()
+	m.launchSetPicker.CancelMode()
+	m.openLaunchSetPicker()
+	m.statusInfo = "Deleted launch set " + set.Name
+	return clearStatusAfter(2 * time.Second)
+}
+
+func (m *Model) launchSelectedLaunchSet() tea.Cmd {
+	set, ok := m.launchSetPicker.Selected()
+	if !ok {
+		return nil
+	}
+	sessions, missing := m.sessionsForLaunchSet(set)
+	if len(sessions) == 0 {
+		m.statusErr = "No saved sessions found for " + set.Name
+		return clearStatusAfter(2 * time.Second)
+	}
+	mode := m.cfg.EffectiveLaunchMode()
+	if mode == config.LaunchModeInPlace {
+		mode = config.LaunchModeTab
+	}
+	m.state = stateSessionList
+	cmd := m.batchLaunchSessions(sessions, mode)
+	if missing > 0 {
+		m.statusErr = fmt.Sprintf("Skipped %d missing saved session(s)", missing)
+	}
+	return cmd
+}
+
+func (m *Model) selectedLaunchSetSessionIDs() []string {
+	selected := m.sessionList.SelectedSessions()
+	ids := make([]string, 0, len(selected))
+	for _, sess := range selected {
+		ids = append(ids, sess.ID)
+	}
+	return ids
+}
+
+func (m *Model) launchSetExistingIDs() map[string]struct{} {
+	ids := map[string]struct{}{}
+	if m.store != nil {
+		all, err := m.store.AllSessionIDs(context.Background())
+		if err == nil {
+			for _, id := range all {
+				ids[id] = struct{}{}
+			}
+			return ids
+		}
+		m.statusErr = "launch sets: " + err.Error()
+	}
+	for _, sess := range m.sessions {
+		ids[sess.ID] = struct{}{}
+	}
+	return ids
+}
+
+func (m *Model) sessionsForLaunchSet(set config.LaunchSet) ([]data.Session, int) {
+	var sessions []data.Session
+	if m.store != nil {
+		loaded, err := m.store.ListSessionsByIDs(context.Background(), set.SessionIDs)
+		if err == nil {
+			sessions = loaded
+		} else {
+			m.statusErr = "launch sets: " + err.Error()
+		}
+	}
+	if sessions == nil {
+		byID := make(map[string]data.Session, len(m.sessions))
+		for _, sess := range m.sessions {
+			byID[sess.ID] = sess
+		}
+		for _, id := range set.SessionIDs {
+			if sess, ok := byID[id]; ok {
+				sessions = append(sessions, sess)
+			}
+		}
+	}
+	found := make(map[string]struct{}, len(sessions))
+	for _, sess := range sessions {
+		found[sess.ID] = struct{}{}
+	}
+	missing := 0
+	for _, id := range set.SessionIDs {
+		if _, ok := found[id]; !ok {
+			missing++
+		}
+	}
+	return sessions, missing
 }
 
 // ----- Pending click fire (single-click debounce) --------------------------

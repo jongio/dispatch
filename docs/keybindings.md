@@ -109,6 +109,34 @@
     - Behavior: Launches every session that has a ✓ selection indicator. If no sessions are selected and cursor is on a folder, opens all sessions under that folder. Each session opens via the configured launch mode.
     - Condition: In session list view; requires at least one selected session OR cursor on a folder
 
+11a. **Ctrl+S** → Save Launch Set
+    - File: internal\tui\keys.go (LaunchSetSave binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+s"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Opens a name input to save the current multi-selection as a named launch set in config.json.
+    - Condition: In session list view or launch set overlay; requires at least one selected session
+
+11b. **Ctrl+L** → Open Launch Sets
+    - File: internal\tui\keys.go (LaunchSetList binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+l"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Opens the launch set overlay. Enter launches the highlighted set, visibly missing session IDs are skipped, Ctrl+R renames, and Ctrl+D asks for delete confirmation.
+    - Condition: In session list view
+
+11c. **Ctrl+R** → Rename Launch Set
+    - File: internal\tui\keys.go (LaunchSetRename binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+r"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Renames the highlighted launch set, rejecting collisions with existing set names.
+    - Condition: Launch set overlay
+
+11d. **Ctrl+D** → Delete Launch Set
+    - File: internal\tui\keys.go (LaunchSetDelete binding)
+    - Code: key.NewBinding(key.WithKeys("ctrl+d"))
+    - Handler: internal\tui\model.go / internal\tui\handlers.go
+    - Behavior: Shows delete confirmation for the highlighted launch set; Enter confirms, Esc cancels.
+    - Condition: Launch set overlay
+
 12. **a** → Select All Visible Sessions
     - File: internal\tui\keys.go (multi-select handler)
     - Code: key.NewBinding(key.WithKeys("a"))

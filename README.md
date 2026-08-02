@@ -534,6 +534,10 @@ The page targets section 1 (user commands) and mirrors the built-in usage: comma
 | `Shift+↑` | Extend selection upward (range select) |
 | `Shift+↓` | Extend selection downward (range select) |
 | `L` | Launch all selected sessions (or all in folder) |
+| `Ctrl+S` | Save selected sessions as a named launch set |
+| `Ctrl+L` | List, launch, rename, or delete saved launch sets |
+| `Ctrl+R` | Rename the highlighted launch set (inside launch set overlay) |
+| `Ctrl+D` | Delete the highlighted launch set (inside launch set overlay) |
 | `a` | Select all visible sessions |
 | `d` | Deselect all |
 
@@ -732,6 +736,7 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `sessionTags` | object | `{}` | Map of session ID to a list of user-defined tags |
 | `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
 | `views` | array | `[]` | Named search, sort, pivot, and filter presets |
+| `launch_sets` | array | `[]` | Named, ordered session ID collections for repeated multi-session launches. Missing IDs are shown in the TUI and skipped |
 | `active_view` | string | `""` | Name of the named view to apply on startup. Empty means default filters |
 | `hidden_columns` | array | `[]` | Optional session-list columns to hide (`repo`, `folder`, `turns`, `host`); empty shows all |
 
@@ -786,6 +791,7 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "ai_search": false,
   "hiddenSessions": [],
   "favoriteSessions": [],
+  "launch_sets": [],
   "keybindings": {}
 }
 ```
@@ -828,7 +834,9 @@ Available action names:
 `config`, `time_range_1`, `time_range_2`, `time_range_3`, `time_range_4`,
 `hide`, `toggle_hidden`, `star`, `launch_window`, `launch_tab`, `launch_pane`,
 `preview_scroll_up`, `preview_scroll_down`, `preview_next_match`,
-`preview_prev_match`, `jump_next_attention`, `filter_attention`, `launch_all`, `select_all`, `deselect_all`,
+`preview_prev_match`, `jump_next_attention`, `filter_attention`, `launch_all`,
+`launch_set_save`, `launch_set_list`, `launch_set_rename`, `launch_set_delete`,
+`select_all`, `deselect_all`,
 `conversation_sort`, `preview_position`, `resume_interrupted`, `view_plan`,
 `copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
 `expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,

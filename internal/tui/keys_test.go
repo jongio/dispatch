@@ -203,6 +203,31 @@ func TestDefaultKeybindingsDoNotCollide(t *testing.T) {
 	}
 }
 
+func TestDefaultKeyMapLaunchSetKeysDoNotCollide(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	owner := map[string]string{}
+	for _, entry := range entries {
+		for _, k := range entry.binding.Keys() {
+			if previous, ok := owner[k]; ok {
+				t.Fatalf("key %q used by both %s and %s", k, previous, entry.name)
+			}
+			owner[k] = entry.name
+		}
+	}
+	for _, action := range []string{"launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete"} {
+		found := false
+		for _, entry := range entries {
+			if entry.name == action {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing launch set action %q", action)
+		}
+	}
+}
+
 func TestKeybindingEntriesHaveHelpCoverage(t *testing.T) {
 	km := defaultKeyMap()
 	entries := keybindingEntries(&km)
