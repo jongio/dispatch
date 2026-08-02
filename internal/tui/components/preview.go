@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -47,6 +48,17 @@ type PreviewPanel struct {
 	// plainLines stores ANSI-stripped versions of renderedLines for
 	// selection coordinate math and clipboard copy.
 	plainLines []string
+
+	searchTerms []string
+	matches     []previewMatch
+	activeMatch int
+	matchCount  int
+}
+
+type previewMatch struct {
+	line  int
+	start int
+	end   int
 }
 
 // NewPreviewPanel returns an empty PreviewPanel.
@@ -86,6 +98,14 @@ func (p *PreviewPanel) SetDetail(d *data.SessionDetail) {
 	p.detail = d
 	p.scroll = 0
 	p.ClearSelection()
+	p.activeMatch = 0
+	p.updateTotalLines()
+}
+
+// SetSearchTerms updates the free-text search terms highlighted in the preview.
+func (p *PreviewPanel) SetSearchTerms(terms []string) {
+	p.searchTerms = append([]string(nil), terms...)
+	p.activeMatch = 0
 	p.updateTotalLines()
 }
 
@@ -230,7 +250,7 @@ func (p *PreviewPanel) ScrollUp(n int) {
 func (p *PreviewPanel) ScrollDown(n int) {
 	p.ClearSelection()
 	p.scroll += n
-	viewportH := max(1, p.height-2)
+	viewportH := p.viewportContentHeight()
 	maxScroll := max(0, p.totalLines-viewportH)
 	if p.scroll > maxScroll {
 		p.scroll = maxScroll
@@ -239,17 +259,80 @@ func (p *PreviewPanel) ScrollDown(n int) {
 
 // PageUp scrolls up by half the viewport height.
 func (p *PreviewPanel) PageUp() {
-	p.ScrollUp(max(1, (p.height-2)/2))
+	p.ScrollUp(max(1, p.viewportContentHeight()/2))
 }
 
 // PageDown scrolls down by half the viewport height.
 func (p *PreviewPanel) PageDown() {
-	p.ScrollDown(max(1, (p.height-2)/2))
+	p.ScrollDown(max(1, p.viewportContentHeight()/2))
 }
 
 // ScrollOffset returns the current scroll position.
 func (p *PreviewPanel) ScrollOffset() int {
 	return p.scroll
+}
+
+// MatchCount returns the number of active search matches in the rendered preview.
+func (p *PreviewPanel) MatchCount() int {
+	return p.matchCount
+}
+
+// ActiveMatch returns the 1-based active match index, or 0 when there are no matches.
+func (p *PreviewPanel) ActiveMatch() int {
+	if p.matchCount == 0 {
+		return 0
+	}
+	return p.activeMatch + 1
+}
+
+// NextMatch advances to the next search match and scrolls it into view.
+func (p *PreviewPanel) NextMatch() bool {
+	p.updateTotalLines()
+	if p.matchCount == 0 {
+		return false
+	}
+	p.activeMatch = (p.activeMatch + 1) % p.matchCount
+	p.scrollToActiveMatch()
+	return true
+}
+
+// PrevMatch moves to the previous search match and scrolls it into view.
+func (p *PreviewPanel) PrevMatch() bool {
+	p.updateTotalLines()
+	if p.matchCount == 0 {
+		return false
+	}
+	p.activeMatch = (p.activeMatch - 1 + p.matchCount) % p.matchCount
+	p.scrollToActiveMatch()
+	return true
+}
+
+func (p *PreviewPanel) scrollToActiveMatch() {
+	if p.matchCount == 0 || p.activeMatch < 0 || p.activeMatch >= len(p.matches) {
+		return
+	}
+	target := p.matches[p.activeMatch].line
+	viewportH := p.viewportContentHeight()
+	if target < p.scroll {
+		p.scroll = target
+	} else if target >= p.scroll+viewportH {
+		p.scroll = target - viewportH + 1
+	}
+	maxScroll := max(0, p.totalLines-viewportH)
+	if p.scroll > maxScroll {
+		p.scroll = maxScroll
+	}
+	if p.scroll < 0 {
+		p.scroll = 0
+	}
+}
+
+func (p *PreviewPanel) viewportContentHeight() int {
+	h := max(1, p.height-2)
+	if p.matchCount > 0 && h > 1 {
+		h--
+	}
+	return h
 }
 
 // HitConversationSort reports whether contentRow (a 0-indexed line in the
@@ -444,6 +527,8 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.idFieldLine = -1
 		p.renderedLines = nil
 		p.plainLines = nil
+		p.matches = nil
+		p.matchCount = 0
 		return
 	}
 	if p.planViewMode && p.planContent != "" {
@@ -453,6 +538,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.recomputeMatches()
 		return
 	}
 	if p.timelineMode && p.detail != nil {
@@ -462,6 +548,7 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.totalLines = len(p.renderedLines)
 		p.convHeaderLine = -1
 		p.idFieldLine = -1
+		p.recomputeMatches()
 		return
 	}
 	if p.detail == nil {
@@ -470,6 +557,8 @@ func (p *PreviewPanel) updateTotalLines() {
 		p.idFieldLine = -1
 		p.renderedLines = nil
 		p.plainLines = nil
+		p.matches = nil
+		p.matchCount = 0
 		return
 	}
 	content, convLine, idLine := p.renderContent()
@@ -478,6 +567,7 @@ func (p *PreviewPanel) updateTotalLines() {
 	p.totalLines = len(p.renderedLines)
 	p.convHeaderLine = convLine
 	p.idFieldLine = idLine
+	p.recomputeMatches()
 }
 
 // stripLines returns a copy of lines with ANSI escape sequences removed.
@@ -487,6 +577,178 @@ func stripLines(lines []string) []string {
 		plain[i] = ansi.Strip(l)
 	}
 	return plain
+}
+
+func (p *PreviewPanel) recomputeMatches() {
+	p.matches = nil
+	p.matchCount = 0
+	if len(p.searchTerms) == 0 || len(p.plainLines) == 0 {
+		p.activeMatch = 0
+		return
+	}
+	for lineIdx, line := range p.plainLines {
+		matches := lineMatches(line, p.searchTerms)
+		for _, m := range matches {
+			m.line = lineIdx
+			p.matches = append(p.matches, m)
+		}
+	}
+	p.matchCount = len(p.matches)
+	if p.matchCount == 0 {
+		p.activeMatch = 0
+		return
+	}
+	if p.activeMatch >= p.matchCount {
+		p.activeMatch = p.matchCount - 1
+	}
+	if p.activeMatch < 0 {
+		p.activeMatch = 0
+	}
+}
+
+func lineMatches(line string, terms []string) []previewMatch {
+	runes := []rune(line)
+	if len(runes) == 0 {
+		return nil
+	}
+	var matches []previewMatch
+	for i := 0; i < len(runes); {
+		bestLen := 0
+		for _, term := range terms {
+			termRunes := []rune(term)
+			if len(termRunes) == 0 || i+len(termRunes) > len(runes) {
+				continue
+			}
+			if strings.EqualFold(string(runes[i:i+len(termRunes)]), term) && len(termRunes) > bestLen {
+				bestLen = len(termRunes)
+			}
+		}
+		if bestLen > 0 {
+			matches = append(matches, previewMatch{start: i, end: i + bestLen})
+			i += bestLen
+			continue
+		}
+		i++
+	}
+	return matches
+}
+
+func (p PreviewPanel) matchesForLine(line int) []previewMatch {
+	var out []previewMatch
+	for _, m := range p.matches {
+		if m.line == line {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func (p PreviewPanel) activeMatchIndexOnLine(line int) int {
+	if p.activeMatch < 0 || p.activeMatch >= len(p.matches) {
+		return -1
+	}
+	if p.matches[p.activeMatch].line != line {
+		return -1
+	}
+	n := 0
+	for i, m := range p.matches {
+		if m.line != line {
+			continue
+		}
+		if i == p.activeMatch {
+			return n
+		}
+		n++
+	}
+	return -1
+}
+
+func (p PreviewPanel) matchStatusLine() string {
+	return styles.DimmedStyle.Render(fmt.Sprintf(
+		"  Matches %d/%d  %s next  %s previous",
+		p.ActiveMatch(),
+		p.matchCount,
+		styles.KeyStyle.Render("Ctrl+N"),
+		styles.KeyStyle.Render("Ctrl+P"),
+	))
+}
+
+func highlightLineMatches(line string, matches []previewMatch, activeOnLine int) string {
+	if len(matches) == 0 {
+		return line
+	}
+	bounds := visibleRuneByteBounds(line)
+	if len(bounds) == 0 {
+		return line
+	}
+	normalStyle, activeStyle := previewMatchStyles()
+	var b strings.Builder
+	last := 0
+	for i, m := range matches {
+		if m.start < 0 || m.end <= m.start || m.start >= len(bounds) {
+			continue
+		}
+		endRune := min(m.end, len(bounds))
+		startByte := bounds[m.start][0]
+		endByte := bounds[endRune-1][1]
+		if startByte < last {
+			continue
+		}
+		b.WriteString(line[last:startByte])
+		style := normalStyle
+		if i == activeOnLine {
+			style = activeStyle
+		}
+		b.WriteString(style.Render(line[startByte:endByte]))
+		last = endByte
+	}
+	b.WriteString(line[last:])
+	return b.String()
+}
+
+func previewMatchStyles() (lipgloss.Style, lipgloss.Style) {
+	t := styles.CurrentTheme()
+	normal := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(t.Selected))
+	active := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(t.Primary))
+	return normal, active
+}
+
+func visibleRuneByteBounds(s string) [][2]int {
+	var bounds [][2]int
+	for i := 0; i < len(s); {
+		if s[i] == '\x1b' {
+			i = skipANSISequence(s, i)
+			continue
+		}
+		r, size := rune(s[i]), 1
+		if r >= 0x80 {
+			r, size = utf8.DecodeRuneInString(s[i:])
+		}
+		bounds = append(bounds, [2]int{i, i + size})
+		i += size
+	}
+	return bounds
+}
+
+func skipANSISequence(s string, i int) int {
+	if i+1 >= len(s) || s[i+1] != '[' {
+		return i + 1
+	}
+	i += 2
+	for i < len(s) {
+		c := s[i]
+		i++
+		if c >= 0x40 && c <= 0x7e {
+			break
+		}
+	}
+	return i
 }
 
 // View renders the preview panel content.
@@ -513,7 +775,11 @@ func (p PreviewPanel) View() string {
 	lines := strings.Split(content, "\n")
 	scroll := p.scroll
 	totalLines := len(lines)
-	maxScroll := max(0, totalLines-innerH)
+	contentH := innerH
+	if p.matchCount > 0 && contentH > 1 {
+		contentH--
+	}
+	maxScroll := max(0, totalLines-contentH)
 	if scroll > maxScroll {
 		scroll = maxScroll
 	}
@@ -523,8 +789,8 @@ func (p PreviewPanel) View() string {
 	if scroll > 0 && scroll < len(lines) {
 		lines = lines[scroll:]
 	}
-	if len(lines) > innerH {
-		lines = lines[:innerH]
+	if len(lines) > contentH {
+		lines = lines[:contentH]
 	}
 
 	// Scroll indicators — replace first/last visible line when content extends.
@@ -533,9 +799,20 @@ func (p PreviewPanel) View() string {
 	if hasScrollUp {
 		lines[0] = styles.DimmedStyle.Render(fmt.Sprintf("  ▲ %d lines above", scroll))
 	}
-	if moreBelow := totalLines - scroll - innerH; moreBelow > 0 && len(lines) > 1 {
+	if moreBelow := totalLines - scroll - contentH; moreBelow > 0 && len(lines) > 1 {
 		hasScrollDown = true
 		lines[len(lines)-1] = styles.DimmedStyle.Render(fmt.Sprintf("  ▼ %d lines below", moreBelow))
+	}
+
+	// Highlight rendered search matches after wrapping/scrolling so layout is unchanged.
+	if p.matchCount > 0 {
+		for i := range lines {
+			if (i == 0 && hasScrollUp) || (i == len(lines)-1 && hasScrollDown) {
+				continue
+			}
+			contentLine := scroll + i
+			lines[i] = highlightLineMatches(lines[i], p.matchesForLine(contentLine), p.activeMatchIndexOnLine(contentLine))
+		}
 	}
 
 	// Apply selection highlight to lines within the active selection range.
@@ -552,6 +829,10 @@ func (p PreviewPanel) View() string {
 				lines[i] = selStyle.Render(lines[i])
 			}
 		}
+	}
+
+	if p.matchCount > 0 {
+		lines = append([]string{p.matchStatusLine()}, lines...)
 	}
 
 	viewportContent := strings.Join(lines, "\n")

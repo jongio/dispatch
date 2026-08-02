@@ -231,6 +231,7 @@ func (m *Model) triggerSearch(inputCmd tea.Cmd) tea.Cmd {
 	// Parse structured tokens from the input.
 	m.searchFilter = ParseSearchTokens(newQuery)
 	m.applySearchTokens()
+	m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	m.filter.DeepSearch = false
 	// Quick search fires immediately; schedule deep search.
 	m.search.deepSearchVersion++
@@ -573,6 +574,7 @@ func (m *Model) applyInitialQuery(query string) []tea.Cmd {
 	m.search.lastRawInput = query
 	m.searchFilter = ParseSearchTokens(query)
 	m.applySearchTokens()
+	m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	m.filter.DeepSearch = false
 	m.search.deepSearchVersion++
 	m.search.deepSearchPending = true
@@ -986,6 +988,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.showHidden = false
 				m.filter.ExcludedDirs = m.cfg.ExcludedDirs
 				m.searchBar.SetValue("")
+				m.searchFilter = SearchFilter{}
+				m.preview.SetSearchTerms(nil)
 			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
@@ -1290,6 +1294,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.filter.Query = ""
 			m.filter.DeepSearch = false
 			m.searchFilter = SearchFilter{}
+			m.preview.SetSearchTerms(nil)
 			m.search.lastRawInput = ""
 			m.search.historyIdx = len(m.search.history)
 			m.clearSearchTokenFilters()
@@ -1503,6 +1508,20 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			before := m.preview.ScrollOffset()
 			m.preview.PageDown()
 			slog.Debug("preview scroll down", "before", before, "after", m.preview.ScrollOffset())
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.PreviewNextMatch):
+		if (m.showPreview || m.previewFullscreen) && m.preview.NextMatch() {
+			m.statusInfo = fmt.Sprintf("Preview match %d/%d", m.preview.ActiveMatch(), m.preview.MatchCount())
+			return m, clearStatusAfter(2 * time.Second)
+		}
+		return m, nil
+
+	case key.Matches(msg, keys.PreviewPrevMatch):
+		if (m.showPreview || m.previewFullscreen) && m.preview.PrevMatch() {
+			m.statusInfo = fmt.Sprintf("Preview match %d/%d", m.preview.ActiveMatch(), m.preview.MatchCount())
+			return m, clearStatusAfter(2 * time.Second)
 		}
 		return m, nil
 
@@ -4814,6 +4833,9 @@ func (m *Model) applyNamedView(v *config.NamedView) {
 	}
 	if v.Search != "" {
 		m.searchBar.SetValue(v.Search)
+		m.searchFilter = ParseSearchTokens(v.Search)
+		m.applySearchTokens()
+		m.preview.SetSearchTerms(searchHighlightTerms(m.searchFilter))
 	}
 	m.showFavorited = v.FavoritesOnly
 	m.showHidden = v.ShowHidden

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -457,6 +458,92 @@ func TestPreviewPanelViewCheckpoints(t *testing.T) {
 	}
 	if !strings.Contains(got, "Checkpoint Beta") {
 		t.Error("View should show checkpoint titles")
+	}
+}
+
+func TestPreviewPanelSearchHighlightsRenderedSections(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(120, 80)
+	p.SetSearchTerms([]string{"AUTH"})
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{
+			ID:         "session-auth",
+			Cwd:        `C:\work\dispatch`,
+			Repository: "repo-auth",
+			Branch:     "feature/auth",
+			Summary:    "Auth summary",
+			TurnCount:  1,
+		},
+		Turns: []data.Turn{
+			{UserMessage: "Please fix auth", AssistantResponse: "AUTH fixed"},
+		},
+		Checkpoints: []data.Checkpoint{{Title: "auth checkpoint"}},
+		Files:       []data.SessionFile{{FilePath: `internal\auth\handler.go`}},
+		Refs:        []data.SessionRef{{RefType: "issue", RefValue: "auth-181"}},
+	})
+
+	if got := p.MatchCount(); got < 8 {
+		t.Fatalf("MatchCount() = %d, want at least 8 across metadata, conversation, checkpoints, files, and refs", got)
+	}
+	view := ansi.Strip(p.View())
+	for _, want := range []string{"Matches 1/", "session-auth", "Please fix auth", "auth checkpoint", `internal\auth\handler.go`, "auth-181"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("highlighted preview should contain %q", want)
+		}
+	}
+}
+
+func TestPreviewPanelSearchNavigationScrollsToMatches(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 12)
+	p.SetSearchTerms([]string{"needle"})
+	turns := make([]data.Turn, 8)
+	for i := range turns {
+		turns[i] = data.Turn{
+			UserMessage:       "filler question " + strconv.Itoa(i),
+			AssistantResponse: "filler answer " + strconv.Itoa(i),
+		}
+	}
+	turns[7].AssistantResponse = "final needle answer"
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "test", TurnCount: len(turns)},
+		Turns:   turns,
+	})
+
+	if p.MatchCount() == 0 {
+		t.Fatal("expected at least one match")
+	}
+	before := p.ScrollOffset()
+	if !p.NextMatch() {
+		t.Fatal("NextMatch() = false, want true")
+	}
+	if p.ActiveMatch() == 0 {
+		t.Error("ActiveMatch() should be 1-based when matches exist")
+	}
+	if p.ScrollOffset() <= before {
+		t.Errorf("NextMatch should scroll toward the later match: before=%d after=%d", before, p.ScrollOffset())
+	}
+}
+
+func TestPreviewPanelClearingSearchTermsResetsMatches(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	p.SetSize(80, 40)
+	p.SetSearchTerms([]string{"needle"})
+	p.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "needle", Cwd: "/a"},
+	})
+	if p.MatchCount() == 0 {
+		t.Fatal("expected match before clearing search terms")
+	}
+	p.SetSearchTerms(nil)
+	if p.MatchCount() != 0 {
+		t.Errorf("MatchCount() after clear = %d, want 0", p.MatchCount())
+	}
+	if p.ActiveMatch() != 0 {
+		t.Errorf("ActiveMatch() after clear = %d, want 0", p.ActiveMatch())
 	}
 }
 
