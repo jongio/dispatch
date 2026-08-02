@@ -138,6 +138,26 @@ func Build() error {
 	return nil
 }
 
+// Screenshots regenerates the website screenshot PNGs via the web npm script.
+func Screenshots() error {
+	fmt.Println("\n=== Regenerating website screenshots ===")
+	return run("npm", "--prefix", "web", "run", "screenshots")
+}
+
+// ScreenshotsCheck verifies the screenshot capture path without rendering PNGs.
+func ScreenshotsCheck() error {
+	fmt.Println("\n=== Checking screenshot capture ===")
+	outDir := filepath.Join(projectDir(), ".screenshots-check")
+	if err := os.RemoveAll(outDir); err != nil {
+		return fmt.Errorf("clean screenshot check dir: %w", err)
+	}
+	if err := run("go", "run", "-tags", "screenshots", "./cmd/screenshots", "--check", "--out", outDir); err != nil {
+		_ = os.RemoveAll(outDir)
+		return err
+	}
+	return os.RemoveAll(outDir)
+}
+
 // Preflight runs all pre-commit checks: format, tidy, vet, lint, WSL lint,
 // build, test, race detection, WSL tests, vulnerability scan, strict
 // formatting, dead code detection, and install verification. If preflight
