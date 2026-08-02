@@ -38,7 +38,7 @@ func TestRenderManPage_Structure(t *testing.T) {
 	}
 }
 
-func TestRenderManPage_ListsEveryCommand(t *testing.T) {
+func TestRenderManPage_RendersEveryManEntry(t *testing.T) {
 	out := renderManPage()
 	for _, c := range manCommands {
 		if !strings.Contains(out, ".B "+manEscape(c.term)) {
@@ -48,6 +48,43 @@ func TestRenderManPage_ListsEveryCommand(t *testing.T) {
 	// The man command documents itself.
 	if !strings.Contains(out, ".B man") {
 		t.Error("man page should document the man command")
+	}
+}
+
+// firstWord returns the first whitespace-delimited word of s.
+func firstWord(s string) string {
+	if fields := strings.Fields(s); len(fields) > 0 {
+		return fields[0]
+	}
+	return ""
+}
+
+// TestManCommandsCoverAllCLICommands guards the man page against drift with
+// the canonical command registry: every cliCommands entry must have at least
+// one manCommands entry whose term begins with that command, and every
+// manCommands term must begin with a known command (catching stale entries).
+func TestManCommandsCoverAllCLICommands(t *testing.T) {
+	documented := make(map[string]struct{}, len(manCommands))
+	for _, c := range manCommands {
+		documented[firstWord(c.term)] = struct{}{}
+	}
+
+	known := make(map[string]struct{}, len(cliCommands))
+	for _, cmd := range cliCommands {
+		known[cmd] = struct{}{}
+	}
+
+	for _, cmd := range cliCommands {
+		if _, ok := documented[cmd]; !ok {
+			t.Errorf("man page has no manCommands entry for command %q", cmd)
+		}
+	}
+
+	for _, c := range manCommands {
+		first := firstWord(c.term)
+		if _, ok := known[first]; !ok {
+			t.Errorf("manCommands entry %q begins with %q, which is not in cliCommands", c.term, first)
+		}
 	}
 }
 

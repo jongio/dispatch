@@ -63,7 +63,7 @@ func configFields() []configField {
 		enumField("default_time_range", func(c *config.Config) *string { return &c.DefaultTimeRange },
 			config.TimeRange1h, config.TimeRange1d, config.TimeRange7d, config.TimeRangeAll),
 		enumField("default_sort", func(c *config.Config) *string { return &c.DefaultSort },
-			config.SortFieldUpdated, config.SortFieldCreated, config.SortFieldTurns, config.SortFieldName, config.SortFieldFolder),
+			config.SortFieldUpdated, config.SortFieldCreated, config.SortFieldTurns, config.SortFieldName, config.SortFieldFolder, config.SortFieldFrecency),
 		enumField("default_sort_order", func(c *config.Config) *string { return &c.DefaultSortOrder },
 			config.SortOrderAsc, config.SortOrderDesc),
 		enumField("default_pivot", func(c *config.Config) *string { return &c.DefaultPivot },

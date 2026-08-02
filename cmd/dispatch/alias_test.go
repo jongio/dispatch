@@ -91,6 +91,16 @@ func TestParseAliasArgs(t *testing.T) {
 	}
 }
 
+func TestParseAliasArgs_RemoveClearConflictMessage(t *testing.T) {
+	_, _, _, _, _, err := parseAliasArgs([]string{"alias", "--remove", "review", "--clear"})
+	if err == nil {
+		t.Fatal("expected error for --remove combined with --clear")
+	}
+	if got := err.Error(); !strings.Contains(got, "cannot be combined with --clear") {
+		t.Errorf("wrong error = %q, want it to contain %q", got, "cannot be combined with --clear")
+	}
+}
+
 func TestRunAlias_Set(t *testing.T) {
 	cfg := &config.Config{}
 	withAliasSeams(t, cfg, []data.Session{{ID: "ses-1"}})

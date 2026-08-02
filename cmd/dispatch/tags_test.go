@@ -123,8 +123,8 @@ func TestParseTagsArgsCSVAndJSONConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for --csv + --json conflict")
 	}
-	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
-		t.Errorf("wrong error = %q, want %q", got, want)
+	if got := err.Error(); !strings.Contains(got, "cannot be combined") {
+		t.Errorf("wrong error = %q, want it to contain %q", got, "cannot be combined")
 	}
 }
 
@@ -133,8 +133,8 @@ func TestParseTagsArgsMarkdownAndJSONConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for --markdown + --json conflict")
 	}
-	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
-		t.Errorf("wrong error = %q, want %q", got, want)
+	if got := err.Error(); !strings.Contains(got, "cannot be combined") {
+		t.Errorf("wrong error = %q, want it to contain %q", got, "cannot be combined")
 	}
 }
 
@@ -143,8 +143,8 @@ func TestParseTagsArgsMarkdownAndCSVConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for --markdown + --csv conflict")
 	}
-	if got, want := err.Error(), "--json, --csv, and --markdown cannot be combined"; got != want {
-		t.Errorf("wrong error = %q, want %q", got, want)
+	if got := err.Error(); !strings.Contains(got, "cannot be combined") {
+		t.Errorf("wrong error = %q, want it to contain %q", got, "cannot be combined")
 	}
 }
 

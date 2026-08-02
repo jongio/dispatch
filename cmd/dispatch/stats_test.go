@@ -481,3 +481,77 @@ func TestMarkdownCell(t *testing.T) {
 		t.Errorf("markdownCell escaped value = %q", got)
 	}
 }
+
+// TestWriteStatsCSV_Golden asserts the exact bytes emitted for a fully
+// populated report, including calendar rows (zero-count days are retained in
+// CSV, unlike the Markdown calendar).
+func TestWriteStatsCSV_Golden(t *testing.T) {
+	report := statsReport{
+		TotalSessions: 3,
+		TotalTurns:    5,
+		TotalFiles:    7,
+		ByRepository:  []countEntry{{Label: "jongio/dispatch", Count: 2}},
+		ByBranch:      []countEntry{{Label: "main", Count: 3}},
+		ByFolder:      []countEntry{{Label: "/code", Count: 2}},
+		ByHostType:    []countEntry{{Label: "local", Count: 3}},
+		Calendar: &activityCalendar{
+			Days: []dayCount{
+				{Date: "2026-01-01", Count: 2},
+				{Date: "2026-01-02", Count: 0},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := writeStatsCSV(&buf, report); err != nil {
+		t.Fatalf("writeStatsCSV: %v", err)
+	}
+
+	want := "section,label,count\n" +
+		"totals,sessions,3\n" +
+		"totals,turns,5\n" +
+		"totals,files,7\n" +
+		"repository,jongio/dispatch,2\n" +
+		"branch,main,3\n" +
+		"folder,/code,2\n" +
+		"host_type,local,3\n" +
+		"calendar,2026-01-01,2\n" +
+		"calendar,2026-01-02,0\n"
+	if got := buf.String(); got != want {
+		t.Errorf("writeStatsCSV bytes =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestWriteMarkdownCalendar_Golden asserts the exact Markdown emitted, and
+// that zero-count days are omitted.
+func TestWriteMarkdownCalendar_Golden(t *testing.T) {
+	cal := activityCalendar{
+		Days: []dayCount{
+			{Date: "2026-01-01", Count: 2},
+			{Date: "2026-01-02", Count: 0},
+			{Date: "2026-01-03", Count: 5},
+		},
+	}
+
+	var buf bytes.Buffer
+	writeMarkdownCalendar(&buf, cal)
+
+	want := "\n## Activity\n\n" +
+		"| Date | Sessions |\n" +
+		"|---|---:|\n" +
+		"| 2026-01-01 | 2 |\n" +
+		"| 2026-01-03 | 5 |\n"
+	if got := buf.String(); got != want {
+		t.Errorf("writeMarkdownCalendar bytes =\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestWriteMarkdownCalendar_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	writeMarkdownCalendar(&buf, activityCalendar{})
+
+	want := "\n## Activity\n\n_No data._\n"
+	if got := buf.String(); got != want {
+		t.Errorf("writeMarkdownCalendar (empty) bytes =\n%q\nwant\n%q", got, want)
+	}
+}

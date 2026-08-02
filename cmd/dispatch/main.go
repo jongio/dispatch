@@ -124,7 +124,9 @@ Commands:
                           Resume the most recent session matching a scope filter
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
-  doctor [--json]         Print environment diagnostics (--json for machine-readable output)
+  doctor [--json] [--strict]
+                          Print environment diagnostics (--json for machine-readable
+                          output, --strict to exit non-zero on warnings)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, JSONL, CSV, IDs, paths, commands, or a table
   tags [--json|--csv|--markdown]
@@ -134,11 +136,11 @@ Commands:
   alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
   views [command]          List named views or set the active view
-  config [get|set|list|edit|path|export|import]
+  config [get|set|unset|list|edit|path|validate|schema|export|import]
                           Read or change preferences (see Config commands)
-  export <id> [flags]     Export a session as Markdown, JSON, or HTML
+  export <id> [flags]     Export a session as Markdown, JSON, HTML, or text
   export --repo R [flags] Export all sessions matching a scope filter (batch mode)
-  info <id> [--json] [--refs]
+  info <id> [--json|--markdown] [--refs]
                           Print a concise session summary
   path <id|--last|--current>
                           Print only a session's working directory (for cd "$(dispatch path x)")
@@ -171,10 +173,12 @@ Session IDs:
 Stats flags:
   --json                  Print the summary as JSON
   --csv                   Print the summary as CSV
+  --markdown              Print the summary as Markdown
   --calendar              Add a per-day activity heatmap
   --repo <name>           Only count sessions for a repository
   --branch <name>         Only count sessions on a branch
   --folder <path>         Only count sessions under a folder
+  --tag <name>            Only count sessions carrying a tag
   --since <date>          Only count sessions created on or after a date
   --until <date>          Only count sessions created on or before a date
   --top <n>               Limit each breakdown to the top N entries
@@ -185,6 +189,7 @@ Search flags:
   --ids                   Print one session ID per line
   --paths                 Print one working directory per line
   --commands              Print one resume command per line
+  --csv                   Print results as CSV
   --table                 Print a readable table
   --format json|jsonl|csv|ids|paths|commands|table
                           Choose the output format
@@ -193,9 +198,12 @@ Search flags:
   --repo <name>           Only include sessions for a repository
   --branch <name>         Only include sessions on a branch
   --folder <path>         Only include sessions under a folder
+  --tag <name>            Only include sessions carrying a tag
   --host <type>           Only include sessions by host type (cli, cloud, actions)
   --since <date>          Only include sessions active on or after a date
   --until <date>          Only include sessions active on or before a date
+  --sort <field>          Sort results by a field
+  --order <asc|desc>      Sort direction
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
 
 Views commands:
@@ -223,7 +231,8 @@ Notes commands:
   notes clear <id>         Clear one session note
 
 Export flags:
-  --format md|json|html   Output format (default md)
+  --format md|json|html|text
+                          Output format (default md)
   --out <dir>             Write to a directory instead of the exports folder
   --stdout                Print to stdout instead of writing a file
   --redact                Mask common secret patterns in the export
@@ -231,6 +240,7 @@ Export flags:
   --repo <name>           (batch) Only export sessions for a repository
   --branch <name>         (batch) Only export sessions on a branch
   --folder <path>         (batch) Only export sessions under a folder
+  --tag <name>            (batch) Only export sessions carrying a tag
   --since <date>          (batch) Only export sessions created on or after a date
   --until <date>          (batch) Only export sessions created on or before a date
 
@@ -253,6 +263,7 @@ Watch flags:
   --branch <name>         Only watch sessions on a branch
   --folder <path>         Only watch sessions under a folder
   --exec <cmd>            Run a command on each attention transition (streaming only)
+  --status <state>        Only report sessions in a given attention state
 
 Flags:
   -h, --help              Show this help message

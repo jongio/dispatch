@@ -397,6 +397,27 @@ func splitInlineFlag(arg string) (flag, value string, ok bool) {
 	return arg[:idx], arg[idx+1:], true
 }
 
+// cliCommands is the canonical list of top-level subcommands accepted by
+// handleArgs. Several surfaces mirror this list — the usage banner in
+// main.go, the manCommands table in man.go, and the four shell completion
+// scripts below. Those mirrors are hand-written on purpose (the completion
+// scripts must stay readable as shell code), so drift tests in this package
+// assert every command here appears in each of them.
+var cliCommands = []string{
+	"help", "version", "open", "new", "doctor", "update", "completion",
+	"stats", "search", "tags", "notes", "views", "aliases", "alias",
+	"compare", "prune", "tag", "watch", "config", "export", "info",
+	"path", "man",
+}
+
+// configSubcommands is the canonical list of `dispatch config` subcommands
+// accepted by runConfig. Mirrored by the completion scripts and the man
+// page synopsis; guarded by the same drift tests as cliCommands.
+var configSubcommands = []string{
+	"list", "get", "set", "unset", "edit", "path",
+	"validate", "schema", "export", "import",
+}
+
 func runCompletion(w io.Writer, shell string) error {
 	if w == nil {
 		w = io.Discard
@@ -443,7 +464,7 @@ _dispatch_completion() {
       ;;
     config)
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "list get set unset edit path export import" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "list get set unset edit path validate schema export import" -- "${cur}") )
       elif [[ "${COMP_WORDS[2]}" == "get" || "${COMP_WORDS[2]}" == "set" || "${COMP_WORDS[2]}" == "unset" ]]; then
         COMPREPLY=( $(compgen -W "$("${bin}" __complete config-keys)" -- "${cur}") )
       fi
@@ -459,7 +480,7 @@ _dispatch_completion() {
   local -a commands flags configsubs shells aliases configkeys openflags newflags
   local bin=${words[1]}
   commands=(help version open new doctor update completion stats search tags notes views aliases alias compare prune tag watch config export info path man)
-  configsubs=(list get set unset edit path export import)
+  configsubs=(list get set unset edit path validate schema export import)
   openflags=(--mode --last --print --agent --model --yolo)
   newflags=(--mode --agent --model --yolo)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
@@ -533,14 +554,15 @@ for bin in dispatch disp
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
   complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo'
   complete -c $bin -n '__dispatch_after new' -a '--mode --agent --model --yolo'
+  complete -c $bin -n '__dispatch_after config' -a 'list get set unset edit path validate schema export import'
   complete -c $bin -n '__dispatch_config_key' -a "($bin __complete config-keys)"
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'notes', 'views', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
-$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path', 'export', 'import')
+$script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path', 'validate', 'schema', 'export', 'import')
 $script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
 $script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
 
