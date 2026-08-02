@@ -254,6 +254,20 @@
     - Behavior: Scrolls preview panel content down by one page
     - Condition: Only when preview panel is visible
 
+22a. **Ctrl+N** → Next Preview Search Match
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("Ctrl+N", "next preview match"))
+     - Handler: internal\tui\model.go
+     - Behavior: Jumps the preview pane to the next highlighted free-text search match and updates the match counter
+     - Condition: Only when preview panel is visible and the active search query has preview matches
+
+22b. **Ctrl+P** → Previous Preview Search Match
+     - File: internal\tui\keys.go
+     - Code: key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("Ctrl+P", "previous preview match"))
+     - Handler: internal\tui\model.go
+     - Behavior: Jumps the preview pane to the previous highlighted free-text search match and updates the match counter
+     - Condition: Only when preview panel is visible and the active search query has preview matches
+
 ### Session Management
 23. **r** → Rebuild Index
     - File: internal\tui\keys.go

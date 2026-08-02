@@ -158,6 +158,27 @@ func ParseSearchTokens(input string) SearchFilter {
 	return sf
 }
 
+func searchHighlightTerms(sf SearchFilter) []string {
+	if strings.TrimSpace(sf.FreeText) == "" {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var terms []string
+	for _, term := range tokenize(sf.FreeText) {
+		term = strings.TrimSpace(term)
+		if term == "" {
+			continue
+		}
+		key := strings.ToLower(term)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		terms = append(terms, term)
+	}
+	return terms
+}
+
 // parseSearchDate parses a date token value in RFC3339 or common date-only
 // forms. It mirrors the CLI stats parser so after:/before: behave the same as
 // --since/--until. Returns false when the value is not a recognized date.

@@ -183,6 +183,26 @@ func TestKeybindingActionNames(t *testing.T) {
 	}
 }
 
+func TestDefaultKeybindingsDoNotCollide(t *testing.T) {
+	km := defaultKeyMap()
+	entries := keybindingEntries(&km)
+	seen := make(map[string]string)
+	for _, entry := range entries {
+		for _, keyName := range entry.binding.Keys() {
+			if previous, ok := seen[keyName]; ok {
+				t.Fatalf("default key %q is bound to both %q and %q", keyName, previous, entry.name)
+			}
+			seen[keyName] = entry.name
+		}
+	}
+	if seen["ctrl+n"] != "preview_next_match" {
+		t.Errorf("ctrl+n owner = %q, want preview_next_match", seen["ctrl+n"])
+	}
+	if seen["ctrl+p"] != "preview_prev_match" {
+		t.Errorf("ctrl+p owner = %q, want preview_prev_match", seen["ctrl+p"])
+	}
+}
+
 func TestKeybindingEntriesHaveHelpCoverage(t *testing.T) {
 	km := defaultKeyMap()
 	entries := keybindingEntries(&km)
