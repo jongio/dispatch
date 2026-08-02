@@ -103,7 +103,7 @@ var manCommands = []manEntry{
 	{"doctor [--json]", "Print environment diagnostics."},
 	{"stats [flags]", "Print session totals and breakdowns."},
 	{"search [query] [flags]", "Print matching sessions without the TUI."},
-	{"tags [--json|--csv]", "List tags in use with per-tag session counts."},
+	{"tags [--json|--csv|--markdown]", "List tags in use with per-tag session counts."},
 	{"config <get|set|list|edit|path>", "Read or change preferences."},
 	{"export <id> [flags]", "Export a session as Markdown or JSON."},
 	{"man", "Write this man page in roff format to standard output."},
