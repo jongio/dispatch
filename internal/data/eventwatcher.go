@@ -211,6 +211,14 @@ func (ew *EventWatcher) handleEvent(event fsnotify.Event, stateDir string) {
 }
 
 // maybeWatchNewDir adds a newly created session directory to the watcher.
+//
+// The Add call is made while holding ew.mu, and only after confirming the
+// watcher has not been stopped. fsnotify's Add blocks forever on a closed
+// watcher (its internal channel is no longer drained), so releasing the lock
+// first would let Stop close the watcher in the gap and wedge this goroutine —
+// which in turn hangs Stop's wg.Wait. Holding the lock makes Stop wait for an
+// in-flight Add instead, which is bounded and safe: Add never calls back into
+// EventWatcher.
 func (ew *EventWatcher) maybeWatchNewDir(path string) {
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
@@ -222,13 +230,13 @@ func (ew *EventWatcher) maybeWatchNewDir(path string) {
 	}
 
 	ew.mu.Lock()
-	w := ew.watcher
-	ew.mu.Unlock()
+	defer ew.mu.Unlock()
 
-	if w != nil {
-		if err := w.Add(path); err != nil {
-			slog.Debug("eventwatcher: failed to watch new dir", "path", path, "error", err)
-		}
+	if ew.stopped || ew.watcher == nil {
+		return
+	}
+	if err := ew.watcher.Add(path); err != nil {
+		slog.Debug("eventwatcher: failed to watch new dir", "path", path, "error", err)
 	}
 }
 

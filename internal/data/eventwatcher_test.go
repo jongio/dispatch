@@ -13,6 +13,26 @@ func recentTimestamp() string {
 	return time.Now().UTC().Format(time.RFC3339)
 }
 
+// waitFor polls cond every 10ms until it returns true or timeout elapses,
+// calling t.Fatalf with desc on timeout. It lets the fsnotify-backed tests
+// finish as soon as the expected state is reached (fast in the happy path)
+// instead of sleeping for a fixed, flaky window. cond must guard any shared
+// state with the same mutex the watcher callback uses.
+func waitFor(t *testing.T, timeout time.Duration, desc string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if cond() {
+		return
+	}
+	t.Fatalf("timed out after %s waiting for %s", timeout, desc)
+}
+
 func TestEventWatcher_FiresOnEventWrite(t *testing.T) {
 	// Create a temporary session-state directory.
 	dir := t.TempDir()
@@ -45,25 +65,24 @@ func TestEventWatcher_FiresOnEventWrite(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	// Give the watcher time to set up.
-	time.Sleep(500 * time.Millisecond)
-
-	// Modify events.jsonl — this should trigger a callback.
+	// Start registers its watches synchronously, so the write below is
+	// observed without a fixed setup delay.
 	newEvent := fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())
 	if err := os.WriteFile(eventsPath, []byte(initial+newEvent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Wait for the debounced callback (50ms debounce + margin).
-	time.Sleep(1000 * time.Millisecond)
+	var status AttentionStatus
+	waitFor(t, 5*time.Second, "callback for test-session-1", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		s, ok := updates["test-session-1"]
+		if ok {
+			status = s
+		}
+		return ok
+	})
 
-	mu.Lock()
-	status, ok := updates["test-session-1"]
-	mu.Unlock()
-
-	if !ok {
-		t.Fatal("expected callback for test-session-1, got none")
-	}
 	// Dead session with turn_end → AttentionWaiting (within 24h).
 	if status != AttentionWaiting {
 		t.Errorf("got status %v, want AttentionWaiting", status)
@@ -181,32 +200,26 @@ func TestEventWatcher_WatchesNewSessionDirs(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(500 * time.Millisecond)
-
 	// Create a new session directory AFTER the watcher started.
 	newSessionDir := filepath.Join(dir, "new-session-abc")
 	if err := os.MkdirAll(newSessionDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-
-	// Give watcher time to pick up the new directory via CREATE event.
-	time.Sleep(500 * time.Millisecond)
-
-	// Write events.jsonl in the new directory.
 	eventsPath := filepath.Join(newSessionDir, "events.jsonl")
-	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
-	time.Sleep(500 * time.Millisecond)
-
-	mu.Lock()
-	_, ok := updates["new-session-abc"]
-	mu.Unlock()
-
-	if !ok {
-		t.Error("expected callback for dynamically created session dir")
-	}
+	// Registering a watch on the freshly created subdirectory happens
+	// asynchronously in the watcher's event loop, so re-write events.jsonl
+	// on each poll until the callback confirms the new dir is watched.
+	waitFor(t, 5*time.Second, "callback for dynamically created session dir", func() bool {
+		line := fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())
+		if err := os.WriteFile(eventsPath, []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		_, ok := updates["new-session-abc"]
+		return ok
+	})
 }
 
 func TestEventWatcher_StopIsIdempotent(t *testing.T) {
@@ -266,18 +279,18 @@ func TestEventWatcher_SessionIDFromPath(t *testing.T) {
 	}
 	defer ew.Stop()
 
-	time.Sleep(500 * time.Millisecond)
-
-	// Modify the file.
+	// Modify the file; Start already registered the watch synchronously.
 	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(1000 * time.Millisecond)
-
-	mu.Lock()
-	id := gotID
-	mu.Unlock()
+	var id string
+	waitFor(t, 5*time.Second, "session ID callback", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		id = gotID
+		return id != ""
+	})
 
 	if id != "abc-123" {
 		t.Errorf("got session ID %q, want %q", id, "abc-123")
