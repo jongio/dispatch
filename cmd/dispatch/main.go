@@ -127,7 +127,7 @@ Commands:
   doctor [--json]         Print environment diagnostics (--json for machine-readable output)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, JSONL, CSV, IDs, paths, commands, or a table
-  tags [--json]           List tags in use with per-tag session counts
+  tags [--json|--csv]     List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
   alias <id> <name>       Set, reassign, clear (--clear), or remove (--remove) a session alias
   notes [command]          List, get, set, or clear session notes
