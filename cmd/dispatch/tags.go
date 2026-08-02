@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/jongio/dispatch/internal/data"
@@ -18,6 +20,7 @@ var tagsListSessionsFn = defaultStatsListSessions
 // tagsOptions holds the parsed flags for the tags command.
 type tagsOptions struct {
 	json bool
+	csv  bool
 }
 
 // tagCount is one tag and the number of sessions that carry it.
@@ -56,6 +59,9 @@ func runTags(w io.Writer, args []string) error {
 	}
 
 	report := buildTagsReport(cfg.SessionTags, sessions)
+	if opts.csv {
+		return writeTagsCSV(w, report)
+	}
 	if opts.json {
 		return writeTagsJSON(w, report)
 	}
@@ -77,11 +83,17 @@ func parseTagsArgs(args []string) (tagsOptions, error) {
 		switch {
 		case arg == "--json":
 			opts.json = true
+		case arg == "--csv":
+			opts.csv = true
 		case strings.HasPrefix(arg, "-"):
 			return tagsOptions{}, fmt.Errorf("unknown flag: %s", arg)
 		default:
 			return tagsOptions{}, fmt.Errorf("tags does not take positional arguments, got %q", arg)
 		}
+	}
+
+	if opts.json && opts.csv {
+		return tagsOptions{}, fmt.Errorf("--json and --csv cannot be combined")
 	}
 
 	return opts, nil
@@ -131,6 +143,21 @@ func writeTagsJSON(w io.Writer, report tagsReport) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
+}
+
+// writeTagsCSV prints the report as RFC 4180 CSV rows.
+func writeTagsCSV(w io.Writer, report tagsReport) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"tag", "count"}); err != nil {
+		return err
+	}
+	for _, e := range report.Tags {
+		if err := cw.Write([]string{csvSafe(e.Tag), strconv.Itoa(e.Count)}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 // writeTagsText prints the report in a plain, human-readable layout.

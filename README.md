@@ -272,9 +272,10 @@ Run `dispatch tags` to list every tag in use with the number of sessions that ca
 ```sh
 dispatch tags
 dispatch tags --json
+dispatch tags --csv
 ```
 
-Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` for scripting.
+Tags come from sessions you have tagged in the TUI. Counts are taken against the current session store, so tags left on sessions that no longer exist are not counted. Use `--json` or `--csv` for scripting.
 
 ### Notes
 
