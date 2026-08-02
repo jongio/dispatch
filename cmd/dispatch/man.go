@@ -104,7 +104,7 @@ var manCommands = []manEntry{
 	{"stats [flags]", "Print session totals and breakdowns."},
 	{"search [query] [flags]", "Print matching sessions without the TUI."},
 	{"tags [--json]", "List tags in use with per-tag session counts."},
-	{"config <get|set|list|edit|path>", "Read or change preferences."},
+	{"config <get|set|list|edit|path|export|import>", "Read or change preferences."},
 	{"export <id> [flags]", "Export a session as Markdown or JSON."},
 	{"man", "Write this man page in roff format to standard output."},
 	{"update", "Update dispatch to the latest release."},
