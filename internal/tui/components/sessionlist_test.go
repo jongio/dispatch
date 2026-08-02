@@ -186,6 +186,51 @@ func TestSessionList_SelectByID_SkipsFolders(t *testing.T) {
 	}
 }
 
+func TestSessionListQuickStarts_RenderAndDoNotBehaveLikeSessions(t *testing.T) {
+	t.Parallel()
+	sl := NewSessionList()
+	sessions := []data.Session{{ID: "sess-aaa", Summary: "Existing", LastActiveAt: "2025-01-15T10:00:00Z"}}
+	sl.SetSessionsWithQuickStarts(sessions, []QuickStart{{Name: "empty-repo", Path: `D:\code\empty-repo`}})
+	sl.SetSize(100, 5)
+	sl.MoveDown()
+
+	if _, ok := sl.Selected(); ok {
+		t.Fatal("Selected returned a session for a quick-start row")
+	}
+	qs, ok := sl.SelectedQuickStart()
+	if !ok || qs.Path != `D:\code\empty-repo` {
+		t.Fatalf("SelectedQuickStart = %#v, %v; want empty repo", qs, ok)
+	}
+	if sl.ToggleSelected() {
+		t.Fatal("ToggleSelected should ignore quick-start rows")
+	}
+	if sl.SelectionCount() != 0 {
+		t.Fatalf("SelectionCount = %d, want 0", sl.SelectionCount())
+	}
+	view := sl.View()
+	if !strings.Contains(view, "New session: empty-repo") {
+		t.Fatalf("View missing quick-start row:\n%s", view)
+	}
+	if sl.SessionCount() != 1 {
+		t.Fatalf("SessionCount = %d, want existing sessions only", sl.SessionCount())
+	}
+}
+
+func TestSessionListQuickStarts_DefaultSetSessionsOutputUnchanged(t *testing.T) {
+	t.Parallel()
+	sessions := makeSessions(4)
+	a := NewSessionList()
+	a.SetSessions(sessions)
+	a.SetSize(100, 8)
+	b := NewSessionList()
+	b.SetSessionsWithQuickStarts(sessions, nil)
+	b.SetSize(100, 8)
+
+	if got, want := b.View(), a.View(); got != want {
+		t.Fatalf("SetSessionsWithQuickStarts nil changed output\n got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 // TestSessionListViewConsistency verifies that every View() output during
 // scrolling has exactly height lines, each of exactly width columns.
 func TestSessionListViewConsistency(t *testing.T) {

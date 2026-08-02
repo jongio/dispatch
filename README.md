@@ -737,6 +737,7 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `sessionAliases` | object | `{}` | Map of session ID to a unique short alias for `dispatch open <alias>` |
 | `views` | array | `[]` | Named search, sort, pivot, and filter presets |
 | `launch_sets` | array | `[]` | Named, ordered session ID collections for repeated multi-session launches. Missing IDs are shown in the TUI and skipped |
+| `project_roots` | array | `[]` | Absolute directories to scan for git repos that should appear as `New session` rows when they have no recent session |
 | `active_view` | string | `""` | Name of the named view to apply on startup. Empty means default filters |
 | `hidden_columns` | array | `[]` | Optional session-list columns to hide (`repo`, `folder`, `turns`, `host`); empty shows all |
 
@@ -792,6 +793,7 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "hiddenSessions": [],
   "favoriteSessions": [],
   "launch_sets": [],
+  "project_roots": [],
   "keybindings": {}
 }
 ```

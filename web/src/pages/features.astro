@@ -240,6 +240,31 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- Project Quick Start -->
+    <section class="section" id="project-quick-start">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Project Quick Start</h2>
+          <p>
+            Add absolute directories to <code>project_roots</code> and Dispatch scans
+            them for git repositories. Repos without a recent Copilot session appear
+            as <strong>New session</strong> rows in the session list.
+          </p>
+          <ul>
+            <li><kbd>Enter</kbd> starts Copilot in the repo root</li>
+            <li>Uses the same launch mode, shell, terminal, agent, model, and yolo settings as existing sessions</li>
+            <li>Scanning is asynchronous and skipped when no project roots are configured</li>
+          </ul>
+        </div>
+        <div class="feature-text">
+          <p class="text-only-note">
+            Quick-start rows are generated locally from configured roots and are hidden
+            automatically once that repo has a recent session.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- Multi-Session Open -->
     <section class="section" id="multi-open">
       <div class="feature-section reverse">

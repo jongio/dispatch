@@ -63,6 +63,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'hidden_columns', type: 'array', default: '[]', description: 'Optional session-list columns to hide (repo, folder, turns, host). Empty shows every column.' },
         { key: 'keybindings', type: 'object', default: '{}', description: 'Remap keyboard shortcuts. Keys are action names; values are comma-separated key lists (see the Keys page).' },
         { key: 'launch_sets', type: 'array', default: '[]', description: 'Named, ordered session ID collections for repeated multi-session launches. Missing IDs are shown and skipped.' },
+        { key: 'project_roots', type: 'array', default: '[]', description: 'Absolute directories to scan for git repos shown as New session rows when they have no recent session.' },
         { key: 'favoriteSessions', type: 'array', default: '[]', description: 'Session IDs starred as favorites.' },
       ]} />
     </div>
@@ -90,6 +91,7 @@ import ConfigTable from '../components/ConfigTable.astro';
   "excluded_words": [],
   "favoriteSessions": [],
   "launch_sets": [],
+  "project_roots": [],
   "theme": "auto",
   "workspace_recovery": true
 }`}</code></pre>

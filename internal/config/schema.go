@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -149,6 +150,7 @@ func ValidateConfig(cfg *Config) []Diagnostic {
 	diags = append(diags, validateSessionKeyMap("sessionLaunches", cfg.SessionLaunches)...)
 	diags = append(diags, validateViews(cfg)...)
 	diags = append(diags, validateLaunchSets(cfg.LaunchSets)...)
+	diags = append(diags, validateProjectRoots(cfg.ProjectRoots)...)
 	diags = append(diags, validateSchemes(cfg.Schemes)...)
 	diags = append(diags, ValidateKeybindings(cfg.Keybindings)...)
 	return diags
@@ -273,6 +275,29 @@ func validateLaunchSets(sets []LaunchSet) []Diagnostic {
 			diags = append(diags, errorDiagnostic(base+".session_ids", "at least one session ID is required"))
 		}
 		diags = append(diags, validateSessionIDs(base+".session_ids", set.SessionIDs)...)
+	}
+	return diags
+}
+
+func validateProjectRoots(roots []string) []Diagnostic {
+	var diags []Diagnostic
+	seen := map[string]int{}
+	for i, root := range roots {
+		path := fmt.Sprintf("project_roots[%d]", i)
+		if strings.TrimSpace(root) == "" {
+			diags = append(diags, errorDiagnostic(path, "project root must not be empty"))
+			continue
+		}
+		if !filepath.IsAbs(root) {
+			diags = append(diags, errorDiagnostic(path, fmt.Sprintf("project root %q must be an absolute path", root)))
+			continue
+		}
+		cleaned := filepath.Clean(root)
+		if first, ok := seen[cleaned]; ok {
+			diags = append(diags, errorDiagnostic(path, fmt.Sprintf("duplicate project root %q (first defined at project_roots[%d])", root, first)))
+			continue
+		}
+		seen[cleaned] = i
 	}
 	return diags
 }

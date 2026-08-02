@@ -4,6 +4,7 @@ import (
 	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // ---------------------------------------------------------------------------
@@ -26,6 +27,11 @@ type (
 	}
 )
 type dataErrorMsg struct{ err error }
+
+type projectQuickStartsMsg struct {
+	quickStarts []components.QuickStart
+	err         error
+}
 
 // Filter picker data.
 type filterDataMsg struct {

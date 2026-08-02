@@ -320,6 +320,10 @@ type Config struct {
 	// be relaunched together from the TUI.
 	LaunchSets []LaunchSet `json:"launch_sets,omitempty"`
 
+	// ProjectRoots is a list of absolute directories that Dispatch scans for
+	// git repositories to offer as quick-start "New session" rows.
+	ProjectRoots []string `json:"project_roots,omitempty"`
+
 	// ActiveView is the name of the currently active named view.
 	// Empty or "Default" means no named view is active.
 	ActiveView string `json:"active_view,omitempty"`

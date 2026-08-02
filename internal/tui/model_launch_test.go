@@ -10,6 +10,7 @@ import (
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
 )
 
@@ -111,6 +112,33 @@ func TestLaunchMultiple_InPlaceModeForced(t *testing.T) {
 	cmd := m.launchMultiple()
 	if cmd == nil {
 		t.Error("launchMultiple in-place mode should return a non-nil command")
+	}
+}
+
+func TestLaunchWithMode_QuickStartRowUsesRepoRootAndLaunchSettings(t *testing.T) {
+	repoRoot := filepath.Join(t.TempDir(), "repo")
+	m := newTestModelWithSize(120, 30)
+	m.cfg = config.Default()
+	m.cfg.YoloMode = true
+	m.cfg.Agent = "coder"
+	m.cfg.Model = "gpt-5"
+	m.sessionList.SetSessionsWithQuickStarts(nil, []components.QuickStart{{Name: "repo", Path: repoRoot}})
+
+	if id := m.selectedSessionID(); id != "" {
+		t.Fatalf("selectedSessionID = %q, want empty for new session", id)
+	}
+	if cwd := m.selectedSessionCwd(); cwd != repoRoot {
+		t.Fatalf("selectedSessionCwd = %q, want repo root %q", cwd, repoRoot)
+	}
+	cfg := m.resumeConfigForSession(m.selectedSessionCwd())
+	if !cfg.YoloMode || cfg.Agent != "coder" || cfg.Model != "gpt-5" || cfg.Cwd != repoRoot {
+		t.Fatalf("resumeConfigForSession = %#v, want existing launch settings and repo root", cfg)
+	}
+	args := platform.BuildResumeArgs(m.selectedSessionID(), cfg)
+	for _, arg := range args {
+		if arg == "--resume" {
+			t.Fatalf("BuildResumeArgs(%q) included --resume: %v", m.selectedSessionID(), args)
+		}
 	}
 }
 

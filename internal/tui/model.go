@@ -306,9 +306,10 @@ type Model struct {
 	pivot     string // "none", "folder", "repo", "branch", "date", "host"
 
 	// Loaded data.
-	sessions []data.Session
-	groups   []data.SessionGroup
-	detail   *data.SessionDetail
+	sessions    []data.Session
+	groups      []data.SessionGroup
+	quickStarts []components.QuickStart
+	detail      *data.SessionDetail
 
 	// Detected shells and terminals for launch flow.
 	shells    []platform.ShellInfo
@@ -703,6 +704,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case sessionDetailMsg:
 		return m.handleSessionDetail(msg)
+
+	case projectQuickStartsMsg:
+		return m.handleProjectQuickStarts(msg)
 
 	case dataErrorMsg:
 		return m.handleDataError(msg)
@@ -3801,6 +3805,12 @@ func (m *Model) updateSelectionStatus() {
 
 // launchWithMode opens the selected session using the specified launch mode.
 func (m *Model) launchWithMode(mode string) tea.Cmd {
+	if qs, ok := m.sessionList.SelectedQuickStart(); ok {
+		if mode == config.LaunchModeInPlace {
+			return m.launchInPlace("", qs.Path)
+		}
+		return m.resolveShellAndLaunch("", qs.Path, mode)
+	}
 	sess, ok := m.sessionList.Selected()
 	if !ok {
 		return nil
@@ -3965,6 +3975,9 @@ func (m Model) selectedSessionID() string {
 }
 
 func (m Model) selectedSessionCwd() string {
+	if qs, ok := m.sessionList.SelectedQuickStart(); ok {
+		return qs.Path
+	}
 	if sess, ok := m.sessionList.Selected(); ok {
 		return sess.Cwd
 	}
