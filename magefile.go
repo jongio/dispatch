@@ -18,8 +18,9 @@ import (
 const staleBinaryThreshold = 30 * time.Second
 
 // deadcodeAllowlist contains functions reported by deadcode that are not
-// genuinely dead: build-tag stubs, interface implementations, and functions
-// called only from files with non-default build tags.
+// genuinely dead: build-tag stubs, interface implementations, functions
+// called only from files with non-default build tags, and exported helpers
+// that exist to let another package assert a cross-package invariant in tests.
 var deadcodeAllowlist = []string{
 	"filterEnv",                    // Unix-only helper called from launchInPlaceUnix (launch_unix.go)
 	"launchInPlaceUnix",            // build-tag stub (launch_windows.go)
@@ -32,6 +33,7 @@ var deadcodeAllowlist = []string{
 	"keyMap.ShortHelp",             // key.Map interface impl
 	"keyMap.FullHelp",              // key.Map interface impl
 	"CurrentTheme",                 // called from screenshot.go (//go:build screenshots)
+	"DefaultKeybindings",           // exported for internal/tui's config-sync drift tests
 }
 
 const (

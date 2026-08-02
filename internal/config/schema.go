@@ -37,7 +37,8 @@ var KeybindingActions = []string{
 	"pivot", "pivot_order", "preview", "preview_fullscreen", "reindex", "help",
 	"config", "time_range_1", "time_range_2", "time_range_3", "time_range_4",
 	"hide", "toggle_hidden", "star", "launch_window", "launch_tab", "launch_pane",
-	"preview_scroll_up", "preview_scroll_down", "jump_next_attention", "filter_attention",
+	"preview_scroll_up", "preview_scroll_down", "preview_next_match", "preview_prev_match",
+	"open_related", "jump_next_attention", "filter_attention",
 	"launch_all", "select_all", "deselect_all", "conversation_sort", "preview_position",
 	"launch_set_save", "launch_set_list", "launch_set_rename", "launch_set_delete",
 	"resume_interrupted", "view_plan", "copy_id", "copy_path", "copy_resume_command",
@@ -56,7 +57,9 @@ var defaultKeybindings = map[string][]string{
 	"time_range_3": {"3"}, "time_range_4": {"4"}, "hide": {"h"}, "toggle_hidden": {"H"},
 	"star": {"*"}, "launch_window": {"w"}, "launch_tab": {"t"}, "launch_pane": {"e"},
 	"preview_scroll_up": {"pgup"}, "preview_scroll_down": {"pgdown"}, "jump_next_attention": {"n"}, "filter_attention": {"!"},
-	"launch_all": {"L"}, "select_all": {"a"}, "deselect_all": {"d"}, "conversation_sort": {"o"},
+	"preview_next_match": {"ctrl+n"}, "preview_prev_match": {"ctrl+p"},
+	"open_related": {"alt+1", "alt+2", "alt+3", "alt+4", "alt+5"},
+	"launch_all":   {"L"}, "select_all": {"a"}, "deselect_all": {"d"}, "conversation_sort": {"o"},
 	"launch_set_save": {"ctrl+s"}, "launch_set_list": {"ctrl+l"}, "launch_set_rename": {"ctrl+r"}, "launch_set_delete": {"ctrl+d"},
 	"preview_position": {"P"}, "resume_interrupted": {"N"}, "view_plan": {"v"}, "copy_id": {"c"},
 	"copy_path": {"C"}, "copy_resume_command": {"Y"}, "copy_preview": {"y"}, "expand_collapse_all": {"x"},
@@ -67,6 +70,18 @@ var defaultKeybindings = map[string][]string{
 }
 
 var keyNamePattern = regexp.MustCompile(`^[^\s,]+$`)
+
+// DefaultKeybindings returns a copy of the default action-to-keys mapping.
+// It exists so packages that cannot be imported here (notably internal/tui,
+// which already depends on this package) can assert that this mirror stays in
+// sync with the real key map.
+func DefaultKeybindings() map[string][]string {
+	out := make(map[string][]string, len(defaultKeybindings))
+	for action, keys := range defaultKeybindings {
+		out[action] = append([]string(nil), keys...)
+	}
+	return out
+}
 
 // ValidateFile loads, migrates, sanitizes, and validates a config file.
 func ValidateFile(path string) (ValidationResult, error) {
@@ -212,7 +227,10 @@ func JSONSchema() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	obj := schema.(map[string]any)
+	obj, ok := schema.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("config schema: unexpected root schema type %T", schema)
+	}
 	obj["$schema"] = "https://json-schema.org/draft/2020-12/schema"
 	obj["$id"] = "https://raw.githubusercontent.com/jongio/dispatch/main/docs/config.schema.json"
 	obj["title"] = "Dispatch config.json"
@@ -417,7 +435,10 @@ func schemaForField(name string, typ reflect.Type) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	base := baseAny.(map[string]any)
+	base, ok := baseAny.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("config schema: unexpected schema type %T for field %q", baseAny, name)
+	}
 	switch name {
 	case "default_time_range", "time_range":
 		base["enum"] = []string{TimeRange1h, TimeRange1d, TimeRange7d, TimeRangeAll}

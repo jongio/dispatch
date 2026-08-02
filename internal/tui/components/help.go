@@ -24,11 +24,6 @@ type HelpOverlay struct {
 	short  []key.Binding
 }
 
-// NewHelpOverlay returns a ready-to-use HelpOverlay.
-func NewHelpOverlay() HelpOverlay {
-	return HelpOverlay{}
-}
-
 // NewHelpOverlayWithBindings returns a HelpOverlay backed by effective key bindings.
 func NewHelpOverlayWithBindings(groups []HelpGroup, short []key.Binding) HelpOverlay {
 	return HelpOverlay{groups: groups, short: short}

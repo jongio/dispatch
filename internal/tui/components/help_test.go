@@ -57,12 +57,12 @@ func testHelpOverlay() HelpOverlay {
 }
 
 // ---------------------------------------------------------------------------
-// NewHelpOverlay
+// NewHelpOverlayWithBindings
 // ---------------------------------------------------------------------------
 
 func TestNewHelpOverlay_Defaults(t *testing.T) {
 	t.Parallel()
-	h := NewHelpOverlay()
+	h := NewHelpOverlayWithBindings(nil, nil)
 	if h.width != 0 || h.height != 0 {
 		t.Error("new HelpOverlay should have zero dimensions")
 	}

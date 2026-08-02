@@ -782,9 +782,9 @@ func visibleRuneByteBounds(s string) [][2]int {
 			i = skipANSISequence(s, i)
 			continue
 		}
-		r, size := rune(s[i]), 1
-		if r >= 0x80 {
-			r, size = utf8.DecodeRuneInString(s[i:])
+		size := 1
+		if s[i] >= 0x80 {
+			_, size = utf8.DecodeRuneInString(s[i:])
 		}
 		bounds = append(bounds, [2]int{i, i + size})
 		i += size

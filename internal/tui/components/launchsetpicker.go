@@ -169,7 +169,7 @@ func (p LaunchSetPicker) View() string {
 		body.WriteString("\n\n" + styles.DimmedStyle.Render("Enter to rename · Esc to cancel"))
 	case launchSetModeDelete:
 		if set, ok := p.Selected(); ok {
-			body.WriteString(fmt.Sprintf("Delete %q?\n\n", set.Name))
+			fmt.Fprintf(&body, "Delete %q?\n\n", set.Name)
 			body.WriteString(styles.DimmedStyle.Render("Enter to delete · Esc to cancel"))
 		}
 	default:

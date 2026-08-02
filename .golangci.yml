@@ -92,6 +92,11 @@ linters:
       - path: internal/data/
         linters:
           - goconst
+      # Config schema/validator mirrors keybinding action names and default
+      # key strings as inline tables; extracting constants hurts readability.
+      - path: internal/config/schema\.go
+        linters:
+          - goconst
       # Copilot client uses inline model names.
       - path: internal/copilot/
         linters:
