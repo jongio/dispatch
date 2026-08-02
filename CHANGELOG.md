@@ -8,9 +8,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+#### TUI
+- **Related sessions in the preview pane** — the preview now lists sessions related to the selected one, ranked by shared refs, then repository and branch, then working directory. Press the shown number key to jump straight to a related session. (#183)
+- **Project quick-start rows** — repositories discovered on disk that have no recorded sessions now appear in the list, so you can start a session in a project directly from Dispatch instead of leaving to run `dispatch new`. (#178)
+- **Named launch sets** — save a group of sessions under a name and relaunch the whole set at once. Missing members are reported rather than silently skipped. (#179)
+- **Search match highlighting in the preview pane** — matches for the active search are highlighted inline in the preview, so you can see why a session matched. (#181)
+- **Help rendered from effective keybindings** — the help overlay is now generated from your configured keybindings instead of a hardcoded list, so remapped keys show their real values. (#260)
+- **Live activity watcher, `dispatch new`, and resume rename** — sessions update live as activity is pushed, plus a `new` command and a renamed resume flow. (#359)
+
+#### CLI
 - **`dispatch path`** — print only a session's working directory so you can `cd "$(dispatch path <id>)"`. Resolves the session by full ID, alias, short ID prefix, `--last`, or `--current` the same way `dispatch open` does. Errors if the session has no recorded directory or the directory no longer exists.
 - **`dispatch alias`**: set, reassign, clear (`--clear`), or remove (`--remove`) a session alias from the command line, completing the CLI parity that `tag` and `notes` already have. Supports `--json`.
 - **`dispatch watch --exec <cmd>`**: run a command on each session attention transition while streaming. Session context is passed through `DISPATCH_SESSION_ID`, `DISPATCH_SESSION_STATE`, `DISPATCH_SESSION_PREV_STATE`, `DISPATCH_SESSION_REPO`, `DISPATCH_SESSION_BRANCH`, `DISPATCH_SESSION_FOLDER`, and `DISPATCH_SESSION_SUMMARY` environment variables. Hook output goes to stderr and a failing hook never stops the watch loop.
+- **`dispatch config validate` and `dispatch config schema`** — check a config file against the JSON Schema and print the schema itself. (#259)
+- **`dispatch config export` / `import`** — move your configuration between machines. (#363)
+- **`dispatch aliases` list output** — print every session alias in a readable list. (#382)
+- **`dispatch tags --csv` and `--markdown`** — machine- and doc-friendly tag output. (#374, #380)
+- **`dispatch views --csv`** — CSV output for named views. (#381)
+- **`dispatch stats` folder breakdown** — sessions grouped by working directory alongside the existing repository and branch breakdowns. (#375)
+- **`dispatch doctor` workspace reporting** — doctor now flags sessions whose recorded workspace no longer exists. (#362)
+
+### Fixed
+
+- **Session repository detection** — Dispatch now prefers the live git origin of a session's working directory over the repository recorded at session creation, so renamed or re-pointed remotes display correctly. (#350)
+- **Keybinding config mirror drift** — `new_session` and `focus_window` were present in the key map but missing from the config schema and help groups, so they could not be remapped and were absent from help.
+- **`default_sort = frecency` rejected by the CLI** — `dispatch config set default_sort frecency` failed validation even though the value is accepted everywhere else.
+- **Silent ID truncation in session lookups** — looking up sessions or session refs by ID silently dropped everything past the first 500 IDs. Both lookups now run in batches, so large launch sets and related-session ranking are correct at any size.
+- **Unquoted `{cwd}` in the new-session command** — the working directory is now shell-quoted before substitution, so directories containing shell metacharacters can no longer inject commands.
+
+### Changed
+
+- **Screenshot workflow** — one command now regenerates screenshots across platforms. (#261)
 
 ## [v0.14.0] — 2026-07-18
 

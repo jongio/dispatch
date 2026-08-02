@@ -55,3 +55,6 @@ cmd/screenshots/package-lock.json
 dispatch_debug.log
 dispatch_test.log
 /dispatch
+
+# Playwright MCP capture artifacts
+.playwright-mcp/

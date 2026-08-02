@@ -525,6 +525,8 @@ The page targets section 1 (user commands) and mirrors the built-in usage: comma
 | `w` | Launch in new window |
 | `t` | Launch in new tab |
 | `e` | Launch in split pane (Windows Terminal, or tmux inside a tmux session) |
+| `+` | Start a new session in the selected directory |
+| `W` | Focus the terminal window of a running session |
 
 #### Multi-Select
 
@@ -600,7 +602,7 @@ Dates accept `YYYY-MM-DD` or full RFC3339 timestamps (e.g. `after:2024-01-15` or
 | `Y` | Copy resume command to clipboard |
 | `PgUp` / `PgDn` | Scroll preview |
 | `Ctrl+N` / `Ctrl+P` | Jump to next / previous preview search match |
-| `r` | Refresh session store |
+| `r` | Rebuild the session index |
 | `,` | Open settings panel |
 
 #### Session Actions
@@ -855,7 +857,8 @@ Available action names:
 `copy_id`, `copy_path`, `copy_resume_command`, `copy_preview`,
 `expand_collapse_all`, `scan_work_status`, `export`, `note`, `tags`, `alias`,
 `shift_up`, `shift_down`, `view_switch`, `open_file`, `open_dir`, `open_ref`,
-`timeline`, `compare`, `git_status`, `cmd_palette`.
+`timeline`, `compare`, `git_status`, `cmd_palette`, `new_session`,
+`focus_window`.
 
 ## Themes
 

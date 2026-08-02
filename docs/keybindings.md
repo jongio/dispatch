@@ -1,4 +1,4 @@
-# COMPREHENSIVE KEYBOARD AND MOUSE BINDING DOCUMENTATION
+# Keyboard and mouse bindings
 # Dispatch TUI (Bubble Tea v2 Go Application)
 # Directory: internal\tui
 
@@ -93,6 +93,20 @@
    - Handler: internal\tui\model.go
    - Behavior: Forces launch in a split pane of the current tab (Windows Terminal only)
    - Condition: Only when a session (not folder) is selected
+
+9a. **+** → Start a New Session
+   - File: internal\tui\keys.go
+   - Code: key.NewBinding(key.WithKeys("+"))
+   - Handler: internal\tui\handlers_eventwatcher.go (handleNewSessionKey)
+   - Behavior: Launches a brand new Copilot CLI session in the selected session's working directory, or in the selected project quick-start directory
+   - Condition: Only in session list view, when the search bar is not focused
+
+9b. **W** → Focus Session Window
+   - File: internal\tui\keys.go
+   - Code: key.NewBinding(key.WithKeys("W"))
+   - Handler: internal\tui\handlers_eventwatcher.go (handleFocusWindowKey)
+   - Behavior: Brings the terminal window of the selected running session to the foreground
+   - Condition: Only when the selected session has a live process
 
 ### Multi-Select Keys
 10. **Space** → Toggle Selection on Current Session
