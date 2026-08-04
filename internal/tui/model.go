@@ -538,7 +538,8 @@ func NewModel() Model {
 	// Honour the configured auto-refresh interval. When disabled (0), the
 	// watcher is never activated so no polling happens; the list still
 	// refreshes on explicit reload and after reindex.
-	if interval, enabled := cfg.EffectiveAutoRefreshInterval(); enabled {
+	screenshotMode := os.Getenv("DISPATCH_SCREENSHOT_MODE") == "1"
+	if interval, enabled := cfg.EffectiveAutoRefreshInterval(); enabled && !screenshotMode {
 		m.dbWatcher.SetInterval(interval)
 		m.dbWatcher.SetActive(true)
 	}
@@ -551,8 +552,10 @@ func NewModel() Model {
 		default:
 		}
 	}, cfg.EffectiveAttentionThreshold(), cfg.WorkspaceRecovery)
-	if err := m.eventWatcher.Start(); err != nil {
-		slog.Debug("eventwatcher: failed to start", "error", err)
+	if !screenshotMode {
+		if err := m.eventWatcher.Start(); err != nil {
+			slog.Debug("eventwatcher: failed to start", "error", err)
+		}
 	}
 
 	m.filter.Since = timeRangeToSince(m.timeRange)

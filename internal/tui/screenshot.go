@@ -698,6 +698,16 @@ var allThemes = []themeEntry{
 // CaptureScreenshots drives the TUI model through every visual state
 // used on the website and returns the rendered ANSI output for each.
 func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) {
+	prevScreenshotMode, hadScreenshotMode := os.LookupEnv("DISPATCH_SCREENSHOT_MODE")
+	os.Setenv("DISPATCH_SCREENSHOT_MODE", "1")
+	defer func() {
+		if hadScreenshotMode {
+			os.Setenv("DISPATCH_SCREENSHOT_MODE", prevScreenshotMode)
+		} else {
+			os.Unsetenv("DISPATCH_SCREENSHOT_MODE")
+		}
+	}()
+
 	// Enable NerdFont icons so the title bar shows the terminal glyph
 	// instead of the ⚡ fallback.
 	styles.SetNerdFontEnabled(true)
@@ -843,6 +853,14 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 // rendering. It bypasses config loading and the bubbletea runtime.
 func newScreenshotModel(width, height int) *Model {
 	m := NewModel()
+	if m.dbWatcher != nil {
+		m.dbWatcher.Stop()
+		m.dbWatcher = nil
+	}
+	if m.eventWatcher != nil {
+		m.eventWatcher.Stop()
+		m.eventWatcher = nil
+	}
 	m.state = stateSessionList
 	m.reindexing = false
 	m.width = width
