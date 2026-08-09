@@ -12,7 +12,7 @@
     "screenshots:check": "node -e \"require('node:fs').rmSync('.screenshots-check',{recursive:true,force:true})\" && go run -tags screenshots ../cmd/screenshots --check --out .screenshots-check && node -e \"require('node:fs').rmSync('.screenshots-check',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "astro": "^7.1.6",
+    "astro": "^7.2.0",
     "marked": "^18.0.9"
   },
   "devDependencies": {
