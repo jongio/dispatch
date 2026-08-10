@@ -156,27 +156,6 @@ func BenchmarkSetHiddenSessions(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// SetAISessions benchmark
-// ---------------------------------------------------------------------------
-
-func BenchmarkSetAISessions(b *testing.B) {
-	sessions := makeSessions(200)
-	sl := NewSessionList()
-	sl.SetSessions(sessions)
-
-	aiSet := make(map[string]struct{}, 50)
-	for i := 0; i < len(sessions); i += 4 {
-		aiSet[sessions[i].ID] = struct{}{}
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		sl.SetAISessions(aiSet)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Folder toggle benchmark
 // ---------------------------------------------------------------------------
 
@@ -236,34 +215,6 @@ func BenchmarkSessionCount(b *testing.B) {
 				sl.SessionCount()
 			}
 		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Benchmark grouping with AI sessions marked
-// ---------------------------------------------------------------------------
-
-func BenchmarkViewGroupedWithAI(b *testing.B) {
-	groups := makeGroups(10, 20)
-	sl := NewSessionList()
-	sl.SetGroups(groups)
-	sl.SetSize(120, 40)
-
-	// Mark every third session as AI.
-	aiSet := make(map[string]struct{})
-	for _, g := range groups {
-		for i, sess := range g.Sessions {
-			if i%3 == 0 {
-				aiSet[sess.ID] = struct{}{}
-			}
-		}
-	}
-	sl.SetAISessions(aiSet)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		sl.View()
 	}
 }
 

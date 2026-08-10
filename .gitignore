@@ -22,7 +22,6 @@ coverage_full.txt
 zero_coverage.txt
 test_output.txt
 mq_coverage
-copilot_cov
 
 # ── OS generated ────────────────────────────────────────────
 .DS_Store

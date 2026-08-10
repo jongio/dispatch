@@ -362,6 +362,9 @@ func unknownFieldDiagnostics(value any, typ reflect.Type, path string) []Diagnos
 		fields := jsonFields(typ)
 		var diags []Diagnostic
 		for key, child := range obj {
+			if path == "$" && key == LegacyRemovedSearchKey {
+				continue
+			}
 			field, ok := fields[key]
 			childPath := joinPath(path, key)
 			if !ok {

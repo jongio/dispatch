@@ -45,11 +45,8 @@ func main() {
 		return
 	}
 
-	// Redirect stderr BEFORE starting Bubble Tea.  The Copilot SDK
-	// subprocess inherits our fd 2 (stderr) and writes error text like
-	// "file already closed" to it.  That raw output leaks into Bubble
-	// Tea's alt-screen buffer.  By redirecting fd 2 here we ensure the
-	// subprocess's stderr goes to the log file (if set) or /dev/null.
+	// Redirect stderr before starting Bubble Tea so child-process output
+	// cannot leak into the alternate-screen buffer.
 	logWriter, logCleanup := setupLogRedirect()
 	defer logCleanup()
 

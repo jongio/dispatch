@@ -229,21 +229,6 @@ func TestCompleteWorkStatusScan_NilCmdWhenNotScanning(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// scanWorkStatusAICmd
-// ---------------------------------------------------------------------------
-
-func TestScanWorkStatusAICmd_NilWithoutCopilotClient(t *testing.T) {
-	t.Parallel()
-	m := newWorkStatusTestModel([]string{"s1"})
-	m.workStatus.workStatusMap["s1"] = data.WorkStatusResult{Status: data.WorkStatusIncomplete}
-	// copilotClient is nil and store is nil, so it should return nil.
-	cmd := m.scanWorkStatusAICmd()
-	if cmd != nil {
-		t.Error("expected nil Cmd when copilotClient and store are both nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // writeContinuationPlansCmd
 // ---------------------------------------------------------------------------
 

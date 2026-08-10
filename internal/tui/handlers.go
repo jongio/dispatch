@@ -14,7 +14,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jongio/dispatch/internal/config"
-	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
@@ -657,7 +656,7 @@ func (m Model) handlePlansScanned(msg plansScannedMsg) (Model, tea.Cmd) {
 	}
 	// Chain: after plans are known, do a quick work status classification
 	// — but only when a work-status scan has been explicitly requested
-	// (W key or reindex completion).
+	// with the R key.
 	if m.workStatus.workStatusScanning {
 		cmds = append(cmds, m.scanWorkStatusQuickCmd())
 	}
@@ -712,15 +711,7 @@ func (m Model) handleWorkStatusScanned(msg workStatusScannedMsg) (Model, tea.Cmd
 			m.preview.SetWorkStatus(result)
 		}
 	}
-	// Chain to optional AI-enhanced analysis for sessions with
-	// incomplete work. If the Copilot SDK is unavailable the command
-	// returns nil and the chain stops here.
-	aiCmd := m.scanWorkStatusAICmd()
-	if aiCmd != nil {
-		return m, aiCmd
-	}
-	// AI unavailable — write continuation plans from non-AI remaining
-	// items (parsed from unchecked plan.md checkboxes).
+	// Write continuation plans from remaining items parsed from plan.md.
 	var sessionsWithRemaining []string
 	for id, result := range m.workStatus.workStatusMap {
 		if len(result.RemainingItems) > 0 {
@@ -732,69 +723,6 @@ func (m Model) handleWorkStatusScanned(msg workStatusScannedMsg) (Model, tea.Cmd
 			return m, contCmd
 		}
 	}
-	return m, m.completeWorkStatusScan()
-}
-
-func (m Model) handleWorkStatusAIScanned(msg workStatusAIScannedMsg) (Model, tea.Cmd) {
-	// Merge AI analysis results into the work status map. The AI may
-	// provide richer detail, updated task counts, and remaining items.
-	var sessionsWithRemaining []string
-	for id, analysis := range msg.analyses {
-		if analysis == nil {
-			continue
-		}
-		existing, ok := m.workStatus.workStatusMap[id]
-		if !ok {
-			continue
-		}
-		// Update detail with AI summary if provided.
-		if analysis.Summary != "" {
-			existing.Detail = analysis.Summary
-		}
-		// Trust AI task counts when they differ from local parse.
-		if analysis.TotalTasks > 0 {
-			existing.TotalTasks = analysis.TotalTasks
-			existing.DoneTasks = analysis.CompletedTasks
-		}
-		// Overwrite status if the AI determined completion.
-		if analysis.Complete && existing.Status == data.WorkStatusIncomplete {
-			existing.Status = data.WorkStatusComplete
-		}
-		existing.RemainingItems = analysis.RemainingItems
-		m.workStatus.workStatusMap[id] = existing
-
-		// Only queue continuation plan writes for sessions that remain
-		// incomplete after AI analysis — don't write "remaining work"
-		// into plans the AI classified as complete.
-		if existing.Status == data.WorkStatusIncomplete && len(analysis.RemainingItems) > 0 {
-			sessionsWithRemaining = append(sessionsWithRemaining, id)
-		}
-	}
-	// Also include sessions that were incomplete with local remaining
-	// items but weren't in the AI results (AI failure/timeout/skipped).
-	// This ensures continuation plans are written even when AI is partial.
-	for id, result := range m.workStatus.workStatusMap {
-		if _, hadAI := msg.analyses[id]; hadAI {
-			continue // already handled above
-		}
-		if result.Status == data.WorkStatusIncomplete && len(result.RemainingItems) > 0 {
-			sessionsWithRemaining = append(sessionsWithRemaining, id)
-		}
-	}
-	m.syncSessionListWorkStatuses()
-	if sel, ok := m.sessionList.Selected(); ok {
-		if result, exists := m.workStatus.workStatusMap[sel.ID]; exists {
-			m.preview.SetWorkStatus(result)
-		}
-	}
-	// Chain: write continuation plans for sessions with remaining items.
-	if len(sessionsWithRemaining) > 0 {
-		contCmd := m.writeContinuationPlansCmd(sessionsWithRemaining)
-		if contCmd != nil {
-			return m, contCmd
-		}
-	}
-	// Chain ends here — no continuation plans to write.
 	return m, m.completeWorkStatusScan()
 }
 
@@ -874,111 +802,6 @@ func (m Model) handleDeepSearchResult(msg deepSearchResultMsg) (Model, tea.Cmd) 
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 	m.detailVersion++
 	return m, m.loadSelectedDetailCmd()
-}
-
-// ----- Copilot SDK search --------------------------------------------------
-
-func (m Model) handleCopilotReady() (Model, tea.Cmd) {
-	// Client is ready — no UI action needed; search will use it.
-	return m, nil
-}
-
-func (m Model) handleCopilotError() (Model, tea.Cmd) {
-	// SDK init/search error — silently ignore, search degrades gracefully.
-	return m, nil
-}
-
-func (m Model) handleCopilotSearchTick(msg copilotSearchTickMsg) (Model, tea.Cmd) {
-	if msg.version != m.search.copilotSearchVersion || m.filter.Query == "" {
-		return m, nil // stale tick — query changed since scheduling
-	}
-	// If copilot client needs lazy init, do it here on the main goroutine
-	// then kick off search.
-	if m.copilotClient == nil && m.store != nil {
-		m.copilotClient = copilot.New(m.store)
-	}
-	// Cancel any in-flight search so it releases the searchMu quickly
-	// and doesn't block this new search for up to 45 seconds.
-	if m.search.copilotSearchCancel != nil {
-		m.search.copilotSearchCancel()
-		m.search.copilotSearchCancel = nil
-	}
-	m.search.copilotSearching = true
-	m.searchBar.SetAISearching(true)
-	// Show "connecting" if SDK hasn't been initialised yet.
-	if m.copilotClient != nil && !m.copilotClient.Available() {
-		m.searchBar.SetAIStatus("connecting")
-	}
-	cmd := m.copilotSearchCmd(msg.version)
-	return m, cmd
-}
-
-func (m Model) handleCopilotSearchResult(msg copilotSearchResultMsg) (Model, tea.Cmd) {
-	if msg.version != m.search.copilotSearchVersion {
-		// Stale result — a newer search is in flight. Don't update
-		// status here; the newer search will set it when it completes.
-		return m, nil
-	}
-	m.search.copilotSearching = false
-	m.searchBar.SetAISearching(false)
-	if msg.err != nil {
-		// AI search is best-effort — show a brief "(✦ unavailable)"
-		// indicator but never block or alarm the user.
-		m.searchBar.SetAIStatus("unavailable")
-		m.searchBar.SetAIResults(0)
-		m.searchBar.SetAIError("")
-		slog.Debug("copilot search failed", "error", msg.err)
-		return m, nil
-	}
-	m.searchBar.SetAIStatus("ready")
-	m.searchBar.SetAIResults(len(msg.sessionIDs))
-	if len(msg.sessionIDs) == 0 {
-		return m, nil
-	}
-	// Store AI session IDs.
-	m.search.aiSessionIDs = make(map[string]struct{}, len(msg.sessionIDs))
-	for _, id := range msg.sessionIDs {
-		m.search.aiSessionIDs[id] = struct{}{}
-	}
-	m.sessionList.SetAISessions(m.search.aiSessionIDs)
-	// Find IDs not already in the current session list and fetch them.
-	missingIDs := m.findMissingAISessionIDs(msg.sessionIDs)
-	if len(missingIDs) > 0 {
-		return m, m.fetchAISessionsCmd(missingIDs, msg.version)
-	}
-	return m, nil
-}
-
-func (m Model) handleAISessionsLoaded(msg aiSessionsLoadedMsg) (Model, tea.Cmd) { //nolint:unparam
-	if msg.version != m.search.copilotSearchVersion {
-		return m, nil // stale
-	}
-	if len(msg.sessions) == 0 {
-		return m, nil
-	}
-	// Apply full filter chain before merging (matches sessionsLoadedMsg).
-	incoming := m.applySessionFilters(msg.sessions)
-	if len(incoming) == 0 {
-		return m, nil
-	}
-	// Only merge into flat session mode — skip if in groups/pivot mode.
-	if m.sessions != nil {
-		existing := make(map[string]struct{}, len(m.sessions))
-		for _, s := range m.sessions {
-			existing[s.ID] = struct{}{}
-		}
-		for _, s := range incoming {
-			if _, ok := existing[s.ID]; !ok {
-				m.sessions = append(m.sessions, s)
-			}
-		}
-		m.sortByAttention(m.sessions)
-		m.sortByFrecency(m.sessions)
-		m.syncSessionListStatuses()
-		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
-		m.searchBar.SetResultCount(m.sessionList.SessionCount())
-	}
-	return m, nil
 }
 
 // ----- Filter picker data --------------------------------------------------

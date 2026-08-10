@@ -1674,6 +1674,18 @@ func TestValidateFile_ValidConfig(t *testing.T) {
 	}
 }
 
+func TestValidateFile_IgnoresRemovedSearchOption(t *testing.T) {
+	t.Parallel()
+	path := writeConfigValidationFixture(t, `{"default_sort":"updated","ai_search":true}`)
+	result, err := ValidateFile(path)
+	if err != nil {
+		t.Fatalf("ValidateFile: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("Valid = false, diagnostics: %#v", result.Diagnostics)
+	}
+}
+
 func TestValidateFile_MalformedConfig(t *testing.T) {
 	t.Parallel()
 	path := writeConfigValidationFixture(t, `{"default_sort":`)

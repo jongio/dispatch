@@ -356,12 +356,10 @@ import Carousel from '../components/Carousel.astro';
           <h2>Work Status Detection</h2>
           <p>
             Dispatch analyzes <code>plan.md</code> files to identify sessions with
-            incomplete planned work. A three-pass scan chain runs automatically:
-            quick plan parsing detects unchecked checkboxes, a full pass extracts
-            task counts, and an optional AI pass uses the Copilot SDK
-            <code>analyze_completion</code> tool for deeper analysis. Sessions display
-            colored dot indicators in the session list so you can spot unfinished
-            work at a glance.
+            incomplete planned work. A deterministic local scan first classifies
+            plan presence, then parses task counts, completed checkboxes, and
+            remaining items. Sessions display colored dot indicators in the
+            session list so you can spot unfinished work at a glance.
           </p>
           <h3>Status Indicators</h3>
           <ul>
@@ -371,16 +369,14 @@ import Carousel from '../components/Carousel.astro';
           </ul>
           <h3>Scan Chain</h3>
           <ul>
-            <li><strong>Quick scan</strong> — parses plan.md for unchecked checkboxes and pending items</li>
-            <li><strong>Full scan</strong> — counts total/done tasks and extracts remaining items</li>
-            <li><strong>AI scan</strong> — Copilot SDK <code>analyze_completion</code> for nuanced completion analysis (requires API access)</li>
+            <li><strong>Quick scan</strong> — classifies sessions by plan presence without reading plan content</li>
+            <li><strong>Full scan</strong> — parses plan.md, counts total and completed tasks, and extracts remaining items</li>
           </ul>
           <h3>Features</h3>
           <ul>
             <li>Work status displayed in preview panel metadata (Work: ✓ Complete / ! Incomplete)</li>
             <li>Filter by work status via the <kbd>!</kbd> status picker (incomplete, complete)</li>
             <li>Press <kbd>R</kbd> to scan work status across all sessions with plans</li>
-            <li>Scans also run automatically on reindex and periodic attention ticks</li>
             <li><strong>Continuation plans</strong> — sessions with remaining items get a "Remaining Work" section auto-appended to their plan.md</li>
           </ul>
         </div>

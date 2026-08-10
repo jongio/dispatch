@@ -189,7 +189,7 @@ type WorkStatusResult struct {
 	TotalTasks     int      // total tasks found in plan
 	DoneTasks      int      // tasks marked as complete
 	Detail         string   // human-readable summary (e.g., "3/7 tasks complete")
-	RemainingItems []string // outstanding items from plan parsing or AI analysis (may be nil)
+	RemainingItems []string // outstanding items from plan parsing (may be nil)
 	Error          error    // non-nil when Status == WorkStatusError
 }
 

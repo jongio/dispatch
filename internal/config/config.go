@@ -1,4 +1,4 @@
-// Package config manages user preferences for copilot-dispatch.
+// Package config manages user preferences for dispatch.
 //
 // Configuration is stored as a JSON file inside the platform-specific
 // config directory. When the file does not exist, sensible defaults are
@@ -32,6 +32,10 @@ const (
 	// config files. Increment this when making breaking schema changes and
 	// add a corresponding migration case in [migrate].
 	currentConfigVersion = 2
+
+	// LegacyRemovedSearchKey is accepted only by validation and import
+	// compatibility paths for the release that removed runtime SDK search.
+	LegacyRemovedSearchKey = "ai_search"
 )
 
 // NamedView holds a saved combination of list state filters that can be
@@ -254,11 +258,6 @@ type Config struct {
 	// (the default), every column is shown. The session name and attention
 	// indicator are always visible and cannot be hidden.
 	HiddenColumns []string `json:"hidden_columns,omitempty"`
-
-	// AISearch enables Copilot SDK-powered AI search. When false (the
-	// default), only the local FTS5 index is used.  Set to true to also
-	// query the Copilot backend for semantically relevant sessions.
-	AISearch bool `json:"ai_search,omitempty"`
 
 	// AttentionThreshold is the duration string (e.g. "15m", "1h") after
 	// which a running session with no activity is classified as "stale"

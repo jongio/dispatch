@@ -459,17 +459,6 @@ func TestSessionList_SetFavoritedSessions_WithGroupView(t *testing.T) {
 // SessionList — additional 0% coverage functions
 // ---------------------------------------------------------------------------
 
-func TestSessionList_SetAISessions(t *testing.T) {
-	t.Parallel()
-	s := NewSessionList()
-	aiSet := map[string]struct{}{"s1": {}, "s2": {}}
-	s.SetAISessions(aiSet)
-
-	if len(s.aiSet) != 2 {
-		t.Errorf("SetAISessions should store the set, got len=%d", len(s.aiSet))
-	}
-}
-
 func TestSessionList_SetPlanStatuses(t *testing.T) {
 	t.Parallel()
 	s := NewSessionList()

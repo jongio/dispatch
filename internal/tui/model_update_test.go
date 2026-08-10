@@ -530,207 +530,6 @@ func TestUpdate_DeepSearchResultMsg_Groups(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Update: copilotReadyMsg / copilotErrorMsg
-// ---------------------------------------------------------------------------
-
-func TestUpdate_CopilotReadyMsg(t *testing.T) {
-	m := newTestModel()
-	result, cmd := m.Update(copilotReadyMsg{})
-	_ = result.(Model)
-	if cmd != nil {
-		t.Error("copilotReadyMsg should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotErrorMsg(t *testing.T) {
-	m := newTestModel()
-	result, cmd := m.Update(copilotErrorMsg{err: errors.New("fail")})
-	_ = result.(Model)
-	if cmd != nil {
-		t.Error("copilotErrorMsg should return nil cmd")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Update: copilotSearchTickMsg
-// ---------------------------------------------------------------------------
-
-func TestUpdate_CopilotSearchTickMsg_Stale(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.filter.Query = "test"
-	result, cmd := m.Update(copilotSearchTickMsg{version: 3})
-	_ = result.(Model)
-	if cmd != nil {
-		t.Error("stale copilotSearchTickMsg should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotSearchTickMsg_EmptyQuery(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.filter.Query = ""
-	result, cmd := m.Update(copilotSearchTickMsg{version: 5})
-	_ = result.(Model)
-	if cmd != nil {
-		t.Error("copilotSearchTickMsg with empty query should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotSearchTickMsg_Current(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.filter.Query = "test"
-	m.copilotClient = nil
-	m.store = nil
-	result, cmd := m.Update(copilotSearchTickMsg{version: 5})
-	rm := result.(Model)
-	if !rm.search.copilotSearching {
-		t.Error("copilotSearching should be true")
-	}
-	if cmd == nil {
-		t.Error("copilotSearchTickMsg should return non-nil cmd")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Update: copilotSearchResultMsg
-// ---------------------------------------------------------------------------
-
-func TestUpdate_CopilotSearchResultMsg_Stale(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.search.copilotSearching = true
-	result, cmd := m.Update(copilotSearchResultMsg{version: 3})
-	rm := result.(Model)
-	if !rm.search.copilotSearching {
-		t.Error("stale result should not clear copilotSearching")
-	}
-	if cmd != nil {
-		t.Error("stale copilotSearchResultMsg should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotSearchResultMsg_Error(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.search.copilotSearching = true
-	result, cmd := m.Update(copilotSearchResultMsg{version: 5, err: errors.New("fail")})
-	rm := result.(Model)
-	if rm.search.copilotSearching {
-		t.Error("copilotSearching should be false")
-	}
-	if cmd != nil {
-		t.Error("copilotSearchResultMsg with error should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotSearchResultMsg_Empty(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.search.copilotSearching = true
-	result, cmd := m.Update(copilotSearchResultMsg{version: 5, sessionIDs: nil})
-	rm := result.(Model)
-	if rm.search.copilotSearching {
-		t.Error("copilotSearching should be false")
-	}
-	if cmd != nil {
-		t.Error("copilotSearchResultMsg with empty results should return nil cmd")
-	}
-}
-
-func TestUpdate_CopilotSearchResultMsg_WithIDs(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.search.copilotSearching = true
-	m.sessions = []data.Session{{ID: "existing"}}
-	result, _ := m.Update(copilotSearchResultMsg{
-		version:    5,
-		sessionIDs: []string{"existing", "new1"},
-	})
-	rm := result.(Model)
-	if rm.search.copilotSearching {
-		t.Error("copilotSearching should be false")
-	}
-	if rm.search.aiSessionIDs == nil {
-		t.Error("aiSessionIDs should be populated")
-	}
-	_, hasExisting := rm.search.aiSessionIDs["existing"]
-	_, hasNew1 := rm.search.aiSessionIDs["new1"]
-	if !hasExisting || !hasNew1 {
-		t.Error("aiSessionIDs should contain all IDs")
-	}
-}
-
-func TestUpdate_CopilotSearchResultMsg_AllExisting(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.search.copilotSearching = true
-	m.sessions = []data.Session{{ID: "a"}, {ID: "b"}}
-	result, cmd := m.Update(copilotSearchResultMsg{
-		version:    5,
-		sessionIDs: []string{"a", "b"},
-	})
-	rm := result.(Model)
-	if rm.search.aiSessionIDs == nil {
-		t.Error("aiSessionIDs should be set")
-	}
-	// All IDs already exist, so no fetch cmd needed.
-	if cmd != nil {
-		t.Error("should return nil cmd when all IDs already exist")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Update: aiSessionsLoadedMsg
-// ---------------------------------------------------------------------------
-
-func TestUpdate_AISessionsLoadedMsg_Stale(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.sessions = []data.Session{{ID: "a"}}
-	result, cmd := m.Update(aiSessionsLoadedMsg{version: 3, sessions: []data.Session{{ID: "x"}}})
-	rm := result.(Model)
-	if len(rm.sessions) != 1 {
-		t.Error("stale aiSessionsLoadedMsg should not modify sessions")
-	}
-	if cmd != nil {
-		t.Error("stale msg should return nil cmd")
-	}
-}
-
-func TestUpdate_AISessionsLoadedMsg_Empty(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.sessions = []data.Session{{ID: "a"}}
-	result, cmd := m.Update(aiSessionsLoadedMsg{version: 5, sessions: nil})
-	rm := result.(Model)
-	if len(rm.sessions) != 1 {
-		t.Error("empty aiSessionsLoadedMsg should not modify sessions")
-	}
-	if cmd != nil {
-		t.Error("empty msg should return nil cmd")
-	}
-}
-
-func TestUpdate_AISessionsLoadedMsg_AppendsSessions(t *testing.T) {
-	m := newTestModel()
-	m.search.copilotSearchVersion = 5
-	m.sessions = []data.Session{{ID: "a"}}
-	result, cmd := m.Update(aiSessionsLoadedMsg{
-		version:  5,
-		sessions: []data.Session{{ID: "b"}, {ID: "c"}},
-	})
-	rm := result.(Model)
-	if len(rm.sessions) != 3 {
-		t.Errorf("sessions count = %d, want 3", len(rm.sessions))
-	}
-	if cmd != nil {
-		t.Error("should return nil cmd")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Update: filterDataMsg
 // ---------------------------------------------------------------------------
 
@@ -1000,40 +799,11 @@ func TestRenderHeader_FitsWidth(t *testing.T) {
 			m.searchBar.SetResultCount(42)
 			m.searchBar.SetSearching(true)
 		}},
-		{"ai_searching", func(m *Model) {
-			m.searchBar.Focus()
-			m.searchBar.SetValue("test query")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAISearching(true)
-			m.searchBar.SetAIStatus("searching")
-		}},
-		{"ai_connecting", func(m *Model) {
-			m.searchBar.Focus()
-			m.searchBar.SetValue("test query")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAISearching(true)
-			m.searchBar.SetAIStatus("connecting")
-		}},
-		{"ai_error", func(m *Model) {
-			m.searchBar.Focus()
-			m.searchBar.SetValue("test query")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAIStatus("error")
-			m.searchBar.SetAIError("unavailable")
-		}},
-		{"ai_results", func(m *Model) {
-			m.searchBar.Focus()
-			m.searchBar.SetValue("test query")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAIStatus("ready")
-			m.searchBar.SetAIResults(5)
-		}},
 		{"long_query", func(m *Model) {
 			m.searchBar.Focus()
 			m.searchBar.SetValue("this is a very long search query to test overflow behavior")
 			m.searchBar.SetResultCount(1234)
-			m.searchBar.SetAISearching(true)
-			m.searchBar.SetAIStatus("searching")
+			m.searchBar.SetSearching(true)
 		}},
 		{"reindexing", func(m *Model) {
 			m.searchBar.Focus()
@@ -1075,33 +845,22 @@ func TestRenderMainView_BadgesVisibleDuringSearch(t *testing.T) {
 		name  string
 		setup func(m *Model)
 	}{
-		{"ai_searching", func(m *Model) {
+		{"searching", func(m *Model) {
 			m.searchBar.Focus()
 			m.searchBar.SetValue("test")
 			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAISearching(true)
-			m.searchBar.SetAIStatus("searching")
+			m.searchBar.SetSearching(true)
 		}},
-		{"ai_error", func(m *Model) {
+		{"many_results", func(m *Model) {
 			m.searchBar.Focus()
 			m.searchBar.SetValue("test")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAIStatus("error")
-			m.searchBar.SetAIError("unavailable")
+			m.searchBar.SetResultCount(9999)
 		}},
-		{"ai_results", func(m *Model) {
-			m.searchBar.Focus()
-			m.searchBar.SetValue("test")
-			m.searchBar.SetResultCount(42)
-			m.searchBar.SetAIStatus("ready")
-			m.searchBar.SetAIResults(5)
-		}},
-		{"long_query_ai", func(m *Model) {
+		{"long_query", func(m *Model) {
 			m.searchBar.Focus()
 			m.searchBar.SetValue("this is a very long search query to test overflow")
 			m.searchBar.SetResultCount(999)
-			m.searchBar.SetAISearching(true)
-			m.searchBar.SetAIStatus("searching")
+			m.searchBar.SetSearching(true)
 		}},
 	}
 
@@ -1275,7 +1034,6 @@ func TestHandleKey_JumpHomeEnd(t *testing.T) {
 func TestCloseStore_NilStore(t *testing.T) {
 	m := newTestModel()
 	m.store = nil
-	m.copilotClient = nil
 	m.closeStore() // should not panic
 }
 
@@ -1435,84 +1193,6 @@ func TestScheduleDeepSearch(t *testing.T) {
 	cmd := m.scheduleDeepSearch(1)
 	if cmd == nil {
 		t.Fatal("scheduleDeepSearch should return non-nil Cmd")
-	}
-}
-
-func TestScheduleCopilotSearch(t *testing.T) {
-	m := newTestModel()
-	cmd := m.scheduleCopilotSearch(1)
-	if cmd == nil {
-		t.Fatal("scheduleCopilotSearch should return non-nil Cmd")
-	}
-}
-
-func TestCopilotSearchCmd_NilClient(t *testing.T) {
-	m := newTestModel()
-	m.copilotClient = nil
-	m.filter.Query = "test"
-	cmd := m.copilotSearchCmd(1)
-	if cmd == nil {
-		t.Fatal("copilotSearchCmd should return non-nil Cmd")
-	}
-	msg := cmd()
-	csm, ok := msg.(copilotSearchResultMsg)
-	if !ok {
-		t.Fatalf("msg type = %T, want copilotSearchResultMsg", msg)
-	}
-	if csm.version != 1 {
-		t.Errorf("version = %d, want 1", csm.version)
-	}
-}
-
-func TestCopilotSearchCmd_EmptyQuery(t *testing.T) {
-	m := newTestModel()
-	m.copilotClient = nil
-	m.filter.Query = ""
-	cmd := m.copilotSearchCmd(2)
-	if cmd == nil {
-		t.Fatal("copilotSearchCmd should return non-nil Cmd")
-	}
-	msg := cmd()
-	csm, ok := msg.(copilotSearchResultMsg)
-	if !ok {
-		t.Fatalf("msg type = %T, want copilotSearchResultMsg", msg)
-	}
-	if csm.version != 2 {
-		t.Errorf("version = %d, want 2", csm.version)
-	}
-}
-
-func TestFetchAISessionsCmd_NilStore(t *testing.T) {
-	m := newTestModel()
-	m.store = nil
-	cmd := m.fetchAISessionsCmd([]string{"a"}, 1)
-	if cmd == nil {
-		t.Fatal("fetchAISessionsCmd should return non-nil Cmd")
-	}
-	msg := cmd()
-	asm, ok := msg.(aiSessionsLoadedMsg)
-	if !ok {
-		t.Fatalf("msg type = %T, want aiSessionsLoadedMsg", msg)
-	}
-	if asm.version != 1 {
-		t.Errorf("version = %d, want 1", asm.version)
-	}
-}
-
-func TestFetchAISessionsCmd_EmptyIDs(t *testing.T) {
-	m := newTestModel()
-	m.store = nil
-	cmd := m.fetchAISessionsCmd(nil, 2)
-	if cmd == nil {
-		t.Fatal("fetchAISessionsCmd should return non-nil Cmd")
-	}
-	msg := cmd()
-	asm, ok := msg.(aiSessionsLoadedMsg)
-	if !ok {
-		t.Fatalf("msg type = %T, want aiSessionsLoadedMsg", msg)
-	}
-	if asm.version != 2 {
-		t.Errorf("version = %d, want 2", asm.version)
 	}
 }
 
@@ -3729,68 +3409,6 @@ func TestDeepSearchCmd_PivotMode_NilStore_Execute(t *testing.T) {
 	}
 }
 
-func TestCopilotSearchCmd_NilClient_Execute(t *testing.T) {
-	m := newTestModel()
-	m.filter.Query = "test"
-	cmd := m.copilotSearchCmd(1)
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if r, ok := msg.(copilotSearchResultMsg); ok {
-		if r.version != 1 {
-			t.Errorf("version: expected 1, got %d", r.version)
-		}
-	} else {
-		t.Errorf("expected copilotSearchResultMsg, got %T", msg)
-	}
-}
-
-func TestCopilotSearchCmd_EmptyQuery_Execute(t *testing.T) {
-	m := newTestModel()
-	m.filter.Query = ""
-	cmd := m.copilotSearchCmd(2)
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if r, ok := msg.(copilotSearchResultMsg); ok {
-		if r.version != 2 {
-			t.Errorf("version: expected 2, got %d", r.version)
-		}
-	}
-}
-
-func TestFetchAISessionsCmd_NilStore_Execute(t *testing.T) {
-	m := newTestModel()
-	cmd := m.fetchAISessionsCmd([]string{"s1"}, 1)
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if r, ok := msg.(aiSessionsLoadedMsg); ok {
-		if r.version != 1 {
-			t.Errorf("version: expected 1, got %d", r.version)
-		}
-	} else {
-		t.Errorf("expected aiSessionsLoadedMsg, got %T", msg)
-	}
-}
-
-func TestFetchAISessionsCmd_EmptyIDs_Execute(t *testing.T) {
-	m := newTestModel()
-	cmd := m.fetchAISessionsCmd(nil, 1)
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if r, ok := msg.(aiSessionsLoadedMsg); ok {
-		if len(r.sessions) != 0 {
-			t.Errorf("expected empty sessions for empty IDs, got %d", len(r.sessions))
-		}
-	}
-}
-
 func TestLoadSelectedDetailCmd_NilStore_Execute(t *testing.T) {
 	m := newTestModel()
 	m.showPreview = true
@@ -3803,23 +3421,6 @@ func TestLoadSelectedDetailCmd_NilStore_Execute(t *testing.T) {
 	// nil store should return nil msg
 	if msg != nil {
 		t.Errorf("expected nil for nil store, got %T", msg)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// closeStore with copilotClient
-// ---------------------------------------------------------------------------
-
-func TestCloseStore_WithCopilotClient(t *testing.T) {
-	m := newTestModel()
-	m.copilotClient = nil // we can't create a real one, but test nil → nil path
-	m.store = nil
-	m.closeStore()
-	if m.copilotClient != nil {
-		t.Error("copilotClient should be nil after close")
-	}
-	if m.store != nil {
-		t.Error("store should be nil after close")
 	}
 }
 

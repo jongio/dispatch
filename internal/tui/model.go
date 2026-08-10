@@ -24,7 +24,6 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/jongio/dispatch/internal/config"
-	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
@@ -44,10 +43,6 @@ const doubleClickTimeout = 300 * time.Millisecond
 const themeAuto = "auto"
 
 const (
-	// copilotSearchTimeout limits a single Copilot AI search request.
-	// Must be generous: Init ~1s + Search ~10s + retries (3 × [0.5s + 1s + 10s]) ≈ 45s.
-	copilotSearchTimeout = 45 * time.Second
-
 	// statusReindexDone is the status message shown when a repair reindex
 	// completes successfully.
 	statusReindexDone = "Rebuild complete ✓"
@@ -156,15 +151,11 @@ const (
 
 // searchState groups fields related to search tracking.
 type searchState struct {
-	deepSearchVersion    int
-	deepSearchPending    bool
-	copilotSearchVersion int                 // version counter for SDK search debounce
-	copilotSearching     bool                // true when SDK search is in progress
-	copilotSearchCancel  context.CancelFunc  // cancels the in-flight SDK search
-	aiSessionIDs         map[string]struct{} // session IDs found by SDK search
-	lastRawInput         string              // last raw search bar text (for change detection)
-	history              []string            // committed search queries, oldest last (for up/down recall)
-	historyIdx           int                 // recall cursor into history; == len(history) means not navigating
+	deepSearchVersion int
+	deepSearchPending bool
+	lastRawInput      string   // last raw search bar text (for change detection)
+	history           []string // committed search queries, oldest last (for up/down recall)
+	historyIdx        int      // recall cursor into history; == len(history) means not navigating
 }
 
 // maxSearchHistory caps how many recent queries are retained for up/down recall.
@@ -224,7 +215,7 @@ func (s *searchState) recallNext() (string, bool) {
 
 // triggerSearch reacts to a new search bar value: it records the raw input,
 // parses structured tokens, kicks off the quick reload, and schedules the
-// debounced deep and Copilot SDK searches. inputCmd, when non-nil, is the
+// debounced deep search. inputCmd, when non-nil, is the
 // command returned by the text input update and is batched in first.
 func (m *Model) triggerSearch(inputCmd tea.Cmd) tea.Cmd {
 	newQuery := m.searchBar.Value()
@@ -239,21 +230,11 @@ func (m *Model) triggerSearch(inputCmd tea.Cmd) tea.Cmd {
 	m.search.deepSearchPending = true
 	m.searchBar.SetSearching(true)
 
-	cmds := make([]tea.Cmd, 0, 4)
+	cmds := make([]tea.Cmd, 0, 3)
 	if inputCmd != nil {
 		cmds = append(cmds, inputCmd)
 	}
 	cmds = append(cmds, m.loadSessionsCmd(), m.scheduleDeepSearch(m.search.deepSearchVersion))
-
-	// Copilot SDK search is gated by config flag.
-	if m.cfg.AISearch {
-		m.search.copilotSearchVersion++
-		m.searchBar.SetAISearching(false) // reset until tick fires
-		m.searchBar.SetAIResults(0)       // clear stale count
-		m.search.aiSessionIDs = nil
-		m.sessionList.SetAISessions(nil)
-		cmds = append(cmds, m.scheduleCopilotSearch(m.search.copilotSearchVersion))
-	}
 
 	return tea.Batch(cmds...)
 }
@@ -264,7 +245,6 @@ type workStatusState struct {
 	filterWorkStatus   map[data.WorkStatus]struct{} // when non-empty, only show sessions with matching work status
 	workStatusScanned  bool                         // true after first successful work status scan
 	workStatusScanning bool                         // true while work status scan chain is in progress
-	workStatusAICancel context.CancelFunc           // cancels in-flight AI work status analysis
 	autoShowPlan       bool                         // when true, auto-switch to plan view on next planContentMsg
 }
 
@@ -372,9 +352,6 @@ type Model struct {
 	// Transient status bar messages.
 	statusErr  string
 	statusInfo string
-
-	// Copilot SDK search.
-	copilotClient *copilot.Client
 
 	// Attention status tracking — scanned from session-state directories.
 	attentionMap    map[string]data.AttentionStatus
@@ -766,9 +743,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case workStatusScannedMsg:
 		return m.handleWorkStatusScanned(msg)
 
-	case workStatusAIScannedMsg:
-		return m.handleWorkStatusAIScanned(msg)
-
 	case continuationPlanCreatedMsg:
 		return m.handleContinuationPlanCreated(msg)
 
@@ -782,22 +756,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case deepSearchResultMsg:
 		return m.handleDeepSearchResult(msg)
-
-	// ----- Copilot SDK search ------------------------------------------------
-	case copilotReadyMsg:
-		return m.handleCopilotReady()
-
-	case copilotErrorMsg:
-		return m.handleCopilotError()
-
-	case copilotSearchTickMsg:
-		return m.handleCopilotSearchTick(msg)
-
-	case copilotSearchResultMsg:
-		return m.handleCopilotSearchResult(msg)
-
-	case aiSessionsLoadedMsg:
-		return m.handleAISessionsLoaded(msg)
 
 	// ----- Filter picker data ---------------------------------------------
 	case filterDataMsg:
@@ -1282,13 +1240,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.searchBar.Blur()
 			m.search.deepSearchPending = false
 			m.searchBar.SetSearching(false)
-			m.searchBar.SetAISearching(false)
-			m.search.copilotSearching = false
-			// Cancel any in-flight SDK search.
-			if m.search.copilotSearchCancel != nil {
-				m.search.copilotSearchCancel()
-				m.search.copilotSearchCancel = nil
-			}
 			// Keep the query active — Escape only dismisses the input focus.
 			// The filter stays applied so subsequent operations (time range,
 			// sort, pivot) continue to honour the search term. To clear the
@@ -1382,11 +1333,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.clearSearchTokenFilters()
 			m.searchBar.SetValue("")
 			m.searchBar.SetSearching(false)
-			m.searchBar.SetAISearching(false)
-			m.searchBar.SetAIResults(0)
-			m.search.copilotSearching = false
-			m.search.aiSessionIDs = nil
-			m.sessionList.SetAISessions(nil)
 			return m, m.loadSessionsCmd()
 		}
 		return m, nil
@@ -4066,17 +4012,6 @@ func (m Model) selectedSessionCwd() string {
 // ---------------------------------------------------------------------------
 
 func (m *Model) closeStore() {
-	// Cancel any in-flight copilot search context so the goroutine
-	// holding searchMu can unblock and exit.
-	if m.search.copilotSearchCancel != nil {
-		m.search.copilotSearchCancel()
-		m.search.copilotSearchCancel = nil
-	}
-	// Cancel any in-flight AI work-status analysis.
-	if m.workStatus.workStatusAICancel != nil {
-		m.workStatus.workStatusAICancel()
-		m.workStatus.workStatusAICancel = nil
-	}
 	if m.dbWatcher != nil {
 		m.dbWatcher.Stop()
 	}
@@ -4090,10 +4025,6 @@ func (m *Model) closeStore() {
 	if m.eventWatchCh != nil {
 		close(m.eventWatchCh)
 		m.eventWatchCh = nil
-	}
-	if m.copilotClient != nil {
-		m.copilotClient.Close()
-		m.copilotClient = nil
 	}
 	if m.store != nil {
 		_ = m.store.Close()
@@ -4382,90 +4313,6 @@ func (m *Model) scanWorkStatusCmd() tea.Cmd {
 	return func() tea.Msg {
 		statuses := data.ScanWorkStatus(planIDs, nil)
 		return workStatusScannedMsg{statuses: statuses}
-	}
-}
-
-// maxAIAnalysisBatch limits the number of sessions analysed per AI pass
-// to keep costs and latency reasonable.
-const maxAIAnalysisBatch = 5
-
-// scanWorkStatusAICmd runs AI-enhanced completion analysis for sessions
-// whose local scan found incomplete work. It calls
-// copilotClient.AnalyzeCompletion for each (up to maxAIAnalysisBatch)
-// and returns a workStatusAIScannedMsg with the results.
-//
-// Returns nil if the Copilot SDK is unavailable or no sessions qualify.
-func (m *Model) scanWorkStatusAICmd() tea.Cmd {
-	// Lazy-init the copilot client if needed.
-	if m.copilotClient == nil && m.store != nil {
-		m.copilotClient = copilot.New(m.store)
-	}
-	client := m.copilotClient
-	if client == nil {
-		return nil
-	}
-
-	// Build visible set for filtering.
-	visibleSet := make(map[string]struct{})
-	for _, id := range m.sessionList.VisibleSessionIDs() {
-		visibleSet[id] = struct{}{}
-	}
-
-	// Collect visible sessions with incomplete work that have plan content.
-	// Only capture session IDs here — file I/O (ReadPlanContent) is
-	// deferred to the background closure to avoid blocking the UI thread.
-	var candidateIDs []string
-	for id, result := range m.workStatus.workStatusMap {
-		if result.Status != data.WorkStatusIncomplete {
-			continue
-		}
-		// Only scan visible sessions.
-		if _, visible := visibleSet[id]; !visible {
-			continue
-		}
-		candidateIDs = append(candidateIDs, id)
-		if len(candidateIDs) >= maxAIAnalysisBatch {
-			break
-		}
-	}
-	if len(candidateIDs) == 0 {
-		return nil
-	}
-
-	// Cancel any previous AI analysis and create a fresh cancellable context.
-	if m.workStatus.workStatusAICancel != nil {
-		m.workStatus.workStatusAICancel()
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	m.workStatus.workStatusAICancel = cancel
-
-	return func() tea.Msg {
-		results := make(map[string]*copilot.CompletionAnalysis, len(candidateIDs))
-		for _, id := range candidateIDs {
-			// Check for cancellation between iterations to allow the user
-			// to interrupt long-running AI analysis batches.
-			if ctx.Err() != nil {
-				slog.Debug("AI work status analysis cancelled", "completed", len(results))
-				break
-			}
-			content, err := data.ReadPlanContent(id)
-			if err != nil || content == "" {
-				continue
-			}
-			// Use the outer ctx for cancellation awareness, but pass
-			// context.Background() to AnalyzeCompletion to prevent
-			// JSON-RPC pipe corruption (same pattern as copilotSearchCmd).
-			analysis, err := client.AnalyzeCompletion(context.Background(), id, content)
-			if err != nil {
-				slog.Debug("AI completion analysis failed",
-					"session", id, "error", err)
-				continue
-			}
-			if analysis != nil {
-				results[id] = analysis
-			}
-		}
-		return workStatusAIScannedMsg{analyses: results}
 	}
 }
 
@@ -4833,77 +4680,6 @@ func loadFilterDataCmd(store *data.Store) tea.Cmd {
 func checkNerdFontCmd() tea.Cmd {
 	return func() tea.Msg {
 		return fontCheckMsg{installed: platform.IsNerdFontInstalled()}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Copilot SDK search helpers
-// ---------------------------------------------------------------------------
-
-// copilotSearchDelay is the debounce delay before starting a Copilot SDK
-// search. Longer than deep search since SDK search is more expensive.
-const copilotSearchDelay = 500 * time.Millisecond
-
-// scheduleCopilotSearch returns a tea.Cmd that fires a copilotSearchTickMsg
-// after a debounce delay. The version counter lets the handler ignore stale ticks.
-func (m Model) scheduleCopilotSearch(version int) tea.Cmd {
-	return tea.Tick(copilotSearchDelay, func(time.Time) tea.Msg {
-		return copilotSearchTickMsg{version: version}
-	})
-}
-
-// copilotSearchCmd runs the Copilot SDK search in a background goroutine.
-// Search() handles lazy initialisation and retries internally.
-// The search context is stored in m.search.copilotSearchCancel so that a newer
-// search (or Escape) can cancel this one, unblocking the searchMu.
-func (m *Model) copilotSearchCmd(version int) tea.Cmd {
-	client := m.copilotClient
-	query := m.filter.Query
-
-	ctx, cancel := context.WithTimeout(context.Background(), copilotSearchTimeout)
-	m.search.copilotSearchCancel = cancel
-
-	return func() tea.Msg {
-		defer cancel()
-		if client == nil || query == "" {
-			return copilotSearchResultMsg{version: version}
-		}
-
-		ids, err := client.Search(ctx, query)
-		return copilotSearchResultMsg{version: version, sessionIDs: ids, err: err}
-	}
-}
-
-// findMissingAISessionIDs returns session IDs from the AI results that
-// are not already present in the current session list.
-func (m *Model) findMissingAISessionIDs(aiIDs []string) []string {
-	existing := make(map[string]struct{}, len(m.sessions))
-	for _, s := range m.sessions {
-		existing[s.ID] = struct{}{}
-	}
-	var missing []string
-	for _, id := range aiIDs {
-		if _, ok := existing[id]; !ok {
-			missing = append(missing, id)
-		}
-	}
-	return missing
-}
-
-// fetchAISessionsCmd fetches sessions by ID from the store for AI-found
-// results not already in the current list.
-func (m Model) fetchAISessionsCmd(ids []string, version int) tea.Cmd {
-	store := m.store
-	return func() tea.Msg {
-		if store == nil || len(ids) == 0 {
-			return aiSessionsLoadedMsg{version: version}
-		}
-		sessions, err := store.ListSessionsByIDs(context.Background(), ids)
-		if err != nil {
-			// Silently degrade — don't break the UI for fetch errors.
-			return aiSessionsLoadedMsg{version: version}
-		}
-		return aiSessionsLoadedMsg{version: version, sessions: sessions}
 	}
 }
 

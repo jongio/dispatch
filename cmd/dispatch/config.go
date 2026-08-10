@@ -78,7 +78,6 @@ func configFields() []configField {
 		enumField("pane_direction", func(c *config.Config) *string { return &c.PaneDirection },
 			config.PaneDirectionAuto, config.PaneDirectionRight, config.PaneDirectionDown, config.PaneDirectionLeft, config.PaneDirectionUp),
 		strField("resume_session_command", func(c *config.Config) *string { return &c.ResumeSessionCommand }),
-		boolField("ai_search", func(c *config.Config) *bool { return &c.AISearch }),
 		durationField("attention_threshold", func(c *config.Config) *string { return &c.AttentionThreshold }),
 		strField("theme", func(c *config.Config) *string { return &c.Theme }),
 		enumField("preview_position", func(c *config.Config) *string { return &c.PreviewPosition },
@@ -574,12 +573,19 @@ func runConfigImport(w io.Writer, args []string) error {
 		r = f
 	}
 
-	cfg := config.Default()
+	imported := struct {
+		*config.Config
+		// Compatibility tombstone for one release. The value is decoded and discarded.
+		RemovedSearchOption json.RawMessage `json:"ai_search"`
+	}{
+		Config: config.Default(),
+	}
 	dec := json.NewDecoder(r)
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(cfg); err != nil {
+	if err := dec.Decode(&imported); err != nil {
 		return fmt.Errorf("parsing config import: %w", err)
 	}
+	cfg := imported.Config
 	if err := configSaveFn(cfg); err != nil {
 		return err
 	}
@@ -648,6 +654,9 @@ func fieldJSONValue(f configField, cfg *config.Config) any {
 
 // unknownConfigKeyErr builds a consistent error for an unrecognized key.
 func unknownConfigKeyErr(key string) error {
+	if key == config.LegacyRemovedSearchKey {
+		return fmt.Errorf("config key %q was removed; session search now uses local FTS5 and LIKE exclusively", key)
+	}
 	names := make([]string, 0, len(configFields()))
 	for _, f := range configFields() {
 		names = append(names, f.name)

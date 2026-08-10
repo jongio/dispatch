@@ -14,11 +14,7 @@ type SearchBar struct {
 	input       textinput.Model
 	resultCount int
 	active      bool
-	searching   bool   // deep search in progress
-	aiSearching bool   // Copilot SDK search in progress
-	aiStatus    string // "connecting", "ready", "error", or "" (not started)
-	aiError     string // error message when aiStatus == "error"
-	aiResults   int    // count of AI-found sessions in last search
+	searching   bool // deep search in progress
 	width       int
 }
 
@@ -79,27 +75,6 @@ func (s *SearchBar) SetSearching(v bool) {
 	s.searching = v
 }
 
-// SetAISearching sets the Copilot SDK search-in-progress indicator.
-func (s *SearchBar) SetAISearching(v bool) {
-	s.aiSearching = v
-}
-
-// SetAIStatus sets the Copilot SDK connection status.
-// Valid values: "" (not started), "connecting", "ready", "error".
-func (s *SearchBar) SetAIStatus(status string) {
-	s.aiStatus = status
-}
-
-// SetAIError sets the AI error message shown when status is "error".
-func (s *SearchBar) SetAIError(msg string) {
-	s.aiError = msg
-}
-
-// SetAIResults sets the count of AI-found sessions from the last search.
-func (s *SearchBar) SetAIResults(n int) {
-	s.aiResults = n
-}
-
 // SetWidth sets the available width for the search bar.
 func (s *SearchBar) SetWidth(w int) {
 	s.width = w
@@ -125,23 +100,6 @@ func (s SearchBar) View() string {
 		count := strconv.Itoa(s.resultCount) + " results"
 		if s.searching {
 			count += " (searching…)"
-		}
-		// AI search status
-		switch {
-		case s.aiSearching:
-			if s.aiStatus == "connecting" {
-				count += " (✦ connecting…)"
-			} else {
-				count += " (✦ searching…)"
-			}
-		case s.aiStatus == "error":
-			if s.aiError != "" {
-				count += " (✦ " + s.aiError + ")"
-			} else {
-				count += " (✦ unavailable)"
-			}
-		case s.aiResults > 0:
-			count += " (✦ " + strconv.Itoa(s.aiResults) + " AI)"
 		}
 		suffix = styles.DimmedStyle.Render(" " + count)
 	}

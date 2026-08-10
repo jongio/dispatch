@@ -10,9 +10,6 @@
     "agent": {
       "type": "string"
     },
-    "ai_search": {
-      "type": "boolean"
-    },
     "attention_threshold": {
       "description": "Positive Go duration such as 15m or 1h.",
       "type": "string"

@@ -411,7 +411,7 @@
     - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("R"))
     - Handler: internal\tui\model.go
-    - Behavior: Scans all sessions with plans for work completion status (quick classification → full parse → optional AI analysis)
+    - Behavior: Scans all sessions with plans using deterministic local parsing, extracts remaining items, and writes continuation plans
     - Condition: In session list view; does not run on startup — must be explicitly triggered
 
 30c. Work status and plan filtering is also available via the **!** status picker (see 30 above). The picker includes "Has plan", "Favorites only", "Incomplete work", and "Complete work" rows below the attention statuses.

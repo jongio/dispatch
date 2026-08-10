@@ -44,7 +44,6 @@ type SessionList struct {
 	expanded       map[string]struct{}              // folder path → expanded state (tree mode)
 	hiddenSet      map[string]struct{}              // session ID → hidden sessions
 	favoritedSet   map[string]struct{}              // session ID → favorited sessions
-	aiSet          map[string]struct{}              // session ID → AI-found sessions
 	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
 	planMap        map[string]bool                  // session ID → has plan.md
 	workStatusMap  map[string]data.WorkStatusResult // session ID → work status
@@ -196,12 +195,6 @@ func (s *SessionList) SetHiddenColumns(keys []string) {
 // columnHidden reports whether the given optional column key is hidden.
 func (s SessionList) columnHidden(key string) bool {
 	return s.hiddenColumns[key]
-}
-
-// SetAISessions updates the set of AI-found session IDs, used to
-// render those sessions with a "✦" marker.
-func (s *SessionList) SetAISessions(set map[string]struct{}) {
-	s.aiSet = set
 }
 
 // SetAttentionStatuses updates the attention status map used to render
@@ -736,9 +729,8 @@ func (s SessionList) View() string {
 			lines = append(lines, s.renderQuickStartRow(item.quickStart, selected))
 		} else {
 			_, hidden := s.hiddenSet[item.session.ID]
-			_, aiFound := s.aiSet[item.session.ID]
 			_, favorited := s.favoritedSet[item.session.ID]
-			lines = append(lines, s.renderSessionRow(item.session, selected, hidden, aiFound, favorited))
+			lines = append(lines, s.renderSessionRow(item.session, selected, hidden, favorited))
 		}
 	}
 	// Pad to full height.
@@ -838,7 +830,7 @@ func hostGroupLabel(hostType string) string {
 	}
 }
 
-func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, aiFound bool, favorited bool) string {
+func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden bool, favorited bool) string {
 	w := s.width
 	if w <= 0 {
 		return ""
@@ -855,9 +847,6 @@ func (s SessionList) renderSessionRow(sess data.Session, selected bool, hidden b
 	summary := CleanSummary(sess.Summary)
 	if favorited {
 		summary = "★ " + summary
-	}
-	if aiFound {
-		summary = "✦ " + summary
 	}
 	if hidden {
 		summary = "[hidden] " + summary

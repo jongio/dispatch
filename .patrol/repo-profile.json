@@ -15,7 +15,6 @@
       "cmd/screenshots",
       "internal/config",
       "internal/contributors",
-      "internal/copilot",
       "internal/data",
       "internal/platform",
       "internal/tui",
@@ -32,7 +31,6 @@
       "charm.land/bubbles/v2 v2.1.0",
       "charm.land/lipgloss/v2 v2.0.3",
       "github.com/charmbracelet/glamour v1.0.0",
-      "github.com/github/copilot-sdk/go v0.3.0",
       "modernc.org/sqlite v1.50.1"
     ]
   },

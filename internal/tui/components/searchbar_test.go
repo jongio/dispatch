@@ -166,88 +166,6 @@ func TestSearchBar_View_NoCountWhenEmpty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AI indicator visibility — the main regression test.
-// The textinput pads its output to exactly input.Width characters, so the
-// AI suffix that is appended AFTER must still fit within the total allocated
-// width.  If it doesn't, the MaxWidth clamp truncates it and the user sees
-// no AI indicator at all.
-// ---------------------------------------------------------------------------
-
-func TestSearchBar_View_AIIndicatorVisible(t *testing.T) {
-	t.Parallel()
-	widths := []int{60, 80, 100, 120}
-	for _, w := range widths {
-		sb := NewSearchBar()
-		_ = sb.Focus()
-		sb.SetValue("hello")
-		sb.SetResultCount(4)
-		sb.SetAIResults(20)
-		sb.SetWidth(w)
-
-		view := sb.View()
-		visW := lipgloss.Width(view)
-
-		if !strings.Contains(view, "✦") {
-			t.Errorf("width=%d: AI indicator (✦) missing from View(); got %q", w, view)
-		}
-		if !strings.Contains(view, "20 AI") {
-			t.Errorf("width=%d: '20 AI' missing from View(); got %q", w, view)
-		}
-		if visW > w {
-			t.Errorf("width=%d: rendered width %d exceeds allocated width", w, visW)
-		}
-	}
-}
-
-func TestSearchBar_View_AISearchingVisible(t *testing.T) {
-	t.Parallel()
-	sb := NewSearchBar()
-	_ = sb.Focus()
-	sb.SetValue("test")
-	sb.SetResultCount(0)
-	sb.SetAISearching(true)
-	sb.SetWidth(80)
-
-	view := sb.View()
-	if !strings.Contains(view, "✦") {
-		t.Errorf("AI searching indicator missing; got %q", view)
-	}
-	if !strings.Contains(view, "searching") {
-		t.Errorf("'searching' text missing; got %q", view)
-	}
-}
-
-func TestSearchBar_View_AIConnectingVisible(t *testing.T) {
-	t.Parallel()
-	sb := NewSearchBar()
-	_ = sb.Focus()
-	sb.SetValue("test")
-	sb.SetAISearching(true)
-	sb.SetAIStatus("connecting")
-	sb.SetWidth(80)
-
-	view := sb.View()
-	if !strings.Contains(view, "connecting") {
-		t.Errorf("'connecting' text missing; got %q", view)
-	}
-}
-
-func TestSearchBar_View_AIUnavailableVisible(t *testing.T) {
-	t.Parallel()
-	sb := NewSearchBar()
-	_ = sb.Focus()
-	sb.SetValue("test")
-	sb.SetAIStatus("error")
-	sb.SetAIError("unavailable")
-	sb.SetWidth(80)
-
-	view := sb.View()
-	if !strings.Contains(view, "unavailable") {
-		t.Errorf("'unavailable' text missing; got %q", view)
-	}
-}
-
 func TestSearchBar_View_FitsWithinWidth(t *testing.T) {
 	t.Parallel()
 	// Even at narrow widths the rendered output must not exceed allocation.
@@ -255,7 +173,7 @@ func TestSearchBar_View_FitsWithinWidth(t *testing.T) {
 	_ = sb.Focus()
 	sb.SetValue("a long query string that might push width")
 	sb.SetResultCount(999)
-	sb.SetAIResults(50)
+	sb.SetSearching(true)
 	sb.SetWidth(50)
 
 	view := sb.View()

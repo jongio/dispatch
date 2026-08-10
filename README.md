@@ -36,7 +36,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Host type icons** — sessions display an icon indicating their origin: CLI (desktop), Cloud (cloud), or Actions (gear)
 - **Incremental auto-refresh** — the session list auto-refreshes within 2 seconds when the Copilot CLI writes new data (WAL file polling when focused). No manual reindex needed for normal use. Tune the interval or turn it off with `auto_refresh_seconds`
 - **Plan indicator** (`v`) — a dot next to sessions that have a `plan.md` file (`~/.copilot/session-state/{session-id}/plan.md`). Press `v` to view the plan in the preview pane. Filter sessions with plans via the `!` status picker
-- **Work status detection** — analyzes `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to explicitly scan work status. Filter by work completion via the `!` status picker. Supports AI-powered analysis via Copilot SDK `analyze_completion` tool
+- **Work status detection** — deterministically parses `plan.md` files to identify sessions with incomplete planned work. Colored dots show completion status in the session list and preview panel. Press `R` to scan work status and create continuation plans from remaining items. Filter by work completion via the `!` status picker
 - **Session hiding** (`h` / `H`) — hide sessions from the list, toggle visibility of hidden sessions, persistent state
 - **Session favorites** (`*`) — star sessions as favorites. Filter to show only favorites via the `!` status picker
 - **Session tags** (`#`) — attach comma-separated tags to sessions and filter to a tag with the `tag:` search token
@@ -734,7 +734,6 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `auto_refresh_seconds` | int | *(unset)* | Session-list poll interval in seconds. Unset uses the default (2s); `0` disables polling; a positive value sets the interval (minimum 1s). Applies on next launch |
 | `theme` | string | `"auto"` | Color scheme: `auto` or a named scheme |
 | `workspace_recovery` | bool | `true` | Detect sessions interrupted by crash/reboot |
-| `ai_search` | bool | `false` | Enable Copilot SDK-powered AI semantic search |
 | `hiddenSessions` | array | `[]` | Session IDs hidden from the main list |
 | `favoriteSessions` | array | `[]` | Session IDs starred as favorites |
 | `keybindings` | object | `{}` | Remap keyboard shortcuts. Keys are action names, values are comma-separated key lists (see [Customizing Keybindings](#customizing-keybindings)) |
@@ -795,7 +794,6 @@ The split starts in the session's working directory (`-c`) and runs the resume c
   "theme": "auto",
   "workspace_recovery": true,
   "notify_on_waiting": false,
-  "ai_search": false,
   "hiddenSessions": [],
   "favoriteSessions": [],
   "launch_sets": [],

@@ -71,7 +71,6 @@ func TestRunConfigList_DefaultsToList(t *testing.T) {
 func TestRunConfigList_JSON(t *testing.T) {
 	cfg := config.Default()
 	cfg.MaxSessions = 42
-	cfg.AISearch = true
 	withConfigSeams(t, cfg)
 
 	var buf bytes.Buffer
@@ -85,8 +84,8 @@ func TestRunConfigList_JSON(t *testing.T) {
 	if got, ok := obj["max_sessions"].(float64); !ok || int(got) != 42 {
 		t.Errorf("max_sessions = %v, want 42", obj["max_sessions"])
 	}
-	if got, ok := obj["ai_search"].(bool); !ok || !got {
-		t.Errorf("ai_search = %v, want true", obj["ai_search"])
+	if _, present := obj["ai_search"]; present {
+		t.Error("ai_search should not be exposed by config list")
 	}
 	// auto_refresh_seconds is unset by default and should serialize as null.
 	if v, present := obj["auto_refresh_seconds"]; !present || v != nil {
@@ -177,6 +176,37 @@ func TestRunConfigImport_File(t *testing.T) {
 	}
 }
 
+func TestRunConfigImport_IgnoresRemovedSearchOption(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	var imported *config.Config
+	configSaveFn = func(c *config.Config) error {
+		imported = c
+		return nil
+	}
+	prevStdin := configStdin
+	configStdin = strings.NewReader(`{"theme":"campbell","ai_search":true}`)
+	t.Cleanup(func() { configStdin = prevStdin })
+
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "import"}); err != nil {
+		t.Fatalf("runConfig import: %v", err)
+	}
+	if imported == nil || imported.Theme != "campbell" {
+		t.Fatalf("imported config = %+v, want theme campbell", imported)
+	}
+}
+
+func TestRunConfigImport_RejectsOtherUnknownKeys(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	prevStdin := configStdin
+	configStdin = strings.NewReader(`{"unexpected":true}`)
+	t.Cleanup(func() { configStdin = prevStdin })
+
+	err := runConfig(&bytes.Buffer{}, []string{"config", "import"})
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("error = %v, want unknown field rejection", err)
+	}
+}
+
 func TestRunConfigGet(t *testing.T) {
 	cfg := config.Default()
 	cfg.Theme = "dracula"
@@ -200,6 +230,20 @@ func TestRunConfigGet_UnknownKey(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown config key") {
 		t.Errorf("error = %v, want unknown config key", err)
+	}
+}
+
+func TestRunConfigRemovedSearchKey(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	for _, args := range [][]string{
+		{"config", "get", "ai_search"},
+		{"config", "set", "ai_search", "true"},
+		{"config", "unset", "ai_search"},
+	} {
+		err := runConfig(&bytes.Buffer{}, args)
+		if err == nil || !strings.Contains(err.Error(), "was removed") {
+			t.Errorf("runConfig(%v) error = %v, want removal message", args, err)
+		}
 	}
 }
 

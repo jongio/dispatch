@@ -1,5 +1,7 @@
 # Security Audit Report -- dispatch
 
+> **Historical record:** This audit reflects the codebase in July 2025. References to `internal/copilot` describe the runtime SDK architecture that has since been removed.
+
 **Date**: 2025-07-13
 **Auditor**: SecOps Agent (dual-model)
 **Target**: `github.com/jongio/dispatch` -- Go 1.26.1 Bubble Tea v2 TUI

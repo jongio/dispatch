@@ -307,7 +307,6 @@ func TestDeepSearchCmdCov_NilStore(t *testing.T) {
 func TestCloseStore_NoStore(t *testing.T) {
 	m := newTestModel()
 	m.store = nil
-	m.copilotClient = nil
 
 	m.closeStore() // should not panic
 }
@@ -577,7 +576,7 @@ func TestCheckNerdFontCmd_ReturnsCmd(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// scheduleDeepSearch / scheduleCopilotSearch — tick factories
+// scheduleDeepSearch tick factory
 // ---------------------------------------------------------------------------
 
 func TestScheduleDeepSearch_Cov(t *testing.T) {
@@ -585,14 +584,6 @@ func TestScheduleDeepSearch_Cov(t *testing.T) {
 	cmd := m.scheduleDeepSearch(42)
 	if cmd == nil {
 		t.Fatal("scheduleDeepSearch should return non-nil Cmd")
-	}
-}
-
-func TestScheduleCopilotSearch_Cov(t *testing.T) {
-	m := newTestModel()
-	cmd := m.scheduleCopilotSearch(7)
-	if cmd == nil {
-		t.Fatal("scheduleCopilotSearch should return non-nil Cmd")
 	}
 }
 
@@ -644,28 +635,6 @@ func TestRenderLoadingView_Cov(t *testing.T) {
 	view := m.renderLoadingView()
 	if !strings.Contains(view, "Loading") {
 		t.Error("renderLoadingView should contain 'Loading'")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// findMissingAISessionIDs — covers AI dedup logic
-// ---------------------------------------------------------------------------
-
-func TestFindMissingAISessionIDs(t *testing.T) {
-	m := newTestModel()
-	m.sessions = []data.Session{{ID: "s1"}, {ID: "s2"}}
-
-	missing := m.findMissingAISessionIDs([]string{"s1", "s3", "s4"})
-	if len(missing) != 2 {
-		t.Errorf("expected 2 missing IDs, got %d", len(missing))
-	}
-	// s3 and s4 should be in missing
-	found := map[string]bool{}
-	for _, id := range missing {
-		found[id] = true
-	}
-	if !found["s3"] || !found["s4"] {
-		t.Errorf("missing should contain s3 and s4, got %v", missing)
 	}
 }
 

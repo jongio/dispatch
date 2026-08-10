@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"github.com/jongio/dispatch/internal/copilot"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
 	"github.com/jongio/dispatch/internal/tui/components"
@@ -73,35 +72,6 @@ type deepSearchResultMsg struct {
 }
 
 // ---------------------------------------------------------------------------
-// Copilot SDK search messages
-// ---------------------------------------------------------------------------
-
-// copilotReadyMsg is sent when the Copilot SDK client initialises successfully.
-type copilotReadyMsg struct{}
-
-// copilotErrorMsg is sent when the Copilot SDK fails to initialise or encounters an error.
-type copilotErrorMsg struct{ err error }
-
-// copilotSearchTickMsg fires after the debounce delay to start an SDK search.
-type copilotSearchTickMsg struct {
-	version int
-}
-
-// copilotSearchResultMsg delivers session IDs found by Copilot SDK search.
-type copilotSearchResultMsg struct {
-	version    int
-	sessionIDs []string
-	err        error
-}
-
-// aiSessionsLoadedMsg delivers sessions fetched by ID for AI-found results
-// not already in the current list.
-type aiSessionsLoadedMsg struct {
-	version  int
-	sessions []data.Session
-}
-
-// ---------------------------------------------------------------------------
 // Attention scan messages
 // ---------------------------------------------------------------------------
 
@@ -149,12 +119,6 @@ type workStatusQuickScannedMsg struct {
 // workStatusScannedMsg delivers full work status analysis results.
 type workStatusScannedMsg struct {
 	statuses map[string]data.WorkStatusResult
-}
-
-// workStatusAIScannedMsg delivers AI-enhanced work status analysis results
-// from the Copilot SDK AnalyzeCompletion method.
-type workStatusAIScannedMsg struct {
-	analyses map[string]*copilot.CompletionAnalysis
 }
 
 // continuationPlanCreatedMsg reports the result of writing continuation

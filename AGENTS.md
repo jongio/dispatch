@@ -19,6 +19,5 @@ mage preflight          # Full CI check (vet + test + build)
   - `cmd/dispatch/` — entry point
   - `internal/tui/` — TUI model, components, styles
   - `internal/data/` — SQLite session store
-  - `internal/copilot/` — Copilot SDK client
   - `internal/config/` — user configuration
   - `internal/platform/` — OS-specific helpers

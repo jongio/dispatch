@@ -1,14 +1,16 @@
 # Upgrade Charm Ecosystem to v2 (Bubbletea, Bubbles, Lipgloss) + Glamour v1.0.0 + Copilot SDK v0.2.0
 
+> **Historical record:** This issue documents the dependency upgrade as implemented in 2026. The Copilot SDK and all runtime SDK features described here have since been removed.
+
 ## Summary
 
-Migrate the dispatch TUI from Charm ecosystem v1 to the coordinated v2 release (Feb 24 2026), including bubbletea v2.0.2, bubbles v2.0.0, lipgloss v2.0.2, glamour v1.0.0, and copilot-sdk v0.2.0.
+Historical migration record for moving the dispatch TUI from Charm ecosystem v1 to the coordinated v2 release, including the dependencies used at that time.
 
 ## Description
 
-The entire Charm ecosystem shipped coordinated v2 releases with significant API improvements: a new high-performance renderer ("Cursed Renderer"), declarative view model, progressive keyboard enhancements, native clipboard support, split mouse/key message types, and pure Lip Gloss (no more I/O fighting with Bubble Tea). Import paths moved to vanity domain `charm.land/*`.
+The Charm ecosystem shipped coordinated v2 releases with significant API improvements: a new high-performance renderer ("Cursed Renderer"), declarative view model, progressive keyboard enhancements, native clipboard support, split mouse/key message types, and pure Lip Gloss (no more I/O fighting with Bubble Tea). Import paths moved to vanity domain `charm.land/*`.
 
-Dispatch currently uses:
+At the time, Dispatch used:
 - `github.com/charmbracelet/bubbletea` v1.3.10 (latest v2 is v2.0.2)
 - `github.com/charmbracelet/bubbles` v1.0.0 (latest v2 is v2.0.0)
 - `github.com/charmbracelet/lipgloss` v1.1.0 (latest v2 is v2.0.2)

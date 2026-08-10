@@ -101,7 +101,6 @@ $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.
 cmd/dispatch/           Entry point
 internal/
   config/               User configuration (JSON, launch modes)
-  copilot/              Copilot SDK client (streaming AI chat)
   data/                 SQLite session store, models, filters
   platform/             OS-specific shell/terminal helpers
   tui/                  Bubble Tea model, key bindings, messages

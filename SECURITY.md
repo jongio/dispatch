@@ -35,9 +35,6 @@ network requests in the following scenarios:
 
 - **Self-update**: `dispatch update` contacts the GitHub Releases API
   (`api.github.com`) to check for and download new versions.
-- **Copilot SDK**: AI-powered features (work status analysis, semantic search)
-  communicate with the GitHub Copilot API. Requires an authenticated Copilot
-  session.
 - **Nerd Font downloads**: Optional font installation downloads from GitHub
   Releases.
 

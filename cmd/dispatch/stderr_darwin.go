@@ -8,8 +8,7 @@ import (
 )
 
 // redirectStderr replaces file descriptor 2 so that child processes
-// (notably the Copilot SDK subprocess) inherit the redirected fd
-// instead of the real console stderr.
+// inherit the redirected fd instead of the real console stderr.
 func captureOriginalStderr() *os.File {
 	dupFD, err := syscall.Dup(2)
 	if err != nil {

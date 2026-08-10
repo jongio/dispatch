@@ -40,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - **Screenshot workflow** — one command now regenerates screenshots across platforms. (#261)
 
+### Removed
+
+- **Runtime Copilot SDK features**: removed semantic AI session search and SDK completion analysis. Session search now uses local SQLite FTS5 and LIKE exclusively, while continuation plans use deterministic `plan.md` parsing.
+
 ## [v0.14.0] — 2026-07-18
 
 This release turns Dispatch from a TUI-only tool into a scriptable CLI: most session operations are now available as non-interactive commands with JSON output, and the TUI gains a git status overlay plus several navigation and organization features.
