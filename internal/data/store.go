@@ -76,7 +76,7 @@ func OpenPath(path string) (*Store, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, fmt.Errorf("session store not found at %s: %w", path, err)
 	}
-	db, err := sql.Open("sqlite", path+"?mode=ro")
+	db, err := openReadOnlySQLite(path)
 	if err != nil {
 		return nil, fmt.Errorf("opening session store: %w", err)
 	}

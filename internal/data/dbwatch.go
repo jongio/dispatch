@@ -146,7 +146,7 @@ func (w *DBWatcher) pollDataVersion() (changed bool, ok bool) {
 			return false, false
 		}
 		var err error
-		db, err = sql.Open("sqlite", w.path+"?mode=ro")
+		db, err = openReadOnlySQLite(w.path)
 		if err != nil {
 			w.mu.Unlock()
 			return false, false

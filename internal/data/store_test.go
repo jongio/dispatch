@@ -226,6 +226,47 @@ func TestOpenPathValidFile(t *testing.T) {
 	defer func() { _ = store.Close() }()
 }
 
+func TestOpenPathReadOnlyWithEscapedPath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "space # percent %")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("creating special-character directory: %v", err)
+	}
+	dbPath := filepath.Join(dir, "session store #1.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("creating temp db: %v", err)
+	}
+	if _, err := db.Exec(schemaSQL); err != nil {
+		_ = db.Close()
+		t.Fatalf("applying schema: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO sessions (id) VALUES ('readable')`); err != nil {
+		_ = db.Close()
+		t.Fatalf("seeding database: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("closing writer: %v", err)
+	}
+
+	store, err := OpenPath(dbPath)
+	if err != nil {
+		t.Fatalf("OpenPath(%q): %v", dbPath, err)
+	}
+	defer func() { _ = store.Close() }()
+
+	var id string
+	if err := store.db.QueryRow("SELECT id FROM sessions").Scan(&id); err != nil {
+		t.Fatalf("reading escaped database path: %v", err)
+	}
+	if id != "readable" {
+		t.Fatalf("id = %q, want readable", id)
+	}
+	if _, err := store.db.Exec(`INSERT INTO sessions (id) VALUES ('forbidden')`); err == nil {
+		t.Fatal("read-only store unexpectedly allowed a write")
+	}
+}
+
 func TestOpenPathInvalidSQLite(t *testing.T) {
 	dir := t.TempDir()
 	badFile := filepath.Join(dir, "not-a-db.sqlite")

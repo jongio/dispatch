@@ -222,6 +222,51 @@ func TestPollDataVersion_DetectsCommit(t *testing.T) {
 	}
 }
 
+func TestPollDataVersionReadOnlyWithEscapedPath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "watch # % space")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("creating special-character directory: %v", err)
+	}
+	dbPath := filepath.Join(dir, "session store #1.db")
+
+	writer, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("opening writer db: %v", err)
+	}
+	defer writer.Close()
+	if _, err := writer.ExecContext(context.Background(), "CREATE TABLE t (id INTEGER PRIMARY KEY)"); err != nil {
+		t.Fatalf("creating table: %v", err)
+	}
+
+	w := &DBWatcher{
+		path:     dbPath,
+		interval: time.Hour,
+		stop:     make(chan struct{}),
+	}
+	defer w.Stop()
+
+	if changed, ok := w.pollDataVersion(); changed || !ok {
+		t.Fatalf("first poll = (%v, %v), want (false, true)", changed, ok)
+	}
+
+	w.mu.Lock()
+	reader := w.db
+	w.mu.Unlock()
+	if reader == nil {
+		t.Fatal("watcher did not retain its read-only connection")
+	}
+	if _, err := reader.ExecContext(context.Background(), "INSERT INTO t (id) VALUES (1)"); err == nil {
+		t.Fatal("watcher read-only connection unexpectedly allowed a write")
+	}
+
+	if _, err := writer.ExecContext(context.Background(), "INSERT INTO t (id) VALUES (1)"); err != nil {
+		t.Fatalf("writing through external connection: %v", err)
+	}
+	if changed, ok := w.pollDataVersion(); !changed || !ok {
+		t.Fatalf("second poll = (%v, %v), want (true, true)", changed, ok)
+	}
+}
+
 func TestResetBaseline(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "session-store.db")
