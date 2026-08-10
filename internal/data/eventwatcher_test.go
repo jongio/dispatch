@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func recentTimestamp() string {
@@ -101,8 +103,6 @@ func TestEventWatcher_DebounceCollapses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("DISPATCH_SESSION_STATE", dir)
-
 	var mu sync.Mutex
 	callCount := 0
 
@@ -112,35 +112,24 @@ func TestEventWatcher_DebounceCollapses(t *testing.T) {
 		mu.Unlock()
 	}, 15*time.Minute, false)
 
-	if err := ew.Start(); err != nil {
-		t.Fatalf("Start() error: %v", err)
-	}
+	ew.wg.Add(1)
+	go ew.debounceLoop(dir)
 	defer ew.Stop()
 
-	time.Sleep(500 * time.Millisecond)
-
-	// Write rapidly 5 times within the debounce window.
 	for i := 0; i < 5; i++ {
-		line := fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())
-		if err := os.WriteFile(eventsPath, []byte(line), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(5 * time.Millisecond)
+		ew.scheduleClassify("debounce-sess")
 	}
 
-	// Wait for debounce to settle (longer to avoid flakiness under load).
-	time.Sleep(500 * time.Millisecond)
+	waitFor(t, 5*time.Second, "one debounced callback", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return callCount == 1
+	})
 
 	mu.Lock()
-	count := callCount
-	mu.Unlock()
-
-	// Should have collapsed to fewer callbacks than writes (not 5).
-	if count > 3 {
-		t.Errorf("expected <=3 debounced callbacks, got %d", count)
-	}
-	if count == 0 {
-		t.Error("expected at least 1 callback, got 0")
+	defer mu.Unlock()
+	if callCount != 1 {
+		t.Fatalf("callback count = %d, want exactly 1", callCount)
 	}
 }
 
@@ -156,29 +145,13 @@ func TestEventWatcher_IgnoresInvalidSessionIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("DISPATCH_SESSION_STATE", dir)
+	ew := NewEventWatcher(nil, 15*time.Minute, false)
+	ew.handleEvent(fsnotify.Event{Name: eventsPath, Op: fsnotify.Write}, dir)
 
-	called := false
-	ew := NewEventWatcher(func(id string, status AttentionStatus) {
-		called = true
-	}, 15*time.Minute, false)
-
-	if err := ew.Start(); err != nil {
-		t.Fatalf("Start() error: %v", err)
-	}
-	defer ew.Stop()
-
-	time.Sleep(500 * time.Millisecond)
-
-	// Modify the file — should NOT trigger callback.
-	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(200 * time.Millisecond)
-
-	if called {
-		t.Error("callback should not fire for invalid session ID")
+	ew.mu.Lock()
+	defer ew.mu.Unlock()
+	if len(ew.dirty) != 0 {
+		t.Fatalf("invalid session scheduled %d classifications, want 0", len(ew.dirty))
 	}
 }
 

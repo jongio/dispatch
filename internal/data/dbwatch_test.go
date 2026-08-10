@@ -49,6 +49,96 @@ func TestSetActive_FalseSkipsPolling(t *testing.T) {
 	}
 }
 
+func TestStopWaitsForInFlightCallback(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "session-store.db")
+	if err := os.WriteFile(dbPath, []byte("not sqlite"), 0o644); err != nil {
+		t.Fatalf("creating database fixture: %v", err)
+	}
+
+	callbackStarted := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	w := &DBWatcher{
+		path:     dbPath,
+		interval: time.Millisecond,
+		stop:     make(chan struct{}),
+		onChange: func() {
+			close(callbackStarted)
+			<-releaseCallback
+		},
+	}
+
+	if w.Poll() {
+		t.Fatal("first Poll should establish the modification baseline")
+	}
+	future := time.Now().Add(5 * time.Second)
+	if err := os.Chtimes(dbPath, future, future); err != nil {
+		t.Fatalf("updating database modification time: %v", err)
+	}
+
+	w.SetActive(true)
+	select {
+	case <-callbackStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for watcher callback")
+	}
+
+	stopDone := make(chan struct{})
+	go func() {
+		w.Stop()
+		close(stopDone)
+	}()
+	secondStopDone := make(chan struct{})
+	go func() {
+		w.Stop()
+		close(secondStopDone)
+	}()
+
+	waitFor(t, 5*time.Second, "watcher stop signal", func() bool {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.stopped
+	})
+	select {
+	case <-stopDone:
+		t.Fatal("Stop returned while callback was still running")
+	default:
+	}
+	select {
+	case <-secondStopDone:
+		t.Fatal("concurrent Stop returned while callback was still running")
+	default:
+	}
+
+	close(releaseCallback)
+	for name, done := range map[string]<-chan struct{}{
+		"first Stop":  stopDone,
+		"second Stop": secondStopDone,
+	} {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s did not return after callback completed", name)
+		}
+	}
+}
+
+func TestSetActiveAfterStopDoesNotStart(t *testing.T) {
+	w := NewDBWatcher(nil)
+	w.Stop()
+
+	w.SetActive(true)
+
+	w.mu.Lock()
+	started := w.started
+	w.mu.Unlock()
+	if started {
+		t.Fatal("SetActive started a watcher after Stop")
+	}
+	if w.Poll() {
+		t.Fatal("Poll reported a change after Stop")
+	}
+}
+
 func TestPollMtime_BaselineThenChange(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "session-store.db")

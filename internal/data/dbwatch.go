@@ -28,7 +28,10 @@ type DBWatcher struct {
 	path        string // path to session-store.db
 	interval    time.Duration
 	stop        chan struct{}
-	stopOnce    sync.Once
+	stopped     bool
+	done        chan struct{}
+	wg          sync.WaitGroup
+	pollWG      sync.WaitGroup
 	onChange    func() // callback fired when change detected
 	started     bool
 	db          *sql.DB // pinned read-only connection for data_version
@@ -46,6 +49,7 @@ func NewDBWatcher(onChange func()) *DBWatcher {
 		path:     path,
 		interval: 2 * time.Second,
 		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
 		onChange: onChange,
 	}
 }
@@ -69,16 +73,40 @@ func (w *DBWatcher) SetInterval(d time.Duration) {
 func (w *DBWatcher) SetActive(active bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.stopped {
+		return
+	}
 	w.active = active
 	if active && !w.started {
 		w.started = true
+		w.wg.Add(1)
 		go w.loop()
 	}
 }
 
-// Stop permanently stops the watcher. It is safe to call multiple times.
+// Stop permanently stops the watcher. It blocks until the polling goroutine
+// and any in-flight callback have exited, and is safe to call multiple times.
 func (w *DBWatcher) Stop() {
-	w.stopOnce.Do(func() { close(w.stop) })
+	w.mu.Lock()
+	if w.stopped {
+		done := w.done
+		w.mu.Unlock()
+		if done != nil {
+			<-done
+		}
+		return
+	}
+	w.stopped = true
+	if w.done == nil {
+		w.done = make(chan struct{})
+	}
+	done := w.done
+	close(w.stop)
+	w.mu.Unlock()
+
+	w.wg.Wait()
+	w.pollWG.Wait()
+
 	w.mu.Lock()
 	db := w.db
 	w.db = nil
@@ -86,6 +114,7 @@ func (w *DBWatcher) Stop() {
 	if db != nil {
 		_ = db.Close()
 	}
+	close(done)
 }
 
 // ResetBaseline updates the last-known state so the next poll cycle won't
@@ -115,6 +144,15 @@ func (w *DBWatcher) ResetBaseline() {
 // modified since the last check. This is also called internally by the
 // loop but can be called manually for immediate checks.
 func (w *DBWatcher) Poll() bool {
+	w.mu.Lock()
+	if w.stopped {
+		w.mu.Unlock()
+		return false
+	}
+	w.pollWG.Add(1)
+	w.mu.Unlock()
+	defer w.pollWG.Done()
+
 	if w.path == "" {
 		return false
 	}
@@ -219,6 +257,8 @@ func (w *DBWatcher) pollMtime() bool {
 }
 
 func (w *DBWatcher) loop() {
+	defer w.wg.Done()
+
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
