@@ -105,7 +105,7 @@ func TestWSL() error {
 // CoverageReport generates an HTML coverage report.
 func CoverageReport() error {
 	fmt.Println("\n=== Generating coverage report ===")
-	if err := run("go", "test", "./internal/...", "-coverprofile="+coverProfile, "-covermode=atomic"); err != nil {
+	if err := run("go", "test", "./...", "-coverprofile="+coverProfile, "-covermode=atomic"); err != nil {
 		return fmt.Errorf("coverage run: %w", err)
 	}
 	if err := run("go", "tool", "cover", "-html="+coverProfile, "-o", coverHTML); err != nil {
