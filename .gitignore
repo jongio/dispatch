@@ -43,6 +43,8 @@ CON
 web/node_modules/
 web/dist/
 web/.astro/
+web/test-results/
+web/playwright-report/
 
 # ── Screenshots tool (Playwright) ──────────────────────────
 .screenshots-check/

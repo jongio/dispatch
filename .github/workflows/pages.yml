@@ -6,6 +6,10 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
   workflow_call:
 
@@ -35,6 +39,8 @@ jobs:
 
       - run: npm install -g npm@latest
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
 
       - run: npm run build
 
@@ -43,6 +49,7 @@ jobs:
           path: web/dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
