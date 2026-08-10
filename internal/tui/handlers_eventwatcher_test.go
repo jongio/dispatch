@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jongio/dispatch/internal/data"
@@ -55,6 +56,56 @@ func TestHandleEventWatcherUpdate(t *testing.T) {
 				t.Errorf("statusInfo = %q, want %q", got.statusInfo, tt.wantStatusInfo)
 			}
 		})
+	}
+}
+
+func TestHandleNewSessionLaunched(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus string
+	}{
+		{name: "success", wantStatus: "New session launched ✓"},
+		{name: "failure", err: errors.New("terminal unavailable"), wantStatus: "Launch failed: terminal unavailable"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := newTestModel()
+			got, cmd := m.handleNewSessionLaunched(newSessionLaunchedMsg{cwd: "/tmp/project", err: tt.err})
+
+			if got.statusInfo != tt.wantStatus {
+				t.Fatalf("statusInfo = %q, want %q", got.statusInfo, tt.wantStatus)
+			}
+			if cmd == nil {
+				t.Fatal("handler should return a status-clear command")
+			}
+		})
+	}
+}
+
+func TestHandleFocusWindowResult(t *testing.T) {
+	t.Parallel()
+
+	m := newTestModel()
+	got, cmd := m.handleFocusWindowResult(focusWindowResultMsg{})
+	if got.statusInfo != "" {
+		t.Fatalf("success statusInfo = %q, want empty", got.statusInfo)
+	}
+	if cmd != nil {
+		t.Fatal("success should not return a command")
+	}
+
+	got, cmd = m.handleFocusWindowResult(focusWindowResultMsg{err: errors.New("window not found")})
+	if got.statusInfo != "Focus failed: window not found" {
+		t.Fatalf("failure statusInfo = %q, want focus error", got.statusInfo)
+	}
+	if cmd == nil {
+		t.Fatal("failure should return a status-clear command")
 	}
 }
 
