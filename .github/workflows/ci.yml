@@ -28,9 +28,8 @@ permissions:
 
 jobs:
   test:
-    # Tests run on Ubuntu only. Cross-platform compilation is verified in the
-    # cross-compile job. Native Windows/macOS testing requires platform-specific
-    # dependencies (ConPTY, system shells) not available in CI runners.
+    # Linux runs the full quality suite; native Windows/macOS behavior is
+    # exercised separately below.
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "0"           # Match release build settings
@@ -100,8 +99,8 @@ jobs:
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
           echo "Coverage: ${COVERAGE}%"
-          if [ "$(echo "$COVERAGE < 60" | bc -l)" -eq 1 ]; then
-            echo "::error::Coverage ${COVERAGE}% is below 60% threshold"
+          if [ "$(echo "$COVERAGE < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${COVERAGE}% is below 80% threshold"
             exit 1
           fi
 
@@ -120,6 +119,24 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
           govulncheck ./...
+
+  # Run native tests on the desktop platforms whose terminal, shell, focus,
+  # permissions, and filesystem behavior cannot be validated by cross-builds.
+  native-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run native test suite
+        run: go test ./... -count=1
 
   # Verify the binary compiles for all release platforms.
   # CGO_ENABLED=0 means cross-compilation is pure Go — no native runners needed.

@@ -54,6 +54,8 @@ func (cs *ColorScheme) Palette() [16]string {
 }
 
 // Validate checks that all required color fields are valid #RRGGBB values.
+//
+//nolint:goconst // Validation labels intentionally mirror the JSON field names.
 func (cs *ColorScheme) Validate() error {
 	fields := []struct {
 		name  string
