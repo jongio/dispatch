@@ -189,6 +189,36 @@ func TestRenderConversationMultipleTurns(t *testing.T) {
 	}
 }
 
+func TestPreviewPanelRedactsConversationSecrets(t *testing.T) {
+	const secret = "some-opaque-token-value"
+	panel := NewPreviewPanel()
+	panel.SetSize(100, 40)
+	panel.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "session-1"},
+		Turns: []data.Turn{{
+			UserMessage:       "Authorization: Bearer " + secret,
+			AssistantResponse: "token=" + secret,
+		}},
+	})
+
+	panel.SetRedactSecrets(true)
+	if !panel.RedactSecrets() {
+		t.Fatal("RedactSecrets() = false after enabling it")
+	}
+	redacted := panel.View()
+	if strings.Contains(redacted, secret) || !strings.Contains(redacted, "[redacted]") {
+		t.Fatalf("redacted preview exposed secret or omitted marker: %q", redacted)
+	}
+
+	panel.SetRedactSecrets(false)
+	if panel.RedactSecrets() {
+		t.Fatal("RedactSecrets() = true after disabling it")
+	}
+	if unredacted := panel.View(); !strings.Contains(unredacted, secret) {
+		t.Fatalf("unredacted preview omitted original content: %q", unredacted)
+	}
+}
+
 func TestRenderConversationMissingUserMessage(t *testing.T) {
 	t.Parallel()
 	turns := []data.Turn{
