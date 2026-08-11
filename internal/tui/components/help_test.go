@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"charm.land/bubbles/v2/key"
+	"charm.land/lipgloss/v2"
 )
 
 func testHelpOverlay() HelpOverlay {
@@ -147,6 +148,61 @@ func TestHelpOverlay_View_DoesNotPanic(t *testing.T) {
 	_ = h.View() // zero size
 	h.SetSize(80, 40)
 	_ = h.View()
+}
+
+func TestShortcutRowsUseWidthAwareColumns(t *testing.T) {
+	t.Parallel()
+	bindings := []key.Binding{
+		key.NewBinding(key.WithHelp("shift+tab", "reverse pivot order")),
+		key.NewBinding(key.WithHelp("ctrl+r", "rename launch set")),
+		key.NewBinding(key.WithHelp("b", "open PR/issue/commit")),
+		key.NewBinding(key.WithHelp("ctrl+d", "delete launch set")),
+	}
+	groups := []HelpGroup{{Title: "Long shortcuts", Bindings: bindings}}
+	keyWidth, entryWidth := shortcutMetrics(groups)
+	if keyWidth != len("shift+tab") {
+		t.Fatalf("key width = %d, want %d", keyWidth, len("shift+tab"))
+	}
+
+	wideRows := shortcutRows(bindings, 70, keyWidth, entryWidth)
+	if len(wideRows) != 2 {
+		t.Fatalf("wide row count = %d, want 2", len(wideRows))
+	}
+	for _, row := range wideRows {
+		if strings.Contains(row, "\n") || lipgloss.Width(row) > 70 {
+			t.Fatalf("wide row wrapped or overflowed: %q", row)
+		}
+	}
+
+	narrowRows := shortcutRows(bindings, 40, keyWidth, entryWidth)
+	if len(narrowRows) != len(bindings) {
+		t.Fatalf("narrow row count = %d, want %d", len(narrowRows), len(bindings))
+	}
+	for _, row := range narrowRows {
+		if strings.Contains(row, "\n") || lipgloss.Width(row) > 40 {
+			t.Fatalf("narrow row wrapped or overflowed: %q", row)
+		}
+	}
+}
+
+func TestHelpOverlay_ViewFitsTerminalWidth(t *testing.T) {
+	t.Parallel()
+	h := NewHelpOverlayWithBindings([]HelpGroup{{
+		Title: "Long shortcuts",
+		Bindings: []key.Binding{
+			key.NewBinding(key.WithHelp("shift+tab", "reverse pivot order")),
+			key.NewBinding(key.WithHelp("ctrl+r", "rename launch set")),
+			key.NewBinding(key.WithHelp("b", "open PR/issue/commit")),
+			key.NewBinding(key.WithHelp("ctrl+d", "delete launch set")),
+		},
+	}}, nil)
+	h.SetSize(80, 40)
+
+	for _, line := range strings.Split(h.View(), "\n") {
+		if width := lipgloss.Width(line); width > 80 {
+			t.Fatalf("rendered line width = %d, want at most 80: %q", width, line)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

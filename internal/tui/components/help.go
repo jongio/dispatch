@@ -24,6 +24,13 @@ type HelpOverlay struct {
 	short  []key.Binding
 }
 
+const (
+	helpMaxContentWidth = 88
+	helpFrameWidth      = 6
+	helpOuterMargin     = 4
+	shortcutColumnGap   = 4
+)
+
 // NewHelpOverlayWithBindings returns a HelpOverlay backed by effective key bindings.
 func NewHelpOverlayWithBindings(groups []HelpGroup, short []key.Binding) HelpOverlay {
 	return HelpOverlay{groups: groups, short: short}
@@ -35,24 +42,55 @@ func (h *HelpOverlay) SetSize(width, height int) {
 	h.height = height
 }
 
-// shortcutRow renders a pair of key+description bindings on a single line
-// with consistent column widths.
-func shortcutRow(key1, desc1, key2, desc2 string) string {
+func shortcutMetrics(groups []HelpGroup) (keyWidth, entryWidth int) {
+	maxDescriptionWidth := 0
+	for _, group := range groups {
+		for _, binding := range group.Bindings {
+			help := binding.Help()
+			keyWidth = max(keyWidth, lipgloss.Width(help.Key))
+			maxDescriptionWidth = max(maxDescriptionWidth, lipgloss.Width(help.Desc))
+		}
+	}
+	keyWidth = max(keyWidth, 1)
+	return keyWidth, keyWidth + 1 + max(maxDescriptionWidth, 1)
+}
+
+func renderShortcut(binding key.Binding, keyWidth, width int) string {
+	help := binding.Help()
+	keyWidth = min(keyWidth, max(1, width-2))
+	descWidth := max(1, width-keyWidth-1)
+	keyText := Truncate(help.Key, keyWidth)
+	descText := Truncate(help.Desc, descWidth)
+
 	keyStyle := lipgloss.NewStyle().
 		Foreground(styles.ColorPrimary).
-		Bold(true).
-		Width(6).
-		Align(lipgloss.Right)
-	descStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorText).
-		Width(16)
+		Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(styles.ColorText)
+	return keyStyle.Render(PadLeft(keyText, keyWidth)) + " " + descStyle.Render(descText)
+}
 
-	left := keyStyle.Render(key1) + " " + descStyle.Render(desc1)
-	if key2 != "" {
-		right := keyStyle.Render(key2) + " " + descStyle.Render(desc2)
-		return left + right
+func shortcutRows(bindings []key.Binding, contentWidth, keyWidth, entryWidth int) []string {
+	twoColumns := contentWidth >= entryWidth*2+shortcutColumnGap
+	if !twoColumns {
+		rows := make([]string, 0, len(bindings))
+		for _, binding := range bindings {
+			rows = append(rows, renderShortcut(binding, keyWidth, contentWidth))
+		}
+		return rows
 	}
-	return left
+
+	columnWidth := (contentWidth - shortcutColumnGap) / 2
+	rows := make([]string, 0, (len(bindings)+1)/2)
+	for i := 0; i < len(bindings); i += 2 {
+		left := renderShortcut(bindings[i], keyWidth, columnWidth)
+		if i+1 == len(bindings) {
+			rows = append(rows, left)
+			continue
+		}
+		right := renderShortcut(bindings[i+1], keyWidth, columnWidth)
+		rows = append(rows, PadToWidth(left, columnWidth)+strings.Repeat(" ", shortcutColumnGap)+right)
+	}
+	return rows
 }
 
 // legendRow renders a pair of icon+description entries on a single line,
@@ -71,17 +109,12 @@ func legendRow(icon1, desc1, icon2, desc2 string) string {
 	return left
 }
 
-func bindingRow(bindings []key.Binding, start int) string {
-	left := bindings[start].Help()
-	if start+1 < len(bindings) {
-		right := bindings[start+1].Help()
-		return shortcutRow(left.Key, left.Desc, right.Key, right.Desc)
-	}
-	return shortcutRow(left.Key, left.Desc, "", "")
-}
-
 // View renders the full help overlay centred on screen.
 func (h HelpOverlay) View() string {
+	contentWidth := min(helpMaxContentWidth, h.width-helpFrameWidth-helpOuterMargin)
+	contentWidth = max(contentWidth, 20)
+	keyWidth, entryWidth := shortcutMetrics(h.groups)
+
 	catStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(styles.ColorPrimary).
@@ -111,9 +144,9 @@ func (h HelpOverlay) View() string {
 				"", "",
 			))
 		}
-		for i := 0; i < len(group.Bindings); i += 2 {
+		for _, row := range shortcutRows(group.Bindings, contentWidth, keyWidth, entryWidth) {
 			sb.WriteByte('\n')
-			sb.WriteString(bindingRow(group.Bindings, i))
+			sb.WriteString(row)
 		}
 	}
 
@@ -130,11 +163,8 @@ func (h HelpOverlay) View() string {
 	body := title + "\n" + sb.String() + "\n\n" +
 		styles.DimmedStyle.Render("Press ? or Esc to close")
 
-	maxW := min(56, h.width-4)
-	maxW = max(maxW, 20)
-
 	overlay := styles.OverlayStyle.
-		Width(maxW).
+		Width(contentWidth).
 		Render(body)
 
 	return lipgloss.Place(h.width, h.height, lipgloss.Center, lipgloss.Center, overlay)
