@@ -30,49 +30,52 @@ func main() {
 		os.Exit(1)
 	}
 
-	var (
-		mode    string // "all" or "release"
-		fromTag string
-		toTag   string
-	)
+	mode, fromTag, toTag, err := parseArgs(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(1)
+	}
 
+	handled, err := runMode(repoDir, mode, fromTag, toTag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	if !handled {
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(1)
+	}
+}
+
+func parseArgs(args []string) (mode, fromTag, toTag string, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--all":
 			mode = "all"
-
 		case "--release":
-			mode = "release"
 			if i+2 >= len(args) {
-				fmt.Fprintln(os.Stderr, "error: --release requires <fromTag> <toTag>")
-				fmt.Fprint(os.Stderr, usage)
-				os.Exit(1)
+				return "", "", "", fmt.Errorf("error: --release requires <fromTag> <toTag>")
 			}
+			mode = "release"
 			fromTag = args[i+1]
 			toTag = args[i+2]
 			i += 2
-
 		default:
-			fmt.Fprintf(os.Stderr, "unknown argument: %s\n", args[i])
-			fmt.Fprint(os.Stderr, usage)
-			os.Exit(1)
+			return "", "", "", fmt.Errorf("unknown argument: %s", args[i])
 		}
 	}
+	return mode, fromTag, toTag, nil
+}
 
+func runMode(repoDir, mode, fromTag, toTag string) (bool, error) {
 	switch mode {
 	case "all":
-		if err := runAll(repoDir); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
+		return true, runAll(repoDir)
 	case "release":
-		if err := runRelease(repoDir, fromTag, toTag); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
+		return true, runRelease(repoDir, fromTag, toTag)
 	default:
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(1)
+		return false, nil
 	}
 }
 

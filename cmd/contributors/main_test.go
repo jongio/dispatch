@@ -162,6 +162,94 @@ func TestUsageContainsExpectedContent(t *testing.T) {
 	}
 }
 
+func TestParseArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		args        []string
+		wantMode    string
+		wantFromTag string
+		wantToTag   string
+		wantErr     string
+	}{
+		{name: "no arguments"},
+		{name: "all", args: []string{"--all"}, wantMode: "all"},
+		{
+			name:        "release",
+			args:        []string{"--release", "v1.0.0", "v1.1.0"},
+			wantMode:    "release",
+			wantFromTag: "v1.0.0",
+			wantToTag:   "v1.1.0",
+		},
+		{
+			name:    "release requires tags",
+			args:    []string{"--release"},
+			wantErr: "error: --release requires <fromTag> <toTag>",
+		},
+		{
+			name:    "unknown argument",
+			args:    []string{"--unknown"},
+			wantErr: "unknown argument: --unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mode, fromTag, toTag, err := parseArgs(tt.args)
+			if mode != tt.wantMode {
+				t.Fatalf("parseArgs() mode = %q, want %q", mode, tt.wantMode)
+			}
+			if fromTag != tt.wantFromTag {
+				t.Fatalf("parseArgs() fromTag = %q, want %q", fromTag, tt.wantFromTag)
+			}
+			if toTag != tt.wantToTag {
+				t.Fatalf("parseArgs() toTag = %q, want %q", toTag, tt.wantToTag)
+			}
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("parseArgs() error = %v, want nil", err)
+				}
+			} else if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("parseArgs() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRunMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		mode        string
+		wantHandled bool
+		wantErr     bool
+	}{
+		{name: "all", mode: "all", wantHandled: true, wantErr: true},
+		{name: "release", mode: "release", wantHandled: true, wantErr: true},
+		{name: "unknown", mode: "unknown"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			handled, err := runMode(t.TempDir(), tt.mode, "v1.0.0", "v1.1.0")
+			if handled != tt.wantHandled {
+				t.Fatalf("runMode() handled = %v, want %v", handled, tt.wantHandled)
+			}
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("runMode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Main subprocess tests — test argument parsing via exit codes
 // ---------------------------------------------------------------------------
