@@ -45,5 +45,9 @@ func runIsolated(m *testing.M) int {
 		os.Setenv("XDG_CONFIG_HOME", tmp)
 	}
 
+	// Unit tests exercise watcher messages directly; do not start live
+	// filesystem or database watchers from NewModel.
+	os.Setenv("DISPATCH_SCREENSHOT_MODE", "1")
+
 	return m.Run()
 }

@@ -971,24 +971,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if err := config.Save(m.cfg); err != nil {
 				m.statusErr = "config save: " + err.Error()
 			}
+			m.resetViewStateToDefaults()
 			// Apply the view settings.
 			if m.activeView != "" {
 				if v := m.cfg.FindView(m.activeView); v != nil {
 					m.applyNamedView(v)
 				}
-			} else {
-				// Reset to config defaults when switching back to Default.
-				m.timeRange = m.cfg.DefaultTimeRange
-				m.filter.Since = timeRangeToSince(m.timeRange)
-				m.sort.Field = sortFieldFromConfig(m.cfg.DefaultSort)
-				m.sort.Order = sortOrderFromConfig(m.cfg.EffectiveSortOrder())
-				m.pivot = m.cfg.DefaultPivot
-				m.showFavorited = false
-				m.showHidden = false
-				m.filter.ExcludedDirs = m.cfg.ExcludedDirs
-				m.searchBar.SetValue("")
-				m.searchFilter = SearchFilter{}
-				m.preview.SetSearchTerms(nil)
 			}
 			m.state = stateSessionList
 			return m, m.loadSessionsCmd()
@@ -4816,6 +4804,28 @@ func timeRangeToSince(r string) *time.Time {
 	default: // "all"
 		return nil
 	}
+}
+
+func (m *Model) resetViewStateToDefaults() {
+	m.timeRange = m.cfg.DefaultTimeRange
+	m.filter.Since = timeRangeToSince(m.timeRange)
+	m.sort.Field = sortFieldFromConfig(m.cfg.DefaultSort)
+	m.sort.Order = sortOrderFromConfig(m.cfg.EffectiveSortOrder())
+	m.pivot = m.cfg.DefaultPivot
+	m.showFavorited = false
+	m.showHidden = false
+	m.filter.ExcludedDirs = m.cfg.ExcludedDirs
+	m.filter.Query = ""
+	m.filter.DeepSearch = false
+	m.searchBar.SetValue("")
+	m.searchBar.SetSearching(false)
+	m.searchFilter = SearchFilter{}
+	m.preview.SetSearchTerms(nil)
+	m.search.lastRawInput = ""
+	m.search.historyIdx = len(m.search.history)
+	m.search.deepSearchVersion++
+	m.search.deepSearchPending = false
+	m.clearSearchTokenFilters()
 }
 
 // applyNamedView applies the settings from a named view to the model state.
