@@ -87,6 +87,9 @@ const (
 	// scan spinner is active ("⣾ Scanning work status…" ≈ 25 chars).
 	headerScanReserve = 28
 
+	// headerLoadReserve is the column reserve while sessions are loading.
+	headerLoadReserve = 28
+
 	// minSearchBarWidth is the minimum width for the search bar to remain
 	// usable when the header is cramped.
 	minSearchBarWidth = 15
@@ -290,6 +293,10 @@ type Model struct {
 	groups      []data.SessionGroup
 	quickStarts []components.QuickStart
 	detail      *data.SessionDetail
+
+	sessionsLoading    bool
+	sessionLoadVersion int
+	sessionLoadCancel  context.CancelFunc
 
 	// Detected shells and terminals for launch flow.
 	shells    []platform.ShellInfo
@@ -709,6 +716,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case groupsLoadedMsg:
 		return m.handleGroupsLoaded(msg)
+
+	case sessionLoadErrorMsg:
+		return m.handleSessionLoadError(msg)
 
 	case sessionDetailMsg:
 		return m.handleSessionDetail(msg)
@@ -2885,6 +2895,8 @@ func (m Model) renderHeader() string {
 		rightReserve = headerReindexReserve
 	} else if m.workStatus.workStatusScanning {
 		rightReserve = headerScanReserve
+	} else if m.sessionsLoading {
+		rightReserve = headerLoadReserve
 	}
 	searchW := m.width - lipgloss.Width(title) - rightReserve
 	if searchW < minSearchBarWidth {
@@ -2906,6 +2918,8 @@ func (m Model) renderHeader() string {
 		right = m.spinner.View() + " Rebuilding index…"
 	} else if m.workStatus.workStatusScanning {
 		right = m.spinner.View() + " Scanning work status…"
+	} else if m.sessionsLoading {
+		right = m.spinner.View() + " Loading sessions…"
 	}
 
 	gap := m.width - lipgloss.Width(title) - lipgloss.Width(search) - lipgloss.Width(right) - 2
@@ -3680,6 +3694,7 @@ func (m *Model) saveConfig() {
 // ---------------------------------------------------------------------------
 
 func (m *Model) setTimeRange(tr string) tea.Cmd {
+	previousSince := m.filter.Since
 	m.timeRange = tr
 	m.cfg.DefaultTimeRange = tr
 	m.saveConfig()
@@ -3687,8 +3702,29 @@ func (m *Model) setTimeRange(tr string) tea.Cmd {
 	// time-range selector; only apply the selector when no token is active.
 	if m.searchFilter.After == nil {
 		m.filter.Since = timeRangeToSince(tr)
+		if m.filter.Since != nil &&
+			(previousSince == nil || m.filter.Since.After(*previousSince)) {
+			m.previewNarrowerTimeRange(*m.filter.Since)
+		}
 	}
 	return m.loadSessionsCmd()
+}
+
+func (m *Model) previewNarrowerTimeRange(since time.Time) {
+	matches := func(session data.Session) bool {
+		lastActive, err := time.Parse(time.RFC3339, session.LastActiveAt)
+		return err != nil || !lastActive.Before(since)
+	}
+
+	if m.groups != nil {
+		m.groups = filterGroupsWhere(m.groups, matches)
+		m.sessionList.SetPivotField(m.pivot)
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
+	} else {
+		m.sessions = filterSessionsWhere(m.sessions, matches)
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
+	}
+	m.searchBar.SetResultCount(m.sessionList.SessionCount())
 }
 
 // ---------------------------------------------------------------------------
@@ -4000,6 +4036,11 @@ func (m Model) selectedSessionCwd() string {
 // ---------------------------------------------------------------------------
 
 func (m *Model) closeStore() {
+	if m.sessionLoadCancel != nil {
+		m.sessionLoadCancel()
+		m.sessionLoadCancel = nil
+	}
+	m.sessionsLoading = false
 	if m.dbWatcher != nil {
 		m.dbWatcher.Stop()
 	}
@@ -4085,16 +4126,25 @@ func detectTerminalsCmd() tea.Cmd {
 	}
 }
 
-func (m Model) loadSessionsCmd() tea.Cmd {
+func (m *Model) loadSessionsCmd() tea.Cmd {
+	if m.sessionLoadCancel != nil {
+		m.sessionLoadCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.sessionLoadCancel = cancel
+	m.sessionLoadVersion++
+	m.sessionsLoading = true
+
 	store := m.store
 	filter := m.filter
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
 	pivot := m.pivot
+	version := m.sessionLoadVersion
 
 	return func() tea.Msg {
 		if store == nil {
-			return dataErrorMsg{err: errors.New("store not available")}
+			return sessionLoadErrorMsg{err: errors.New("store not available"), version: version}
 		}
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
@@ -4106,9 +4156,9 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 				sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
 			}
 
-			groups, err := store.GroupSessions(context.Background(), pf, filter, sessionSort, limit)
+			groups, err := store.GroupSessions(ctx, pf, filter, sessionSort, limit)
 			if err != nil {
-				return dataErrorMsg{err: err}
+				return sessionLoadErrorMsg{err: err, version: version}
 			}
 			// Group ordering is fixed per pivot mode (sort direction
 			// only affects sessions, not groups):
@@ -4119,13 +4169,13 @@ func (m Model) loadSessionsCmd() tea.Cmd {
 			} else {
 				sortGroupsByLabel(groups, data.Ascending)
 			}
-			return groupsLoadedMsg{groups: groups}
+			return groupsLoadedMsg{groups: groups, version: version}
 		}
-		sessions, err := store.ListSessions(context.Background(), filter, sortOpts, limit)
+		sessions, err := store.ListSessions(ctx, filter, sortOpts, limit)
 		if err != nil {
-			return dataErrorMsg{err: err}
+			return sessionLoadErrorMsg{err: err, version: version}
 		}
-		return sessionsLoadedMsg{sessions: sessions}
+		return sessionsLoadedMsg{sessions: sessions, version: version}
 	}
 }
 

@@ -182,8 +182,8 @@ func TestUpdate_StoreOpenedMsg(t *testing.T) {
 	m.state = stateLoading
 	result, cmd := m.Update(storeOpenedMsg{store: nil})
 	rm := result.(Model)
-	if rm.state != stateSessionList {
-		t.Errorf("state = %v, want stateSessionList", rm.state)
+	if rm.state != stateLoading || !rm.sessionsLoading {
+		t.Errorf("state = %v, loading = %v, want loading state", rm.state, rm.sessionsLoading)
 	}
 	// cmd should be non-nil (loadSessionsCmd)
 	if cmd == nil {
@@ -1168,10 +1168,75 @@ func TestLoadSessionsCmd_NilStore(t *testing.T) {
 		t.Fatal("loadSessionsCmd should return non-nil Cmd")
 	}
 	msg := cmd()
-	if de, ok := msg.(dataErrorMsg); !ok {
-		t.Errorf("msg type = %T, want dataErrorMsg", msg)
+	if de, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Errorf("msg type = %T, want sessionLoadErrorMsg", msg)
 	} else if de.err == nil {
-		t.Error("dataErrorMsg.err should be non-nil for nil store")
+		t.Error("sessionLoadErrorMsg.err should be non-nil for nil store")
+	}
+}
+
+func TestLoadSessionsCmdSupersedesStaleResults(t *testing.T) {
+	m := newTestModel()
+	first := m.loadSessionsCmd()
+	second := m.loadSessionsCmd()
+
+	result, _ := m.Update(first())
+	got := result.(Model)
+	if !got.sessionsLoading || got.sessionLoadVersion != 2 {
+		t.Fatalf("stale result changed load state: loading = %v, version = %d",
+			got.sessionsLoading, got.sessionLoadVersion)
+	}
+
+	result, _ = got.Update(second())
+	got = result.(Model)
+	if got.sessionsLoading {
+		t.Fatal("latest result should finish session loading")
+	}
+}
+
+func TestSessionsLoadedClearsLoadingIndicator(t *testing.T) {
+	m := newTestModel()
+	m.state = stateLoading
+	m.sessionsLoading = true
+	m.sessionLoadVersion = 3
+
+	result, _ := m.Update(sessionsLoadedMsg{
+		sessions: []data.Session{{ID: "session-1"}},
+		version:  3,
+	})
+	got := result.(Model)
+	if got.sessionsLoading || got.state != stateSessionList {
+		t.Fatalf("loaded state = %v, loading = %v", got.state, got.sessionsLoading)
+	}
+}
+
+func TestRenderHeaderShowsSessionLoading(t *testing.T) {
+	m := newTestModelWithSize(120, 30)
+	m.sessionsLoading = true
+
+	if header := m.renderHeader(); !strings.Contains(header, "Loading sessions") {
+		t.Fatalf("renderHeader() = %q, want loading status", header)
+	}
+}
+
+func TestSetTimeRangePreviewsNarrowerResults(t *testing.T) {
+	m := newTestModel()
+	m.timeRange = "all"
+	m.filter.Since = nil
+	m.sessions = []data.Session{
+		{ID: "recent", LastActiveAt: time.Now().UTC().Format(time.RFC3339)},
+		{ID: "old", LastActiveAt: time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)},
+	}
+	m.sessionList.SetSessions(m.sessions)
+
+	if cmd := m.setTimeRange("1h"); cmd == nil {
+		t.Fatal("setTimeRange() returned nil command")
+	}
+	if len(m.sessions) != 1 || m.sessions[0].ID != "recent" {
+		t.Fatalf("preview sessions = %#v, want recent session only", m.sessions)
+	}
+	if !m.sessionsLoading {
+		t.Fatal("setTimeRange() should show the loading indicator")
 	}
 }
 
@@ -2781,8 +2846,8 @@ func TestLoadSessionsCmd_PivotMode_NilStore(t *testing.T) {
 		t.Fatal("loadSessionsCmd should return non-nil Cmd")
 	}
 	msg := cmd()
-	if _, ok := msg.(dataErrorMsg); !ok {
-		t.Errorf("msg type = %T, want dataErrorMsg", msg)
+	if _, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Errorf("msg type = %T, want sessionLoadErrorMsg", msg)
 	}
 }
 
@@ -3366,8 +3431,8 @@ func TestLoadSessionsCmd_NilStore_Execute(t *testing.T) {
 		t.Fatal("cmd should not be nil")
 	}
 	msg := cmd()
-	if _, ok := msg.(dataErrorMsg); !ok {
-		t.Errorf("expected dataErrorMsg for nil store, got %T", msg)
+	if _, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Errorf("expected sessionLoadErrorMsg for nil store, got %T", msg)
 	}
 }
 
@@ -3379,8 +3444,8 @@ func TestLoadSessionsCmd_PivotMode_NilStore_Execute(t *testing.T) {
 		t.Fatal("cmd should not be nil")
 	}
 	msg := cmd()
-	if _, ok := msg.(dataErrorMsg); !ok {
-		t.Errorf("expected dataErrorMsg for nil store pivot, got %T", msg)
+	if _, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Errorf("expected sessionLoadErrorMsg for nil store pivot, got %T", msg)
 	}
 }
 

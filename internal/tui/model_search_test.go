@@ -130,8 +130,8 @@ func TestStoreOpenedAppliesInitialQuery(t *testing.T) {
 	result, cmd := m.Update(storeOpenedMsg{store: nil})
 	rm := result.(Model)
 
-	if rm.state != stateSessionList {
-		t.Errorf("state = %v, want stateSessionList", rm.state)
+	if rm.state != stateLoading || !rm.sessionsLoading {
+		t.Errorf("state = %v, loading = %v, want loading state", rm.state, rm.sessionsLoading)
 	}
 	if rm.filter.Query != "seattle" {
 		t.Errorf("filter.Query = %q, want %q", rm.filter.Query, "seattle")

@@ -264,8 +264,8 @@ func TestLoadSessionsCmdCov_NilStore(t *testing.T) {
 	}
 
 	msg := cmd()
-	if _, ok := msg.(dataErrorMsg); !ok {
-		t.Fatalf("expected dataErrorMsg with nil store, got %T", msg)
+	if _, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Fatalf("expected sessionLoadErrorMsg with nil store, got %T", msg)
 	}
 }
 
@@ -276,8 +276,8 @@ func TestLoadSessionsCmd_WithPivot(t *testing.T) {
 
 	cmd := m.loadSessionsCmd()
 	msg := cmd()
-	if _, ok := msg.(dataErrorMsg); !ok {
-		t.Fatalf("expected dataErrorMsg with nil store + pivot, got %T", msg)
+	if _, ok := msg.(sessionLoadErrorMsg); !ok {
+		t.Fatalf("expected sessionLoadErrorMsg with nil store + pivot, got %T", msg)
 	}
 }
 

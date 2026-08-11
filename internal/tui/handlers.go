@@ -67,7 +67,6 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (Model, tea.Cmd) {
 
 func (m Model) handleStoreOpened(msg storeOpenedMsg) (Model, tea.Cmd) {
 	m.store = msg.store
-	m.state = stateSessionList
 	// Apply a command-line search query before building the load command so
 	// the first load is already filtered.
 	var extra []tea.Cmd
@@ -404,6 +403,10 @@ func (m Model) handlePendingClickFire(msg pendingClickFireMsg) (Model, tea.Cmd) 
 // ----- Session data loading ------------------------------------------------
 
 func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
+	if msg.version != m.sessionLoadVersion {
+		return m, nil
+	}
+	m.finishSessionLoad()
 	prevID := m.selectedSessionID()
 	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
@@ -435,6 +438,10 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
+	if msg.version != m.sessionLoadVersion {
+		return m, nil
+	}
+	m.finishSessionLoad()
 	prevID := m.selectedSessionID()
 	m.groups = m.applyGroupFilters(msg.groups)
 	for i := range m.groups {
@@ -529,6 +536,28 @@ func (m Model) handleDataError(msg dataErrorMsg) (Model, tea.Cmd) { //nolint:unp
 		m.state = stateSessionList
 	}
 	return m, nil
+}
+
+func (m Model) handleSessionLoadError(msg sessionLoadErrorMsg) (Model, tea.Cmd) { //nolint:unparam
+	if msg.version != m.sessionLoadVersion {
+		return m, nil
+	}
+	m.finishSessionLoad()
+	if !errors.Is(msg.err, context.Canceled) {
+		m.statusErr = "Data: " + msg.err.Error()
+	}
+	if m.state == stateLoading {
+		m.state = stateSessionList
+	}
+	return m, nil
+}
+
+func (m *Model) finishSessionLoad() {
+	m.sessionsLoading = false
+	if m.sessionLoadCancel != nil {
+		m.sessionLoadCancel()
+		m.sessionLoadCancel = nil
+	}
 }
 
 // bellFn writes the terminal bell (BEL) character. It is a package variable so

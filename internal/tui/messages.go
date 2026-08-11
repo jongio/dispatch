@@ -18,15 +18,28 @@ type (
 
 // Session data loading.
 type (
-	sessionsLoadedMsg struct{ sessions []data.Session }
-	groupsLoadedMsg   struct{ groups []data.SessionGroup }
-	sessionDetailMsg  struct {
+	sessionsLoadedMsg struct {
+		sessions []data.Session
+		version  int
+	}
+	groupsLoadedMsg struct {
+		groups  []data.SessionGroup
+		version int
+	}
+	sessionDetailMsg struct {
 		detail  *data.SessionDetail
 		related []components.RelatedSessionItem
 		version int // matches Model.detailVersion to discard stale results
 	}
 )
-type dataErrorMsg struct{ err error }
+
+type (
+	dataErrorMsg        struct{ err error }
+	sessionLoadErrorMsg struct {
+		err     error
+		version int
+	}
+)
 
 type projectQuickStartsMsg struct {
 	quickStarts []components.QuickStart
