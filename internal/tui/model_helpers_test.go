@@ -138,6 +138,7 @@ func TestSortDisplayLabel(t *testing.T) {
 	}{
 		{data.SortByFolder, "folder"},
 		{data.SortByName, "name"},
+		{data.SortByFrecency, "recent"},
 		{data.SortByUpdated, "updated"},
 		{data.SortByCreated, "updated"}, // default
 		{data.SortByTurns, "updated"},   // default
@@ -646,6 +647,127 @@ func TestToggleSortOrder(t *testing.T) {
 	m.toggleSortOrder()
 	if m.sort.Order != data.Descending {
 		t.Errorf("toggle from ASC → DESC, got %v", m.sort.Order)
+	}
+}
+
+func TestSortSessionsLocally(t *testing.T) {
+	now := time.Now()
+	m := newTestModel()
+	m.attentionMap = map[string]data.AttentionStatus{
+		"a": data.AttentionIdle,
+		"b": data.AttentionWaiting,
+	}
+	m.cfg.SessionLaunches = map[string]config.SessionLaunch{
+		"a": {Count: 1, Last: now.Add(-time.Hour).Unix()},
+		"b": {Count: 5, Last: now.Unix()},
+	}
+
+	tests := []struct {
+		name  string
+		field data.SortField
+		a     data.Session
+		b     data.Session
+	}{
+		{name: "updated", field: data.SortByUpdated, a: data.Session{ID: "a", LastActiveAt: "1"}, b: data.Session{ID: "b", LastActiveAt: "2"}},
+		{name: "created", field: data.SortByCreated, a: data.Session{ID: "a", CreatedAt: "1"}, b: data.Session{ID: "b", CreatedAt: "2"}},
+		{name: "turns", field: data.SortByTurns, a: data.Session{ID: "a", TurnCount: 1}, b: data.Session{ID: "b", TurnCount: 2}},
+		{name: "name", field: data.SortByName, a: data.Session{ID: "a", Summary: "a"}, b: data.Session{ID: "b", Summary: "b"}},
+		{name: "folder", field: data.SortByFolder, a: data.Session{ID: "a", Cwd: "a"}, b: data.Session{ID: "b", Cwd: "b"}},
+		{name: "attention", field: data.SortByAttention, a: data.Session{ID: "a"}, b: data.Session{ID: "b"}},
+		{name: "frecency", field: data.SortByFrecency, a: data.Session{ID: "a"}, b: data.Session{ID: "b"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sessions := []data.Session{tt.a, tt.b}
+			m.sortSessionsLocally(sessions, data.SortOptions{Field: tt.field, Order: data.Descending})
+			if sessions[0].ID != "b" {
+				t.Fatalf("descending sessions = %#v", sessions)
+			}
+			m.sortSessionsLocally(sessions, data.SortOptions{Field: tt.field, Order: data.Ascending})
+			if sessions[0].ID != "a" {
+				t.Fatalf("ascending sessions = %#v", sessions)
+			}
+		})
+	}
+}
+
+func TestPreviewCurrentSortUpdatesFlatAndGroupedSessions(t *testing.T) {
+	t.Run("flat", func(t *testing.T) {
+		m := newTestModel()
+		m.sessions = []data.Session{{ID: "a", Cwd: "a"}, {ID: "b", Cwd: "b"}}
+		m.sessionList.SetSessions(m.sessions)
+		m.sort = data.SortOptions{Field: data.SortByFolder, Order: data.Descending}
+
+		m.previewCurrentSort()
+		if m.sessions[0].ID != "b" {
+			t.Fatalf("flat sessions = %#v", m.sessions)
+		}
+	})
+
+	t.Run("grouped", func(t *testing.T) {
+		m := newTestModel()
+		m.groups = []data.SessionGroup{{
+			Label:    "group",
+			Sessions: []data.Session{{ID: "a", Summary: "a"}, {ID: "b", Summary: "b"}},
+			Count:    2,
+		}}
+		m.sessionList.SetGroups(m.groups)
+		m.sort = data.SortOptions{Field: data.SortByName, Order: data.Descending}
+
+		m.previewCurrentSort()
+		if m.groups[0].Sessions[0].ID != "b" {
+			t.Fatalf("grouped sessions = %#v", m.groups)
+		}
+	})
+}
+
+func TestPreviewCurrentPivotRegroupsVisibleSessions(t *testing.T) {
+	m := newTestModel()
+	m.sessions = []data.Session{
+		{ID: "a", Repository: "repo-b", Summary: "b"},
+		{ID: "b", Repository: "repo-a", Summary: "a"},
+	}
+	m.sessionList.SetSessions(m.sessions)
+	m.pivot = pivotRepo
+	m.sort = data.SortOptions{Field: data.SortByName, Order: data.Ascending}
+
+	m.previewCurrentPivot()
+	if m.sessions != nil || len(m.groups) != 2 ||
+		m.groups[0].Label != "repo-a" || m.groups[1].Label != "repo-b" {
+		t.Fatalf("repo groups = %#v, sessions = %#v", m.groups, m.sessions)
+	}
+
+	m.pivot = pivotNone
+	m.previewCurrentPivot()
+	if m.groups != nil || len(m.sessions) != 2 || m.sessions[0].Summary != "a" {
+		t.Fatalf("flat sessions = %#v, groups = %#v", m.sessions, m.groups)
+	}
+}
+
+func TestPreviewGroupLabel(t *testing.T) {
+	session := data.Session{
+		Cwd:          "folder",
+		Repository:   "repo",
+		Branch:       "branch",
+		HostType:     "host",
+		LastActiveAt: "2026-08-11T12:00:00Z",
+	}
+	tests := map[string]string{
+		pivotFolder: "folder",
+		pivotRepo:   "repo",
+		pivotBranch: "branch",
+		pivotDate:   time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC).Local().Format("2006-01-02"),
+		pivotHost:   "host",
+	}
+	for pivot, want := range tests {
+		if got := previewGroupLabel(session, pivot); got != want {
+			t.Errorf("previewGroupLabel(%q) = %q, want %q", pivot, got, want)
+		}
+	}
+
+	session.LastActiveAt = "2026-08-10 invalid"
+	if got := previewGroupLabel(session, pivotDate); got != "2026-08-10" {
+		t.Errorf("invalid date fallback = %q", got)
 	}
 }
 

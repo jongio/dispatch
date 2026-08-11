@@ -792,7 +792,8 @@ func (m Model) handleGitStateScanned(msg gitStateScannedMsg) (Model, tea.Cmd) {
 	// When a git-state filter is active, reload sessions so the list
 	// reflects the detected states.
 	if m.filterGitDirty || m.filterMissingWorkspace {
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 	}
 	return m, nil
 }

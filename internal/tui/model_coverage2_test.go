@@ -251,37 +251,6 @@ func TestScanPlansCmd_ReturnsCmdFunc(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// loadSessionsCmd — 40.9% coverage
-// ---------------------------------------------------------------------------
-
-func TestLoadSessionsCmdCov_NilStore(t *testing.T) {
-	m := newTestModel()
-	m.store = nil
-
-	cmd := m.loadSessionsCmd()
-	if cmd == nil {
-		t.Fatal("loadSessionsCmd should return non-nil Cmd")
-	}
-
-	msg := cmd()
-	if _, ok := msg.(sessionLoadErrorMsg); !ok {
-		t.Fatalf("expected sessionLoadErrorMsg with nil store, got %T", msg)
-	}
-}
-
-func TestLoadSessionsCmd_WithPivot(t *testing.T) {
-	m := newTestModel()
-	m.store = nil // Still nil — we just test that the pivot path runs
-	m.pivot = "folder"
-
-	cmd := m.loadSessionsCmd()
-	msg := cmd()
-	if _, ok := msg.(sessionLoadErrorMsg); !ok {
-		t.Fatalf("expected sessionLoadErrorMsg with nil store + pivot, got %T", msg)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // deepSearchCmd — 43.5% coverage
 // ---------------------------------------------------------------------------
 

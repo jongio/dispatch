@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"strconv"
@@ -1176,26 +1177,66 @@ func TestLoadSessionsCmd_NilStore(t *testing.T) {
 }
 
 func TestLoadSessionsCmdSupersedesStaleResults(t *testing.T) {
-	m := newTestModel()
+	m := newBehavioralFlowModel(t)
+	m.sessions = []data.Session{{ID: "current"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.sessionsLoading = true
+	m.sessionLoadVersion = 2
+
+	result, _ := m.Update(sessionsLoadedMsg{
+		sessions: []data.Session{{ID: "stale"}},
+		version:  1,
+	})
+	got := result.(Model)
+	if len(got.sessions) != 1 || got.sessions[0].ID != "current" ||
+		!got.sessionsLoading {
+		t.Fatalf("stale flat result changed model: sessions = %#v, loading = %v",
+			got.sessions, got.sessionsLoading)
+	}
+
+	got.pivot = pivotFolder
+	got.groups = []data.SessionGroup{{
+		Label:    "current",
+		Sessions: []data.Session{{ID: "current"}},
+		Count:    1,
+	}}
+	got.sessionList.SetPivotField(pivotFolder)
+	got.sessionList.SetGroupsWithQuickStarts(got.groups, nil)
+	result, _ = got.Update(groupsLoadedMsg{
+		groups: []data.SessionGroup{{
+			Label:    "stale",
+			Sessions: []data.Session{{ID: "stale"}},
+			Count:    1,
+		}},
+		version: 1,
+	})
+	got = result.(Model)
+	if len(got.groups) != 1 || got.groups[0].Label != "current" ||
+		!got.sessionsLoading {
+		t.Fatalf("stale grouped result changed model: groups = %#v, loading = %v",
+			got.groups, got.sessionsLoading)
+	}
+}
+
+func TestLoadSessionsCmdCancelsPredecessor(t *testing.T) {
+	m := newBehavioralFlowModel(t)
+	m.store = openBehavioralFlowStore(t)
+
 	first := m.loadSessionsCmd()
 	second := m.loadSessionsCmd()
 
-	result, _ := m.Update(first())
-	got := result.(Model)
-	if !got.sessionsLoading || got.sessionLoadVersion != 2 {
-		t.Fatalf("stale result changed load state: loading = %v, version = %d",
-			got.sessionsLoading, got.sessionLoadVersion)
+	firstResult, ok := first().(sessionLoadErrorMsg)
+	if !ok || !errors.Is(firstResult.err, context.Canceled) || firstResult.version != 1 {
+		t.Fatalf("first result = %#v, want version 1 cancellation", firstResult)
 	}
-
-	result, _ = got.Update(second())
-	got = result.(Model)
-	if got.sessionsLoading {
-		t.Fatal("latest result should finish session loading")
+	secondResult, ok := second().(sessionsLoadedMsg)
+	if !ok || secondResult.version != 2 || len(secondResult.sessions) == 0 {
+		t.Fatalf("second result = %#v, want current sessions", secondResult)
 	}
 }
 
 func TestSessionsLoadedClearsLoadingIndicator(t *testing.T) {
-	m := newTestModel()
+	m := newBehavioralFlowModel(t)
 	m.state = stateLoading
 	m.sessionsLoading = true
 	m.sessionLoadVersion = 3
@@ -1210,33 +1251,131 @@ func TestSessionsLoadedClearsLoadingIndicator(t *testing.T) {
 	}
 }
 
-func TestRenderHeaderShowsSessionLoading(t *testing.T) {
-	m := newTestModelWithSize(120, 30)
-	m.sessionsLoading = true
+func TestSessionLoadErrorRecovery(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus bool
+	}{
+		{name: "load failure is visible", err: errors.New("query failed"), wantStatus: true},
+		{name: "cancellation is silent", err: context.Canceled},
+	}
 
-	if header := m.renderHeader(); !strings.Contains(header, "Loading sessions") {
-		t.Fatalf("renderHeader() = %q, want loading status", header)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newBehavioralFlowModel(t)
+			m.state = stateLoading
+			m.sessionsLoading = true
+			m.sessionLoadVersion = 4
+
+			result, _ := m.Update(sessionLoadErrorMsg{err: tt.err, version: 4})
+			got := result.(Model)
+			if got.state != stateSessionList || got.sessionsLoading {
+				t.Fatalf("state = %v, loading = %v", got.state, got.sessionsLoading)
+			}
+			if tt.wantStatus != (got.statusErr != "") {
+				t.Fatalf("statusErr = %q, want status = %v", got.statusErr, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestRenderHeaderShowsSessionLoading(t *testing.T) {
+	for _, width := range []int{80, 120} {
+		m := newTestModelWithSize(width, 30)
+		m.state = stateSessionList
+		m.sessionsLoading = true
+
+		if view := m.View().Content; !strings.Contains(view, "Loading sessions") {
+			t.Fatalf("View() at width %d omitted loading status: %q", width, view)
+		}
 	}
 }
 
 func TestSetTimeRangePreviewsNarrowerResults(t *testing.T) {
-	m := newTestModel()
-	m.timeRange = "all"
-	m.filter.Since = nil
-	m.sessions = []data.Session{
-		{ID: "recent", LastActiveAt: time.Now().UTC().Format(time.RFC3339)},
-		{ID: "old", LastActiveAt: time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)},
-	}
-	m.sessionList.SetSessions(m.sessions)
+	now := time.Now().UTC().Truncate(time.Second)
+	recent := data.Session{ID: "recent", LastActiveAt: now.Format(time.RFC3339)}
+	old := data.Session{ID: "old", LastActiveAt: now.Add(-2 * time.Hour).Format(time.RFC3339)}
+	invalid := data.Session{ID: "invalid", LastActiveAt: "not-a-time"}
 
-	if cmd := m.setTimeRange("1h"); cmd == nil {
-		t.Fatal("setTimeRange() returned nil command")
-	}
-	if len(m.sessions) != 1 || m.sessions[0].ID != "recent" {
-		t.Fatalf("preview sessions = %#v, want recent session only", m.sessions)
-	}
-	if !m.sessionsLoading {
-		t.Fatal("setTimeRange() should show the loading indicator")
+	t.Run("flat sessions", func(t *testing.T) {
+		m := newTestModel()
+		m.timeRange = "all"
+		m.sessions = []data.Session{recent, old, invalid}
+		m.sessionList.SetSessions(m.sessions)
+
+		if cmd := m.setTimeRange("1h"); cmd == nil {
+			t.Fatal("setTimeRange() returned nil command")
+		}
+		if len(m.sessions) != 1 || m.sessions[0].ID != "recent" ||
+			m.sessionList.SessionCount() != 1 {
+			t.Fatalf("preview sessions = %#v, count = %d", m.sessions, m.sessionList.SessionCount())
+		}
+		if !m.sessionsLoading {
+			t.Fatal("setTimeRange() should show the loading indicator")
+		}
+	})
+
+	t.Run("grouped sessions", func(t *testing.T) {
+		m := newTestModel()
+		m.timeRange = "all"
+		m.pivot = pivotFolder
+		m.groups = []data.SessionGroup{
+			{Label: "recent", Sessions: []data.Session{recent}, Count: 1},
+			{Label: "old", Sessions: []data.Session{old, invalid}, Count: 2},
+		}
+		m.sessionList.SetPivotField(pivotFolder)
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, nil)
+
+		m.setTimeRange("1h")
+		if len(m.groups) != 1 || m.groups[0].Label != "recent" ||
+			m.sessionList.SessionCount() != 1 {
+			t.Fatalf("preview groups = %#v, count = %d", m.groups, m.sessionList.SessionCount())
+		}
+	})
+
+	t.Run("widening does not preview", func(t *testing.T) {
+		m := newTestModel()
+		m.timeRange = "1h"
+		since := now.Add(-time.Hour)
+		m.filter.Since = &since
+		m.sessions = []data.Session{recent}
+		m.sessionList.SetSessions(m.sessions)
+
+		m.setTimeRange("all")
+		if len(m.sessions) != 1 || m.sessions[0].ID != "recent" {
+			t.Fatalf("widening changed preview sessions: %#v", m.sessions)
+		}
+	})
+
+	t.Run("after filter takes precedence", func(t *testing.T) {
+		m := newTestModel()
+		after := now.Add(-24 * time.Hour)
+		m.searchFilter.After = &after
+		m.filter.Since = &after
+		m.sessions = []data.Session{recent, old}
+		m.sessionList.SetSessions(m.sessions)
+
+		m.setTimeRange("1h")
+		if m.filter.Since != &after && !m.filter.Since.Equal(after) {
+			t.Fatalf("filter since = %v, want %v", m.filter.Since, after)
+		}
+		if len(m.sessions) != 2 {
+			t.Fatalf("after filter should prevent preview, got %#v", m.sessions)
+		}
+	})
+}
+
+func TestCloseStoreCancelsSessionLoad(t *testing.T) {
+	m := newTestModel()
+	cancelled := false
+	m.sessionLoadCancel = func() { cancelled = true }
+	m.sessionsLoading = true
+
+	m.closeStore()
+	if !cancelled || m.sessionLoadCancel != nil || m.sessionsLoading {
+		t.Fatalf("cancelled = %v, cancel set = %v, loading = %v",
+			cancelled, m.sessionLoadCancel != nil, m.sessionsLoading)
 	}
 }
 
@@ -1806,6 +1945,29 @@ func TestHandleKey_Sort(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("sort should return loadSessionsCmd")
+	}
+}
+
+func TestHandleKey_SortAppliesLoadedResult(t *testing.T) {
+	m := newBehavioralFlowModel(t)
+	m.store = openBehavioralFlowStore(t)
+	m.sort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+
+	result, cmd := m.Update(runeKeyMsg('s'))
+	got := result.(Model)
+	if got.sort.Field != data.SortByFolder || got.sessionLoadVersion != 1 {
+		t.Fatalf("sort = %#v, load version = %d", got.sort, got.sessionLoadVersion)
+	}
+
+	result, _ = got.Update(cmd())
+	got = result.(Model)
+	if got.sessionsLoading || len(got.sessions) != 5 {
+		t.Fatalf("loading = %v, sessions = %#v", got.sessionsLoading, got.sessions)
+	}
+	for i := 1; i < len(got.sessions); i++ {
+		if got.sessions[i-1].Cwd < got.sessions[i].Cwd {
+			t.Fatalf("sessions are not sorted by folder descending: %#v", got.sessions)
+		}
 	}
 }
 
@@ -2424,25 +2586,37 @@ func TestHandleKey_TimeRange4(t *testing.T) {
 func TestHandleKey_Up(t *testing.T) {
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
+	m.sessionList.MoveDown()
 	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-	_ = result.(Model)
-	// Just verify no panic.
+	got := result.(Model)
+	if got.selectedSessionID() != "s1" {
+		t.Fatalf("selected session = %q, want s1", got.selectedSessionID())
+	}
 }
 
 func TestHandleKey_Down(t *testing.T) {
 	m := newTestModel()
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}})
 	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	_ = result.(Model)
+	got := result.(Model)
+	if got.selectedSessionID() != "s2" {
+		t.Fatalf("selected session = %q, want s2", got.selectedSessionID())
+	}
 }
 
 func TestHandleKey_LeftRight_Folder(t *testing.T) {
 	m := newTestModel()
-	// Left/right on non-folder item should be noop.
+	m.sessionList.SetSessions([]data.Session{{ID: "s1"}})
 	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
-	_ = result.(Model)
-	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	_ = result.(Model)
+	got := result.(Model)
+	if got.selectedSessionID() != "s1" {
+		t.Fatalf("left changed non-folder selection to %q", got.selectedSessionID())
+	}
+	result, _ = got.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	got = result.(Model)
+	if got.selectedSessionID() != "s1" {
+		t.Fatalf("right changed non-folder selection to %q", got.selectedSessionID())
+	}
 }
 
 func TestHandleKey_Enter_NoSelection(t *testing.T) {
@@ -2830,24 +3004,6 @@ func TestUpdate_UnhandledMsg(t *testing.T) {
 	_ = result.(Model)
 	if cmd != nil {
 		t.Error("unhandled msg should return nil cmd (from empty batch)")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// loadSessionsCmd with pivot mode
-// ---------------------------------------------------------------------------
-
-func TestLoadSessionsCmd_PivotMode_NilStore(t *testing.T) {
-	m := newTestModel()
-	m.store = nil
-	m.pivot = pivotFolder
-	cmd := m.loadSessionsCmd()
-	if cmd == nil {
-		t.Fatal("loadSessionsCmd should return non-nil Cmd")
-	}
-	msg := cmd()
-	if _, ok := msg.(sessionLoadErrorMsg); !ok {
-		t.Errorf("msg type = %T, want sessionLoadErrorMsg", msg)
 	}
 }
 
@@ -3421,31 +3577,6 @@ func TestLoadFilterDataCmd_NilStore_Execute(t *testing.T) {
 	msg := cmd()
 	if _, ok := msg.(filterDataMsg); !ok {
 		t.Errorf("expected filterDataMsg, got %T", msg)
-	}
-}
-
-func TestLoadSessionsCmd_NilStore_Execute(t *testing.T) {
-	m := newTestModel()
-	cmd := m.loadSessionsCmd()
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(sessionLoadErrorMsg); !ok {
-		t.Errorf("expected sessionLoadErrorMsg for nil store, got %T", msg)
-	}
-}
-
-func TestLoadSessionsCmd_PivotMode_NilStore_Execute(t *testing.T) {
-	m := newTestModel()
-	m.pivot = pivotFolder
-	cmd := m.loadSessionsCmd()
-	if cmd == nil {
-		t.Fatal("cmd should not be nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(sessionLoadErrorMsg); !ok {
-		t.Errorf("expected sessionLoadErrorMsg for nil store pivot, got %T", msg)
 	}
 }
 

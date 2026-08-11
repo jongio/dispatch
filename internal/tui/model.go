@@ -931,7 +931,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.filter.ExcludedDirs = excluded
 			m.state = stateSessionList
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		}
 		return m, nil
 
@@ -957,7 +958,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.filterGitDirty = m.attentionPicker.FilterGitDirty()
 			m.filterMissingWorkspace = m.attentionPicker.FilterMissingWorkspace()
 			m.state = stateSessionList
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		}
 		return m, nil
 
@@ -989,7 +991,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.state = stateSessionList
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		}
 		return m, nil
 
@@ -1245,7 +1248,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.filter.Query != "" || m.searchFilter.HasTokens() {
 				m.search.pushHistory(m.searchBar.Value())
 				m.filter.DeepSearch = true
-				return m, m.loadSessionsCmd()
+				cmd := m.loadSessionsCmd()
+				return m, cmd
 			}
 			return m, nil
 		case key.Matches(msg, keys.Enter):
@@ -1255,7 +1259,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.search.deepSearchPending && (m.filter.Query != "" || m.searchFilter.HasTokens()) {
 				m.search.deepSearchPending = false
 				m.filter.DeepSearch = true
-				return m, m.loadSessionsCmd()
+				cmd := m.loadSessionsCmd()
+				return m, cmd
 			}
 			// Ensure deep mode is active for any confirmed query so that
 			// subsequent reloads (time range, sort, pivot) also search deeply.
@@ -1331,7 +1336,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.clearSearchTokenFilters()
 			m.searchBar.SetValue("")
 			m.searchBar.SetSearching(false)
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		}
 		return m, nil
 
@@ -1479,15 +1485,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Sort):
 		m.cycleSort()
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 
 	case key.Matches(msg, keys.SortOrder):
 		m.toggleSortOrder()
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 
 	case key.Matches(msg, keys.Pivot):
 		m.cyclePivot()
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 
 	case key.Matches(msg, keys.Preview):
 		m.showPreview = !m.showPreview
@@ -2255,7 +2264,8 @@ func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Enter):
 			m.configPanel.ConfirmEdit()
 			m.saveConfigFromPanel()
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		default:
 			var cmd tea.Cmd
 			m.configPanel, cmd = m.configPanel.Update(msg)
@@ -2266,7 +2276,8 @@ func (m Model) handleConfigKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Escape):
 		m.state = stateSessionList
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 	case key.Matches(msg, keys.Up):
 		m.configPanel.MoveUp()
 	case key.Matches(msg, keys.Down):
@@ -2693,13 +2704,16 @@ func (m Model) handleHeaderClick(x, y int) (tea.Model, tea.Cmd) {
 		switch action {
 		case "sort":
 			m.cycleSort()
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		case "sortorder":
 			m.toggleSortOrder()
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		case "pivot":
 			m.cyclePivot()
-			return m, m.loadSessionsCmd()
+			cmd := m.loadSessionsCmd()
+			return m, cmd
 		case "expandall":
 			if m.sessionList.AllExpanded() {
 				m.sessionList.CollapseAll()
@@ -3614,15 +3628,121 @@ func (m *Model) sortByFrecency(sessions []data.Session) {
 	if m.sort.Field != data.SortByFrecency {
 		return
 	}
+	m.sortSessionsLocally(sessions, m.sort)
+}
+
+func (m *Model) sortSessionsLocally(sessions []data.Session, sortOpts data.SortOptions) {
 	now := time.Now()
 	slices.SortStableFunc(sessions, func(a, b data.Session) int {
-		sa := config.FrecencyScore(m.cfg.SessionLaunches[a.ID], now)
-		sb := config.FrecencyScore(m.cfg.SessionLaunches[b.ID], now)
-		if m.sort.Order == data.Ascending {
-			return cmp.Compare(sa, sb)
+		var c int
+		switch sortOpts.Field {
+		case data.SortByCreated:
+			c = cmp.Compare(a.CreatedAt, b.CreatedAt)
+		case data.SortByTurns:
+			c = cmp.Compare(a.TurnCount, b.TurnCount)
+		case data.SortByName:
+			c = cmp.Compare(a.Summary, b.Summary)
+		case data.SortByFolder:
+			c = cmp.Compare(a.Cwd, b.Cwd)
+		case data.SortByAttention:
+			c = cmp.Compare(attentionPriority(m.attentionMap[a.ID]), attentionPriority(m.attentionMap[b.ID]))
+		case data.SortByFrecency:
+			sa := config.FrecencyScore(m.cfg.SessionLaunches[a.ID], now)
+			sb := config.FrecencyScore(m.cfg.SessionLaunches[b.ID], now)
+			c = cmp.Compare(sa, sb)
+		default:
+			c = cmp.Compare(a.LastActiveAt, b.LastActiveAt)
 		}
-		return cmp.Compare(sb, sa)
+		if sortOpts.Order == data.Descending {
+			return -c
+		}
+		return c
 	})
+}
+
+func (m *Model) previewCurrentSort() {
+	if m.groups != nil {
+		for i := range m.groups {
+			m.sortSessionsLocally(m.groups[i].Sessions, m.sort)
+		}
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
+		return
+	}
+	m.sortSessionsLocally(m.sessions, m.sort)
+	m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
+}
+
+func (m *Model) previewCurrentPivot() {
+	sessions := m.sessions
+	if m.groups != nil {
+		sessions = sessionsFromGroups(m.groups)
+	}
+	if len(sessions) == 0 {
+		return
+	}
+
+	prevID := m.selectedSessionID()
+	if m.pivot == pivotNone {
+		m.groups = nil
+		m.sessions = sessions
+		m.sortSessionsLocally(m.sessions, m.sort)
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
+	} else {
+		groupMap := make(map[string]int)
+		groups := make([]data.SessionGroup, 0)
+		for _, session := range sessions {
+			label := previewGroupLabel(session, m.pivot)
+			index, ok := groupMap[label]
+			if !ok {
+				index = len(groups)
+				groupMap[label] = index
+				groups = append(groups, data.SessionGroup{Label: label})
+			}
+			groups[index].Sessions = append(groups[index].Sessions, session)
+			groups[index].Count++
+		}
+		sessionSort := m.sort
+		if m.pivot == pivotDate {
+			sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
+		}
+		for i := range groups {
+			m.sortSessionsLocally(groups[i].Sessions, sessionSort)
+		}
+		if m.pivot == pivotDate {
+			sortGroupsByLabel(groups, data.Descending)
+		} else {
+			sortGroupsByLabel(groups, data.Ascending)
+		}
+		m.sessions = nil
+		m.groups = groups
+		m.sessionList.SetPivotField(m.pivot)
+		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
+	}
+	if prevID != "" {
+		m.sessionList.SelectByID(prevID)
+	}
+	m.searchBar.SetResultCount(m.sessionList.SessionCount())
+}
+
+func previewGroupLabel(session data.Session, pivot string) string {
+	switch pivot {
+	case pivotRepo:
+		return session.Repository
+	case pivotBranch:
+		return session.Branch
+	case pivotDate:
+		if t, err := time.Parse(time.RFC3339, session.LastActiveAt); err == nil {
+			return t.Local().Format("2006-01-02")
+		}
+		if len(session.LastActiveAt) > 10 {
+			return session.LastActiveAt[:10]
+		}
+		return session.LastActiveAt
+	case pivotHost:
+		return session.HostType
+	default:
+		return session.Cwd
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -3643,12 +3763,14 @@ func (m *Model) cycleSort() {
 			m.sort.Field = sortFields[(i+1)%len(sortFields)]
 			m.cfg.DefaultSort = sortFieldToConfig(m.sort.Field)
 			m.saveConfig()
+			m.previewCurrentSort()
 			return
 		}
 	}
 	m.sort.Field = data.SortByUpdated
 	m.cfg.DefaultSort = sortFieldToConfig(m.sort.Field)
 	m.saveConfig()
+	m.previewCurrentSort()
 }
 
 func (m *Model) toggleSortOrder() {
@@ -3659,6 +3781,7 @@ func (m *Model) toggleSortOrder() {
 	}
 	m.cfg.DefaultSortOrder = sortOrderToConfig(m.sort.Order)
 	m.saveConfig()
+	m.previewCurrentSort()
 }
 
 var pivotModes = []string{pivotNone, pivotFolder, pivotRepo, pivotBranch, pivotDate, pivotHost}
@@ -3669,12 +3792,14 @@ func (m *Model) cyclePivot() {
 			m.pivot = pivotModes[(i+1)%len(pivotModes)]
 			m.cfg.DefaultPivot = m.pivot
 			m.saveConfig()
+			m.previewCurrentPivot()
 			return
 		}
 	}
 	m.pivot = pivotNone
 	m.cfg.DefaultPivot = m.pivot
 	m.saveConfig()
+	m.previewCurrentPivot()
 }
 
 // ---------------------------------------------------------------------------
@@ -3713,7 +3838,7 @@ func (m *Model) setTimeRange(tr string) tea.Cmd {
 func (m *Model) previewNarrowerTimeRange(since time.Time) {
 	matches := func(session data.Session) bool {
 		lastActive, err := time.Parse(time.RFC3339, session.LastActiveAt)
-		return err != nil || !lastActive.Before(since)
+		return err == nil && !lastActive.Before(since)
 	}
 
 	if m.groups != nil {
@@ -3740,7 +3865,7 @@ func sortDisplayLabel(f data.SortField) string {
 	case data.SortByAttention:
 		return "attention"
 	case data.SortByFrecency:
-		return "frecency"
+		return "recent"
 	default:
 		return "updated"
 	}

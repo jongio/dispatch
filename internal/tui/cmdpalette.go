@@ -111,7 +111,8 @@ func (m Model) handleCmdPaletteAction(msg cmdPaletteActionMsg) (tea.Model, tea.C
 
 	case "sort":
 		m.cycleSort()
-		return m, m.loadSessionsCmd()
+		cmd := m.loadSessionsCmd()
+		return m, cmd
 
 	case "preview":
 		m.showPreview = !m.showPreview
