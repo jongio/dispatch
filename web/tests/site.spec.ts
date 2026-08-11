@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const pages = [
-  { path: '', heading: 'dispatch' },
+  { path: './', heading: 'dispatch' },
   { path: 'features/', heading: 'Features' },
   { path: 'install/', heading: 'Install' },
   { path: 'cli/', heading: 'CLI Reference' },
@@ -43,7 +43,7 @@ for (const pageInfo of pages) {
 }
 
 test('primary navigation reaches the features page', async ({ page, isMobile }) => {
-  await page.goto('');
+  await page.goto('./');
 
   if (isMobile) {
     const menuToggle = page.getByRole('button', { name: 'Toggle menu' });
@@ -57,7 +57,7 @@ test('primary navigation reaches the features page', async ({ page, isMobile }) 
 });
 
 test('skip link moves focus to main content', async ({ page, browserName }) => {
-  await page.goto('');
+  await page.goto('./');
 
   const skipLink = page.getByRole('link', { name: 'Skip to main content' });
   if (browserName === 'webkit' && process.platform === 'win32') {

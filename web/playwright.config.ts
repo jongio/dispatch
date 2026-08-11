@@ -29,9 +29,12 @@ export default defineConfig({
       use: { ...devices['Pixel 7'] },
     },
   ],
-  webServer: {
-    command: 'npm run build && npm run preview -- --host 127.0.0.1',
-    url: 'http://127.0.0.1:4321/dispatch/',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: process.env.DISPATCH_EXTERNAL_WEB_SERVER
+    ? undefined
+    : {
+        command:
+          'node ./node_modules/astro/bin/astro.mjs preview --host 127.0.0.1 --port 4321',
+        url: 'http://127.0.0.1:4321/dispatch/',
+        reuseExistingServer: false,
+      },
 });
