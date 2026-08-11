@@ -2,20 +2,35 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
 	"path/filepath"
+	"unicode/utf8"
 )
 
 // readOnlySQLiteDSN returns an escaped SQLite file URI that enforces
 // read-only access at both the file-open and connection levels.
 func readOnlySQLiteDSN(path string) (string, error) {
+	if !utf8.ValidString(path) {
+		return "", fmt.Errorf("SQLite path is not valid UTF-8")
+	}
+
 	absolute, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
 	}
+	if !filepath.IsAbs(absolute) {
+		return "", fmt.Errorf("SQLite path could not be made absolute: %q", path)
+	}
+
+	volume := filepath.VolumeName(absolute)
+	if len(volume) > 0 && volume[len(volume)-1] == ':' &&
+		(len(volume) != 2 || !isASCIILetter(volume[0])) {
+		return "", fmt.Errorf("SQLite path has unsupported volume %q", volume)
+	}
 
 	uriPath := filepath.ToSlash(absolute)
-	if filepath.VolumeName(absolute) != "" {
+	if volume != "" {
 		uriPath = "/" + uriPath
 	}
 	uri := url.URL{
@@ -27,6 +42,10 @@ func readOnlySQLiteDSN(path string) (string, error) {
 	query.Set("_query_only", "1")
 	uri.RawQuery = query.Encode()
 	return uri.String(), nil
+}
+
+func isASCIILetter(value byte) bool {
+	return value >= 'A' && value <= 'Z' || value >= 'a' && value <= 'z'
 }
 
 // openReadOnlySQLite opens path with the shared read-only SQLite protections.
