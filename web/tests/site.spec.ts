@@ -42,20 +42,31 @@ for (const pageInfo of pages) {
   });
 }
 
-test('primary navigation reaches the features page', async ({ page }) => {
+test('primary navigation reaches the features page', async ({ page, isMobile }) => {
   await page.goto('');
 
+  if (isMobile) {
+    const menuToggle = page.getByRole('button', { name: 'Toggle menu' });
+    await menuToggle.click();
+    await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
+  }
   await page.getByRole('link', { name: 'Features', exact: true }).first().click();
 
   await expect(page).toHaveURL(/\/dispatch\/features\/$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Features' })).toBeVisible();
 });
 
-test('skip link moves focus to main content', async ({ page }) => {
+test('skip link moves focus to main content', async ({ page, browserName }) => {
   await page.goto('');
 
-  await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+  if (browserName === 'webkit' && process.platform === 'win32') {
+    // WebKit on Windows does not enable link tabbing without the host OS
+    // full-keyboard-access setting, so start from the same focused control.
+    await skipLink.focus();
+  } else {
+    await page.keyboard.press('Tab');
+  }
   await expect(skipLink).toBeFocused();
   await skipLink.press('Enter');
 
