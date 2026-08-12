@@ -30,12 +30,21 @@ section() { echo ""; echo "=== $1 ==="; }
 has_cmd() { command -v "$1" &>/dev/null; }
 
 get_go_version() {
-    go version 2>/dev/null | grep -oP 'go\K[0-9]+\.[0-9]+(\.[0-9]+)?' || echo ""
+    go version 2>/dev/null | sed -n 's/.* go\([0-9][0-9.]*\).*/\1/p'
 }
 
 version_ge() {
     # Returns 0 if $1 >= $2 (dot-separated version comparison)
-    printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1 | grep -qx "$2"
+    awk -v have="$1" -v need="$2" '
+        BEGIN {
+            split(have, h, "."); split(need, n, ".")
+            for (i = 1; i <= 3; i++) {
+                hv = h[i] + 0; nv = n[i] + 0
+                if (hv > nv) exit 0
+                if (hv < nv) exit 1
+            }
+            exit 0
+        }'
 }
 
 # ---------------------------------------------------------------------------
@@ -71,14 +80,14 @@ if has_cmd mage; then
     ok "Mage ($(mage --version 2>/dev/null || echo 'installed'))"
 else
     if [[ "$CHECK_ONLY" == true ]]; then
-        missing "Mage not found. Install: go install github.com/magefile/mage@latest"
+        missing "Mage not found. Install: go install github.com/magefile/mage@v1.17.2"
     else
         status "Installing Mage..."
-        go install github.com/magefile/mage@latest 2>/dev/null || true
+        go install github.com/magefile/mage@v1.17.2 2>/dev/null || true
         if has_cmd mage; then
             ok "Mage installed"
         else
-            missing "Mage install failed. Ensure \$GOPATH/bin is in PATH, then: go install github.com/magefile/mage@latest"
+            missing "Mage install failed. Ensure \$GOPATH/bin is in PATH, then: go install github.com/magefile/mage@v1.17.2"
         fi
     fi
 fi
@@ -103,15 +112,14 @@ fi
 # ---------------------------------------------------------------------------
 section "Optional Tools (used by 'mage preflight')"
 
-declare -A TOOLS=(
-    [golangci-lint]="go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest|Linter"
-    [gofumpt]="go install mvdan.cc/gofumpt@latest|Strict formatter"
-    [govulncheck]="go install golang.org/x/vuln/cmd/govulncheck@latest|Vulnerability scanner"
-    [deadcode]="go install golang.org/x/tools/cmd/deadcode@latest|Dead code detector"
-)
-
 for tool in golangci-lint gofumpt govulncheck deadcode; do
-    IFS='|' read -r install_cmd desc <<< "${TOOLS[$tool]}"
+    case "$tool" in
+        golangci-lint) package="github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2"; desc="Linter" ;;
+        gofumpt) package="mvdan.cc/gofumpt@v0.11.0"; desc="Strict formatter" ;;
+        govulncheck) package="golang.org/x/vuln/cmd/govulncheck@v1.6.0"; desc="Vulnerability scanner" ;;
+        deadcode) package="golang.org/x/tools/cmd/deadcode@v0.48.0"; desc="Dead code detector" ;;
+    esac
+    install_cmd="go install $package"
     if has_cmd "$tool"; then
         ok "$desc ($tool)"
     else
@@ -119,7 +127,7 @@ for tool in golangci-lint gofumpt govulncheck deadcode; do
             warn "$desc not found. Install: $install_cmd"
         else
             status "Installing $tool..."
-            eval "$install_cmd" 2>/dev/null || true
+            go install "$package" 2>/dev/null || true
             if has_cmd "$tool"; then
                 ok "$desc ($tool) installed"
             else

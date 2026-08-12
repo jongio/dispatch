@@ -15,12 +15,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -37,7 +35,6 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - run: npm install -g npm@latest
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm test
@@ -52,6 +49,10 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

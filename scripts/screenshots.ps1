@@ -39,9 +39,12 @@ try {
         exit 1
     }
 
-    $renderDir = if ($OutDir) { $OutDir } elseif ($Check) { ".screenshots-check" } else { "web\public\screenshots" }
-    if ($Check -and (Test-Path $renderDir)) {
-        Remove-Item $renderDir -Recurse -Force
+    $renderDir = if ($Check) {
+        Join-Path ([System.IO.Path]::GetTempPath()) "dispatch-screenshots-check-$([guid]::NewGuid().ToString('N'))"
+    } elseif ($OutDir) {
+        $OutDir
+    } else {
+        "web\public\screenshots"
     }
 
     $goArgs = @("-tags", "screenshots", "./cmd/screenshots", "--out", $renderDir)
@@ -55,7 +58,6 @@ try {
     }
 
     if ($Check) {
-        Remove-Item $renderDir -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "Screenshot capture check passed." -ForegroundColor Green
         return
     }
@@ -70,5 +72,8 @@ try {
     Write-Host "Done." -ForegroundColor Green
 }
 finally {
+    if ($Check -and $renderDir -and (Test-Path $renderDir)) {
+        Remove-Item $renderDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
     Pop-Location
 }

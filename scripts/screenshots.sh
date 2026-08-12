@@ -42,9 +42,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$check" == true ]]; then
-  rm -rf "$out_dir"
-  go run -tags screenshots ./cmd/screenshots --check --out "$out_dir"
-  rm -rf "$out_dir"
+  check_dir="$(mktemp -d "${TMPDIR:-/tmp}/dispatch-screenshots-check.XXXXXX")"
+  trap 'rm -rf "$check_dir"' EXIT
+  go run -tags screenshots ./cmd/screenshots --check --out "$check_dir"
   echo "Screenshot capture check passed."
   exit 0
 fi

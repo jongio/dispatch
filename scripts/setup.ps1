@@ -74,14 +74,14 @@ if (Test-Command 'mage') {
     Write-OK "Mage ($mageVer)"
 } else {
     if ($Check) {
-        Write-Missing "Mage not found. Install: go install github.com/magefile/mage@latest"
+        Write-Missing "Mage not found. Install: go install github.com/magefile/mage@v1.17.2"
     } else {
         Write-Status "Installing Mage..."
-        & go install github.com/magefile/mage@latest 2>&1 | Out-Null
+        & go install github.com/magefile/mage@v1.17.2 2>&1 | Out-Null
         if (Test-Command 'mage') {
             Write-OK "Mage installed"
         } else {
-            Write-Missing "Mage install failed. Run: go install github.com/magefile/mage@latest"
+            Write-Missing "Mage install failed. Run: go install github.com/magefile/mage@v1.17.2"
         }
     }
 }
@@ -112,10 +112,10 @@ if (Test-Path $sessionStore) {
 Write-Section "Optional Tools (used by 'mage preflight')"
 
 $optionalTools = @(
-    @{ Name = 'golangci-lint'; Install = 'go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest'; Desc = 'Linter' },
-    @{ Name = 'gofumpt';       Install = 'go install mvdan.cc/gofumpt@latest'; Desc = 'Strict formatter' },
-    @{ Name = 'govulncheck';   Install = 'go install golang.org/x/vuln/cmd/govulncheck@latest'; Desc = 'Vulnerability scanner' },
-    @{ Name = 'deadcode';      Install = 'go install golang.org/x/tools/cmd/deadcode@latest'; Desc = 'Dead code detector' }
+    @{ Name = 'golangci-lint'; Package = 'github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2'; Desc = 'Linter' },
+    @{ Name = 'gofumpt';       Package = 'mvdan.cc/gofumpt@v0.11.0'; Desc = 'Strict formatter' },
+    @{ Name = 'govulncheck';   Package = 'golang.org/x/vuln/cmd/govulncheck@v1.6.0'; Desc = 'Vulnerability scanner' },
+    @{ Name = 'deadcode';      Package = 'golang.org/x/tools/cmd/deadcode@v0.48.0'; Desc = 'Dead code detector' }
 )
 
 foreach ($tool in $optionalTools) {
@@ -123,14 +123,14 @@ foreach ($tool in $optionalTools) {
         Write-OK "$($tool.Desc) ($($tool.Name))"
     } else {
         if ($Check) {
-            Write-Warn "$($tool.Desc) not found. Install: $($tool.Install)"
+            Write-Warn "$($tool.Desc) not found. Install: go install $($tool.Package)"
         } else {
             Write-Status "Installing $($tool.Name)..."
-            Invoke-Expression $tool.Install 2>&1 | Out-Null
+            & go install $tool.Package 2>&1 | Out-Null
             if (Test-Command $tool.Name) {
                 Write-OK "$($tool.Desc) ($($tool.Name)) installed"
             } else {
-                Write-Warn "$($tool.Desc) install failed. Run: $($tool.Install)"
+                Write-Warn "$($tool.Desc) install failed. Run: go install $($tool.Package)"
             }
         }
     }
@@ -149,7 +149,7 @@ if (Test-Command 'gcc') {
 if (-not $Check) {
     Write-Section "Build & Verify"
 
-    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $repoRoot = Split-Path -Parent $PSScriptRoot
     if (-not (Test-Path (Join-Path $repoRoot 'go.mod'))) {
         # Try current directory
         $repoRoot = Get-Location

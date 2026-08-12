@@ -20,7 +20,7 @@ on:
 
 # Cancel in-progress runs for the same branch/PR to avoid wasted resources.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
 
       - name: Check strict formatting (gofumpt)
         run: |
-          go install mvdan.cc/gofumpt@v0.11.0 || { echo "gofumpt install failed, skipping"; exit 0; }
+          go install mvdan.cc/gofumpt@v0.11.0
           unformatted=$(gofumpt -l .)
           if [ -n "$unformatted" ]; then
             echo "::error::Files need strict formatting (gofumpt):"
@@ -67,8 +67,8 @@ jobs:
 
       - name: Check dead code
         run: |
-          go install golang.org/x/tools/cmd/deadcode@v0.48.0 || { echo "deadcode install failed, skipping"; exit 0; }
-          go install github.com/magefile/mage@v1.17.2 || { echo "mage install failed, skipping"; exit 0; }
+          go install golang.org/x/tools/cmd/deadcode@v0.48.0
+          go install github.com/magefile/mage@v1.17.2
           mage deadcode
 
       - run: go build ./cmd/dispatch/
@@ -153,7 +153,7 @@ jobs:
 
       - name: Cross-compile all release targets
         run: |
-          for pair in darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+          for pair in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             os="${pair%/*}"
             arch="${pair#*/}"
             echo "Building $os/$arch..."
