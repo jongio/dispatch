@@ -289,10 +289,13 @@ type Model struct {
 	pivot     string // "none", "folder", "repo", "branch", "date", "host"
 
 	// Loaded data.
-	sessions    []data.Session
-	groups      []data.SessionGroup
-	quickStarts []components.QuickStart
-	detail      *data.SessionDetail
+	sessions            []data.Session
+	groups              []data.SessionGroup
+	quickStarts         []components.QuickStart
+	projectRepos        []components.QuickStart
+	projectReposLoaded  bool
+	projectReposLoading bool
+	detail              *data.SessionDetail
 
 	sessionsLoading    bool
 	sessionLoadVersion int
@@ -2752,6 +2755,15 @@ func (m Model) badgeClickAction(x int) string {
 		cursor += w + 2 // "  " separator between parts
 	}
 
+	// Structured search token badge.
+	if summary := m.searchFilter.TokenSummary(); summary != "" {
+		w := lipgloss.Width(styles.ActiveBadgeStyle.Render(summary))
+		if x >= cursor && x < cursor+w {
+			return "" // search token badges are display-only
+		}
+		cursor += w + 2
+	}
+
 	// Time range selector — individual items separated by " ".
 	for i, tr := range timeRanges {
 		var rendered string
@@ -4803,6 +4815,40 @@ func (m Model) loadSelectedDetailCmd() tea.Cmd {
 
 func (m Model) relatedCandidateSessions() []data.Session {
 	return m.sessionList.AllSessions()
+}
+
+func (m Model) loadedSessions() []data.Session {
+	if m.groups != nil {
+		return sessionsFromGroups(m.groups)
+	}
+	return m.sessions
+}
+
+func (m *Model) refreshSelectedDetailCmd(previousSessions []data.Session) tea.Cmd {
+	selectedID := m.selectedSessionID()
+	if m.detail != nil &&
+		m.detail.Session.ID == selectedID &&
+		sameSessionIDs(previousSessions, m.loadedSessions()) {
+		return nil
+	}
+	m.detailVersion++
+	return m.loadSelectedDetailCmd()
+}
+
+func sameSessionIDs(a, b []data.Session) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	ids := make(map[string]struct{}, len(a))
+	for _, session := range a {
+		ids[session.ID] = struct{}{}
+	}
+	for _, session := range b {
+		if _, ok := ids[session.ID]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func loadRelatedSessionItems(ctx context.Context, store *data.Store, detail *data.SessionDetail, sessions []data.Session, gitStatuses map[string]platform.GitStatus) ([]components.RelatedSessionItem, error) {

@@ -185,6 +185,21 @@ func TestFilterBuilder_UntilFilter(t *testing.T) {
 	}
 }
 
+func TestFilterBuilder_ExpandedDatePredicates(t *testing.T) {
+	since := time.Now().Add(-24 * time.Hour)
+	until := time.Now()
+	fb := filterBuilder{expandDatePredicates: true}
+	fb.apply(FilterOptions{Since: &since, Until: &until})
+
+	if len(fb.args) != 6 {
+		t.Fatalf("expected 6 args for expanded date filters, got %d", len(fb.args))
+	}
+	where := fb.whereSQL()
+	if !strings.Contains(where, "t_since") || !strings.Contains(where, "t_until") {
+		t.Fatalf("expanded date predicates missing indexed turn checks: %s", where)
+	}
+}
+
 func TestFilterBuilder_HasRefsFilter(t *testing.T) {
 	var fb filterBuilder
 	fb.apply(FilterOptions{HasRefs: true})
@@ -225,7 +240,8 @@ func TestFilterBuilder_AllFilters(t *testing.T) {
 	if where == "" {
 		t.Error("whereSQL should be non-empty for all filters")
 	}
-	// 10 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) + 1 (since) + 1 (until) + 1 (excluded) = 16
+	// 10 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) +
+	// 1 (since) + 1 (until) + 1 (excluded) = 16.
 	if len(fb.args) != 16 {
 		t.Errorf("expected 16 args for all filters, got %d", len(fb.args))
 	}

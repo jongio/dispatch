@@ -20,19 +20,34 @@ var projectScanSkipDirs = map[string]struct{}{
 	"vendor":       {},
 }
 
-func discoverProjectQuickStartsCmd(roots []string, sessions []data.Session) tea.Cmd {
+func discoverProjectReposCmd(roots []string) tea.Cmd {
 	if len(roots) == 0 {
 		return nil
 	}
 	roots = append([]string(nil), roots...)
-	sessions = append([]data.Session(nil), sessions...)
 	return func() tea.Msg {
 		repos, err := discoverGitRepos(roots, projectRootScanDepth)
 		if err != nil {
 			return projectQuickStartsMsg{err: err}
 		}
-		return projectQuickStartsMsg{quickStarts: filterQuickStartRepos(repos, sessions)}
+		return projectQuickStartsMsg{repos: repos}
 	}
+}
+
+func (m *Model) loadProjectReposCmd() tea.Cmd {
+	if m.projectReposLoaded || m.projectReposLoading || len(m.cfg.ProjectRoots) == 0 {
+		return nil
+	}
+	m.projectReposLoading = true
+	return discoverProjectReposCmd(m.cfg.ProjectRoots)
+}
+
+func (m *Model) refreshProjectQuickStarts() {
+	sessions := m.sessions
+	if m.groups != nil {
+		sessions = sessionsFromGroups(m.groups)
+	}
+	m.quickStarts = filterQuickStartRepos(m.projectRepos, sessions)
 }
 
 func discoverGitRepos(roots []string, maxDepth int) ([]components.QuickStart, error) {

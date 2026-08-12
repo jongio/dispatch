@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
@@ -1564,6 +1565,20 @@ func TestBadgeClickAction_ZeroX(t *testing.T) {
 	action := m.badgeClickAction(0)
 	if action != "" {
 		t.Errorf("badgeClickAction(0) = %q, want empty", action)
+	}
+}
+
+func TestBadgeClickAction_AccountsForSearchTokenBadge(t *testing.T) {
+	m := newTestModelWithSize(120, 25)
+	m.searchFilter = ParseSearchTokens("repo:jongio")
+
+	rendered := ansi.Strip(m.renderBadges())
+	sortX := strings.Index(rendered, "s:")
+	if sortX < 0 {
+		t.Fatalf("sort indicator not found in badges: %q", rendered)
+	}
+	if action := m.badgeClickAction(sortX); action != "sort" {
+		t.Fatalf("badgeClickAction(%d) = %q, want sort", sortX, action)
 	}
 }
 
@@ -3254,6 +3269,47 @@ func TestHandleMouse_LeftClick_PreviewRelatedSessionMovesFocus(t *testing.T) {
 	rm := result.(Model)
 	if got := rm.selectedSessionID(); got != "related" {
 		t.Fatalf("selectedSessionID() = %q, want related", got)
+	}
+}
+
+func TestHandleMouse_LeftClick_WrappedRelatedRowsStayAligned(t *testing.T) {
+	m := newTestModelWithSize(120, 60)
+	m.showPreview = true
+	m.detail = &data.SessionDetail{Session: data.Session{ID: "current"}}
+	m.preview.SetDetail(m.detail)
+	m.preview.SetRelatedSessions([]components.RelatedSessionItem{
+		{ID: "first", Summary: "First related session", DisplayRepository: "jongio/dispatch-with-a-long-name", Branch: "feature/first", LastActiveAt: "2026-08-01T12:00:00Z"},
+		{ID: "second", Summary: "Second related session", DisplayRepository: "jongio/dispatch-with-a-long-name", Branch: "feature/second", LastActiveAt: "2026-08-01T12:00:00Z"},
+		{ID: "third", Summary: "Third related session", DisplayRepository: "jongio/dispatch-with-a-long-name", Branch: "feature/third", LastActiveAt: "2026-08-01T12:00:00Z"},
+	})
+	m.recalcLayout()
+	m.sessionList.SetSessions([]data.Session{{ID: "current"}, {ID: "first"}, {ID: "second"}, {ID: "third"}})
+
+	previewLines := strings.Split(ansi.Strip(m.preview.View()), "\n")
+	visibleRow := -1
+	for i, line := range previewLines {
+		if strings.Contains(line, "Second relate") {
+			visibleRow = i
+			break
+		}
+	}
+	if visibleRow < 0 {
+		t.Fatalf("second related session not found in preview:\n%s", strings.Join(previewLines, "\n"))
+	}
+	contentRow := m.preview.ContentLineForViewportRow(visibleRow - 1)
+	if id, ok := m.preview.HitRelatedSession(contentRow); !ok || id != "second" {
+		t.Fatalf("visible row %d maps to content row %d and related session %q, %v; want second",
+			visibleRow, contentRow, id, ok)
+	}
+
+	result, _ := m.Update(tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
+		X:      m.layout.listWidth + 5,
+		Y:      styles.HeaderLines + visibleRow,
+	})
+	rm := result.(Model)
+	if got := rm.selectedSessionID(); got != "second" {
+		t.Fatalf("selectedSessionID() = %q, want second", got)
 	}
 }
 

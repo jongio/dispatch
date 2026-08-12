@@ -116,7 +116,7 @@ func TestProjectQuickStartsUpdateFlatAndGroupedLists(t *testing.T) {
 		m.sessions = []data.Session{{ID: "s1", Summary: "Existing"}}
 		m.sessionList.SetSessions(m.sessions)
 
-		result, cmd := m.Update(projectQuickStartsMsg{quickStarts: quickStarts})
+		result, cmd := m.Update(projectQuickStartsMsg{repos: quickStarts})
 		got := result.(Model)
 
 		if cmd != nil || len(got.quickStarts) != 1 ||
@@ -144,7 +144,7 @@ func TestProjectQuickStartsUpdateFlatAndGroupedLists(t *testing.T) {
 			}},
 		}}
 
-		result, _ := m.Update(projectQuickStartsMsg{quickStarts: quickStarts})
+		result, _ := m.Update(projectQuickStartsMsg{repos: quickStarts})
 		got := result.(Model)
 
 		if len(got.groups) != 1 || len(got.quickStarts) != 1 {
@@ -166,6 +166,71 @@ func TestProjectQuickStartsUpdateFlatAndGroupedLists(t *testing.T) {
 			t.Fatalf("project scan status = %q, cmd nil = %v", got.statusErr, cmd == nil)
 		}
 	})
+}
+
+func TestProjectRepoDiscoveryIsCached(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "new-repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatalf("creating repository marker: %v", err)
+	}
+
+	m := newBehavioralFlowModel(t)
+	m.cfg.ProjectRoots = []string{root}
+
+	cmd := m.loadProjectReposCmd()
+	if cmd == nil || !m.projectReposLoading {
+		t.Fatal("first project discovery should start a scan")
+	}
+	if duplicate := m.loadProjectReposCmd(); duplicate != nil {
+		t.Fatal("project discovery should not overlap an in-flight scan")
+	}
+
+	result, _ := m.Update(cmd())
+	got := result.(Model)
+	if !got.projectReposLoaded || got.projectReposLoading || len(got.projectRepos) != 1 {
+		t.Fatalf("project cache state: loaded=%v loading=%v repos=%#v",
+			got.projectReposLoaded, got.projectReposLoading, got.projectRepos)
+	}
+	if cached := got.loadProjectReposCmd(); cached != nil {
+		t.Fatal("loaded project repositories should be reused")
+	}
+}
+
+func TestSessionReloadSkipsUnchangedDetailCandidates(t *testing.T) {
+	m := newBehavioralFlowModel(t)
+	m.projectReposLoaded = true
+	m.sessions = []data.Session{{ID: "s1"}, {ID: "s2"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.detail = &data.SessionDetail{Session: data.Session{ID: "s1"}}
+	m.detailVersion = 7
+
+	result, _ := m.Update(sessionsLoadedMsg{
+		sessions: []data.Session{{ID: "s2"}, {ID: "s1"}},
+	})
+	got := result.(Model)
+
+	if got.detailVersion != 7 {
+		t.Fatalf("detail version = %d, want unchanged version 7", got.detailVersion)
+	}
+}
+
+func TestSessionReloadRefreshesChangedDetailCandidates(t *testing.T) {
+	m := newBehavioralFlowModel(t)
+	m.projectReposLoaded = true
+	m.sessions = []data.Session{{ID: "s1"}, {ID: "s2"}}
+	m.sessionList.SetSessions(m.sessions)
+	m.detail = &data.SessionDetail{Session: data.Session{ID: "s1"}}
+	m.detailVersion = 7
+
+	result, _ := m.Update(sessionsLoadedMsg{
+		sessions: []data.Session{{ID: "s1"}, {ID: "s3"}},
+	})
+	got := result.(Model)
+
+	if got.detailVersion != 8 {
+		t.Fatalf("detail version = %d, want refreshed version 8", got.detailVersion)
+	}
 }
 
 func TestWorkStatusScanChainUpdatesListWritesPlanAndRefreshesPreview(t *testing.T) {

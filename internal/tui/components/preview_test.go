@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -465,6 +466,23 @@ func TestPreviewPanelRelatedSessionsShownWithRowsAndHits(t *testing.T) {
 	}
 	if id, ok := p.RelatedSessionIDAt(0); !ok || id != "related-1" {
 		t.Fatalf("RelatedSessionIDAt(0) = %q, %v; want related-1, true", id, ok)
+	}
+}
+
+func TestPreviewPanelRelatedSessionRowsFitContentWidth(t *testing.T) {
+	t.Parallel()
+	p := NewPreviewPanel()
+	const contentWidth = 44
+	row := p.renderRelatedSessionRow(1, RelatedSessionItem{
+		ID:                "related-2",
+		Summary:           "Second related session with a long summary",
+		DisplayRepository: "jongio/dispatch-with-a-long-repository-name",
+		Branch:            "feature/long-related-session-branch",
+		LastActiveAt:      "2026-08-01T12:00:00Z",
+	}, contentWidth)
+
+	if width := lipgloss.Width(row); width > contentWidth {
+		t.Fatalf("related row width = %d, want <= %d: %q", width, contentWidth, ansi.Strip(row))
 	}
 }
 

@@ -407,13 +407,14 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.finishSessionLoad()
+	previousSessions := m.loadedSessions()
 	prevID := m.selectedSessionID()
 	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
 	m.sortByFrecency(m.sessions)
 	m.groups = nil
 	m.syncSessionListStatuses()
-	m.quickStarts = nil
+	m.refreshProjectQuickStarts()
 	m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
 	// Restore cursor to the previously selected session if possible.
 	if prevID != "" {
@@ -428,12 +429,9 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 		m.state = stateSessionList
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
-	m.detailVersion++
 	return m, tea.Batch(
-		m.loadSelectedDetailCmd(),
-		m.scanPlansCmd(),
-		m.scanGitStatesCmd(),
-		discoverProjectQuickStartsCmd(m.cfg.ProjectRoots, m.sessions),
+		m.refreshSelectedDetailCmd(previousSessions),
+		m.loadProjectReposCmd(),
 	)
 }
 
@@ -442,6 +440,7 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.finishSessionLoad()
+	previousSessions := m.loadedSessions()
 	prevID := m.selectedSessionID()
 	m.groups = m.applyGroupFilters(msg.groups)
 	for i := range m.groups {
@@ -451,7 +450,7 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	m.sessions = nil
 	m.syncSessionListStatuses()
 	m.sessionList.SetPivotField(m.pivot)
-	m.quickStarts = nil
+	m.refreshProjectQuickStarts()
 	m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
 	if prevID != "" {
 		m.sessionList.SelectByID(prevID)
@@ -463,21 +462,21 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 		m.state = stateSessionList
 	}
 	m.searchBar.SetResultCount(m.sessionList.SessionCount())
-	m.detailVersion++
 	return m, tea.Batch(
-		m.loadSelectedDetailCmd(),
-		m.scanPlansCmd(),
-		m.scanGitStatesCmd(),
-		discoverProjectQuickStartsCmd(m.cfg.ProjectRoots, sessionsFromGroups(m.groups)),
+		m.refreshSelectedDetailCmd(previousSessions),
+		m.loadProjectReposCmd(),
 	)
 }
 
 func (m Model) handleProjectQuickStarts(msg projectQuickStartsMsg) (Model, tea.Cmd) {
+	m.projectReposLoading = false
 	if msg.err != nil {
 		m.statusErr = "project scan: " + msg.err.Error()
 		return m, clearStatusAfter(3 * time.Second)
 	}
-	m.quickStarts = msg.quickStarts
+	m.projectRepos = msg.repos
+	m.projectReposLoaded = true
+	m.refreshProjectQuickStarts()
 	if m.groups != nil {
 		m.sessionList.SetPivotField(m.pivot)
 		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)

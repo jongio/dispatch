@@ -308,6 +308,12 @@ func escapeLIKE(s string) string {
 // Each value is COALESCE'd to empty-string so that SQLite's multi-arg MAX()
 // never sees NULL (which would poison the result to NULL).
 const lastActiveExpr = `MAX(
+	COALESCE((SELECT MAX(t_last.timestamp) FROM turns t_last WHERE t_last.session_id = s.id), ''),
+	COALESCE(s.updated_at, ''),
+	COALESCE(s.created_at, '')
+)`
+
+const lastActiveJoinedExpr = `MAX(
 	COALESCE(tc.last_turn_at, ''),
 	COALESCE(s.updated_at, ''),
 	COALESCE(s.created_at, '')
@@ -315,9 +321,11 @@ const lastActiveExpr = `MAX(
 
 // filterBuilder accumulates JOIN and WHERE clauses with parameterised args.
 type filterBuilder struct {
-	joins  []string
-	wheres []string
-	args   []any
+	joins                []string
+	wheres               []string
+	args                 []any
+	lastActiveExpr       string
+	expandDatePredicates bool
 
 	// hasFTS reports whether the FTS5 search_index table is available. When
 	// true, deep search resolves turn and checkpoint text through the index
@@ -325,13 +333,20 @@ type filterBuilder struct {
 	hasFTS bool
 }
 
+func (fb *filterBuilder) lastActiveSQL() string {
+	if fb.lastActiveExpr != "" {
+		return fb.lastActiveExpr
+	}
+	return lastActiveExpr
+}
+
 func (fb *filterBuilder) apply(f FilterOptions) {
 	// Exclude empty sessions: no turns AND no files, checkpoints, or refs.
 	// Sessions with activity in any of these tables are kept even if turns
 	// haven't been recorded (e.g. MCP / sub-agent work).
 	fb.wheres = append(fb.wheres,
-		`(COALESCE(tc.turn_count, 0) > 0`+
-			` OR COALESCE(fc.file_count, 0) > 0`+
+		`(EXISTS (SELECT 1 FROM turns t_activity WHERE t_activity.session_id = s.id)`+
+			` OR EXISTS (SELECT 1 FROM session_files sf_activity WHERE sf_activity.session_id = s.id)`+
 			` OR EXISTS (SELECT 1 FROM checkpoints cp2 WHERE cp2.session_id = s.id)`+
 			` OR EXISTS (SELECT 1 FROM session_refs sr3 WHERE sr3.session_id = s.id))`)
 
@@ -389,12 +404,28 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 		fb.args = append(fb.args, f.HostType)
 	}
 	if f.Since != nil {
-		fb.wheres = append(fb.wheres, lastActiveExpr+" >= ?")
-		fb.args = append(fb.args, f.Since.UTC().Format(time.RFC3339))
+		value := f.Since.UTC().Format(time.RFC3339)
+		if fb.expandDatePredicates {
+			fb.wheres = append(fb.wheres,
+				`(COALESCE(s.updated_at, '') >= ? OR COALESCE(s.created_at, '') >= ?`+
+					` OR EXISTS (SELECT 1 FROM turns t_since WHERE t_since.session_id = s.id AND COALESCE(t_since.timestamp, '') >= ?))`)
+			fb.args = append(fb.args, value, value, value)
+		} else {
+			fb.wheres = append(fb.wheres, fb.lastActiveSQL()+" >= ?")
+			fb.args = append(fb.args, value)
+		}
 	}
 	if f.Until != nil {
-		fb.wheres = append(fb.wheres, lastActiveExpr+" <= ?")
-		fb.args = append(fb.args, f.Until.UTC().Format(time.RFC3339))
+		value := f.Until.UTC().Format(time.RFC3339)
+		if fb.expandDatePredicates {
+			fb.wheres = append(fb.wheres,
+				`(COALESCE(s.updated_at, '') <= ? AND COALESCE(s.created_at, '') <= ?`+
+					` AND NOT EXISTS (SELECT 1 FROM turns t_until WHERE t_until.session_id = s.id AND COALESCE(t_until.timestamp, '') > ?))`)
+			fb.args = append(fb.args, value, value, value)
+		} else {
+			fb.wheres = append(fb.wheres, fb.lastActiveSQL()+" <= ?")
+			fb.args = append(fb.args, value)
+		}
 	}
 	if f.HasRefs {
 		fb.wheres = append(fb.wheres, "EXISTS (SELECT 1 FROM session_refs sr WHERE sr.session_id = s.id)")
@@ -477,16 +508,12 @@ var sessionColumnsBase = `s.id, ` + coalesceCwd + `, COALESCE(s.repository,''), 
 	COALESCE(s.summary,''), COALESCE(s.created_at,''), COALESCE(s.updated_at,'')`
 
 // sessionColumnsSuffix is the computed columns appended after host_type.
-// Turn and file counts come from pre-aggregated LEFT JOINs (see countJoins)
-// rather than correlated subqueries, which avoids per-row rescans.
+// Indexed correlated aggregates avoid materializing complete turns and files
+// summaries before filtering and limiting the session rows.
 var sessionColumnsSuffix = lastActiveExpr + ` AS last_active_at,
-	COALESCE(tc.turn_count, 0) AS turn_count,
-	COALESCE(fc.file_count, 0) AS file_count`
-
-// countJoins provides the LEFT JOINs for pre-aggregated turn and file counts.
-// Every query that uses sessionColumnsSuffix must include these joins.
-const countJoins = ` LEFT JOIN (SELECT session_id, COUNT(*) AS turn_count, MAX(timestamp) AS last_turn_at FROM turns GROUP BY session_id) tc ON tc.session_id = s.id` +
-	` LEFT JOIN (SELECT session_id, COUNT(DISTINCT file_path) AS file_count FROM session_files GROUP BY session_id) fc ON fc.session_id = s.id`
+	COALESCE((SELECT COUNT(*) FROM turns t_count WHERE t_count.session_id = s.id), 0) AS turn_count,
+	COALESCE((SELECT COUNT(DISTINCT sf_count.file_path)
+		FROM session_files sf_count WHERE sf_count.session_id = s.id), 0) AS file_count`
 
 // sessionColumns returns the full SELECT column list, including host_type
 // when the schema supports it.
@@ -500,6 +527,27 @@ func (s *Store) sessionColumns() string {
 	'' AS host_type,
 	` + sessionColumnsSuffix
 }
+
+var sessionColumnsJoinedSuffix = lastActiveJoinedExpr + ` AS last_active_at,
+	COALESCE(tc.turn_count, 0) AS turn_count,
+	COALESCE((SELECT COUNT(DISTINCT sf_count.file_path)
+		FROM session_files sf_count WHERE sf_count.session_id = s.id), 0) AS file_count`
+
+func (s *Store) sessionColumnsJoined() string {
+	if s.hasHostType {
+		return sessionColumnsBase + `,
+	COALESCE(s.host_type,''),
+	` + sessionColumnsJoinedSuffix
+	}
+	return sessionColumnsBase + `,
+	'' AS host_type,
+	` + sessionColumnsJoinedSuffix
+}
+
+const turnStatsJoin = ` LEFT JOIN (
+	SELECT session_id, COUNT(*) AS turn_count, MAX(timestamp) AS last_turn_at
+	FROM turns GROUP BY session_id
+) tc ON tc.session_id = s.id`
 
 // scanner is the subset of *sql.Row and *sql.Rows used to read columns.
 type scanner interface{ Scan(dest ...any) error }
@@ -558,10 +606,28 @@ func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
 func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
 	var fb filterBuilder
 	fb.hasFTS = s.hasFTS5
+	useTurnStatsJoin := sort.Field != SortByCreated &&
+		sort.Field != SortByTurns &&
+		sort.Field != SortByName &&
+		sort.Field != SortByFolder
+	fb.expandDatePredicates = !useTurnStatsJoin
+	if useTurnStatsJoin {
+		fb.lastActiveExpr = lastActiveJoinedExpr
+	}
 	fb.apply(s.withAutoExclusions(filter))
 
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + fb.joinSQL() + fb.whereSQL()
-	q += fmt.Sprintf(" ORDER BY %s %s", sortColumn(sort.Field), sortDir(sort.Order))
+	columns := s.sessionColumns()
+	joins := ""
+	sortExpr := sortColumn(sort.Field)
+	if useTurnStatsJoin {
+		columns = s.sessionColumnsJoined()
+		joins = turnStatsJoin
+		if sortExpr == lastActiveExpr {
+			sortExpr = lastActiveJoinedExpr
+		}
+	}
+	q := "SELECT " + columns + " FROM sessions s" + joins + fb.joinSQL() + fb.whereSQL()
+	q += fmt.Sprintf(" ORDER BY %s %s", sortExpr, sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultQueryLimit
@@ -630,7 +696,7 @@ func (s *Store) appendSessionsBatch(ctx context.Context, ids []string, byID map[
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	q := "SELECT " + s.sessionColumns() + " FROM sessions s" + countJoins + " WHERE s.id IN (" +
+	q := "SELECT " + s.sessionColumns() + " FROM sessions s WHERE s.id IN (" +
 		strings.Join(placeholders, ",") + ")"
 
 	rows, err := s.db.QueryContext(ctx, q, args...)
@@ -736,7 +802,7 @@ func (s *Store) AllSessionIDs(ctx context.Context) ([]string, error) {
 // GetSession loads a single session and all of its related turns,
 // checkpoints, files, and refs.
 func (s *Store) GetSession(ctx context.Context, id string) (*SessionDetail, error) {
-	row := s.db.QueryRowContext(ctx, "SELECT "+s.sessionColumns()+" FROM sessions s"+countJoins+" WHERE s.id = ?", id)
+	row := s.db.QueryRowContext(ctx, "SELECT "+s.sessionColumns()+" FROM sessions s WHERE s.id = ?", id)
 	sess, err := scanSession(row)
 	if err != nil {
 		return nil, fmt.Errorf("loading session %s: %w", id, err)
@@ -1226,8 +1292,8 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	if pivot == PivotByHost && !s.hasHostType {
 		expr = "''"
 	}
-	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s%s ORDER BY pivot_label, %s %s",
-		expr, s.sessionColumns(), countJoins, fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
+		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit

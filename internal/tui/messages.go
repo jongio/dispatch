@@ -42,8 +42,8 @@ type (
 )
 
 type projectQuickStartsMsg struct {
-	quickStarts []components.QuickStart
-	err         error
+	repos []components.QuickStart
+	err   error
 }
 
 // Filter picker data.

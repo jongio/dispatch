@@ -829,8 +829,8 @@ func (p PreviewPanel) View() string {
 		content, _, _ = p.renderContent()
 	}
 
-	// innerW = content+padding width passed to lipgloss Width() (excludes border).
-	// lipgloss Width() includes padding; text wraps at innerW - hPadding(2) = p.width-4.
+	// Lipgloss Width includes border and padding. The style is intentionally
+	// rendered two columns narrower than p.width, so its text area is p.width-6.
 	innerW := max(1, p.width-2)
 	innerH := max(1, p.height-2)
 
@@ -930,14 +930,14 @@ func (p *PreviewPanel) renderContent() (string, int, int) {
 	if p.detail == nil {
 		// Use height-2 to account for the border added by View().
 		return lipgloss.Place(
-			max(1, p.width-4), max(1, p.height-2),
+			max(1, p.width-6), max(1, p.height-2),
 			lipgloss.Center, lipgloss.Center,
 			styles.DimmedStyle.Render("Select a session"),
 		), -1, -1
 	}
 
 	s := p.detail.Session
-	contentW := max(1, p.width-4) // text area = total - border(2) - padding(2)
+	contentW := max(1, p.width-6) // rendered width - border(2) - padding(2)
 
 	var b strings.Builder
 	convLine := -1
@@ -1198,23 +1198,37 @@ func (p *PreviewPanel) renderRelatedSessionRow(i int, related RelatedSessionItem
 	}
 	meta := context + " · " + FormatTimestamp(related.LastActiveAt)
 	prefix := fmt.Sprintf("  %d. ", i+1)
-	available := max(1, contentW-lipgloss.Width(prefix)-lipgloss.Width(meta)-3)
+	bodyWidth := contentW - lipgloss.Width(prefix)
+	if bodyWidth <= 0 {
+		return styles.DimmedStyle.Render(Truncate(prefix, contentW))
+	}
+
+	separator := " — "
+	if bodyWidth <= lipgloss.Width(separator)+1 {
+		return styles.DimmedStyle.Render(prefix) +
+			styles.PreviewValueStyle.Render(Truncate(summary, bodyWidth))
+	}
+
+	// Keep each related session on one visual line. Wrapped rows break the
+	// logical-line hit map used for mouse navigation.
+	meta = Truncate(meta, min(lipgloss.Width(meta), bodyWidth/2))
+	available := max(1, bodyWidth-lipgloss.Width(separator)-lipgloss.Width(meta))
 	return styles.DimmedStyle.Render(prefix) +
 		styles.PreviewValueStyle.Render(Truncate(summary, available)) +
-		styles.DimmedStyle.Render(" — "+meta)
+		styles.DimmedStyle.Render(separator+meta)
 }
 
 // renderPlanContent renders the plan.md content as styled markdown using
 // Glamour, with a cyan "Plan" header and a hint to return.
 // renderTimelineContent produces the timeline view content.
 func (p PreviewPanel) renderTimelineContent() string {
-	contentW := max(1, p.width-4)
+	contentW := max(1, p.width-6)
 	entries := BuildTimeline(p.detail)
 	return RenderTimeline(entries, contentW)
 }
 
 func (p PreviewPanel) renderPlanContent() string {
-	contentW := max(1, p.width-4) // text area = total - border(2) - padding(2)
+	contentW := max(1, p.width-6) // rendered width - border(2) - padding(2)
 
 	var b strings.Builder
 
