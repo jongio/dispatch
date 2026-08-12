@@ -10,7 +10,7 @@
     "test": "astro check && astro build && node scripts/run-playwright.mjs",
     "test:e2e": "astro build && node scripts/run-playwright.mjs",
     "screenshots": "go run -tags screenshots ../cmd/screenshots --out public/screenshots && node ../cmd/screenshots/render.mjs public/screenshots",
-    "screenshots:check": "node -e \"require('node:fs').rmSync('.screenshots-check',{recursive:true,force:true})\" && go run -tags screenshots ../cmd/screenshots --check --out .screenshots-check && node -e \"require('node:fs').rmSync('.screenshots-check',{recursive:true,force:true})\""
+    "screenshots:check": "node scripts/check-screenshots.mjs"
   },
   "dependencies": {
     "astro": "^7.2.0",
