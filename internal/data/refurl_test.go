@@ -28,7 +28,6 @@ func TestRefURL(t *testing.T) {
 		{"unknown type", "owner/repo", "branch", "main", "", false},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := RefURL(tt.repo, tt.refType, tt.refValue)
@@ -90,7 +89,6 @@ func TestBestRef(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, ok := BestRef(tt.refs)
@@ -102,6 +100,31 @@ func TestBestRef(t *testing.T) {
 			}
 			if got.RefType != tt.wantType || got.RefValue != tt.wantValue {
 				t.Errorf("BestRef() = {%q,%q}, want {%q,%q}", got.RefType, got.RefValue, tt.wantType, tt.wantValue)
+			}
+		})
+	}
+}
+
+func TestNormalizeRepoSlug(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		repo string
+		want string
+	}{
+		{name: "bare slug", repo: "owner/repo", want: "owner/repo"},
+		{name: "https remote", repo: "https://github.com/owner/repo.git", want: "owner/repo"},
+		{name: "ssh remote", repo: "git@github.com:owner/repo.git", want: "owner/repo"},
+		{name: "surrounding whitespace", repo: "  github.com/owner/repo  ", want: "owner/repo"},
+		{name: "missing repository", repo: "owner", want: ""},
+		{name: "empty owner", repo: "/repo", want: ""},
+		{name: "empty repository", repo: "owner/", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := NormalizeRepoSlug(tt.repo); got != tt.want {
+				t.Fatalf("NormalizeRepoSlug(%q) = %q, want %q", tt.repo, got, tt.want)
 			}
 		})
 	}

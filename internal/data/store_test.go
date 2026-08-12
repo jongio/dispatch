@@ -141,6 +141,28 @@ func seedRef(t *testing.T, db *sql.DB, sessionID, refType, refValue string, turn
 	}
 }
 
+func TestAllSessionIDsIncludesEmptySessions(t *testing.T) {
+	t.Parallel()
+	store := newTestStore(t)
+	t.Cleanup(func() { _ = store.Close() })
+
+	seedSession(t, store.db, "with-turn", "/repo", "owner/repo", "main", "active", "", "")
+	seedTurn(t, store.db, "with-turn", 0, "hello", "world", "")
+	seedSession(t, store.db, "empty", "/repo", "owner/repo", "main", "", "", "")
+
+	ids, err := store.AllSessionIDs(context.Background())
+	if err != nil {
+		t.Fatalf("AllSessionIDs() error = %v", err)
+	}
+	got := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		got[id] = true
+	}
+	if len(got) != 2 || !got["with-turn"] || !got["empty"] {
+		t.Fatalf("AllSessionIDs() = %v, want both populated and empty sessions", ids)
+	}
+}
+
 // seedCheckpoint inserts a checkpoints row.
 func seedCheckpoint(t *testing.T, db *sql.DB, sessionID string, num int, title, overview string) {
 	t.Helper()

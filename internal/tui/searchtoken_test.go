@@ -189,15 +189,32 @@ func TestApplySearchTokens_SetsFilterFields(t *testing.T) {
 }
 
 func TestApplySearchTokens_StatusSetsAttentionFilter(t *testing.T) {
-	m := newTestModel()
-	m.searchFilter = ParseSearchTokens("status:waiting")
-	m.applySearchTokens()
-
-	if len(m.attentionFilter) != 1 {
-		t.Fatalf("expected 1 attention filter, got %d", len(m.attentionFilter))
+	tests := []struct {
+		token string
+		want  data.AttentionStatus
+	}{
+		{token: "waiting", want: data.AttentionWaiting},
+		{token: "active", want: data.AttentionActive},
+		{token: "stale", want: data.AttentionStale},
+		{token: "idle", want: data.AttentionIdle},
+		{token: "interrupted", want: data.AttentionInterrupted},
+		{token: "working", want: data.AttentionWorking},
+		{token: "thinking", want: data.AttentionThinking},
+		{token: "compacting", want: data.AttentionCompacting},
 	}
-	if _, ok := m.attentionFilter[data.AttentionWaiting]; !ok {
-		t.Error("expected attentionFilter to contain AttentionWaiting")
+	for _, tt := range tests {
+		t.Run(tt.token, func(t *testing.T) {
+			m := newTestModel()
+			m.searchFilter = ParseSearchTokens("status:" + tt.token)
+			m.applySearchTokens()
+
+			if len(m.attentionFilter) != 1 {
+				t.Fatalf("attention filter count = %d, want 1", len(m.attentionFilter))
+			}
+			if _, ok := m.attentionFilter[tt.want]; !ok {
+				t.Fatalf("attention filter = %v, want status %v", m.attentionFilter, tt.want)
+			}
+		})
 	}
 }
 

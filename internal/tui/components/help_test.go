@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -187,21 +188,34 @@ func TestShortcutRowsUseWidthAwareColumns(t *testing.T) {
 
 func TestHelpOverlay_ViewFitsTerminalWidth(t *testing.T) {
 	t.Parallel()
-	h := NewHelpOverlayWithBindings([]HelpGroup{{
-		Title: "Long shortcuts",
-		Bindings: []key.Binding{
-			key.NewBinding(key.WithHelp("shift+tab", "reverse pivot order")),
-			key.NewBinding(key.WithHelp("ctrl+r", "rename launch set")),
-			key.NewBinding(key.WithHelp("b", "open PR/issue/commit")),
-			key.NewBinding(key.WithHelp("ctrl+d", "delete launch set")),
+	groups := []HelpGroup{
+		{
+			Title: "Session Status",
+			Bindings: []key.Binding{
+				key.NewBinding(key.WithHelp("shift+tab", "reverse pivot order")),
+				key.NewBinding(key.WithHelp("ctrl+r", "rename launch set")),
+				key.NewBinding(key.WithHelp("b", "open PR/issue/commit")),
+				key.NewBinding(key.WithHelp("ctrl+d", "delete launch set")),
+			},
 		},
-	}}, nil)
-	h.SetSize(80, 40)
+	}
 
-	for _, line := range strings.Split(h.View(), "\n") {
-		if width := lipgloss.Width(line); width > 80 {
-			t.Fatalf("rendered line width = %d, want at most 80: %q", width, line)
-		}
+	for _, terminalWidth := range []int{30, 40, 60, 80, 120} {
+		t.Run(strconv.Itoa(terminalWidth), func(t *testing.T) {
+			t.Parallel()
+			h := NewHelpOverlayWithBindings(groups, nil)
+			h.SetSize(terminalWidth, 100)
+
+			view := h.View()
+			if !strings.Contains(view, "Needs") || !strings.Contains(view, "working") {
+				t.Fatal("status legend is missing")
+			}
+			for _, line := range strings.Split(view, "\n") {
+				if width := lipgloss.Width(line); width > terminalWidth {
+					t.Fatalf("rendered line width = %d, want at most %d: %q", width, terminalWidth, line)
+				}
+			}
+		})
 	}
 }
 
