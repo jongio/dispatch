@@ -73,32 +73,33 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 ## Requirements
 
 - **GitHub Copilot CLI** installed and used at least once (so the session store exists)
-- **Go 1.26+** — only required when building from source; binary releases have no dependencies
+- **Cosign** installed to verify binary release authenticity
+- **Go 1.26+** — only required when building from source
 
 ## Installation
 
 ### Shell script (Linux / macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.sh | sh
 ```
 
 To install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
+curl -fsSL https://github.com/jongio/dispatch/releases/download/v0.1.0/install.sh | sh -s -- v0.1.0
 ```
 
 ### PowerShell (Windows)
 
 ```powershell
-irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+irm https://github.com/jongio/dispatch/releases/latest/download/install.ps1 | iex
 ```
 
 To install a specific version:
 
 ```powershell
-$v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+$v="v0.1.0"; irm https://github.com/jongio/dispatch/releases/download/v0.1.0/install.ps1 | iex
 ```
 
 ### From source

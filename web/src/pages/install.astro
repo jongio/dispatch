@@ -16,9 +16,9 @@ const base = import.meta.env.BASE_URL;
   <section class="section">
     <div class="container">
       <InstallBlock tabs={[
-        { label: 'Linux', id: 'linux', icon: 'linux', code: 'curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh' },
-        { label: 'macOS', id: 'macos', icon: 'apple', code: 'curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh' },
-        { label: 'Windows', id: 'windows', icon: 'windows', code: 'irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex' },
+        { label: 'Linux', id: 'linux', icon: 'linux', code: 'curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.sh | sh' },
+        { label: 'macOS', id: 'macos', icon: 'apple', code: 'curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.sh | sh' },
+        { label: 'Windows', id: 'windows', icon: 'windows', code: 'irm https://github.com/jongio/dispatch/releases/latest/download/install.ps1 | iex' },
         { label: 'From source', id: 'source', icon: 'source', code: 'go install github.com/jongio/dispatch/cmd/dispatch@latest' },
       ]} />
 

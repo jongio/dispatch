@@ -35,18 +35,14 @@ sboms:
   - artifacts: archive
 
 signs:
-  # Classic detached signature: produces ${artifact}.sig and ${artifact}.pem,
-  # which install.sh and install.ps1 verify with
-  # `cosign verify-blob --signature ...sig --certificate ...pem`. cosign is
-  # pinned to the v2.x line in release.yml so this keeps working; cosign v3
-  # forces the single-file bundle format instead.
+  # Store the complete Sigstore bundle in GoReleaser's tracked signature
+  # artifact so the certificate is published with every release.
   - cmd: cosign
     artifacts: checksum
     args:
       - "sign-blob"
       - "--yes"
-      - "--output-signature=${signature}"
-      - "--output-certificate=${certificate}"
+      - "--bundle=${signature}"
       - "${artifact}"
 
 changelog:
@@ -72,6 +68,9 @@ changelog:
       - "^test:"
 
 release:
+  extra_files:
+    - glob: install.sh
+    - glob: install.ps1
   draft: false
   prerelease: auto
   header: |
@@ -79,21 +78,21 @@ release:
 
     **Linux / macOS:**
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+    curl -fsSL https://github.com/jongio/dispatch/releases/download/{{ .Tag }}/install.sh | sh
     ```
 
     **Windows (PowerShell):**
     ```powershell
-    irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+    irm https://github.com/jongio/dispatch/releases/download/{{ .Tag }}/install.ps1 | iex
     ```
 
     **Install this specific version:**
     ```bash
     # Linux / macOS
-    curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- {{ .Tag }}
+    curl -fsSL https://github.com/jongio/dispatch/releases/download/{{ .Tag }}/install.sh | sh -s -- {{ .Tag }}
 
     # Windows (PowerShell)
-    $v="{{ .Tag }}"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+    $v="{{ .Tag }}"; irm https://github.com/jongio/dispatch/releases/download/{{ .Tag }}/install.ps1 | iex
     ```
   footer: |
     ---

@@ -18,9 +18,11 @@ concurrency:
 
 jobs:
   ci:
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
   release:
+    if: github.ref == 'refs/heads/main'
     needs: ci
     runs-on: ubuntu-latest
     permissions:
@@ -38,19 +40,18 @@ jobs:
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
-          # Pin to the maintained v2.x line. cosign v3 auto-loads a signing
-          # config and forces the new single-file bundle format, which breaks
-          # the classic detached .sig/.pem signing that install.sh and
-          # install.ps1 verify. See the signs block in .goreleaser.yml.
-          cosign-release: v2.6.4
+          cosign-release: v3.1.3
 
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
       - name: Compute next version
         id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get the latest semver tag, default to v0.0.0 if none exists
-          LATEST=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          # Base the next version on the latest published release, not merely a
+          # pushed tag, so a failed publication can retry the same version.
+          LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty')
           if [ -z "$LATEST" ]; then
             LATEST="v0.0.0"
           fi
@@ -80,6 +81,22 @@ jobs:
           NEXT="${MAJOR}.${MINOR}.${PATCH}"
           echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
           echo "Bumping ${CURRENT} -> ${NEXT} (${{ inputs.bump }})"
+
+      - name: Verify changelog entry
+        env:
+          RELEASE_VERSION: v${{ steps.version.outputs.version }}
+        run: |
+          if ! grep -q "## \[${RELEASE_VERSION}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for ${RELEASE_VERSION} -- add one before releasing"
+            exit 1
+          fi
+          echo "Found changelog entry for ${RELEASE_VERSION}"
+
+      - name: Validate release configuration
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          version: "v2.17.1"
+          args: check
 
       - name: Generate contributor notes
         env:
@@ -120,22 +137,21 @@ jobs:
           # Move contrib-notes to temp dir so GoReleaser sees a clean git state
           mv contrib-notes.md "$RUNNER_TEMP/contrib-notes.md" 2>/dev/null || true
 
-      - name: Verify changelog entry
-        env:
-          RELEASE_VERSION: v${{ steps.version.outputs.version }}
-        run: |
-          if ! grep -q "## \[${RELEASE_VERSION}\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no entry for ${RELEASE_VERSION} -- add one before releasing"
-            exit 1
-          fi
-          echo "Found changelog entry for ${RELEASE_VERSION}"
-
       - name: Create and push tag
         run: |
+          TAG="v${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            if [ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]; then
+              echo "::error::Existing retry tag $TAG does not point to HEAD"
+              exit 1
+            fi
+            echo "Reusing unpublished retry tag $TAG"
+          else
+            git tag -a "$TAG" -m "$TAG"
+          fi
+          git push origin "$TAG"
 
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:

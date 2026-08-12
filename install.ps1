@@ -1,9 +1,9 @@
 # Installer for Dispatch — a Go TUI launcher for GitHub Copilot CLI extensions.
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
-#   $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
-#   $env:VERSION = "v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+#   irm https://github.com/jongio/dispatch/releases/latest/download/install.ps1 | iex
+#   $v="v0.1.0"; irm https://github.com/jongio/dispatch/releases/download/v0.1.0/install.ps1 | iex
+#   $env:VERSION = "v0.1.0"; irm https://github.com/jongio/dispatch/releases/download/v0.1.0/install.ps1 | iex
 #   .\install.ps1 -Version v0.1.0
 #
 # Parameters:
@@ -12,6 +12,10 @@
 # Environment variables:
 #   VERSION  Override the version to install (e.g. v0.1.0). Defaults to latest.
 #            The -Version parameter and $v variable take precedence.
+
+param(
+    [string]$Version
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -22,6 +26,7 @@ $Script:Repo            = 'jongio/dispatch'
 $Script:BinaryName      = 'dispatch.exe'
 $Script:ChecksumsFile   = 'dispatch_checksums.txt'
 $Script:GitHubDownload  = "https://github.com/$Script:Repo/releases/download"
+$Script:LegacyV014ChecksumSHA256 = 'd3dcc577efe9d6e5e9ed5afa1f9d4be400a6b146a2b559f90f8dd860609a08c4'
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -59,9 +64,9 @@ function Get-DispatchArch {
 # Version resolution
 # ---------------------------------------------------------------------------
 function Get-DispatchVersion {
-    # Priority: $v variable (one-liner friendly) > $env:VERSION > latest from GitHub.
+    # Priority: -Version > $v variable (one-liner friendly) > $env:VERSION > latest from GitHub.
     # $v is set by: $v="v0.1.0"; irm ... | iex
-    $requestedVersion = if ($v) { $v } elseif ($env:VERSION) { $env:VERSION } else { $null }
+    $requestedVersion = if ($Version) { $Version } elseif ($v) { $v } elseif ($env:VERSION) { $env:VERSION } else { $null }
 
     if ($requestedVersion) {
         $ver = $requestedVersion.ToString().Trim()
@@ -173,34 +178,45 @@ function Install-Dispatch {
         Write-Success 'Downloaded archive'
 
         # ---- Verify cosign signature on checksums file -----------------------
-        $cosignCmd = Get-Command cosign -ErrorAction SilentlyContinue
-        if ($cosignCmd) {
-            Write-Status 'Verifying cosign signature on checksums file...'
+        if ($tag -eq 'v0.14.0') {
+            Write-Status 'Verifying pinned v0.14.0 checksums digest...'
+            $checksumsHash = (Get-FileHash -Path $checksumsPath -Algorithm SHA256).Hash
+            if ($checksumsHash -ine $Script:LegacyV014ChecksumSHA256) {
+                Write-Fail 'Pinned checksums verification failed. The checksums file may have been tampered with.'
+            }
+            Write-Success 'Pinned checksums digest verified'
+        }
+        else {
+            if (-not (Get-Command cosign -ErrorAction SilentlyContinue)) {
+                Write-Fail 'cosign is required to verify release authenticity. Install it from https://docs.sigstore.dev/cosign/system_config/installation/'
+            }
+            Write-Status 'Verifying cosign bundle for checksums file...'
             $sigUrl  = "$Script:GitHubDownload/$tag/$($Script:ChecksumsFile).sig"
-            $pemUrl  = "$Script:GitHubDownload/$tag/$($Script:ChecksumsFile).pem"
             $sigPath = Join-Path $tempDir "$($Script:ChecksumsFile).sig"
-            $pemPath = Join-Path $tempDir "$($Script:ChecksumsFile).pem"
 
             Invoke-WebRequest -Uri $sigUrl -OutFile $sigPath -UseBasicParsing
-            Invoke-WebRequest -Uri $pemUrl -OutFile $pemPath -UseBasicParsing
 
             $cosignArgs = @(
                 'verify-blob'
-                '--signature', $sigPath
-                '--certificate', $pemPath
-                '--certificate-identity-regexp', "^https://github\.com/$Script:Repo/"
+                '--bundle', $sigPath
+                '--certificate-identity', "https://github.com/$Script:Repo/.github/workflows/release.yml@refs/heads/main"
                 '--certificate-oidc-issuer', 'https://token.actions.githubusercontent.com'
                 $checksumsPath
             )
 
-            $cosignResult = & cosign @cosignArgs 2>&1
-            if ($LASTEXITCODE -ne 0) {
+            $savedErrorAction = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $cosignResult = & cosign @cosignArgs 2>&1
+                $cosignExitCode = $LASTEXITCODE
+            }
+            finally {
+                $ErrorActionPreference = $savedErrorAction
+            }
+            if ($cosignExitCode -ne 0) {
                 Write-Fail "Cosign signature verification failed. The checksums file may have been tampered with.`n$cosignResult"
             }
             Write-Success 'Cosign signature verified'
-        }
-        else {
-            Write-Warn 'cosign not found - skipping signature verification. Install cosign for supply-chain security.'
         }
 
         # ---- Verify checksum -------------------------------------------------

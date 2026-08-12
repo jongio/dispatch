@@ -2,9 +2,9 @@
 # Installer for Dispatch — a Go TUI launcher for GitHub Copilot CLI extensions.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
-#   VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+#   curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/jongio/dispatch/releases/download/v0.1.0/install.sh | sh -s -- v0.1.0
+#   curl -fsSL https://github.com/jongio/dispatch/releases/download/v0.1.0/install.sh | VERSION=v0.1.0 sh
 #
 # Arguments:
 #   [version]    Version to install (e.g. v0.1.0, 0.1.0). Defaults to latest.
@@ -30,6 +30,7 @@ REPO="jongio/dispatch"
 BINARY="dispatch"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases/latest"
 GITHUB_DOWNLOAD="https://github.com/${REPO}/releases/download"
+LEGACY_V014_CHECKSUM_SHA256="d3dcc577efe9d6e5e9ed5afa1f9d4be400a6b146a2b559f90f8dd860609a08c4"
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -188,23 +189,25 @@ main() {
     info "Downloading checksums…"
     http_download "${checksums_url}" "${tmp}/${checksums_name}"
 
-    if command -v cosign >/dev/null 2>&1; then
-        info "Verifying cosign signature on checksums file…"
+    if [ "${tag}" = "v0.14.0" ]; then
+        info "Verifying pinned v0.14.0 checksums digest…"
+        checksums_sha=$(compute_sha256 "${tmp}/${checksums_name}")
+        [ "${checksums_sha}" = "${LEGACY_V014_CHECKSUM_SHA256}" ] \
+            || fail "Pinned checksums verification failed. The checksums file may have been tampered with."
+        pass "Pinned checksums digest verified"
+    else
+        command -v cosign >/dev/null 2>&1 || fail "cosign is required to verify release authenticity. Install it from https://docs.sigstore.dev/cosign/system_config/installation/"
+        info "Verifying cosign bundle for checksums file…"
         sig_url="${GITHUB_DOWNLOAD}/${tag}/${checksums_name}.sig"
-        pem_url="${GITHUB_DOWNLOAD}/${tag}/${checksums_name}.pem"
         http_download "${sig_url}" "${tmp}/${checksums_name}.sig"
-        http_download "${pem_url}" "${tmp}/${checksums_name}.pem"
 
         cosign verify-blob \
-            --signature "${tmp}/${checksums_name}.sig" \
-            --certificate "${tmp}/${checksums_name}.pem" \
-            --certificate-identity-regexp "^https://github\\.com/${REPO}/" \
+            --bundle "${tmp}/${checksums_name}.sig" \
+            --certificate-identity "https://github.com/${REPO}/.github/workflows/release.yml@refs/heads/main" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "${tmp}/${checksums_name}" \
             || fail "Cosign signature verification failed. The checksums file may have been tampered with."
         pass "Cosign signature verified"
-    else
-        warn "cosign not found — skipping signature verification. Install cosign for supply-chain security."
     fi
 
     # ---- Verify checksum -------------------------------------------------
