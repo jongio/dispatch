@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.15.0] — 2026-08-12
+
 ### Added
 
 #### TUI
