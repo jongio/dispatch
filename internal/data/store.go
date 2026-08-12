@@ -142,18 +142,26 @@ func Maintain(ctx context.Context) error {
 		return nil // no store yet — nothing to maintain
 	}
 
-	db, err := sql.Open("sqlite", path)
+	dsn, err := readWriteSQLiteDSN(path)
+	if err != nil {
+		return fmt.Errorf("building maintenance connection: %w", err)
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return fmt.Errorf("opening store for maintenance: %w", err)
 	}
 	defer func() { _ = db.Close() }()
 
 	// Checkpoint WAL — consolidates write-ahead log into the main db.
-	if _, err := db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+	var busy, logFrames, checkpointedFrames int
+	if err := db.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &checkpointedFrames); err != nil {
 		if isDBBusy(err) {
 			return ErrIndexBusy
 		}
 		return fmt.Errorf("WAL checkpoint: %w", err)
+	}
+	if busy != 0 {
+		return ErrIndexBusy
 	}
 
 	// Rebuild FTS5 search index from source data.
@@ -900,11 +908,7 @@ func (s *Store) searchSessionsLIKE(ctx context.Context, query string, limit int)
 			'turn' AS source_type, CAST(t.turn_index AS TEXT) AS source_id
 		FROM turns t
 		JOIN sessions s2 ON s2.id = t.session_id
-		WHERE t.user_message LIKE ? ESCAPE '\'
-			AND (EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = t.session_id)
-				OR EXISTS (SELECT 1 FROM session_files sf WHERE sf.session_id = t.session_id)
-				OR EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = t.session_id)
-				OR EXISTS (SELECT 1 FROM session_refs sr WHERE sr.session_id = t.session_id))` + autoClause + `
+		WHERE t.user_message LIKE ? ESCAPE '\'` + autoClause + `
 	) sub`
 	args := []any{pattern, pattern, pattern} //nolint:prealloc // literal init is clearer than make+append
 	args = append(args, extraArgs...)

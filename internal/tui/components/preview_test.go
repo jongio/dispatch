@@ -205,6 +205,7 @@ func TestPreviewPanelRedactsConversationSecrets(t *testing.T) {
 	if !panel.RedactSecrets() {
 		t.Fatal("RedactSecrets() = false after enabling it")
 	}
+
 	redacted := panel.View()
 	if strings.Contains(redacted, secret) || !strings.Contains(redacted, "[redacted]") {
 		t.Fatalf("redacted preview exposed secret or omitted marker: %q", redacted)
@@ -216,6 +217,19 @@ func TestPreviewPanelRedactsConversationSecrets(t *testing.T) {
 	}
 	if unredacted := panel.View(); !strings.Contains(unredacted, secret) {
 		t.Fatalf("unredacted preview omitted original content: %q", unredacted)
+	}
+}
+
+func TestPreviewPanelRedactsPlanSecrets(t *testing.T) {
+	const secret = "some-opaque-token-value"
+	panel := NewPreviewPanel()
+	panel.SetSize(100, 40)
+	panel.SetPlanContent("Authorization: Bearer " + secret)
+	panel.SetRedactSecrets(true)
+
+	rendered := ansi.Strip(panel.renderPlanContent())
+	if strings.Contains(rendered, secret) || !strings.Contains(rendered, "[redacted]") {
+		t.Fatalf("redacted plan exposed secret or omitted marker: %q", rendered)
 	}
 }
 

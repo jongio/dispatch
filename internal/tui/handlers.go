@@ -589,7 +589,9 @@ func (m Model) handleAttentionScanned(msg attentionScannedMsg) (Model, tea.Cmd) 
 	// Update preview panel status if a session is selected.
 	if m.detail != nil {
 		m.preview.SetAttentionStatus(m.attentionStatusForSession(m.detail.Session.ID))
-		m.preview.SetLastEvent(data.LastSessionEvent(m.detail.Session.ID))
+		if m.detail.Session.ID == msg.previewID {
+			m.preview.SetLastEvent(msg.previewLastEvt)
+		}
 	}
 	// Always schedule the next periodic scan. When the attention filter
 	// is active, also reload sessions so the list reflects updated

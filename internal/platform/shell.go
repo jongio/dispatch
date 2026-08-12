@@ -647,6 +647,12 @@ func launchTmuxPane(shell ShellInfo, resumeCmd, cwd, paneDirection string) error
 	return startAndWaitBriefly(cmd)
 }
 
+// wtEscapeArg protects dynamic values from Windows Terminal's secondary
+// command-line grammar, where an unescaped semicolon starts another command.
+func wtEscapeArg(value string) string {
+	return strings.ReplaceAll(value, ";", `\;`)
+}
+
 func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cwd string, launchStyle string, paneDirection string) error {
 	// Use Windows Terminal when configured (or defaulted by LaunchSession).
 	if terminal == termWindowsTerminal {
@@ -666,19 +672,19 @@ func launchWindowsSession(shell ShellInfo, resumeCmd string, terminal string, cw
 				args = append(args, "-w", "0", "new-tab")
 			}
 			if cwd != "" {
-				args = append(args, "--startingDirectory", cwd)
+				args = append(args, "--startingDirectory", wtEscapeArg(cwd))
 			}
 			switch {
 			case strings.Contains(strings.ToLower(shell.Path), "pwsh"), strings.Contains(strings.ToLower(shell.Path), "powershell"):
-				args = append(args, shell.Path, "-NoLogo", "-Command", psQuote(resumeCmd))
+				args = append(args, wtEscapeArg(shell.Path), "-NoLogo", "-Command", wtEscapeArg(psQuote(resumeCmd)))
 			case strings.Contains(strings.ToLower(shell.Path), "cmd"):
-				args = append(args, shell.Path, "/k", cmdEscape(resumeCmd))
+				args = append(args, wtEscapeArg(shell.Path), "/k", wtEscapeArg(cmdEscape(resumeCmd)))
 			default:
 				bashCmd := resumeCmd
 				if isGitBash(shell) {
 					bashCmd = bashifyCmd(resumeCmd)
 				}
-				args = append(args, shell.Path, "-c", bashCmd)
+				args = append(args, wtEscapeArg(shell.Path), "-c", wtEscapeArg(bashCmd))
 			}
 			cmd := exec.CommandContext(context.Background(), p, args...)
 			return startAndWaitBriefly(cmd)
@@ -993,14 +999,14 @@ func buildWSLWTArgs(shell ShellInfo, resumeCmd, winCwd, distro, launchStyle, pan
 	}
 
 	if winCwd != "" {
-		args = append(args, "--startingDirectory", winCwd)
+		args = append(args, "--startingDirectory", wtEscapeArg(winCwd))
 	}
 
 	// wt.exe wsl.exe -d <distro> -- <shell> -c <resumeCmd>
 	if distro != "" {
-		args = append(args, "wsl.exe", "-d", distro, "--", shell.Path, "-c", resumeCmd)
+		args = append(args, "wsl.exe", "-d", wtEscapeArg(distro), "--", wtEscapeArg(shell.Path), "-c", wtEscapeArg(resumeCmd))
 	} else {
-		args = append(args, "wsl.exe", "--", shell.Path, "-c", resumeCmd)
+		args = append(args, "wsl.exe", "--", wtEscapeArg(shell.Path), "-c", wtEscapeArg(resumeCmd))
 	}
 
 	return args

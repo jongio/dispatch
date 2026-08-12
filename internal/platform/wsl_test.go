@@ -48,8 +48,8 @@ func TestBuildWSLWTArgs_MaliciousDistroName(t *testing.T) {
 			}
 
 			// The distro name must be a single unsplit argument.
-			if args[dIdx+1] != distro {
-				t.Errorf("distro arg = %q, want %q (must not be split)", args[dIdx+1], distro)
+			if args[dIdx+1] != wtEscapeArg(distro) {
+				t.Errorf("distro arg = %q, want %q (must not be split)", args[dIdx+1], wtEscapeArg(distro))
 			}
 
 			// Verify the overall structure: nothing from the distro
@@ -65,7 +65,7 @@ func TestBuildWSLWTArgs_MaliciousDistroName(t *testing.T) {
 				t.Fatal("wsl.exe not found in args")
 			}
 			// After wsl.exe: -d, <distro>, --, <shell>, -c, <resumeCmd>
-			expected := []string{"wsl.exe", "-d", distro, "--", shell.Path, "-c", "echo test"}
+			expected := []string{"wsl.exe", "-d", wtEscapeArg(distro), "--", wtEscapeArg(shell.Path), "-c", "echo test"}
 			tail := args[wslIdx:]
 			if len(tail) != len(expected) {
 				t.Fatalf("tail args len = %d, want %d; got %v", len(tail), len(expected), tail)
@@ -112,8 +112,8 @@ func TestBuildWSLWTArgs_MaliciousShellPath(t *testing.T) {
 			}
 
 			// The shell path must appear as a single argument immediately after --.
-			if args[sepIdx+1] != path {
-				t.Errorf("shell path = %q, want %q (must be single arg)", args[sepIdx+1], path)
+			if args[sepIdx+1] != wtEscapeArg(path) {
+				t.Errorf("shell path = %q, want %q (must be single arg)", args[sepIdx+1], wtEscapeArg(path))
 			}
 		})
 	}
@@ -152,8 +152,8 @@ func TestBuildWSLWTArgs_MaliciousWindowsPath(t *testing.T) {
 			}
 
 			// Path must be a single unsplit argument.
-			if args[sdIdx+1] != winPath {
-				t.Errorf("startingDirectory arg = %q, want %q", args[sdIdx+1], winPath)
+			if args[sdIdx+1] != wtEscapeArg(winPath) {
+				t.Errorf("startingDirectory arg = %q, want %q", args[sdIdx+1], wtEscapeArg(winPath))
 			}
 
 			// Verify no extra --startingDirectory flags were injected.

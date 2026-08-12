@@ -122,6 +122,7 @@ func TestLaunchWithMode_QuickStartRowUsesRepoRootAndLaunchSettings(t *testing.T)
 	m.cfg.YoloMode = true
 	m.cfg.Agent = "coder"
 	m.cfg.Model = "gpt-5"
+	m.cfg.NewSessionCommand = "copilot --new"
 	m.sessionList.SetSessionsWithQuickStarts(nil, []components.QuickStart{{Name: "repo", Path: repoRoot}})
 
 	if id := m.selectedSessionID(); id != "" {
@@ -130,9 +131,12 @@ func TestLaunchWithMode_QuickStartRowUsesRepoRootAndLaunchSettings(t *testing.T)
 	if cwd := m.selectedSessionCwd(); cwd != repoRoot {
 		t.Fatalf("selectedSessionCwd = %q, want repo root %q", cwd, repoRoot)
 	}
-	cfg := m.resumeConfigForSession(m.selectedSessionCwd())
+	cfg := m.resumeConfigForSession(m.selectedSessionID(), m.selectedSessionCwd())
 	if !cfg.YoloMode || cfg.Agent != "coder" || cfg.Model != "gpt-5" || cfg.Cwd != repoRoot {
 		t.Fatalf("resumeConfigForSession = %#v, want existing launch settings and repo root", cfg)
+	}
+	if cfg.ResumeSessionCommand != m.cfg.NewSessionCommand {
+		t.Fatalf("new-session command = %q, want %q", cfg.ResumeSessionCommand, m.cfg.NewSessionCommand)
 	}
 	args := platform.BuildResumeArgs(m.selectedSessionID(), cfg)
 	for _, arg := range args {

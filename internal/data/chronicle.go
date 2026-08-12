@@ -117,9 +117,10 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 	}
 
 	// ----- Streaming state shared across all collect calls -----
-	var lineBuf strings.Builder   // current line being assembled
-	var allOutput strings.Builder // accumulated emitted lines for success check
-	var linesEmitted int          // total unique lines emitted (for startup readiness)
+	var lineBuf strings.Builder // current line being assembled
+	var linesEmitted int        // total unique lines emitted (for startup readiness)
+	var successSeen bool
+	var errorSeen bool
 
 	// Dedup window — skip lines seen in the last dedupeWindow unique
 	// lines. This catches repeated TUI chrome from screen redraws.
@@ -140,12 +141,14 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 		// Add to dedup window, evicting oldest if full.
 		if len(seenOrder) >= dedupeWindow {
 			delete(seen, seenOrder[0])
-			seenOrder = seenOrder[1:]
+			copy(seenOrder, seenOrder[1:])
+			seenOrder = seenOrder[:len(seenOrder)-1]
 		}
 		seen[line] = struct{}{}
 		seenOrder = append(seenOrder, line)
-		allOutput.WriteString(line)
-		allOutput.WriteByte('\n')
+		lowerLine := strings.ToLower(line)
+		successSeen = successSeen || strings.Contains(lowerLine, "reindexed") || strings.Contains(lowerLine, "sessions")
+		errorSeen = errorSeen || strings.Contains(lowerLine, "error")
 		linesEmitted++
 		if onLine != nil {
 			onLine(line)
@@ -227,11 +230,10 @@ func ChronicleReindex(ctx context.Context, onLine func(line string)) error {
 	}
 
 	// Check for success markers in the output.
-	lower := strings.ToLower(allOutput.String())
-	if strings.Contains(lower, "reindexed") || strings.Contains(lower, "sessions") {
+	if successSeen {
 		return nil
 	}
-	if strings.Contains(lower, "error") {
+	if errorSeen {
 		return fmt.Errorf("chronicle reindex reported an error")
 	}
 

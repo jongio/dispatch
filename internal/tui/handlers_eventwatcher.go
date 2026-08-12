@@ -31,7 +31,7 @@ func (m Model) handleEventWatcherUpdate(msg eventWatcherUpdateMsg) (Model, tea.C
 	// Update preview if the changed session is currently selected.
 	if m.detail != nil && m.detail.Session.ID == msg.sessionID {
 		m.preview.SetAttentionStatus(msg.status)
-		m.preview.SetLastEvent(data.LastSessionEvent(msg.sessionID))
+		m.preview.SetLastEvent(msg.lastEvent)
 	}
 
 	var cmds []tea.Cmd

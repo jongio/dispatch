@@ -1223,7 +1223,11 @@ func (p PreviewPanel) renderPlanContent() string {
 	b.WriteString(styles.DimmedStyle.Render("Press v or Esc to return") + "\n\n")
 
 	// ── Plan body — rendered as markdown ──
-	lines := markdown.RenderStatic(p.planContent, contentW)
+	planContent := p.planContent
+	if p.redactSecrets {
+		planContent = platform.RedactSecrets(planContent)
+	}
+	lines := markdown.RenderStatic(planContent, contentW)
 	b.WriteString(strings.Join(lines, "\n"))
 
 	return b.String()

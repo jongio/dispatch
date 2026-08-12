@@ -11,6 +11,16 @@ import (
 // readOnlySQLiteDSN returns an escaped SQLite file URI that enforces
 // read-only access at both the file-open and connection levels.
 func readOnlySQLiteDSN(path string) (string, error) {
+	return sqliteFileDSN(path, "ro", true)
+}
+
+// readWriteSQLiteDSN returns an escaped SQLite file URI that allows writes but
+// refuses to create a missing database.
+func readWriteSQLiteDSN(path string) (string, error) {
+	return sqliteFileDSN(path, "rw", false)
+}
+
+func sqliteFileDSN(path, mode string, queryOnly bool) (string, error) {
 	if !utf8.ValidString(path) {
 		return "", fmt.Errorf("SQLite path is not valid UTF-8")
 	}
@@ -38,8 +48,10 @@ func readOnlySQLiteDSN(path string) (string, error) {
 		Path:   uriPath,
 	}
 	query := uri.Query()
-	query.Set("mode", "ro")
-	query.Set("_query_only", "1")
+	query.Set("mode", mode)
+	if queryOnly {
+		query.Set("_query_only", "1")
+	}
 	uri.RawQuery = query.Encode()
 	return uri.String(), nil
 }

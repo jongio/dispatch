@@ -97,7 +97,9 @@ type attentionQuickScannedMsg struct {
 // attentionScannedMsg delivers session attention statuses from the
 // full session-state directory scanner (includes events.jsonl analysis).
 type attentionScannedMsg struct {
-	statuses map[string]data.AttentionStatus
+	statuses       map[string]data.AttentionStatus
+	previewID      string
+	previewLastEvt data.SessionEvent
 }
 
 // attentionTickMsg fires periodically to trigger the next attention scan.
@@ -165,6 +167,7 @@ type exportDoneMsg struct {
 type eventWatcherUpdateMsg struct {
 	sessionID string
 	status    data.AttentionStatus
+	lastEvent data.SessionEvent
 }
 
 // newSessionLaunchedMsg reports that a new session launch command completed.

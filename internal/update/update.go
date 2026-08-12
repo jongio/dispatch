@@ -578,6 +578,7 @@ func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 	// extracted newBinaryPath to avoid Windows file-locking issues on
 	// the just-written exe.
 	companions := []string{binaryName + ".exe", aliasName + ".exe"}
+	var companionErrors []error
 	for _, name := range companions {
 		if strings.EqualFold(name, exeName) {
 			continue
@@ -591,15 +592,23 @@ func replaceWindows(newBinaryPath, exeDir, exeName string) error {
 			oldCompanion = fmt.Sprintf("%s.old.%d", companionPath, time.Now().UnixNano())
 		}
 		if err := renameWithRetry(companionPath, oldCompanion); err != nil {
+			companionErrors = append(companionErrors, fmt.Errorf("preparing companion %s: %w", name, err))
 			continue
 		}
 		if err := copyFile(newBinaryPath, companionPath); err != nil {
-			_ = renameWithRetry(oldCompanion, companionPath) // restore on failure
+			restoreErr := renameWithRetry(oldCompanion, companionPath)
+			if restoreErr != nil {
+				err = errors.Join(err, fmt.Errorf("restoring companion %s: %w", name, restoreErr))
+			}
+			companionErrors = append(companionErrors, fmt.Errorf("updating companion %s: %w", name, err))
 			continue
 		}
 		_ = removeWithRetry(oldCompanion)
 	}
 
+	if len(companionErrors) > 0 {
+		return fmt.Errorf("primary binary updated but companion update failed: %w", errors.Join(companionErrors...))
+	}
 	return nil
 }
 

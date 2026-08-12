@@ -170,8 +170,7 @@ func WriteContinuationPlan(sessionID string, remaining []string, summary string)
 	// Open-then-Fstat eliminates the TOCTOU window between Lstat and
 	// WriteFile: we verify the opened fd itself is a regular file (or
 	// newly created) before writing any bytes.
-	//nolint:gosec // 0644 is the standard permission for plan.md files
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("opening plan for write: %w", err)
 	}
@@ -187,6 +186,9 @@ func WriteContinuationPlan(sessionID string, remaining []string, summary string)
 
 	if _, err := f.WriteString(updated); err != nil {
 		return fmt.Errorf("writing plan: %w", err)
+	}
+	if err := f.Chmod(0o600); err != nil {
+		return fmt.Errorf("restricting plan permissions: %w", err)
 	}
 	return nil
 }
@@ -210,9 +212,12 @@ func readFileIfExists(path string) (string, error) {
 	if !info.Mode().IsRegular() {
 		return "", nil
 	}
-	content, err := io.ReadAll(io.LimitReader(f, maxPlanFileSize))
+	content, err := io.ReadAll(io.LimitReader(f, maxPlanFileSize+1))
 	if err != nil {
 		return "", err
+	}
+	if len(content) > maxPlanFileSize {
+		return "", fmt.Errorf("plan exceeds maximum mutable size of %d bytes", maxPlanFileSize)
 	}
 	return string(content), nil
 }

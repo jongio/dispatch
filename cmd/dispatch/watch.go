@@ -40,9 +40,9 @@ var watchExecFn = runWatchHook
 // through DISPATCH_SESSION_* variables and is never interpolated into the
 // command string, so untrusted session data cannot change what runs. Command
 // output is routed to stderr to keep stdout clean for --json consumers.
-func runWatchHook(command string, sessionEnv []string) error {
+func runWatchHook(ctx context.Context, command string, sessionEnv []string) error {
 	shellPath, flag := hookShell()
-	cmd := exec.CommandContext(context.Background(), shellPath, flag, command)
+	cmd := exec.CommandContext(ctx, shellPath, flag, command)
 	cmd.Env = append(os.Environ(), sessionEnv...)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
@@ -82,8 +82,8 @@ func hookEnv(id, state, prevState string, meta data.Session) []string {
 
 // fireWatchHook runs the configured hook command for one transition. Any error
 // is written to stderr; the watch loop continues regardless.
-func fireWatchHook(command, id, state, prevState string, meta data.Session) {
-	if err := watchExecFn(command, hookEnv(id, state, prevState, meta)); err != nil {
+func fireWatchHook(ctx context.Context, command, id, state, prevState string, meta data.Session) {
+	if err := watchExecFn(ctx, command, hookEnv(id, state, prevState, meta)); err != nil {
 		fmt.Fprintf(os.Stderr, "watch hook failed for %s: %v\n", shortID(id), err)
 	}
 }
@@ -284,7 +284,10 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 	}
 
 	// Build initial state for transition detection.
-	attention := scanFiltered(opts)
+	attention, err := scanFiltered(opts)
+	if err != nil {
+		return err
+	}
 	for id, status := range attention {
 		prev[id] = status
 	}
@@ -294,7 +297,10 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			current := scanFiltered(opts)
+			current, scanErr := scanFiltered(opts)
+			if scanErr != nil {
+				continue
+			}
 			var meta map[string]data.Session
 			if opts.exec != "" {
 				meta = watchSessionMeta(opts)
@@ -321,7 +327,7 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 						if existed {
 							prevState = old.String()
 						}
-						fireWatchHook(opts.exec, id, status.String(), prevState, meta[id])
+						fireWatchHook(ctx, opts.exec, id, status.String(), prevState, meta[id])
 					}
 				}
 			}
@@ -341,7 +347,7 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 							fmt.Fprintf(w, "[%s] %s  gone\n", ts, shortID(id))
 						}
 						if opts.exec != "" {
-							fireWatchHook(opts.exec, id, "gone", prev[id].String(), meta[id])
+							fireWatchHook(ctx, opts.exec, id, "gone", prev[id].String(), meta[id])
 						}
 					}
 				}
@@ -352,12 +358,12 @@ func runWatchStream(w io.Writer, opts watchOptions) error {
 }
 
 // scanFiltered runs the attention scan and filters by session metadata.
-func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
+func scanFiltered(opts watchOptions) (map[string]data.AttentionStatus, error) {
 	threshold := 15 * time.Minute
 	attention := watchScanAttentionFn(threshold)
 
 	if opts.repo == "" && opts.branch == "" && opts.folder == "" {
-		return filterAttentionByStatus(attention, opts)
+		return filterAttentionByStatus(attention, opts), nil
 	}
 
 	sessions, err := watchListSessionsFn(data.FilterOptions{
@@ -366,7 +372,7 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 		Folder:     opts.folder,
 	})
 	if err != nil {
-		return filterAttentionByStatus(attention, opts)
+		return nil, err
 	}
 
 	allowed := make(map[string]bool, len(sessions))
@@ -380,7 +386,7 @@ func scanFiltered(opts watchOptions) map[string]data.AttentionStatus {
 			filtered[id] = status
 		}
 	}
-	return filterAttentionByStatus(filtered, opts)
+	return filterAttentionByStatus(filtered, opts), nil
 }
 
 func filterAttentionByStatus(attention map[string]data.AttentionStatus, opts watchOptions) map[string]data.AttentionStatus {
@@ -417,7 +423,10 @@ func watchSessionMeta(opts watchOptions) map[string]data.Session {
 
 // buildWatchSnapshot creates a snapshot of the current attention state.
 func buildWatchSnapshot(opts watchOptions) (watchSnapshot, error) {
-	attention := scanFiltered(opts)
+	attention, err := scanFiltered(opts)
+	if err != nil {
+		return watchSnapshot{}, err
+	}
 
 	sessions, err := watchListSessionsFn(data.FilterOptions{
 		Repository: opts.repo,

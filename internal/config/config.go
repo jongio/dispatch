@@ -667,6 +667,7 @@ func Load() (*Config, error) {
 		cfg.MaxSessions = 0
 	}
 	cfg.sanitize()
+	normalizeLegacyFields(cfg)
 
 	// Migrate old config schemas forward. If the version changed, persist
 	// the upgraded config so future loads skip migration.
@@ -699,11 +700,15 @@ func migrate(cfg *Config) {
 	// v1 → v2: custom_command renamed to resume_session_command.
 	// Copy the old value if the new field is empty.
 	if cfg.ConfigVersion < 2 {
-		if cfg.CustomCommand != "" && cfg.ResumeSessionCommand == "" {
-			cfg.ResumeSessionCommand = cfg.CustomCommand
-		}
-		cfg.CustomCommand = "" // clear so it won't be written back
+		normalizeLegacyFields(cfg)
 	}
+}
+
+func normalizeLegacyFields(cfg *Config) {
+	if cfg.CustomCommand != "" && cfg.ResumeSessionCommand == "" {
+		cfg.ResumeSessionCommand = cfg.CustomCommand
+	}
+	cfg.CustomCommand = ""
 }
 
 // shellUnsafe contains characters that must never appear in shell or terminal
@@ -736,6 +741,10 @@ func sanitizeConfigValue(v string) string {
 // Save writes the given Config to disk as a JSON file.
 // The parent directory is created if it does not already exist.
 func Save(cfg *Config) error {
+	if cfg.ConfigVersion > currentConfigVersion {
+		return fmt.Errorf("config version %d is newer than supported version %d", cfg.ConfigVersion, currentConfigVersion)
+	}
+
 	path, err := configPath()
 	if err != nil {
 		return err
@@ -752,6 +761,9 @@ func Save(cfg *Config) error {
 
 	if err := os.WriteFile(path, data, configFilePerm); err != nil {
 		return fmt.Errorf("writing config: %w", err)
+	}
+	if err := os.Chmod(path, configFilePerm); err != nil {
+		return fmt.Errorf("restricting config permissions: %w", err)
 	}
 	return nil
 }

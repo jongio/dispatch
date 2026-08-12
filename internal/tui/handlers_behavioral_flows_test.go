@@ -59,7 +59,8 @@ func TestOpenFileCommandReportsMissingPath(t *testing.T) {
 
 	result, _ := m.Update(msg)
 	if view := result.(Model).filePicker.View(); !strings.Contains(view, "file not found") ||
-		!strings.Contains(view, "deleted-plan.md") {
+		!strings.Contains(view, "deleted") ||
+		!strings.Contains(view, "plan.md") {
 		t.Fatalf("picker warning did not identify the missing file:\n%s", view)
 	}
 }

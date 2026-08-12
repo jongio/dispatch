@@ -40,6 +40,8 @@ const (
 	configKindString configFieldKind = "string"
 	configKindBool   configFieldKind = "bool"
 	configKindInt    configFieldKind = "int"
+
+	legacyCustomCommandKey = "custom_command"
 )
 
 // configField describes one preference that the config command can read and
@@ -219,6 +221,9 @@ func autoRefreshField() configField {
 
 // findConfigField returns the field with the given name, or false if unknown.
 func findConfigField(name string) (configField, bool) {
+	if name == legacyCustomCommandKey {
+		name = "resume_session_command"
+	}
 	for _, f := range configFields() {
 		if f.name == name {
 			return f, true

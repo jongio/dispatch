@@ -3,6 +3,7 @@ package data
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -277,6 +278,34 @@ func TestWriteContinuationPlan_AppendToExisting(t *testing.T) {
 	}
 }
 
+func TestWriteContinuationPlan_RejectsOversizedExistingPlan(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+
+	sessionID := "oversized-plan-session"
+	sessionDir := filepath.Join(dir, sessionID)
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(sessionDir, "plan.md")
+	original := strings.Repeat("x", maxPlanFileSize) + "TAIL-SENTINEL"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := WriteContinuationPlan(sessionID, []string{"new task"}, "must not replace the original")
+	if err == nil || !strings.Contains(err.Error(), "exceeds maximum mutable size") {
+		t.Fatalf("WriteContinuationPlan() error = %v, want oversized-plan error", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != original {
+		t.Fatal("WriteContinuationPlan() modified an oversized plan")
+	}
+}
+
 func TestWriteContinuationPlan_ReplaceExistingSection(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DISPATCH_SESSION_STATE", dir)
@@ -497,5 +526,33 @@ func TestMergeRemainingSection_NoExistingHeader(t *testing.T) {
 	}
 	if !strings.Contains(result, remainingWorkHeader) {
 		t.Error("expected new section appended")
+	}
+}
+
+func TestWriteContinuationPlanRestrictsPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not enforced on Windows")
+	}
+	dir := t.TempDir()
+	t.Setenv("DISPATCH_SESSION_STATE", dir)
+	sessionID := "session-permissions"
+	sessionDir := filepath.Join(dir, sessionID)
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(sessionDir, "plan.md")
+	if err := os.WriteFile(path, []byte("# Plan\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteContinuationPlan(sessionID, []string{"finish"}, "summary"); err != nil {
+		t.Fatalf("WriteContinuationPlan: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("plan permissions = %o, want 600", got)
 	}
 }

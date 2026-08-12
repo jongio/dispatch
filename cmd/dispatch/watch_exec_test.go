@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"strings"
@@ -73,7 +74,7 @@ func TestFireWatchHook_InvokesExec(t *testing.T) {
 	var gotCmd string
 	var gotEnv []string
 	prev := watchExecFn
-	watchExecFn = func(command string, env []string) error {
+	watchExecFn = func(_ context.Context, command string, env []string) error {
 		gotCmd = command
 		gotEnv = env
 		return nil
@@ -81,7 +82,7 @@ func TestFireWatchHook_InvokesExec(t *testing.T) {
 	t.Cleanup(func() { watchExecFn = prev })
 
 	meta := data.Session{Repository: "o/r", Branch: "b", Cwd: "/w", Summary: "s"}
-	fireWatchHook("do-thing", "sess1", "waiting", "none", meta)
+	fireWatchHook(context.Background(), "do-thing", "sess1", "waiting", "none", meta)
 
 	if gotCmd != "do-thing" {
 		t.Errorf("command = %q, want %q", gotCmd, "do-thing")
@@ -97,11 +98,11 @@ func TestFireWatchHook_InvokesExec(t *testing.T) {
 
 func TestFireWatchHook_ErrorDoesNotBlock(t *testing.T) {
 	prev := watchExecFn
-	watchExecFn = func(string, []string) error { return errors.New("boom") }
+	watchExecFn = func(context.Context, string, []string) error { return errors.New("boom") }
 	t.Cleanup(func() { watchExecFn = prev })
 
 	// A failing hook must not panic; the error is written to stderr.
-	fireWatchHook("bad", "id", "waiting", "none", data.Session{})
+	fireWatchHook(context.Background(), "bad", "id", "waiting", "none", data.Session{})
 }
 
 func TestHookShell(t *testing.T) {
@@ -119,13 +120,13 @@ func TestHookShell(t *testing.T) {
 }
 
 func TestRunWatchHook_Success(t *testing.T) {
-	if err := runWatchHook("exit 0", nil); err != nil {
+	if err := runWatchHook(context.Background(), "exit 0", nil); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
 
 func TestRunWatchHook_NonZeroExit(t *testing.T) {
-	if err := runWatchHook("exit 1", nil); err == nil {
+	if err := runWatchHook(context.Background(), "exit 1", nil); err == nil {
 		t.Fatal("expected error for non-zero exit")
 	}
 }

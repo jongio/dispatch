@@ -139,7 +139,7 @@ func TestScanGitStatuses(t *testing.T) {
 		"sess-clean":   cleanDir,
 		"sess-missing": missingDir,
 	}
-	results := ScanGitStatuses(sessions)
+	results := ScanGitStatusesWithRepositories(sessions, nil)
 	if !results["sess-clean"].IsRepo || results["sess-clean"].State() != GitStateClean {
 		t.Errorf("ScanGitStatuses[clean] = %+v, want a clean repo", results["sess-clean"])
 	}

@@ -167,6 +167,10 @@ func (s GitStatus) State() GitState {
 // branch headers, ahead/behind counts, and changed entries come from one
 // consistent snapshot and the call never blocks longer than gitCommandTimeout.
 func DetectGitStatus(dir string) GitStatus {
+	return detectGitStatus(dir, "")
+}
+
+func detectGitStatus(dir, knownRepository string) GitStatus {
 	info, err := os.Stat(dir)
 	if err != nil || !info.IsDir() {
 		return GitStatus{Dir: dir, Exists: false}
@@ -190,7 +194,10 @@ func DetectGitStatus(dir string) GitStatus {
 	s.Dir = dir
 	s.Exists = true
 	s.IsRepo = true
-	s.Repository = detectOriginRepository(dir)
+	s.Repository = knownRepository
+	if s.Repository == "" {
+		s.Repository = detectOriginRepository(dir)
+	}
 	return s
 }
 
@@ -199,7 +206,9 @@ func DetectGitStatus(dir string) GitStatus {
 // It is the single git-scanning entry point used by the background refresh: the
 // session-list badge enum is derived from each GitStatus via State(), while the
 // inline push/pull column and the preview pane use the full status.
-func ScanGitStatuses(sessions map[string]string) map[string]GitStatus {
+// ScanGitStatusesWithRepositories uses repository metadata already loaded from
+// the session store to avoid a second git subprocess for each workspace.
+func ScanGitStatusesWithRepositories(sessions, repositories map[string]string) map[string]GitStatus {
 	results := make(map[string]GitStatus, len(sessions))
 	byDir := make(map[string]GitStatus, len(sessions))
 	for id, dir := range sessions {
@@ -207,7 +216,7 @@ func ScanGitStatuses(sessions map[string]string) map[string]GitStatus {
 			results[id] = status
 			continue
 		}
-		status := DetectGitStatus(dir)
+		status := detectGitStatus(dir, repositories[id])
 		byDir[dir] = status
 		results[id] = status
 	}

@@ -359,6 +359,9 @@ type Model struct {
 	// Transient status bar messages.
 	statusErr  string
 	statusInfo string
+	// configLoadFailed prevents default fallback values from overwriting a
+	// malformed or unreadable user config during ordinary TUI interactions.
+	configLoadFailed bool
 
 	// Attention status tracking — scanned from session-state directories.
 	attentionMap    map[string]data.AttentionStatus
@@ -397,8 +400,8 @@ type Model struct {
 
 // NewModel creates the root Model with default configuration.
 func NewModel() Model {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
+	cfg, loadErr := config.Load()
+	if loadErr != nil || cfg == nil {
 		cfg = config.Default()
 	}
 
@@ -473,8 +476,9 @@ func NewModel() Model {
 	}
 
 	m := Model{
-		state: stateLoading,
-		cfg:   cfg,
+		state:            stateLoading,
+		cfg:              cfg,
+		configLoadFailed: loadErr != nil,
 
 		sort: data.SortOptions{
 			Field: sortFieldFromConfig(cfg.DefaultSort),
@@ -531,8 +535,9 @@ func NewModel() Model {
 	// Event watcher — push-based attention updates via fsnotify.
 	m.eventWatchCh = make(chan eventWatcherUpdateMsg, 16)
 	m.eventWatcher = data.NewEventWatcher(func(id string, status data.AttentionStatus) {
+		lastEvent := data.LastSessionEvent(id)
 		select {
-		case m.eventWatchCh <- eventWatcherUpdateMsg{sessionID: id, status: status}:
+		case m.eventWatchCh <- eventWatcherUpdateMsg{sessionID: id, status: status, lastEvent: lastEvent}:
 		default:
 		}
 	}, cfg.EffectiveAttentionThreshold(), cfg.WorkspaceRecovery)
@@ -2009,7 +2014,7 @@ func (m Model) handleCopyResumeCommand() (tea.Model, tea.Cmd) {
 
 	cmds := make([]string, 0, len(sessions))
 	for _, sess := range sessions {
-		cmd, err := platform.BuildResumeCommandString(sess.ID, m.resumeConfigForSession(sess.Cwd))
+		cmd, err := platform.BuildResumeCommandString(sess.ID, m.resumeConfigForSession(sess.ID, sess.Cwd))
 		if err != nil {
 			m.statusErr = "resume command: " + err.Error()
 			return m, clearStatusAfter(2 * time.Second)
@@ -3809,6 +3814,10 @@ func (m *Model) cyclePivot() {
 // saveConfig writes the current config to disk. On failure it sets statusErr
 // so the user sees a transient notification.
 func (m *Model) saveConfig() {
+	if m.configLoadFailed {
+		m.statusErr = "config save disabled: fix or remove the unreadable config file"
+		return
+	}
 	if err := config.Save(m.cfg); err != nil {
 		m.statusErr = "config save: " + err.Error()
 	}
@@ -4078,7 +4087,7 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 // the TUI when the session ends.
 func (m *Model) launchInPlace(sessionID, cwd string) tea.Cmd {
 	m.recordLaunch(sessionID)
-	cfg := m.resumeConfigForSession(cwd)
+	cfg := m.resumeConfigForSession(sessionID, cwd)
 	cmd, err := platform.NewResumeCmd(sessionID, cfg)
 	if err != nil {
 		m.statusErr = err.Error()
@@ -4104,7 +4113,7 @@ func launchStyleForMode(mode string) string {
 // launchExternal opens the session in a new tab, window, or pane depending on launchStyle.
 func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchStyle string) tea.Cmd {
 	m.recordLaunch(sessionID)
-	cfg := m.resumeConfigForSession(cwd)
+	cfg := m.resumeConfigForSession(sessionID, cwd)
 	cfg.LaunchStyle = launchStyle
 	return func() tea.Msg {
 		if err := platform.LaunchSession(shell, sessionID, cfg); err != nil {
@@ -4116,13 +4125,17 @@ func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchS
 	}
 }
 
-func (m Model) resumeConfigForSession(cwd string) platform.ResumeConfig {
+func (m Model) resumeConfigForSession(sessionID, cwd string) platform.ResumeConfig {
+	command := m.cfg.ResumeSessionCommand
+	if sessionID == "" {
+		command = m.cfg.NewSessionCommand
+	}
 	return platform.ResumeConfig{
 		YoloMode:             m.cfg.YoloMode,
 		Agent:                m.cfg.Agent,
 		Model:                m.cfg.Model,
 		Terminal:             m.cfg.DefaultTerminal,
-		ResumeSessionCommand: m.cfg.ResumeSessionCommand,
+		ResumeSessionCommand: command,
 		Cwd:                  cwd,
 		PaneDirection:        m.cfg.EffectivePaneDirection(),
 	}
@@ -4326,9 +4339,21 @@ func (m Model) scanAttentionQuickCmd() tea.Cmd {
 func (m Model) scanAttentionCmd() tea.Cmd {
 	threshold := m.cfg.EffectiveAttentionThreshold()
 	wr := m.cfg.WorkspaceRecovery
+	var previewID string
+	if m.detail != nil {
+		previewID = m.detail.Session.ID
+	}
 	return func() tea.Msg {
 		statuses := data.ScanAttention(threshold, wr)
-		return attentionScannedMsg{statuses: statuses}
+		var lastEvent data.SessionEvent
+		if previewID != "" {
+			lastEvent = data.LastSessionEvent(previewID)
+		}
+		return attentionScannedMsg{
+			statuses:       statuses,
+			previewID:      previewID,
+			previewLastEvt: lastEvent,
+		}
 	}
 }
 
@@ -4365,10 +4390,12 @@ func (m Model) scanPlansCmd() tea.Cmd {
 func (m Model) scanGitStatesCmd() tea.Cmd {
 	// Build a map of session ID to directory for all loaded sessions.
 	sessionDirs := make(map[string]string)
+	sessionRepos := make(map[string]string)
 	if m.sessions != nil {
 		for _, s := range m.sessions {
 			if s.Cwd != "" {
 				sessionDirs[s.ID] = s.Cwd
+				sessionRepos[s.ID] = s.Repository
 			}
 		}
 	}
@@ -4376,6 +4403,7 @@ func (m Model) scanGitStatesCmd() tea.Cmd {
 		for _, s := range g.Sessions {
 			if s.Cwd != "" {
 				sessionDirs[s.ID] = s.Cwd
+				sessionRepos[s.ID] = s.Repository
 			}
 		}
 	}
@@ -4392,7 +4420,7 @@ func (m Model) scanGitStatesCmd() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		return gitStateScannedMsg{statuses: platform.ScanGitStatuses(sessionDirs)}
+		return gitStateScannedMsg{statuses: platform.ScanGitStatusesWithRepositories(sessionDirs, sessionRepos)}
 	}
 }
 

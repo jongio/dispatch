@@ -147,8 +147,15 @@ func TestEffectiveLaunchMode_CustomStringFallsThrough(t *testing.T) {
 func setupTempConfig(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("APPDATA", tmp)
-	if runtime.GOOS != "windows" {
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("APPDATA", tmp)
+	case "darwin":
+		t.Setenv("HOME", tmp)
+		if err := os.MkdirAll(filepath.Join(tmp, "Library", "Application Support"), 0o755); err != nil {
+			t.Fatalf("create macOS config directory: %v", err)
+		}
+	default:
 		t.Setenv("XDG_CONFIG_HOME", tmp)
 	}
 	return tmp
@@ -167,6 +174,32 @@ func TestLoad_NoFile_ReturnsDefault(t *testing.T) {
 	}
 	if cfg.ShowPreview != def.ShowPreview {
 		t.Errorf("ShowPreview = %v, want %v", cfg.ShowPreview, def.ShowPreview)
+	}
+}
+
+func TestLoadNormalizesLegacyCustomCommandAtCurrentVersion(t *testing.T) {
+	setupTempConfig(t)
+	path, err := configPath()
+	if err != nil {
+		t.Fatalf("configPath: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("create config directory: %v", err)
+	}
+	content := `{"config_version":2,"custom_command":"copilot --resume {sessionId}"}`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ResumeSessionCommand != "copilot --resume {sessionId}" {
+		t.Fatalf("ResumeSessionCommand = %q", cfg.ResumeSessionCommand)
+	}
+	if cfg.CustomCommand != "" {
+		t.Fatalf("CustomCommand = %q, want empty", cfg.CustomCommand)
 	}
 }
 

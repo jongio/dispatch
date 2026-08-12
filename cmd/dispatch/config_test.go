@@ -247,6 +247,34 @@ func TestRunConfigRemovedSearchKey(t *testing.T) {
 	}
 }
 
+func TestRunConfigLegacyCustomCommandAlias(t *testing.T) {
+	cfg := config.Default()
+	cfg.ResumeSessionCommand = "copilot --resume {sessionId}"
+	cfg = withConfigSeams(t, cfg)
+
+	var getOut bytes.Buffer
+	if err := runConfig(&getOut, []string{"config", "get", "custom_command"}); err != nil {
+		t.Fatalf("get custom_command: %v", err)
+	}
+	if strings.TrimSpace(getOut.String()) != cfg.ResumeSessionCommand {
+		t.Fatalf("get custom_command = %q, want %q", getOut.String(), cfg.ResumeSessionCommand)
+	}
+
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "set", "custom_command", "copilot --continue"}); err != nil {
+		t.Fatalf("set custom_command: %v", err)
+	}
+	if cfg.ResumeSessionCommand != "copilot --continue" {
+		t.Fatalf("ResumeSessionCommand = %q, want legacy alias value", cfg.ResumeSessionCommand)
+	}
+
+	if err := runConfig(&bytes.Buffer{}, []string{"config", "unset", "custom_command"}); err != nil {
+		t.Fatalf("unset custom_command: %v", err)
+	}
+	if cfg.ResumeSessionCommand != config.Default().ResumeSessionCommand {
+		t.Fatalf("ResumeSessionCommand = %q after unset, want default", cfg.ResumeSessionCommand)
+	}
+}
+
 func TestRunConfigGet_RequiresKey(t *testing.T) {
 	withConfigSeams(t, config.Default())
 	if err := runConfig(&bytes.Buffer{}, []string{"config", "get"}); err == nil {
