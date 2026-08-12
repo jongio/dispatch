@@ -208,7 +208,7 @@
     - File: internal\tui\keys.go
     - Code: key.NewBinding(key.WithKeys("s"))
     - Handler: internal\tui\model.go
-    - Behavior: Cycles through sort options (updated, folder, name, attention, frecency). Affects session ordering within groups. Group ordering is fixed per group mode (A-Z for folder/repo/branch/host, newest first for date).
+    - Behavior: Cycles through sort options (updated, folder, name, attention, recent). Affects session ordering within groups. Group ordering is fixed per group mode (A-Z for folder/repo/branch/host, newest first for date).
     - Condition: In session list view
 
 18. **S** (Shift+S) → Toggle Sort Direction

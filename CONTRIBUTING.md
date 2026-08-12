@@ -6,17 +6,17 @@ Thank you for your interest in contributing! Here's how to get started.
 
 - **Go 1.26.5+** (see `go.mod` for the authoritative version)
 - **Git**
-- **[Mage](https://magefile.org/)** — Go-based build tool (install: `go install github.com/magefile/mage@latest`)
+- **[Mage](https://magefile.org/)** — Go-based build tool (install: `go install github.com/magefile/mage@v1.17.2`)
 
 ### Optional Tools
 
-These are used by `mage preflight` but skipped gracefully if not installed:
+These are used by `mage preflight`. Install the pinned versions used by CI:
 
 ```sh
-go install mvdan.cc/gofumpt@latest           # Strict formatting
-go install golang.org/x/vuln/cmd/govulncheck@latest  # Vulnerability scanner
-go install golang.org/x/tools/cmd/deadcode@latest    # Dead code detection
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest  # Linter
+go install mvdan.cc/gofumpt@v0.11.0
+go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+go install golang.org/x/tools/cmd/deadcode@v0.48.0
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 ```
 
 ## Installing a Release
@@ -25,16 +25,18 @@ To install the latest release (or test against a specific version):
 
 ```sh
 # Latest — Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh
+curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.sh | sh
 
 # Specific version — Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/jongio/dispatch/main/install.sh | sh -s -- v0.1.0
+version=vX.Y.Z
+curl -fsSL "https://github.com/jongio/dispatch/releases/download/$version/install.sh" | sh -s -- "$version"
 
 # Latest — Windows (PowerShell)
-irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+irm https://github.com/jongio/dispatch/releases/latest/download/install.ps1 | iex
 
 # Specific version — Windows (PowerShell)
-$v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.ps1 | iex
+$version="vX.Y.Z"
+irm "https://github.com/jongio/dispatch/releases/download/$version/install.ps1" | iex
 ```
 
 ## Development Setup
@@ -70,7 +72,7 @@ $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.
 | `mage build`     | Compile dev binary with version info                     |
 | `mage screenshots` | Regenerate website screenshot PNGs                    |
 | `mage screenshotsCheck` | Verify screenshot capture without rendering PNGs |
-| `mage preflight` | Full 11-step CI verification (see below)                 |
+| `mage preflight` | Full 13-step CI verification (see below)                 |
 | `mage vet`       | Run `go vet ./...`                                       |
 | `mage lint`      | Run `golangci-lint` (falls back to `go vet`)             |
 | `mage fmt`       | Format all Go source files                               |
@@ -86,18 +88,20 @@ $v="v0.1.0"; irm https://raw.githubusercontent.com/jongio/dispatch/main/install.
 1. `gofmt` formatting
 2. `go mod tidy` dependency tidiness
 3. `go vet ./...` static analysis
-4. `golangci-lint run` (skipped if not installed)
-5. `go build ./...` compilation
-6. `go test ./... -count=1` unit tests
-7. `go test -race ./... -count=1` race detection
-8. WSL tests for Unix code paths (skipped if WSL unavailable)
-9. `govulncheck ./...` vulnerability scan (skipped if not installed)
-10. `gofumpt -l .` strict formatting (skipped if not installed)
-11. `deadcode ./...` dead code detection (skipped if not installed)
+4. `golangci-lint run`
+5. WSL/Linux lint (skipped if WSL or its linter is unavailable)
+6. `go build ./...` compilation
+7. `go test ./... -count=1` unit tests
+8. `go test -race ./... -count=1` race detection
+9. WSL tests for Unix code paths (skipped if WSL unavailable)
+10. `govulncheck ./...` vulnerability scan
+11. `gofumpt -l .` strict formatting
+12. `deadcode ./...` dead code detection
+13. Local install and binary verification
 
 ## Project Structure
 
-```
+```text
 cmd/dispatch/           Entry point
 internal/
   config/               User configuration (JSON, launch modes)

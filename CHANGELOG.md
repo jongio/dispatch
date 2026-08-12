@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
+- **Session state and launch reliability** — reject oversized continuation plans, preserve legacy configuration compatibility, keep scoped watch results scoped on metadata failures, propagate watcher cancellation, and surface companion-updater failures.
+- **Storage safety and performance** — use read/write-only SQLite maintenance, report busy WAL checkpoints, bound Chronicle reindex memory, remove a redundant search query, move event reads off the TUI update loop, and reuse known repository metadata.
+- **Installer and release trust** — verify future release artifacts with Sigstore identity, use a pinned v0.14.0 checksum trust anchor during migration, publish immutable installer assets, constrain releases to `main`, and make retry behavior safe.
+- **Website and dependency safety** — sanitize rendered changelog HTML and enforce strict npm peer dependency resolution.
 - **Session repository detection** — Dispatch now prefers the live git origin of a session's working directory over the repository recorded at session creation, so renamed or re-pointed remotes display correctly. (#350)
 - **Keybinding config mirror drift** — `new_session` and `focus_window` were present in the key map but missing from the config schema and help groups, so they could not be remapped and were absent from help.
 - **`default_sort = frecency` rejected by the CLI** — `dispatch config set default_sort frecency` failed validation even though the value is accepted everywhere else.
@@ -39,6 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 
 - **Screenshot workflow** — one command now regenerates screenshots across platforms. (#261)
+- **Documentation screenshots** — regenerated all 240 UI captures across five themes and synchronized installation, CLI, configuration, sorting, and quality-pipeline documentation with the current code.
+- **Automation hardening** — pin setup tools, fail CI when required tools cannot install, add Linux ARM64 cross-compilation, and improve Windows/macOS/Linux portability.
 
 ### Removed
 

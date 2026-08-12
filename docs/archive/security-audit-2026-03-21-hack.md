@@ -9,7 +9,7 @@
 
 ## Attack Surface Map
 
-```
+```text
 Entry Points:
   1. CLI args (--all, --release <from> <to>)  --> cmd/contributors/main.go
   2. Git history (author names, emails)        --> git log --format=%aN|%aE
@@ -220,7 +220,7 @@ Defense in depth provided by stripping raw `<>`.
 
 ## Verification
 
-```
+```text
 go build ./...              # EXIT 0
 go test ./... -count=1      # ALL PASS (13 packages)
 ```

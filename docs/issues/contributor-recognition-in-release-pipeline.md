@@ -46,19 +46,19 @@ For an open-source project, contributor recognition is a force multiplier — it
 
 Create a script/tool that extracts contributors between two git tags:
 
-```
+```sh
 git log v0.2.0..v0.3.0 --format='%aN <%aE>' | sort -u
 ```
 
 Also extract from `Co-authored-by:` trailers (important for dispatch since Copilot co-authoring is used extensively):
 
-```
+```sh
 git log v0.2.0..v0.3.0 --format='%(trailers:key=Co-authored-by,valueonly)' | sort -u
 ```
 
 And from GitHub PR data (merged PRs in the range):
 
-```
+```sh
 gh pr list --state merged --base main --json author,mergedAt --limit 100
 ```
 
@@ -124,7 +124,7 @@ Thank you to everyone who has contributed to dispatch!
 
 This file should be auto-updated during the release process.
 
-#### 6. Mage Target
+### 6. Mage Target
 
 Add a `mage contributors` target to `magefile.go` that regenerates `CONTRIBUTORS.md` from git history. This can be called during preflight or release.
 

@@ -4,7 +4,7 @@
 
 After every code change (file edit, create, or delete), run:
 
-```
+```sh
 go build ./...
 ```
 
@@ -14,7 +14,7 @@ If the build fails, fix the issue before making any further changes.
 
 After the build passes, run:
 
-```
+```sh
 mage install
 ```
 

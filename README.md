@@ -21,7 +21,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
 - **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
-- **Sorting** (`s` / `S`) — 7 fields (updated, created, turns, name, folder, attention, frecency) with toggleable direction. Sort applies to both sessions and group ordering
+- **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, attention, recent) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created`, `turns`, and `frecency` values
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Active search terms are highlighted; use `Ctrl+N` / `Ctrl+P` to jump between preview matches. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
@@ -87,7 +87,8 @@ curl -fsSL https://github.com/jongio/dispatch/releases/latest/download/install.s
 To install a specific version:
 
 ```bash
-curl -fsSL https://github.com/jongio/dispatch/releases/download/v0.1.0/install.sh | sh -s -- v0.1.0
+version=vX.Y.Z
+curl -fsSL "https://github.com/jongio/dispatch/releases/download/$version/install.sh" | sh -s -- "$version"
 ```
 
 ### PowerShell (Windows)
@@ -99,7 +100,8 @@ irm https://github.com/jongio/dispatch/releases/latest/download/install.ps1 | ie
 To install a specific version:
 
 ```powershell
-$v="v0.1.0"; irm https://github.com/jongio/dispatch/releases/download/v0.1.0/install.ps1 | iex
+$version="vX.Y.Z"
+irm "https://github.com/jongio/dispatch/releases/download/$version/install.ps1" | iex
 ```
 
 ### From source
@@ -978,7 +980,7 @@ go build ./cmd/dispatch/
 | **Test** | `mage test` | `go test` with race detector + shuffle |
 | **TestWSL** | `mage testWSL` | Run tests under WSL Linux for Unix code path coverage |
 | **CoverageReport** | `mage coverageReport` | Generate `coverage.html` with atomic coverage profile |
-| **Preflight** | `mage preflight` | Full CI check (11 steps — see below) |
+| **Preflight** | `mage preflight` | Full CI check (13 steps — see below) |
 | **Vet** | `mage vet` | `go vet ./...` |
 | **Lint** | `mage lint` | golangci-lint (falls back to go vet) |
 | **Fmt** | `mage fmt` | Format all Go source files |
@@ -990,18 +992,20 @@ go build ./cmd/dispatch/
 
 `mage preflight` runs the same checks as CI — if preflight passes, CI will pass:
 
-```
-Step  1/11  gofmt           — Auto-format source files
-Step  2/11  go mod tidy     — Clean up module dependencies
-Step  3/11  go vet          — Static analysis
-Step  4/11  golangci-lint   — Extended linter suite (20+ linters)
-Step  5/11  go build        — Compile all packages
-Step  6/11  go test         — Unit & integration tests (shuffled, race-detected)
-Step  7/11  go test -race   — Race detection (requires gcc / CGO)
-Step  8/11  WSL tests       — Unix code path coverage (skipped if WSL unavailable)
-Step  9/11  govulncheck     — Known vulnerability scan
-Step 10/11  gofumpt         — Strict formatting enforcement
-Step 11/11  deadcode        — Unreachable code detection
+```text
+Step  1/13  gofmt           — Auto-format source files
+Step  2/13  go mod tidy     — Clean up module dependencies
+Step  3/13  go vet          — Static analysis
+Step  4/13  golangci-lint   — Extended linter suite
+Step  5/13  WSL lint        — Linux-only lint coverage when WSL is available
+Step  6/13  go build        — Compile all packages
+Step  7/13  go test         — Unit and integration tests
+Step  8/13  go test -race   — Race detection (requires gcc / CGO on Windows)
+Step  9/13  WSL tests       — Unix code path coverage when WSL is available
+Step 10/13  govulncheck     — Known vulnerability scan
+Step 11/13  gofumpt         — Strict formatting enforcement
+Step 12/13  deadcode        — Unreachable code detection
+Step 13/13  install         — Build, install, and verify the development binary
 ```
 
 ### CI Pipeline
@@ -1016,16 +1020,16 @@ Every push and PR runs on GitHub Actions:
 | `go test` | Full test suite |
 | `go test -race` | Race condition detection (CGO enabled) |
 | `govulncheck` | Known vulnerability scan |
-| Cross-compile | Verify `darwin/amd64`, `darwin/arm64`, `windows/amd64`, `windows/arm64` |
+| Cross-compile | Verify Linux, macOS, and Windows on amd64 and arm64 |
 
 ### Test Quality
 
 | Metric | Value |
 |---|---|
-| Test packages | 7/7 passing |
-| Coverage | ~79% overall (styles 99%, components 90%, config 88%) |
-| Test files | 39 test files for 44 source files |
-| Test:source ratio | 1.9:1 lines |
+| Test packages | 13/13 passing |
+| Tests | 4,036 passing |
+| Coverage | 84.6% overall; 93.6% security-classified |
+| Test files | 168 |
 | Test patterns | Table-driven, `t.Helper()`, standard library only |
 | Race detector | ✅ CI + local (when gcc available) |
 | Shuffle | ✅ Randomized test order |
@@ -1034,13 +1038,13 @@ Every push and PR runs on GitHub Actions:
 
 ### Optional Tools
 
-These enhance the local development experience. All skip gracefully if not installed:
+Install the pinned versions used by CI for consistent local results:
 
 ```sh
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest  # Extended linting
-go install golang.org/x/vuln/cmd/govulncheck@latest                   # Vulnerability scanning
-go install mvdan.cc/gofumpt@latest                                     # Strict formatting
-go install golang.org/x/tools/cmd/deadcode@latest                      # Dead code detection
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+go install mvdan.cc/gofumpt@v0.11.0
+go install golang.org/x/tools/cmd/deadcode@v0.48.0
 ```
 
 ## Contributing

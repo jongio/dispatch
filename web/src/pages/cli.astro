@@ -30,6 +30,7 @@ import CliTable from '../components/CliTable.astro';
               { name: 'stats', description: 'Session totals and breakdowns by repository, branch, folder, and host, with --json, --csv, --calendar, --top.' },
               { name: 'export <id>', description: 'Export a session as Markdown, JSON, or HTML, with --redact, --stdout, and batch by --repo/--branch/--query.' },
               { name: 'info <id>', description: 'Print a concise summary of one session.' },
+              { name: 'path <id>', description: "Print a session's working directory. Also accepts --last and --current." },
               { name: 'compare <a> <b>', description: 'Compare two sessions side by side, with --json.' },
               { name: 'tags', description: 'List all tags with per-tag session counts, with --json, --csv, or --markdown.' },
               { name: 'tag <id>', description: 'Add, remove, or set tags on a session (--add, --remove, --set, --json).' },
@@ -39,7 +40,7 @@ import CliTable from '../components/CliTable.astro';
               { name: 'alias list', description: 'List all session aliases, with --json for scripting.' },
               { name: 'watch', description: 'Monitor attention state across sessions (--once, --json, --interval).' },
               { name: 'prune', description: 'Report and remove stale config entries (--apply, --json).' },
-              { name: 'config', description: 'Read and set preferences (list, get, set, unset, edit, path).' },
+              { name: 'config', description: 'Read, validate, import, export, and set preferences (list, get, set, unset, edit, path, validate, schema, export, import).' },
               { name: 'doctor', description: 'Print setup diagnostics, with --json.' },
               { name: 'completion <shell>', description: 'Generate a completion script (bash, zsh, fish, powershell).' },
               { name: 'man', description: 'Generate a roff man page.' },
@@ -57,6 +58,11 @@ import CliTable from '../components/CliTable.astro';
               { name: '--demo', description: 'Launch with a demo database of synthetic sessions.' },
               { name: '--clear-cache', description: 'Reset all configuration to defaults.' },
               { name: '--reindex', description: 'Rebuild the session store index via Copilot CLI.' },
+              { name: '--current', description: 'Filter startup to the current Git repository and branch.' },
+              { name: '--cwd <path>', description: 'Filter startup to sessions under a folder.' },
+              { name: '--repo <name>', description: 'Filter startup to a repository.' },
+              { name: '--branch <name>', description: 'Filter startup to a branch.' },
+              { name: '--query <text>', description: 'Pre-fill the TUI search box.' },
             ]} />
           </div>
 
