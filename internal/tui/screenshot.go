@@ -51,6 +51,7 @@ type captureCtx struct {
 	branchGroups  []data.SessionGroup
 	dateGroups    []data.SessionGroup
 	detail        *data.SessionDetail
+	related       []components.RelatedSessionItem
 	flatFilter    data.FilterOptions
 	flatSort      data.SortOptions
 	configVals    components.ConfigValues
@@ -106,6 +107,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.showPreview = true
 		m.detail = c.detail
 		m.preview.SetDetail(c.detail)
+		m.preview.SetRelatedSessions(c.related)
 		m.recalcLayout()
 		add("hero-main", m)
 	}
@@ -212,6 +214,7 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		m.showPreview = true
 		m.detail = c.detail
 		m.preview.SetDetail(c.detail)
+		m.preview.SetRelatedSessions(c.related)
 		m.recalcLayout()
 		add("preview-panel", m)
 	}
@@ -765,6 +768,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 			break
 		}
 	}
+	related := screenshotRelatedSessions(detail, sessions)
 
 	// Build a fake attention map so screenshots show all five status
 	// indicators (waiting=purple, active=green, stale=yellow, interrupted=orange ⚡, idle=gray).
@@ -820,6 +824,7 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 		branchGroups:  branchGroups,
 		dateGroups:    dateGroups,
 		detail:        detail,
+		related:       related,
 		flatFilter:    flatFilter,
 		flatSort:      flatSort,
 		attentionMap:  attentionMap,
@@ -847,6 +852,32 @@ func CaptureScreenshots(dbPath string, width, height int) ([]Screenshot, error) 
 	}
 
 	return shots, nil
+}
+
+func screenshotRelatedSessions(detail *data.SessionDetail, sessions []data.Session) []components.RelatedSessionItem {
+	if detail == nil {
+		return nil
+	}
+	related := make([]components.RelatedSessionItem, 0, maxRelatedSessions)
+	for _, session := range sessions {
+		if session.ID == detail.Session.ID ||
+			session.Repository == "" ||
+			session.Repository != detail.Session.Repository {
+			continue
+		}
+		related = append(related, components.RelatedSessionItem{
+			ID:           session.ID,
+			Summary:      session.Summary,
+			Repository:   session.Repository,
+			Branch:       session.Branch,
+			Cwd:          session.Cwd,
+			LastActiveAt: session.LastActiveAt,
+		})
+		if len(related) == maxRelatedSessions {
+			break
+		}
+	}
+	return related
 }
 
 // newScreenshotModel creates a minimal Model suitable for off-screen

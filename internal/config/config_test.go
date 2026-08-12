@@ -20,6 +20,7 @@ func TestDefaultValues(t *testing.T) {
 	if cfg.ConfigVersion != currentConfigVersion {
 		t.Errorf("ConfigVersion = %d, want %d", cfg.ConfigVersion, currentConfigVersion)
 	}
+
 	if cfg.DefaultShell != "" {
 		t.Errorf("DefaultShell = %q, want empty", cfg.DefaultShell)
 	}
@@ -70,6 +71,28 @@ func TestDefaultValues(t *testing.T) {
 	}
 	if cfg.PreviewPosition != "" {
 		t.Errorf("PreviewPosition = %q, want empty", cfg.PreviewPosition)
+	}
+}
+
+func TestNormalizeLegacyFrecencySort(t *testing.T) {
+	cfg := &Config{
+		DefaultSort: legacySortFieldFrecency,
+		Views: []NamedView{
+			{Name: "legacy", Sort: legacySortFieldFrecency},
+			{Name: "current", Sort: SortFieldName},
+		},
+	}
+
+	normalizeLegacyFields(cfg)
+
+	if cfg.DefaultSort != SortFieldUpdated {
+		t.Errorf("DefaultSort = %q, want %q", cfg.DefaultSort, SortFieldUpdated)
+	}
+	if cfg.Views[0].Sort != SortFieldUpdated {
+		t.Errorf("legacy view sort = %q, want %q", cfg.Views[0].Sort, SortFieldUpdated)
+	}
+	if cfg.Views[1].Sort != SortFieldName {
+		t.Errorf("current view sort = %q, want %q", cfg.Views[1].Sort, SortFieldName)
 	}
 }
 

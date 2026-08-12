@@ -71,21 +71,15 @@ func TestSchemaEnumsMatchValidatorEnums(t *testing.T) {
 		})
 	}
 
-	// default_sort must advertise frecency; a regression here would silently
-	// drop the frecency sort from validation and completion.
+	// Removed sort values must not remain in schema validation or completion.
 	sortProp, ok := props["default_sort"].(map[string]any)
 	if !ok {
 		t.Fatal("schema property default_sort missing")
 	}
 	enum, _ := sortProp["enum"].([]string)
-	found := false
 	for _, v := range enum {
-		if v == SortFieldFrecency {
-			found = true
-			break
+		if v == legacySortFieldFrecency {
+			t.Errorf("default_sort enum %v still advertises removed value %q", enum, v)
 		}
-	}
-	if !found {
-		t.Errorf("default_sort enum %v is missing %q", enum, SortFieldFrecency)
 	}
 }

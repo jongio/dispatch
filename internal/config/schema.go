@@ -141,7 +141,7 @@ func ValidateConfig(cfg *Config) []Diagnostic {
 	}
 
 	addEnum("default_time_range", cfg.DefaultTimeRange, []string{TimeRange1h, TimeRange1d, TimeRange7d, TimeRangeAll})
-	addEnum("default_sort", cfg.DefaultSort, []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder, SortFieldFrecency})
+	addEnum("default_sort", cfg.DefaultSort, []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder})
 	addEnum("default_sort_order", cfg.DefaultSortOrder, []string{SortOrderAsc, SortOrderDesc})
 	addEnum("default_pivot", cfg.DefaultPivot, []string{PivotNone, PivotFolder, PivotRepo, PivotBranch, PivotDate, PivotHost})
 	addEnum("launch_mode", cfg.LaunchMode, []string{LaunchModeInPlace, LaunchModeTab, LaunchModeWindow, LaunchModePane})
@@ -164,7 +164,6 @@ func ValidateConfig(cfg *Config) []Diagnostic {
 	diags = append(diags, validateSessionKeyMap("sessionNotes", cfg.SessionNotes)...)
 	diags = append(diags, validateSessionKeyMap("sessionTags", cfg.SessionTags)...)
 	diags = append(diags, validateSessionKeyMap("sessionAliases", cfg.SessionAliases)...)
-	diags = append(diags, validateSessionKeyMap("sessionLaunches", cfg.SessionLaunches)...)
 	diags = append(diags, validateViews(cfg)...)
 	diags = append(diags, validateLaunchSets(cfg.LaunchSets)...)
 	diags = append(diags, validateProjectRoots(cfg.ProjectRoots)...)
@@ -267,7 +266,7 @@ func validateViews(cfg *Config) []Diagnostic {
 			}
 		}
 		addViewEnum("time_range", v.TimeRange, []string{TimeRange1h, TimeRange1d, TimeRange7d, TimeRangeAll})
-		addViewEnum("sort", v.Sort, []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder, SortFieldFrecency})
+		addViewEnum("sort", v.Sort, []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder})
 		addViewEnum("sort_order", v.SortOrder, []string{SortOrderAsc, SortOrderDesc})
 		addViewEnum("pivot", v.Pivot, []string{PivotNone, PivotFolder, PivotRepo, PivotBranch, PivotDate, PivotHost})
 	}
@@ -448,7 +447,7 @@ func schemaForField(name string, typ reflect.Type) (map[string]any, error) {
 	case "default_time_range", "time_range":
 		base["enum"] = []string{TimeRange1h, TimeRange1d, TimeRange7d, TimeRangeAll}
 	case "default_sort", "sort":
-		base["enum"] = []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder, SortFieldFrecency}
+		base["enum"] = []string{SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder}
 	case "default_sort_order", "sort_order":
 		base["enum"] = []string{SortOrderAsc, SortOrderDesc}
 	case "default_pivot", "pivot":

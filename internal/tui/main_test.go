@@ -9,8 +9,7 @@ import (
 
 // TestMain isolates the OS user-config directory for the entire tui test
 // binary. Many tests here build a Model (NewModel, NewModelWithQuery, or
-// newTestModel) and persist preferences through config.Save — for example
-// recordLaunch stamps a frecency entry on every session launch. Without this
+// newTestModel) and persist preferences through config.Save. Without this
 // redirect those writes land in the developer's real config file, so running
 // "go test ./..." (as "mage install" does) silently overwrites the user's
 // %APPDATA%\dispatch\config.json (or ~/.config/dispatch/config.json) with

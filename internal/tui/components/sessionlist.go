@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
@@ -1066,10 +1067,10 @@ func (s SessionList) renderQuickStartRow(qs QuickStart, selected bool) string {
 
 // applyRowStyle renders a row line with the appropriate style based on state.
 func (s SessionList) applyRowStyle(line string, selected, hidden, favorited, waiting bool) string {
-	padded := PadToWidth(line, s.width)
 	if selected {
-		return styles.SelectedStyle.Render(padded)
+		return styles.SelectedStyle.Render(PadToWidth(ansi.Strip(line), s.width))
 	}
+	padded := PadToWidth(line, s.width)
 	if waiting {
 		return styles.WaitingRowStyle.Render(padded)
 	}

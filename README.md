@@ -21,7 +21,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 - **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
 - **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
-- **Sorting** (`s` / `S`) — 5 fields (updated, folder, name, attention, recent) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created`, `turns`, and `frecency` values
+- **Sorting** (`s` / `S`) — 4 fields (updated, folder, name, attention) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created` and `turns` values
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
 - **Preview panel** (`p`) — metadata, chat-style conversation bubbles, checkpoints (up to 5), files (up to 5), refs (up to 5), scroll indicators. Active search terms are highlighted; use `Ctrl+N` / `Ctrl+P` to jump between preview matches. Toggle conversation sort order with `o`. Press `z` to view the preview fullscreen. Click the session ID row to copy it to clipboard
@@ -714,7 +714,7 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `default_shell` | string | `""` | Preferred shell (`bash`, `zsh`, `pwsh`, `cmd.exe`). Empty = auto-detect |
 | `default_terminal` | string | `""` | Terminal emulator. Empty = auto-detect |
 | `default_time_range` | string | `"1d"` | Time filter: `1h`, `1d`, `7d`, `all` |
-| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder`, `frecency` |
+| `default_sort` | string | `"updated"` | Sort field: `updated`, `created`, `turns`, `name`, `folder` |
 | `default_sort_order` | string | `"desc"` | Sort direction: `asc`, `desc` |
 | `default_pivot` | string | `"folder"` | Grouping: `none`, `folder`, `repo`, `branch`, `date`, `host` |
 | `default_collapsed` | bool | `false` | Start group headers collapsed (single-line) |

@@ -329,9 +329,31 @@ func TestAsyncStoreCommandsReturnBehavioralResults(t *testing.T) {
 	}
 
 	m.pivot = pivotDate
+	m.sort.Order = data.Ascending
 	dateGroups := m.loadSessionsCmd()().(groupsLoadedMsg)
-	if len(dateGroups.groups) == 0 {
-		t.Fatal("date grouping should return at least one group")
+	if len(dateGroups.groups) == 0 ||
+		dateGroups.groups[0].Label > dateGroups.groups[len(dateGroups.groups)-1].Label {
+		t.Fatalf("ascending date groups = %#v", dateGroups.groups)
+	}
+	for _, group := range dateGroups.groups {
+		for i := 1; i < len(group.Sessions); i++ {
+			if group.Sessions[i-1].LastActiveAt > group.Sessions[i].LastActiveAt {
+				t.Fatalf("ascending sessions in date group %q = %#v", group.Label, group.Sessions)
+			}
+		}
+	}
+
+	m.sort.Order = data.Descending
+	dateGroups = m.loadSessionsCmd()().(groupsLoadedMsg)
+	if dateGroups.groups[0].Label < dateGroups.groups[len(dateGroups.groups)-1].Label {
+		t.Fatalf("descending date groups = %#v", dateGroups.groups)
+	}
+	for _, group := range dateGroups.groups {
+		for i := 1; i < len(group.Sessions); i++ {
+			if group.Sessions[i-1].LastActiveAt < group.Sessions[i].LastActiveAt {
+				t.Fatalf("descending sessions in date group %q = %#v", group.Label, group.Sessions)
+			}
+		}
 	}
 
 	m.pivot = pivotNone

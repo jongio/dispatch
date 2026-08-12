@@ -138,7 +138,6 @@ func buildPruneReport(cfg *config.Config, liveIDs map[string]bool) pruneReport {
 		pruneMapStringString("aliases", cfg.SessionAliases, liveIDs),
 		pruneMapStringSlice("tags", cfg.SessionTags, liveIDs),
 		pruneMapStringString("notes", cfg.SessionNotes, liveIDs),
-		pruneMapStringLaunch("launches", cfg.SessionLaunches, liveIDs),
 		pruneStringSlice("favorites", cfg.FavoriteSessions, liveIDs),
 		pruneStringSlice("hidden", cfg.HiddenSessions, liveIDs),
 	)
@@ -154,7 +153,6 @@ func applyPrune(cfg *config.Config, liveIDs map[string]bool) {
 	pruneMapInPlace(cfg.SessionAliases, liveIDs)
 	pruneMapSliceInPlace(cfg.SessionTags, liveIDs)
 	pruneMapInPlace(cfg.SessionNotes, liveIDs)
-	pruneMapLaunchInPlace(cfg.SessionLaunches, liveIDs)
 	cfg.FavoriteSessions = filterSlice(cfg.FavoriteSessions, liveIDs)
 	cfg.HiddenSessions = filterSlice(cfg.HiddenSessions, liveIDs)
 }
@@ -178,21 +176,6 @@ func pruneMapStringString(name string, m map[string]string, liveIDs map[string]b
 // pruneMapStringSlice reports stale entries in a map[string][]string keyed by
 // session ID.
 func pruneMapStringSlice(name string, m map[string][]string, liveIDs map[string]bool) pruneCategory {
-	cat := pruneCategory{Name: name}
-	for id := range m {
-		if liveIDs[id] {
-			cat.Kept++
-		} else {
-			cat.Stale++
-			cat.Removed = append(cat.Removed, id)
-		}
-	}
-	sort.Strings(cat.Removed)
-	return cat
-}
-
-// pruneMapStringLaunch reports stale entries in the SessionLaunches map.
-func pruneMapStringLaunch(name string, m map[string]config.SessionLaunch, liveIDs map[string]bool) pruneCategory {
 	cat := pruneCategory{Name: name}
 	for id := range m {
 		if liveIDs[id] {
@@ -232,15 +215,6 @@ func pruneMapInPlace(m map[string]string, liveIDs map[string]bool) {
 
 // pruneMapSliceInPlace deletes keys from a map[string][]string that are not in liveIDs.
 func pruneMapSliceInPlace(m map[string][]string, liveIDs map[string]bool) {
-	for id := range m {
-		if !liveIDs[id] {
-			delete(m, id)
-		}
-	}
-}
-
-// pruneMapLaunchInPlace deletes keys from the SessionLaunches map that are not in liveIDs.
-func pruneMapLaunchInPlace(m map[string]config.SessionLaunch, liveIDs map[string]bool) {
 	for id := range m {
 		if !liveIDs[id] {
 			delete(m, id)

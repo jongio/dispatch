@@ -1573,12 +1573,70 @@ func TestBadgeClickAction_AccountsForSearchTokenBadge(t *testing.T) {
 	m.searchFilter = ParseSearchTokens("repo:jongio")
 
 	rendered := ansi.Strip(m.renderBadges())
-	sortX := strings.Index(rendered, "s:")
+	sortX := strings.Index(rendered, "Sort (s):")
 	if sortX < 0 {
 		t.Fatalf("sort indicator not found in badges: %q", rendered)
 	}
 	if action := m.badgeClickAction(sortX); action != "sort" {
 		t.Fatalf("badgeClickAction(%d) = %q, want sort", sortX, action)
+	}
+}
+
+func TestBadgeLabelsAndMouseTargetsStayAligned(t *testing.T) {
+	m := newTestModelWithSize(160, 25)
+	m.pivot = pivotDate
+	rendered := ansi.Strip(m.renderBadges())
+
+	targets := []struct {
+		label  string
+		action string
+	}{
+		{"1:1h", "time:1h"},
+		{"Sort (s):", "sort"},
+		{"Group (tab):", "pivot"},
+		{"Expand (x):", "expandall"},
+	}
+	for _, target := range targets {
+		byteIndex := strings.Index(rendered, target.label)
+		if byteIndex < 0 {
+			t.Fatalf("%q not found in badges: %q", target.label, rendered)
+		}
+
+		x := lipgloss.Width(rendered[:byteIndex])
+		if action := m.badgeClickAction(x); action != target.action {
+			t.Fatalf("badgeClickAction(%d) for %q = %q, want %q",
+				x, target.label, action, target.action)
+		}
+	}
+
+	sortArrow := styles.IconSortDown()
+	byteIndex := strings.Index(rendered, sortArrow)
+	if byteIndex < 0 {
+		t.Fatalf("sort arrow not found in badges: %q", rendered)
+	}
+	if action := m.badgeClickAction(lipgloss.Width(rendered[:byteIndex])); action != "sortorder" {
+		t.Fatalf("sort arrow action = %q, want sortorder", action)
+	}
+}
+
+func TestBadgeHeadersAreBoldAndPrimary(t *testing.T) {
+	m := newTestModelWithSize(160, 25)
+	m.pivot = pivotFolder
+	rendered := m.renderBadges()
+
+	for _, label := range []string{"Time", "Sort", "Group", "Expand"} {
+		want := styles.KeyStyle.Bold(true).Render(label)
+		if !strings.Contains(rendered, want) {
+			t.Errorf("renderBadges() does not contain styled header %q", label)
+		}
+	}
+
+	plain := ansi.Strip(rendered)
+	if strings.Contains(plain, "Time (1-4):") {
+		t.Errorf("renderBadges() still contains old time header: %q", plain)
+	}
+	if !strings.Contains(plain, "Time: 1:1h") {
+		t.Errorf("renderBadges() missing shortened time header: %q", plain)
 	}
 }
 

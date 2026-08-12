@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
 
@@ -141,7 +140,11 @@ func relatedRecencyScore(s data.Session, now time.Time) float64 {
 	if t.IsZero() {
 		return 0
 	}
-	return config.FrecencyScore(config.SessionLaunch{Count: 1, Last: t.Unix()}, now)
+	age := now.Sub(t)
+	if age < 0 {
+		age = 0
+	}
+	return -age.Seconds()
 }
 
 func parseRelatedTimestamp(timestamp string) time.Time {

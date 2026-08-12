@@ -192,7 +192,7 @@ func (t *Theme) buildStyles() {
 	t.DimmedStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed))
 	t.HiddenStyle = lipgloss.NewStyle().Foreground(c(t.Dimmed)).Faint(true)
 	t.FavoritedStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
-	t.WaitingRowStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true).Background(c(t.Selected))
+	t.WaitingRowStyle = lipgloss.NewStyle().Foreground(c(t.Primary)).Bold(true)
 	t.GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(c(t.Primary))
 
 	// Filter badges.

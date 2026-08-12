@@ -138,7 +138,6 @@ func TestSortDisplayLabel(t *testing.T) {
 	}{
 		{data.SortByFolder, "folder"},
 		{data.SortByName, "name"},
-		{data.SortByFrecency, "recent"},
 		{data.SortByUpdated, "updated"},
 		{data.SortByCreated, "updated"}, // default
 		{data.SortByTurns, "updated"},   // default
@@ -614,13 +613,8 @@ func TestCycleSort(t *testing.T) {
 	}
 
 	m.cycleSort()
-	if m.sort.Field != data.SortByFrecency {
-		t.Errorf("after fourth cycle: %v, want SortByFrecency", m.sort.Field)
-	}
-
-	m.cycleSort()
 	if m.sort.Field != data.SortByUpdated {
-		t.Errorf("after fifth cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
+		t.Errorf("after fourth cycle: %v, want SortByUpdated (wraps)", m.sort.Field)
 	}
 }
 
@@ -651,17 +645,11 @@ func TestToggleSortOrder(t *testing.T) {
 }
 
 func TestSortSessionsLocally(t *testing.T) {
-	now := time.Now()
 	m := newTestModel()
 	m.attentionMap = map[string]data.AttentionStatus{
 		"a": data.AttentionIdle,
 		"b": data.AttentionWaiting,
 	}
-	m.cfg.SessionLaunches = map[string]config.SessionLaunch{
-		"a": {Count: 1, Last: now.Add(-time.Hour).Unix()},
-		"b": {Count: 5, Last: now.Unix()},
-	}
-
 	tests := []struct {
 		name  string
 		field data.SortField
@@ -674,7 +662,6 @@ func TestSortSessionsLocally(t *testing.T) {
 		{name: "name", field: data.SortByName, a: data.Session{ID: "a", Summary: "a"}, b: data.Session{ID: "b", Summary: "b"}},
 		{name: "folder", field: data.SortByFolder, a: data.Session{ID: "a", Cwd: "a"}, b: data.Session{ID: "b", Cwd: "b"}},
 		{name: "attention", field: data.SortByAttention, a: data.Session{ID: "a"}, b: data.Session{ID: "b"}},
-		{name: "frecency", field: data.SortByFrecency, a: data.Session{ID: "a"}, b: data.Session{ID: "b"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -717,6 +704,42 @@ func TestPreviewCurrentSortUpdatesFlatAndGroupedSessions(t *testing.T) {
 		m.previewCurrentSort()
 		if m.groups[0].Sessions[0].ID != "b" {
 			t.Fatalf("grouped sessions = %#v", m.groups)
+		}
+	})
+
+	t.Run("date pivot sorts labels and sessions by direction", func(t *testing.T) {
+		m := newTestModel()
+		m.pivot = pivotDate
+		m.groups = []data.SessionGroup{
+			{
+				Label: "2026-08-12",
+				Sessions: []data.Session{
+					{ID: "newer", LastActiveAt: "2026-08-12T12:00:00Z"},
+					{ID: "older", LastActiveAt: "2026-08-12T08:00:00Z"},
+				},
+				Count: 2,
+			},
+			{
+				Label:    "2026-08-11",
+				Sessions: []data.Session{{ID: "previous", LastActiveAt: "2026-08-11T12:00:00Z"}},
+				Count:    1,
+			},
+		}
+		m.sessionList.SetPivotField(pivotDate)
+		m.sessionList.SetGroups(m.groups)
+		m.sort = data.SortOptions{Field: data.SortByUpdated, Order: data.Ascending}
+
+		m.previewCurrentSort()
+		if m.groups[0].Label != "2026-08-11" ||
+			m.groups[1].Sessions[0].ID != "older" {
+			t.Fatalf("ascending date groups = %#v", m.groups)
+		}
+
+		m.sort.Order = data.Descending
+		m.previewCurrentSort()
+		if m.groups[0].Label != "2026-08-12" ||
+			m.groups[0].Sessions[0].ID != "newer" {
+			t.Fatalf("descending date groups = %#v", m.groups)
 		}
 	})
 }

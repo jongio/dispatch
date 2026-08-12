@@ -330,7 +330,7 @@ func applyLegacyDefaults(isDark bool) {
 	DimmedStyle = lipgloss.NewStyle().Foreground(dimmed)
 	HiddenStyle = lipgloss.NewStyle().Foreground(dimmed).Faint(true)
 	FavoritedStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
-	WaitingRowStyle = lipgloss.NewStyle().Foreground(lp).Bold(true).Background(ls)
+	WaitingRowStyle = lipgloss.NewStyle().Foreground(lp).Bold(true)
 	GroupHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lp)
 
 	BadgeStyle = lipgloss.NewStyle().Foreground(lbdg).Background(lbbg).Padding(0, 1)

@@ -2764,6 +2764,9 @@ func (m Model) badgeClickAction(x int) string {
 		cursor += w + 2
 	}
 
+	timePrefix := renderBadgeHeader("Time") + styles.DimmedStyle.Render(": ")
+	cursor += lipgloss.Width(timePrefix)
+
 	// Time range selector — individual items separated by " ".
 	for i, tr := range timeRanges {
 		var rendered string
@@ -2788,19 +2791,19 @@ func (m Model) badgeClickAction(x int) string {
 	if m.sort.Order == data.Ascending {
 		arrow = styles.IconSortUp()
 	}
-	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
-	sortKeyRendered := styles.KeyStyle.Render("s")
-	sortKeyW := lipgloss.Width(sortKeyRendered)
-	sortPrefix := styles.DimmedStyle.Render(": ")
+	sortPrefix := styles.DimmedStyle.Render("Sort (") +
+		styles.KeyStyle.Render("s") +
+		styles.DimmedStyle.Render("): ")
 	sortPrefixW := lipgloss.Width(sortPrefix)
 	sortArrowRendered := styles.DimmedStyle.Render(arrow + " ")
 	sortArrowW := lipgloss.Width(sortArrowRendered)
-	sortFullRendered := sortKeyRendered + styles.DimmedStyle.Render(": "+sortLabel)
+	sortValueRendered := sortArrowRendered + styles.DimmedStyle.Render(sortDisplayLabel(m.sort.Field))
+	sortFullRendered := sortPrefix + sortValueRendered
 	w := lipgloss.Width(sortFullRendered)
 	if x >= cursor && x < cursor+w {
 		// Click on the arrow portion (including trailing space) toggles order;
 		// elsewhere cycles sort field.
-		arrowStart := cursor + sortKeyW + sortPrefixW
+		arrowStart := cursor + sortPrefixW
 		if x >= arrowStart && x < arrowStart+sortArrowW {
 			return "sortorder"
 		}
@@ -2813,7 +2816,9 @@ func (m Model) badgeClickAction(x int) string {
 	if pivotLabel == pivotNone {
 		pivotLabel = "list"
 	}
-	pivotRendered := styles.KeyStyle.Render("tab") + styles.DimmedStyle.Render(": "+pivotLabel)
+	pivotRendered := styles.DimmedStyle.Render("Group (") +
+		styles.KeyStyle.Render("tab") +
+		styles.DimmedStyle.Render("): "+pivotLabel)
 	pw := lipgloss.Width(pivotRendered)
 	if x >= cursor && x < cursor+pw {
 		return "pivot"
@@ -2826,14 +2831,61 @@ func (m Model) badgeClickAction(x int) string {
 		if m.sessionList.AllExpanded() {
 			expandIcon = styles.IconCollapseAll()
 		}
-		expandRendered := styles.KeyStyle.Render("x") + styles.DimmedStyle.Render(": "+expandIcon)
+		expandRendered := styles.DimmedStyle.Render("Expand (") +
+			styles.KeyStyle.Render("x") +
+			styles.DimmedStyle.Render("): "+expandIcon)
 		ew := lipgloss.Width(expandRendered)
 		if x >= cursor && x < cursor+ew {
 			return "expandall"
 		}
 	}
-
 	return ""
+}
+
+func (m Model) renderTimeBadgeGroup() string {
+	var trParts []string
+	for _, tr := range timeRanges {
+		if tr.label == m.timeRange {
+			trParts = append(trParts, styles.ActiveBadgeStyle.Render(tr.key+":"+tr.label))
+		} else {
+			trParts = append(trParts, styles.KeyStyle.Render(tr.key)+styles.DimmedStyle.Render(":"+tr.label))
+		}
+	}
+	return renderBadgeHeader("Time") + styles.DimmedStyle.Render(": ") + strings.Join(trParts, " ")
+}
+
+func (m Model) renderSortBadge() string {
+	arrow := styles.IconSortDown()
+	if m.sort.Order == data.Ascending {
+		arrow = styles.IconSortUp()
+	}
+	return renderBadgeHeader("Sort") + styles.DimmedStyle.Render(" (") +
+		styles.KeyStyle.Render("s") +
+		styles.DimmedStyle.Render("): "+arrow+" "+sortDisplayLabel(m.sort.Field))
+}
+
+func (m Model) renderGroupBadge() string {
+	pivotLabel := m.pivot
+	if pivotLabel == pivotNone {
+		pivotLabel = "list"
+	}
+	return renderBadgeHeader("Group") + styles.DimmedStyle.Render(" (") +
+		styles.KeyStyle.Render("tab") +
+		styles.DimmedStyle.Render("): "+pivotLabel)
+}
+
+func (m Model) renderExpandBadge() string {
+	expandIcon := styles.IconExpandAll()
+	if m.sessionList.AllExpanded() {
+		expandIcon = styles.IconCollapseAll()
+	}
+	return renderBadgeHeader("Expand") + styles.DimmedStyle.Render(" (") +
+		styles.KeyStyle.Render("x") +
+		styles.DimmedStyle.Render("): "+expandIcon)
+}
+
+func renderBadgeHeader(label string) string {
+	return styles.KeyStyle.Bold(true).Render(label)
 }
 
 // ---------------------------------------------------------------------------
@@ -2981,39 +3033,13 @@ func (m Model) renderBadges() string {
 		parts = append(parts, styles.ActiveBadgeStyle.Render(summary))
 	}
 
-	// Inline time range selector — show key shortcuts (1-4).
-	var trParts []string
-	for _, tr := range timeRanges {
-		if tr.label == m.timeRange {
-			trParts = append(trParts, styles.ActiveBadgeStyle.Render(tr.key+":"+tr.label))
-		} else {
-			trParts = append(trParts, styles.KeyStyle.Render(tr.key)+styles.DimmedStyle.Render(":"+tr.label))
-		}
-	}
-	parts = append(parts, strings.Join(trParts, " "))
-
-	// Sort indicator with shortcut.
-	arrow := styles.IconSortDown()
-	if m.sort.Order == data.Ascending {
-		arrow = styles.IconSortUp()
-	}
-	sortLabel := arrow + " " + sortDisplayLabel(m.sort.Field)
-	parts = append(parts, styles.KeyStyle.Render("s")+styles.DimmedStyle.Render(": "+sortLabel))
-
-	// Pivot/group indicator with shortcut (no direction arrow).
-	pivotLabel := m.pivot
-	if pivotLabel == pivotNone {
-		pivotLabel = "list"
-	}
-	parts = append(parts, styles.KeyStyle.Render("tab")+styles.DimmedStyle.Render(": "+pivotLabel))
+	parts = append(parts, m.renderTimeBadgeGroup())
+	parts = append(parts, m.renderSortBadge())
+	parts = append(parts, m.renderGroupBadge())
 
 	// Expand/collapse all indicator — only shown in tree mode.
 	if m.pivot != pivotNone {
-		expandIcon := styles.IconExpandAll()
-		if m.sessionList.AllExpanded() {
-			expandIcon = styles.IconCollapseAll()
-		}
-		parts = append(parts, styles.KeyStyle.Render("x")+styles.DimmedStyle.Render(": "+expandIcon))
+		parts = append(parts, m.renderExpandBadge())
 	}
 
 	// Favorites filter indicator.
@@ -3637,19 +3663,7 @@ func attentionPriority(status data.AttentionStatus) int {
 	}
 }
 
-// sortByFrecency re-sorts the session slice by frecency when the current
-// sort field is SortByFrecency. Sessions the user launches often and
-// recently sort first; sessions with no launch history keep their incoming
-// (updated-time) order via a stable sort.
-func (m *Model) sortByFrecency(sessions []data.Session) {
-	if m.sort.Field != data.SortByFrecency {
-		return
-	}
-	m.sortSessionsLocally(sessions, m.sort)
-}
-
 func (m *Model) sortSessionsLocally(sessions []data.Session, sortOpts data.SortOptions) {
-	now := time.Now()
 	slices.SortStableFunc(sessions, func(a, b data.Session) int {
 		var c int
 		switch sortOpts.Field {
@@ -3663,10 +3677,6 @@ func (m *Model) sortSessionsLocally(sessions []data.Session, sortOpts data.SortO
 			c = cmp.Compare(a.Cwd, b.Cwd)
 		case data.SortByAttention:
 			c = cmp.Compare(attentionPriority(m.attentionMap[a.ID]), attentionPriority(m.attentionMap[b.ID]))
-		case data.SortByFrecency:
-			sa := config.FrecencyScore(m.cfg.SessionLaunches[a.ID], now)
-			sb := config.FrecencyScore(m.cfg.SessionLaunches[b.ID], now)
-			c = cmp.Compare(sa, sb)
 		default:
 			c = cmp.Compare(a.LastActiveAt, b.LastActiveAt)
 		}
@@ -3678,15 +3688,23 @@ func (m *Model) sortSessionsLocally(sessions []data.Session, sortOpts data.SortO
 }
 
 func (m *Model) previewCurrentSort() {
+	prevID := m.selectedSessionID()
 	if m.groups != nil {
+		sessionSort := groupedSessionSort(m.pivot, m.sort)
 		for i := range m.groups {
-			m.sortSessionsLocally(m.groups[i].Sessions, m.sort)
+			m.sortSessionsLocally(m.groups[i].Sessions, sessionSort)
+		}
+		if m.pivot == pivotDate {
+			sortGroupsByLabel(m.groups, m.sort.Order)
 		}
 		m.sessionList.SetGroupsWithQuickStarts(m.groups, m.quickStarts)
-		return
+	} else {
+		m.sortSessionsLocally(m.sessions, m.sort)
+		m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
 	}
-	m.sortSessionsLocally(m.sessions, m.sort)
-	m.sessionList.SetSessionsWithQuickStarts(m.sessions, m.quickStarts)
+	if prevID != "" {
+		m.sessionList.SelectByID(prevID)
+	}
 }
 
 func (m *Model) previewCurrentPivot() {
@@ -3718,15 +3736,12 @@ func (m *Model) previewCurrentPivot() {
 			groups[index].Sessions = append(groups[index].Sessions, session)
 			groups[index].Count++
 		}
-		sessionSort := m.sort
-		if m.pivot == pivotDate {
-			sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
-		}
+		sessionSort := groupedSessionSort(m.pivot, m.sort)
 		for i := range groups {
 			m.sortSessionsLocally(groups[i].Sessions, sessionSort)
 		}
 		if m.pivot == pivotDate {
-			sortGroupsByLabel(groups, data.Descending)
+			sortGroupsByLabel(groups, m.sort.Order)
 		} else {
 			sortGroupsByLabel(groups, data.Ascending)
 		}
@@ -3771,7 +3786,6 @@ var sortFields = []data.SortField{
 	data.SortByFolder,
 	data.SortByName,
 	data.SortByAttention,
-	data.SortByFrecency,
 }
 
 func (m *Model) cycleSort() {
@@ -3885,8 +3899,6 @@ func sortDisplayLabel(f data.SortField) string {
 		return "name"
 	case data.SortByAttention:
 		return "attention"
-	case data.SortByFrecency:
-		return "recent"
 	default:
 		return "updated"
 	}
@@ -4098,7 +4110,6 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 // runs the Copilot CLI session resume in the current terminal, and quits
 // the TUI when the session ends.
 func (m *Model) launchInPlace(sessionID, cwd string) tea.Cmd {
-	m.recordLaunch(sessionID)
 	cfg := m.resumeConfigForSession(sessionID, cwd)
 	cmd, err := platform.NewResumeCmd(sessionID, cfg)
 	if err != nil {
@@ -4124,7 +4135,6 @@ func launchStyleForMode(mode string) string {
 
 // launchExternal opens the session in a new tab, window, or pane depending on launchStyle.
 func (m *Model) launchExternal(shell platform.ShellInfo, sessionID, cwd, launchStyle string) tea.Cmd {
-	m.recordLaunch(sessionID)
 	cfg := m.resumeConfigForSession(sessionID, cwd)
 	cfg.LaunchStyle = launchStyle
 	return func() tea.Msg {
@@ -4151,17 +4161,6 @@ func (m Model) resumeConfigForSession(sessionID, cwd string) platform.ResumeConf
 		Cwd:                  cwd,
 		PaneDirection:        m.cfg.EffectivePaneDirection(),
 	}
-}
-
-// recordLaunch stamps a session launch in the config so the frecency sort
-// can rank frequently and recently launched sessions first. Empty IDs (new
-// sessions started from a folder) are ignored.
-func (m *Model) recordLaunch(sessionID string) {
-	if sessionID == "" {
-		return
-	}
-	m.cfg.RecordLaunch(sessionID, time.Now())
-	m.saveConfig()
 }
 
 func (m Model) selectedSessionID() string {
@@ -4299,23 +4298,14 @@ func (m *Model) loadSessionsCmd() tea.Cmd {
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
 
-			// Date grouping always shows most recent sessions first,
-			// regardless of the user's sort field/direction.
-			sessionSort := sortOpts
-			if pivot == pivotDate {
-				sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
-			}
+			sessionSort := groupedSessionSort(pivot, sortOpts)
 
 			groups, err := store.GroupSessions(ctx, pf, filter, sessionSort, limit)
 			if err != nil {
 				return sessionLoadErrorMsg{err: err, version: version}
 			}
-			// Group ordering is fixed per pivot mode (sort direction
-			// only affects sessions, not groups):
-			//   date  → newest date first (descending labels)
-			//   other → A-Z (ascending labels)
 			if pivot == pivotDate {
-				sortGroupsByLabel(groups, data.Descending)
+				sortDateGroups(groups, sortOpts.Order)
 			} else {
 				sortGroupsByLabel(groups, data.Ascending)
 			}
@@ -4762,17 +4752,14 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 		if pivot != pivotNone {
 			pf := pivotFieldFromString(pivot)
 
-			sessionSort := sortOpts
-			if pivot == pivotDate {
-				sessionSort = data.SortOptions{Field: data.SortByUpdated, Order: data.Descending}
-			}
+			sessionSort := groupedSessionSort(pivot, sortOpts)
 
 			groups, err := store.GroupSessions(context.Background(), pf, filter, sessionSort, limit)
 			if err != nil {
 				return dataErrorMsg{err: err}
 			}
 			if pivot == pivotDate {
-				sortGroupsByLabel(groups, data.Descending)
+				sortDateGroups(groups, sortOpts.Order)
 			} else {
 				sortGroupsByLabel(groups, data.Ascending)
 			}
@@ -4966,6 +4953,26 @@ func sortGroupsByLabel(groups []data.SessionGroup, order data.SortOrder) {
 	})
 }
 
+func sortDateGroups(groups []data.SessionGroup, order data.SortOrder) {
+	sortGroupsByLabel(groups, order)
+	for i := range groups {
+		slices.SortStableFunc(groups[i].Sessions, func(a, b data.Session) int {
+			c := cmp.Compare(a.LastActiveAt, b.LastActiveAt)
+			if order == data.Descending {
+				return -c
+			}
+			return c
+		})
+	}
+}
+
+func groupedSessionSort(pivot string, sortOpts data.SortOptions) data.SortOptions {
+	if pivot == pivotDate {
+		return data.SortOptions{Field: data.SortByUpdated, Order: sortOpts.Order}
+	}
+	return sortOpts
+}
+
 // ---------------------------------------------------------------------------
 // Conversion helpers
 // ---------------------------------------------------------------------------
@@ -4980,8 +4987,6 @@ func sortFieldFromConfig(s string) data.SortField {
 		return data.SortByName
 	case pivotFolder, "cwd":
 		return data.SortByFolder
-	case "frecency":
-		return data.SortByFrecency
 	default:
 		return data.SortByUpdated
 	}
@@ -4997,8 +5002,6 @@ func sortFieldToConfig(f data.SortField) string {
 		return "name"
 	case data.SortByFolder:
 		return "folder"
-	case data.SortByFrecency:
-		return "frecency"
 	default:
 		return "updated"
 	}

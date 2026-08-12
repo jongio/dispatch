@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
 func makeSessions(n int) []data.Session {
@@ -20,6 +22,7 @@ func makeSessions(n int) []data.Session {
 		"fix\n\nThe build is broken. Here is the build output:\n\nsrc/UserCard.tsx:12:5 - error TS2532",
 		"Please summarize the following code file.\n",
 	}
+
 	sessions := make([]data.Session, n)
 	for i := range sessions {
 		sessions[i] = data.Session{
@@ -33,6 +36,19 @@ func makeSessions(n int) []data.Session {
 		}
 	}
 	return sessions
+}
+
+func TestApplyRowStyleSelectedUsesContinuousBackground(t *testing.T) {
+	s := NewSessionList()
+	s.SetSize(24, 5)
+	line := styles.AttentionActiveStyle.Render(styles.IconAttentionActive()+" ") + "session"
+
+	got := s.applyRowStyle(line, true, false, false, false)
+	want := styles.SelectedStyle.Render(PadToWidth(ansi.Strip(line), s.width))
+
+	if got != want {
+		t.Errorf("selected row retained nested ANSI styles:\ngot  %q\nwant %q", got, want)
+	}
 }
 
 func makeGroups(folders int, sessionsPerFolder int) []data.SessionGroup {

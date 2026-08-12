@@ -94,7 +94,7 @@ func (v *NamedView) Validate() error {
 	}
 	if v.Sort != "" {
 		switch v.Sort {
-		case SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder, SortFieldFrecency:
+		case SortFieldUpdated, SortFieldCreated, SortFieldTurns, SortFieldName, SortFieldFolder:
 		default:
 			return fmt.Errorf("named view %q: invalid sort %q", v.Name, v.Sort)
 		}
@@ -146,7 +146,7 @@ type Config struct {
 	DefaultTimeRange string `json:"default_time_range"`
 
 	// DefaultSort is the field used to order session lists.
-	// Valid values: "updated", "created", "turns", "name", "folder", "frecency".
+	// Valid values: "updated", "created", "turns", "name", "folder".
 	DefaultSort string `json:"default_sort"`
 
 	// DefaultSortOrder is the direction used to order session lists.
@@ -238,11 +238,6 @@ type Config struct {
 	// is needed. They are displayed in the preview panel and indicated
 	// by a marker in the session list.
 	SessionNotes map[string]string `json:"sessionNotes,omitempty"`
-
-	// SessionLaunches maps session IDs to their launch statistics. It is
-	// used by the frecency sort to rank sessions the user launches often
-	// and recently ahead of ones they rarely open.
-	SessionLaunches map[string]SessionLaunch `json:"sessionLaunches,omitempty"`
 
 	// SessionTags maps session IDs to a list of user-defined tags. Tags group
 	// related sessions for quick filtering with the tag: search token and are
@@ -404,13 +399,14 @@ const (
 
 // Sort field constants for NamedView.Sort and DefaultSort.
 const (
-	SortFieldUpdated  = "updated"
-	SortFieldCreated  = "created"
-	SortFieldTurns    = "turns"
-	SortFieldName     = "name"
-	SortFieldFolder   = "folder"
-	SortFieldFrecency = "frecency"
+	SortFieldUpdated = "updated"
+	SortFieldCreated = "created"
+	SortFieldTurns   = "turns"
+	SortFieldName    = "name"
+	SortFieldFolder  = "folder"
 )
+
+const legacySortFieldFrecency = "frecency"
 
 // Pivot mode constants for NamedView.Pivot.
 const (
@@ -709,6 +705,14 @@ func normalizeLegacyFields(cfg *Config) {
 		cfg.ResumeSessionCommand = cfg.CustomCommand
 	}
 	cfg.CustomCommand = ""
+	if cfg.DefaultSort == legacySortFieldFrecency {
+		cfg.DefaultSort = SortFieldUpdated
+	}
+	for i := range cfg.Views {
+		if cfg.Views[i].Sort == legacySortFieldFrecency {
+			cfg.Views[i].Sort = SortFieldUpdated
+		}
+	}
 }
 
 // shellUnsafe contains characters that must never appear in shell or terminal

@@ -45,6 +45,7 @@ const (
 	nfSearch     = "\uf002" //  nf-fa-search
 	nfClock      = "\uf017" //  nf-fa-clock_o
 	nfBullet     = "\uf111" //  nf-fa-circle
+	nfCircleOpen = "\uf10c" //  nf-fa-circle_o
 	nfSortUp     = "▲"
 	nfSortDown   = "▼"
 	nfGear       = "\uf013" //  nf-fa-gear
@@ -195,7 +196,7 @@ func IconAttentionActive() string { return icon(nfBullet, fbAttentionDot) }
 func IconAttentionStale() string { return icon(nfBullet, fbAttentionDot) }
 
 // IconAttentionIdle returns an open dot for "not running" status.
-func IconAttentionIdle() string { return icon(nfBullet, fbAttentionIdle) }
+func IconAttentionIdle() string { return icon(nfCircleOpen, fbAttentionIdle) }
 
 // IconAttentionInterrupted returns a lightning bolt for "crashed/interrupted" status.
 func IconAttentionInterrupted() string { return icon("\uf0e7", "⚡") }

@@ -36,7 +36,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Website and dependency safety** — sanitize rendered changelog HTML and enforce strict npm peer dependency resolution.
 - **Session repository detection** — Dispatch now prefers the live git origin of a session's working directory over the repository recorded at session creation, so renamed or re-pointed remotes display correctly. (#350)
 - **Keybinding config mirror drift** — `new_session` and `focus_window` were present in the key map but missing from the config schema and help groups, so they could not be remapped and were absent from help.
-- **`default_sort = frecency` rejected by the CLI** — `dispatch config set default_sort frecency` failed validation even though the value is accepted everywhere else.
 - **Silent ID truncation in session lookups** — looking up sessions or session refs by ID silently dropped everything past the first 500 IDs. Both lookups now run in batches, so large launch sets and related-session ranking are correct at any size.
 - **Unquoted `{cwd}` in the new-session command** — the working directory is now shell-quoted before substitution, so directories containing shell metacharacters can no longer inject commands.
 
@@ -49,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Removed
 
 - **Runtime Copilot SDK features**: removed semantic AI session search and SDK completion analysis. Session search now uses local SQLite FTS5 and LIKE exclusively, while continuation plans use deterministic `plan.md` parsing.
+- **Recent/frecency sort**: removed the confusing launch-frequency sort and its persisted launch statistics. Existing `frecency` defaults and named views now fall back to `updated`.
 
 ## [v0.14.0] — 2026-07-18
 

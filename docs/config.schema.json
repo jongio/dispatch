@@ -49,8 +49,7 @@
         "created",
         "turns",
         "name",
-        "folder",
-        "frecency"
+        "folder"
       ],
       "type": "string"
     },
@@ -343,21 +342,6 @@
       },
       "type": "object"
     },
-    "sessionLaunches": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "properties": {
-          "count": {
-            "type": "integer"
-          },
-          "last": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "type": "object"
-    },
     "sessionNotes": {
       "additionalProperties": {
         "type": "string"
@@ -418,8 +402,7 @@
               "created",
               "turns",
               "name",
-              "folder",
-              "frecency"
+              "folder"
             ],
             "type": "string"
           },

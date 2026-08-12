@@ -411,7 +411,6 @@ func (m Model) handleSessionsLoaded(msg sessionsLoadedMsg) (Model, tea.Cmd) {
 	prevID := m.selectedSessionID()
 	m.sessions = m.applySessionFilters(msg.sessions)
 	m.sortByAttention(m.sessions)
-	m.sortByFrecency(m.sessions)
 	m.groups = nil
 	m.syncSessionListStatuses()
 	m.refreshProjectQuickStarts()
@@ -445,7 +444,6 @@ func (m Model) handleGroupsLoaded(msg groupsLoadedMsg) (Model, tea.Cmd) {
 	m.groups = m.applyGroupFilters(msg.groups)
 	for i := range m.groups {
 		m.sortByAttention(m.groups[i].Sessions)
-		m.sortByFrecency(m.groups[i].Sessions)
 	}
 	m.sessions = nil
 	m.syncSessionListStatuses()

@@ -47,10 +47,6 @@ func makePruneConfig() *config.Config {
 		},
 		FavoriteSessions: []string{"live-1", "gone-4"},
 		HiddenSessions:   []string{"gone-5"},
-		SessionLaunches: map[string]config.SessionLaunch{
-			"live-1": {Count: 5},
-			"gone-6": {Count: 1},
-		},
 	}
 }
 
