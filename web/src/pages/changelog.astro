@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { marked } from 'marked';
+import sanitizeHtml from 'sanitize-html';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -50,7 +51,17 @@ renderer.heading = function(token) {
   return `<h${depth}>${text}</h${depth}>\n`;
 };
 
-const html = await marked.parse(content, { renderer });
+const rendered = await marked.parse(content, { renderer });
+const html = sanitizeHtml(rendered, {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['h2']),
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    h2: ['class'],
+    h3: ['class'],
+    span: ['class'],
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+});
 ---
 
 <Base title="Changelog — Dispatch">
