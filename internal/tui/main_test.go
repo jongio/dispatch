@@ -49,5 +49,9 @@ func runIsolated(m *testing.M) int {
 	// filesystem or database watchers from NewModel.
 	os.Setenv("DISPATCH_SCREENSHOT_MODE", "1")
 
+	// Tests must never overwrite the developer's system clipboard. Individual
+	// clipboard tests replace this no-op with a recorder and restore it afterward.
+	clipboardWrite = func(string) error { return nil }
+
 	return m.Run()
 }
