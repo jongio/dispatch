@@ -438,11 +438,17 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 	}
 	if len(f.ExcludedWords) > 0 {
 		for _, word := range f.ExcludedWords {
+			word = strings.TrimSpace(word)
+			if word == "" {
+				continue
+			}
 			pattern := "%" + escapeLIKE(strings.ToLower(word)) + "%"
 			fb.wheres = append(fb.wheres,
 				`(LOWER(COALESCE(s.summary,'')) NOT LIKE ? ESCAPE '\'`+
-					` AND NOT EXISTS (SELECT 1 FROM turns t3 WHERE t3.session_id = s.id AND LOWER(t3.user_message) LIKE ? ESCAPE '\'))`)
-			fb.args = append(fb.args, pattern, pattern)
+					` AND NOT EXISTS (SELECT 1 FROM turns t3 WHERE t3.session_id = s.id`+
+					` AND (LOWER(COALESCE(t3.user_message,'')) LIKE ? ESCAPE '\'`+
+					` OR LOWER(COALESCE(t3.assistant_response,'')) LIKE ? ESCAPE '\')))`)
+			fb.args = append(fb.args, pattern, pattern, pattern)
 		}
 	}
 }

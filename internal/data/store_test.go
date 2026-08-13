@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -969,6 +970,14 @@ func TestFilterCombinedRepositoryAndBranch(t *testing.T) {
 	}
 }
 
+func requireSessionIDs(t *testing.T, sessions []Session, want ...string) {
+	t.Helper()
+	got := sessionIDs(sessions)
+	if !slices.Equal(got, want) {
+		t.Fatalf("session IDs = %v, want %v", got, want)
+	}
+}
+
 func TestFilterByExcludedWords_Summary(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
@@ -983,11 +992,7 @@ func TestFilterByExcludedWords_Summary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSessions with ExcludedWords: %v", err)
 	}
-	for _, sess := range sessions {
-		if sess.ID == "sess-1" {
-			t.Error("sess-1 should be excluded by ExcludedWords matching summary")
-		}
-	}
+	requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-4")
 }
 
 func TestFilterByExcludedWords_TurnContent(t *testing.T) {
@@ -1004,11 +1009,24 @@ func TestFilterByExcludedWords_TurnContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSessions with ExcludedWords (turn): %v", err)
 	}
-	for _, sess := range sessions {
-		if sess.ID == "sess-2" {
-			t.Error("sess-2 should be excluded by ExcludedWords matching turn content")
-		}
+	requireSessionIDs(t, sessions, "sess-3", "sess-1", "sess-4")
+}
+
+func TestFilterByExcludedWords_AssistantResponse(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	// "here are the unit" appears only in sess-1's assistant response.
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"here are the unit"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with ExcludedWords (assistant response): %v", err)
 	}
+	requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-4")
 }
 
 func TestFilterByExcludedWords_CaseInsensitive(t *testing.T) {
@@ -1025,11 +1043,7 @@ func TestFilterByExcludedWords_CaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSessions with ExcludedWords (case): %v", err)
 	}
-	for _, sess := range sessions {
-		if sess.ID == "sess-1" {
-			t.Error("sess-1 should be excluded by case-insensitive ExcludedWords match")
-		}
-	}
+	requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-4")
 }
 
 func TestFilterByExcludedWords_MultipleWords(t *testing.T) {
@@ -1046,9 +1060,80 @@ func TestFilterByExcludedWords_MultipleWords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSessions with multiple ExcludedWords: %v", err)
 	}
-	for _, sess := range sessions {
-		if sess.ID == "sess-1" || sess.ID == "sess-4" {
-			t.Errorf("%s should be excluded by ExcludedWords", sess.ID)
+	requireSessionIDs(t, sessions, "sess-3", "sess-2")
+}
+
+func TestFilterByExcludedWords_IgnoresBlankEntries(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"", "   "}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with blank ExcludedWords: %v", err)
+	}
+	requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-1", "sess-4")
+}
+
+func TestFilterByExcludedWords_TrimsEntries(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{ExcludedWords: []string{"  auth  "}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with padded ExcludedWords: %v", err)
+	}
+	requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-4")
+}
+
+func TestFilterByExcludedWords_TreatsLIKEWildcardsLiterally(t *testing.T) {
+	for _, word := range []string{"%", "_", `\`} {
+		t.Run(word, func(t *testing.T) {
+			s := newTestStore(t)
+			defer func() { _ = s.Close() }()
+			populateTestData(t, s)
+
+			sessions, err := s.ListSessions(
+				context.Background(),
+				FilterOptions{ExcludedWords: []string{word}},
+				SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+			)
+			if err != nil {
+				t.Fatalf("ListSessions with literal ExcludedWords %q: %v", word, err)
+			}
+			requireSessionIDs(t, sessions, "sess-3", "sess-2", "sess-1", "sess-4")
+		})
+	}
+}
+
+func TestGroupSessions_AppliesExcludedWords(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	groups, err := s.GroupSessions(
+		context.Background(),
+		PivotByRepo,
+		FilterOptions{ExcludedWords: []string{"here are the unit"}},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("GroupSessions with ExcludedWords: %v", err)
+	}
+	for _, group := range groups {
+		for _, sess := range group.Sessions {
+			if sess.ID == "sess-1" {
+				t.Fatal("grouped sessions should exclude assistant-response matches")
+			}
 		}
 	}
 }
