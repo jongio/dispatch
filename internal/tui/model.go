@@ -4276,13 +4276,17 @@ func detectTerminalsCmd() tea.Cmd {
 }
 
 func (m *Model) loadSessionsCmd() tea.Cmd {
+	return m.loadSessionsCmdWithIndicator(true)
+}
+
+func (m *Model) loadSessionsCmdWithIndicator(showIndicator bool) tea.Cmd {
 	if m.sessionLoadCancel != nil {
 		m.sessionLoadCancel()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	m.sessionLoadCancel = cancel
 	m.sessionLoadVersion++
-	m.sessionsLoading = true
+	m.sessionsLoading = m.sessionsLoading || showIndicator
 
 	store := m.store
 	filter := m.filter

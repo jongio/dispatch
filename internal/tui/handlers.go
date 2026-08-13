@@ -134,7 +134,7 @@ func (m Model) handleSessionsChanged() (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	cmds = append(cmds, m.waitForDBChangeCmd()) // re-arm the listener
 	if m.store != nil {
-		cmds = append(cmds, m.loadSessionsCmd())
+		cmds = append(cmds, m.loadSessionsCmdWithIndicator(false))
 	}
 	return m, tea.Batch(cmds...)
 }
