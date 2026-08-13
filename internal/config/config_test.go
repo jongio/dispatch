@@ -341,19 +341,19 @@ func TestJSONFieldNames(t *testing.T) {
 func withTempConfigDir(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
+	t.Setenv("DISPATCH_CONFIG", "")
 
 	switch runtime.GOOS {
 	case "windows":
 		t.Setenv("APPDATA", tmpDir)
 	case "darwin":
 		// On macOS, os.UserConfigDir() returns ~/Library/Application Support.
-		// We can't easily override it without HOME.
 		t.Setenv("HOME", tmpDir)
-		// Create the Library/Application Support structure.
 		appSupportDir := filepath.Join(tmpDir, "Library", "Application Support")
 		if err := os.MkdirAll(appSupportDir, 0o755); err != nil {
 			t.Fatalf("creating macOS config dir: %v", err)
 		}
+		return appSupportDir
 	default:
 		// Linux: XDG_CONFIG_HOME takes precedence.
 		t.Setenv("XDG_CONFIG_HOME", tmpDir)

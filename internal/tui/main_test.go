@@ -33,6 +33,7 @@ func runIsolated(m *testing.M) int {
 	// Redirect the same environment variable os.UserConfigDir() reads on each
 	// platform so config.Save/Load resolve inside tmp instead of the real user
 	// configuration directory.
+	os.Setenv("DISPATCH_CONFIG", "")
 	switch runtime.GOOS {
 	case "windows":
 		os.Setenv("APPDATA", tmp)

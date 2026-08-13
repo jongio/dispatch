@@ -1048,8 +1048,13 @@ func TestCloseStore_NilStore(t *testing.T) {
 func setupTempConfigDir(t *testing.T) {
 	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("APPDATA", tmp)
-	if runtime.GOOS != "windows" {
+	t.Setenv("DISPATCH_CONFIG", "")
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("APPDATA", tmp)
+	case "darwin":
+		t.Setenv("HOME", tmp)
+	default:
 		t.Setenv("XDG_CONFIG_HOME", tmp)
 	}
 }

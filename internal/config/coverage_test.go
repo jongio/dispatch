@@ -147,14 +147,17 @@ func TestEffectiveLaunchMode_CustomStringFallsThrough(t *testing.T) {
 func setupTempConfig(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
+	t.Setenv("DISPATCH_CONFIG", "")
 	switch runtime.GOOS {
 	case "windows":
 		t.Setenv("APPDATA", tmp)
 	case "darwin":
 		t.Setenv("HOME", tmp)
-		if err := os.MkdirAll(filepath.Join(tmp, "Library", "Application Support"), 0o755); err != nil {
+		appSupportDir := filepath.Join(tmp, "Library", "Application Support")
+		if err := os.MkdirAll(appSupportDir, 0o755); err != nil {
 			t.Fatalf("create macOS config directory: %v", err)
 		}
+		return appSupportDir
 	default:
 		t.Setenv("XDG_CONFIG_HOME", tmp)
 	}
