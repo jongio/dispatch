@@ -4292,6 +4292,9 @@ func (m *Model) loadSessionsCmdWithIndicator(showIndicator bool) tea.Cmd {
 	filter := m.filter
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
+	if filter.DeepSearch && filter.Query != "" {
+		limit = -1
+	}
 	pivot := m.pivot
 	version := m.sessionLoadVersion
 
@@ -4747,6 +4750,9 @@ func (m Model) deepSearchCmd(version int) tea.Cmd {
 	filter.DeepSearch = true
 	sortOpts := m.sort
 	limit := m.cfg.MaxSessions
+	if filter.Query != "" {
+		limit = -1
+	}
 	pivot := m.pivot
 
 	return func() tea.Msg {

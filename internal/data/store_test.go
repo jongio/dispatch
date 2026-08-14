@@ -536,6 +536,21 @@ func TestListSessionsWithLimit(t *testing.T) {
 	}
 }
 
+func TestListSessionsNegativeLimitReturnsAll(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	populateTestData(t, s)
+
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{},
+		SortOptions{Field: SortByUpdated, Order: Descending}, -1)
+	if err != nil {
+		t.Fatalf("ListSessions with negative limit: %v", err)
+	}
+	if len(sessions) != 4 {
+		t.Errorf("expected all 4 active sessions, got %d", len(sessions))
+	}
+}
+
 func TestListSessionsSortByUpdatedDesc(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
@@ -2869,6 +2884,88 @@ func TestDeepSearchAlsoMatchesSessionFields(t *testing.T) {
 	}
 	if sessions[0].ID != "sess-1" {
 		t.Errorf("expected sess-1, got %s", sessions[0].ID)
+	}
+}
+
+func TestDeepSearchMatchesEveryContentField(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	seedSession(t, s.db, "session-id-token", "/cwd-token", "repository-token",
+		"branch-token", "summary-token", "created-session-token", "updated-session-token")
+	if _, err := s.db.Exec(`UPDATE sessions SET host_type = ? WHERE id = ?`,
+		"host-token", "session-id-token"); err != nil {
+		t.Fatalf("updating host type: %v", err)
+	}
+	seedTurn(t, s.db, "session-id-token", 731, "user-message-token",
+		"assistant-response-token", "turn-timestamp-token")
+	if _, err := s.db.Exec(
+		`INSERT INTO checkpoints (
+			session_id, checkpoint_number, title, overview, history, work_done,
+			technical_details, important_files, next_steps
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"session-id-token", 947, "checkpoint-title-token", "checkpoint-overview-token",
+		"checkpoint-history-token", "checkpoint-work-token", "checkpoint-technical-token",
+		"checkpoint-files-token", "checkpoint-next-token",
+	); err != nil {
+		t.Fatalf("seeding complete checkpoint: %v", err)
+	}
+	seedFile(t, s.db, "session-id-token", "file-path-token", "tool-name-token",
+		853, "file-timestamp-token")
+	seedRef(t, s.db, "session-id-token", "ref-type-token", "ref-value-token",
+		619, "ref-timestamp-token")
+
+	queries := []string{
+		"cwd-token", "repository-token", "branch-token", "summary-token", "host-token",
+		"user-message-token", "assistant-response-token",
+		"checkpoint-title-token", "checkpoint-overview-token",
+		"checkpoint-history-token", "checkpoint-work-token", "checkpoint-technical-token",
+		"checkpoint-files-token", "checkpoint-next-token", "file-path-token",
+		"tool-name-token", "ref-type-token", "ref-value-token",
+	}
+	for _, query := range queries {
+		t.Run(query, func(t *testing.T) {
+			sessions, err := s.ListSessions(context.Background(),
+				FilterOptions{Query: query, DeepSearch: true},
+				SortOptions{Field: SortByUpdated, Order: Descending}, 10)
+			if err != nil {
+				t.Fatalf("ListSessions: %v", err)
+			}
+			if len(sessions) != 1 || sessions[0].ID != "session-id-token" {
+				t.Fatalf("expected session-id-token for %q, got %v", query, sessionIDs(sessions))
+			}
+		})
+	}
+}
+
+func TestDeepSearchDoesNotMatchIdentifiersOrdinalsOrTimestamps(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	seedSession(t, s.db, "identifier-only-token", "/work", "owner/repo", "main",
+		"ordinary session", "created-only-token", "updated-only-token")
+	seedTurn(t, s.db, "identifier-only-token", 731, "ordinary user message",
+		"ordinary assistant response", "turn-time-only-token")
+	seedCheckpoint(t, s.db, "identifier-only-token", 947, "ordinary checkpoint", "ordinary overview")
+	seedFile(t, s.db, "identifier-only-token", "ordinary.go", "edit", 853, "file-time-only-token")
+	seedRef(t, s.db, "identifier-only-token", "pr", "42", 619, "ref-time-only-token")
+
+	for _, query := range []string{
+		"identifier-only-token", "created-only-token", "updated-only-token",
+		"731", "turn-time-only-token", "947", "853", "file-time-only-token",
+		"619", "ref-time-only-token",
+	} {
+		t.Run(query, func(t *testing.T) {
+			sessions, err := s.ListSessions(context.Background(),
+				FilterOptions{Query: query, DeepSearch: true},
+				SortOptions{Field: SortByUpdated, Order: Descending}, 10)
+			if err != nil {
+				t.Fatalf("ListSessions: %v", err)
+			}
+			if len(sessions) != 0 {
+				t.Fatalf("expected no content match for %q, got %v", query, sessionIDs(sessions))
+			}
+		})
 	}
 }
 

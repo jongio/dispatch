@@ -326,10 +326,11 @@ type filterBuilder struct {
 	args                 []any
 	lastActiveExpr       string
 	expandDatePredicates bool
+	hasHostType          bool
 
 	// hasFTS reports whether the FTS5 search_index table is available. When
-	// true, deep search resolves turn and checkpoint text through the index
-	// instead of scanning those tables with LIKE.
+	// true, deep search also checks indexed content that is not represented
+	// by the modeled source-table fields.
 	hasFTS bool
 }
 
@@ -353,31 +354,35 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 	if f.Query != "" {
 		pattern := "%" + escapeLIKE(f.Query) + "%"
 		if f.DeepSearch {
-			// Deep mode: search session fields + related tables.
+			// Deep mode scans every modeled source-table field directly. The
+			// search index is additive because it can be stale or incomplete.
 			clauses := []string{
 				`s.summary LIKE ? ESCAPE '\'`,
 				`s.branch LIKE ? ESCAPE '\'`,
 				`s.repository LIKE ? ESCAPE '\'`,
 				`s.cwd LIKE ? ESCAPE '\'`,
-				`EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = s.id AND t2.user_message LIKE ? ESCAPE '\')`,
-				`EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s.id AND (cp.title LIKE ? ESCAPE '\' OR cp.overview LIKE ? ESCAPE '\'))`,
-				`EXISTS (SELECT 1 FROM session_files sf2 WHERE sf2.session_id = s.id AND sf2.file_path LIKE ? ESCAPE '\')`,
-				`EXISTS (SELECT 1 FROM session_refs sr2 WHERE sr2.session_id = s.id AND sr2.ref_value LIKE ? ESCAPE '\')`,
+				`EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = s.id AND (` +
+					`t2.user_message LIKE ? ESCAPE '\' OR t2.assistant_response LIKE ? ESCAPE '\'))`,
+				`EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s.id AND (` +
+					`cp.title LIKE ? ESCAPE '\' OR cp.overview LIKE ? ESCAPE '\' OR cp.history LIKE ? ESCAPE '\' OR ` +
+					`cp.work_done LIKE ? ESCAPE '\' OR cp.technical_details LIKE ? ESCAPE '\' OR ` +
+					`cp.important_files LIKE ? ESCAPE '\' OR cp.next_steps LIKE ? ESCAPE '\'))`,
+				`EXISTS (SELECT 1 FROM session_files sf2 WHERE sf2.session_id = s.id AND (` +
+					`sf2.file_path LIKE ? ESCAPE '\' OR sf2.tool_name LIKE ? ESCAPE '\'))`,
+				`EXISTS (SELECT 1 FROM session_refs sr2 WHERE sr2.session_id = s.id AND (` +
+					`sr2.ref_type LIKE ? ESCAPE '\' OR sr2.ref_value LIKE ? ESCAPE '\'))`,
 			}
-			fb.args = append(fb.args, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
+			for range 17 {
+				fb.args = append(fb.args, pattern)
+			}
+			if fb.hasHostType {
+				clauses = append(clauses, `s.host_type LIKE ? ESCAPE '\'`)
+				fb.args = append(fb.args, pattern)
+			}
 
-			// The FTS5 index covers assistant replies and every checkpoint text
-			// field, none of which the LIKE clauses above reach. It is additive
-			// rather than a replacement: LIKE still catches substrings inside a
-			// token (bug "1137" within "PR1137") that the tokenizer splits away.
 			if ftsTerms := escapeFTS5Terms(f.Query); fb.hasFTS && ftsTerms != "" {
 				clauses = append(clauses, `s.id IN (SELECT session_id FROM search_index WHERE content MATCH ?)`)
 				fb.args = append(fb.args, ftsTerms)
-			} else {
-				// Without the index, assistant replies are only reachable by scan.
-				clauses = append(clauses,
-					`EXISTS (SELECT 1 FROM turns t4 WHERE t4.session_id = s.id AND t4.assistant_response LIKE ? ESCAPE '\')`)
-				fb.args = append(fb.args, pattern)
 			}
 			fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " OR ")+")")
 		} else {
@@ -608,10 +613,12 @@ func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
 }
 
 // ListSessions returns sessions matching the filter, ordered and limited as
-// specified. TurnCount and FileCount are computed via subqueries.
+// specified. A negative limit returns every match; zero uses the default.
+// TurnCount and FileCount are computed via subqueries.
 func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort SortOptions, limit int) ([]Session, error) {
 	var fb filterBuilder
 	fb.hasFTS = s.hasFTS5
+	fb.hasHostType = s.hasHostType
 	useTurnStatsJoin := sort.Field != SortByCreated &&
 		sort.Field != SortByTurns &&
 		sort.Field != SortByName &&
@@ -635,11 +642,13 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 	q := "SELECT " + columns + " FROM sessions s" + joins + fb.joinSQL() + fb.whereSQL()
 	q += fmt.Sprintf(" ORDER BY %s %s", sortExpr, sortDir(sort.Order))
 
-	if limit <= 0 {
+	if limit == 0 {
 		limit = defaultQueryLimit
 	}
-	q += limitClause
-	fb.args = append(fb.args, limit)
+	if limit > 0 {
+		q += limitClause
+		fb.args = append(fb.args, limit)
+	}
 
 	rows, err := s.db.QueryContext(ctx, q, fb.args...)
 	if err != nil {
@@ -1286,10 +1295,12 @@ func (s *Store) ResolveIDPrefix(ctx context.Context, prefix string) (string, err
 }
 
 // GroupSessions groups sessions by the specified pivot field, applying the
-// given filter and sort order within each group.
+// given filter and sort order within each group. A negative limit returns
+// every match; zero uses the default.
 func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
 	var fb filterBuilder
 	fb.hasFTS = s.hasFTS5
+	fb.hasHostType = s.hasHostType
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
@@ -1301,11 +1312,13 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
 		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
 
-	if limit <= 0 {
+	if limit == 0 {
 		limit = defaultGroupLimit
 	}
-	q += limitClause
-	fb.args = append(fb.args, limit)
+	if limit > 0 {
+		q += limitClause
+		fb.args = append(fb.args, limit)
+	}
 
 	rows, err := s.db.QueryContext(ctx, q, fb.args...)
 	if err != nil {

@@ -642,9 +642,7 @@ func BenchmarkSearchSessionsLIKEvsNTS(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 // TestListSessionsDeepSearchFTSMatchesAssistantResponse covers the case where a
-// term (a bug number, for example) appears only in the assistant half of a
-// turn. The LIKE fallback scans user_message only, so the FTS index is what
-// makes these sessions findable from the session list.
+// term appears only in the assistant half of a turn.
 func TestListSessionsDeepSearchFTSMatchesAssistantResponse(t *testing.T) {
 	s := newFTSTestStore(t)
 	db := s.db
@@ -666,9 +664,41 @@ func TestListSessionsDeepSearchFTSMatchesAssistantResponse(t *testing.T) {
 	}
 }
 
+func TestListSessionsDeepSearchFTSDoesNotDependOnCompleteIndex(t *testing.T) {
+	s := newFTSTestStore(t)
+	db := s.db
+
+	seedSession(t, db, "stale-fts", "/home/user/project", "owner/repo", "main",
+		"Investigate crash", "2024-01-10T10:00:00Z", "2024-01-10T12:00:00Z")
+	seedTurn(t, db, "stale-fts", 0, "what is going on",
+		"Only the source table contains assistant-source-token.", "2024-01-10T10:00:00Z")
+	if _, err := db.Exec(
+		`INSERT INTO checkpoints (
+			session_id, checkpoint_number, title, overview, history, work_done,
+			technical_details, important_files, next_steps
+		) VALUES (?, ?, '', '', ?, '', '', '', '')`,
+		"stale-fts", 1, "Only the source table contains checkpoint-source-token.",
+	); err != nil {
+		t.Fatalf("seeding checkpoint: %v", err)
+	}
+
+	for _, query := range []string{"assistant-source-token", "checkpoint-source-token"} {
+		t.Run(query, func(t *testing.T) {
+			sessions, err := s.ListSessions(context.Background(),
+				FilterOptions{Query: query, DeepSearch: true},
+				SortOptions{Field: SortByUpdated, Order: Descending}, 50)
+			if err != nil {
+				t.Fatalf("ListSessions: %v", err)
+			}
+			if len(sessions) != 1 || sessions[0].ID != "stale-fts" {
+				t.Fatalf("expected [stale-fts], got %v", sessionIDs(sessions))
+			}
+		})
+	}
+}
+
 // TestListSessionsDeepSearchFTSMatchesCheckpointBody verifies that checkpoint
-// text beyond title and overview (history, technical details, files) is
-// reachable through the index.
+// text beyond title and overview is reachable when the index is available.
 func TestListSessionsDeepSearchFTSMatchesCheckpointBody(t *testing.T) {
 	s := newFTSTestStore(t)
 	db := s.db

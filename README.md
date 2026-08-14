@@ -18,7 +18,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 
 ## Features
 
-- **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
+- **Full-text search** (`/`) — Two-tier search: quick search (summaries, branches, repos, directories) returns results instantly; deep search scans all user-visible session metadata and content fields after 300ms. FTS5 adds indexed matches when available without replacing the source-field scan. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
 - **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
 - **Sorting** (`s` / `S`) — 4 fields (updated, folder, name, attention) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created` and `turns` values

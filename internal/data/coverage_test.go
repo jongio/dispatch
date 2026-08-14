@@ -91,13 +91,11 @@ func TestFilterBuilder_QueryDeepSearch(t *testing.T) {
 	var fb filterBuilder
 	fb.apply(FilterOptions{Query: "test", DeepSearch: true})
 
-	// Deep search without FTS5: 4 session fields + user_message + 2 checkpoint
-	// fields + files + refs + assistant_response = 10 LIKE patterns.
-	if len(fb.args) != 10 {
-		t.Errorf("expected 10 args for deep search, got %d", len(fb.args))
+	if len(fb.args) != 17 {
+		t.Errorf("expected 17 args for deep search, got %d", len(fb.args))
 	}
 	if !strings.Contains(fb.whereSQL(), "assistant_response") {
-		t.Error("deep search without FTS5 should scan turns.assistant_response")
+		t.Error("deep search should scan turns.assistant_response")
 	}
 }
 
@@ -105,9 +103,9 @@ func TestFilterBuilder_QueryDeepSearchFTS(t *testing.T) {
 	fb := filterBuilder{hasFTS: true}
 	fb.apply(FilterOptions{Query: "test", DeepSearch: true})
 
-	// Deep search with FTS5: 9 LIKE patterns + 1 MATCH = 10 args.
-	if len(fb.args) != 10 {
-		t.Errorf("expected 10 args for FTS deep search, got %d", len(fb.args))
+	// FTS5 is additive to the 17 direct content-field predicates.
+	if len(fb.args) != 18 {
+		t.Errorf("expected 18 args for FTS deep search, got %d", len(fb.args))
 	}
 	where := fb.whereSQL()
 	if !strings.Contains(where, "search_index WHERE content MATCH ?") {
@@ -130,8 +128,8 @@ func TestFilterBuilder_QueryDeepSearchFTSBlankQuery(t *testing.T) {
 	if strings.Contains(fb.whereSQL(), "MATCH") {
 		t.Error("blank query should not produce an FTS MATCH clause")
 	}
-	if len(fb.args) != 10 {
-		t.Errorf("expected 10 args for LIKE fallback, got %d", len(fb.args))
+	if len(fb.args) != 17 {
+		t.Errorf("expected 17 args for LIKE fallback, got %d", len(fb.args))
 	}
 }
 
@@ -240,10 +238,10 @@ func TestFilterBuilder_AllFilters(t *testing.T) {
 	if where == "" {
 		t.Error("whereSQL should be non-empty for all filters")
 	}
-	// 10 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) +
-	// 1 (since) + 1 (until) + 1 (excluded) = 16.
-	if len(fb.args) != 16 {
-		t.Errorf("expected 16 args for all filters, got %d", len(fb.args))
+	// 17 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) +
+	// 1 (since) + 1 (until) + 1 (excluded) = 23.
+	if len(fb.args) != 23 {
+		t.Errorf("expected 23 args for all filters, got %d", len(fb.args))
 	}
 }
 

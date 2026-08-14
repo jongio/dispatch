@@ -216,8 +216,8 @@ type FilterOptions struct {
 	// DeepSearch controls the breadth of the text search. When false
 	// (default / quick mode), only session-level fields are searched
 	// (summary, branch, repository, cwd). When true (deep mode), related
-	// tables are also searched: turns.user_message, checkpoints.title,
-	// checkpoints.overview, session_files.file_path, session_refs.ref_value.
+	// tables are also searched across their user-visible content fields.
+	// FTS5 is additive and is not required for source-table matches.
 	DeepSearch bool `json:"deep_search,omitempty"`
 }
 

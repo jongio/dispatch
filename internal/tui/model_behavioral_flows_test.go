@@ -372,8 +372,44 @@ func TestAsyncStoreCommandsReturnBehavioralResults(t *testing.T) {
 		t.Fatalf("deep grouped version = %d, groups = %#v", deepGrouped.version, deepGrouped.groups)
 	}
 
+	m.cfg.MaxSessions = 1
+	m.pivot = pivotNone
+	m.filter.Query = "Question"
+	deep = m.deepSearchCmd(19)().(deepSearchResultMsg)
+	if len(deep.sessions) != 5 {
+		t.Fatalf("deep search should ignore the normal session cap, got %d sessions", len(deep.sessions))
+	}
+
+	m.filter.DeepSearch = true
+	reloaded := m.loadSessionsCmd()().(sessionsLoadedMsg)
+	if len(reloaded.sessions) != 5 {
+		t.Fatalf("deep search reload should ignore the normal session cap, got %d sessions", len(reloaded.sessions))
+	}
+
+	m.pivot = pivotRepo
+	reloadedGroups := m.loadSessionsCmd()().(groupsLoadedMsg)
+	var reloadedCount int
+	for _, group := range reloadedGroups.groups {
+		reloadedCount += len(group.Sessions)
+	}
+	if reloadedCount != 5 {
+		t.Fatalf("grouped deep search reload should ignore the normal session cap, got %d sessions", reloadedCount)
+	}
+
 	m.pivot = pivotNone
 	m.filter.Query = ""
+	m.filter.Repository = "user/repo0"
+	structured := m.deepSearchCmd(20)().(deepSearchResultMsg)
+	if len(structured.sessions) != 1 {
+		t.Fatalf("structured-only deep search should retain the normal session cap, got %d sessions",
+			len(structured.sessions))
+	}
+	structuredReload := m.loadSessionsCmd()().(sessionsLoadedMsg)
+	if len(structuredReload.sessions) != 1 {
+		t.Fatalf("structured-only reload should retain the normal session cap, got %d sessions",
+			len(structuredReload.sessions))
+	}
+	m.filter.Repository = ""
 	m.showPreview = true
 	m.sessionList.SetSessions(flat.sessions)
 	m.gitStatusMap = map[string]platform.GitStatus{
