@@ -143,6 +143,62 @@ func TestFilterBuilder_FolderFilter(t *testing.T) {
 	if where == "" {
 		t.Error("whereSQL should be non-empty for folder filter")
 	}
+	wantArgs := []any{"/home/user", "/home/user/%"}
+	if len(fb.args) != len(wantArgs) {
+		t.Fatalf("expected %d platform-appropriate folder args, got %d", len(wantArgs), len(fb.args))
+	}
+	for i, want := range wantArgs {
+		if fb.args[i] != want {
+			t.Errorf("folder arg %d = %#v, want %#v", i, fb.args[i], want)
+		}
+	}
+}
+
+func TestFolderMatchPatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		folder  string
+		windows bool
+		want    []string
+	}{
+		{name: "unix", folder: "/home/user/", want: []string{"/home/user", "/home/user/%"}},
+		{name: "unix root", folder: "/", want: []string{"/", "/%"}},
+		{name: "unix literal backslash", folder: `/home/user\literal`, want: []string{`/home/user\\literal`, `/home/user\\literal/%`}},
+		{name: "windows backslashes", folder: `C:\repo\`, windows: true, want: []string{"C:/repo", "C:/repo/%"}},
+		{name: "windows mixed", folder: `C:\repo/sub`, windows: true, want: []string{"C:/repo/sub", "C:/repo/sub/%"}},
+		{name: "windows root", folder: `C:\`, windows: true, want: []string{"C:/", "C:/%"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := folderMatchPatterns(tt.folder, tt.windows)
+			if len(got) != len(tt.want) {
+				t.Fatalf("folderMatchPatterns() returned %d patterns, want %d: %#v", len(got), len(tt.want), got)
+			}
+			for i, want := range tt.want {
+				if got[i] != want {
+					t.Errorf("pattern %d = %q, want %q", i, got[i], want)
+				}
+			}
+		})
+	}
+}
+
+func TestUsesWindowsPathSyntax(t *testing.T) {
+	for _, tt := range []struct {
+		path string
+		want bool
+	}{
+		{path: `D:\code\project`, want: true},
+		{path: "D:/code/project", want: true},
+		{path: `\\server\share\project`, want: true},
+		{path: `/home/user\literal`, want: false},
+		{path: `folder\child`, want: false},
+	} {
+		if got := usesWindowsPathSyntax(tt.path); got != tt.want {
+			t.Errorf("usesWindowsPathSyntax(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
 }
 
 func TestFilterBuilder_RepositoryFilter(t *testing.T) {
@@ -214,9 +270,9 @@ func TestFilterBuilder_ExcludedDirs(t *testing.T) {
 	var fb filterBuilder
 	fb.apply(FilterOptions{ExcludedDirs: []string{"/tmp", "/var"}})
 
-	// 2 excluded dirs → 2 NOT LIKE args
-	if len(fb.args) != 2 {
-		t.Errorf("expected 2 args for excluded dirs, got %d", len(fb.args))
+	// Each excluded dir uses exact and descendant boundary patterns.
+	if len(fb.args) != 4 {
+		t.Errorf("expected 4 args for excluded dirs, got %d", len(fb.args))
 	}
 }
 
@@ -240,10 +296,9 @@ func TestFilterBuilder_AllFilters(t *testing.T) {
 	if where == "" {
 		t.Error("whereSQL should be non-empty for all filters")
 	}
-	// 10 (deep search) + 1 (folder) + 1 (repo) + 1 (branch) +
-	// 1 (since) + 1 (until) + 1 (excluded) = 16.
-	if len(fb.args) != 16 {
-		t.Errorf("expected 16 args for all filters, got %d", len(fb.args))
+	wantArgs := 18
+	if len(fb.args) != wantArgs {
+		t.Errorf("expected %d args for all filters, got %d", wantArgs, len(fb.args))
 	}
 }
 

@@ -81,9 +81,18 @@ func runVersion(w io.Writer, args []string) error {
 
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
 	var flags startupFlags
+	positionalQueryStarted := false
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		if positionalQueryStarted && !strings.HasPrefix(arg, "-") {
+			flags.queryParts = append(flags.queryParts, arg)
+			continue
+		}
 		switch arg {
+		case "--":
+			flags.queryParts = append(flags.queryParts, args[i+1:]...)
+			i = len(args)
+
 		case "--help", "-h", "help":
 			printUsage()
 			showUpdateNotification(origStderr, updateCh)
@@ -105,12 +114,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "completion":
-			if len(args) < 2 {
+			commandArgs := args[i:]
+			if len(commandArgs) < 2 {
 				err := errors.New("completion requires a shell: bash, zsh, fish, or powershell")
 				fmt.Fprintf(os.Stderr, "completion: %v\n", err)
 				return true, cleanup, startupOptions{}, err
 			}
-			if cErr := runCompletion(os.Stdout, args[1]); cErr != nil {
+			if cErr := runCompletion(os.Stdout, commandArgs[1]); cErr != nil {
 				fmt.Fprintf(os.Stderr, "completion: %v\n", cErr)
 				return true, cleanup, startupOptions{}, cErr
 			}
@@ -142,119 +152,126 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			return true, cleanup, startupOptions{}, nil
 
 		case "open":
-			if oErr := runOpen(os.Stdout, args); oErr != nil {
+			if oErr := runOpen(os.Stdout, args[i:]); oErr != nil {
 				fmt.Fprintf(os.Stderr, "open: %v\n", oErr)
 				return true, cleanup, startupOptions{}, oErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "new":
-			if nErr := runNew(os.Stdout, args); nErr != nil {
+			if nErr := runNew(os.Stdout, args[i:]); nErr != nil {
 				fmt.Fprintf(os.Stderr, "new: %v\n", nErr)
 				return true, cleanup, startupOptions{}, nErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "stats":
-			if sErr := runStats(os.Stdout, args); sErr != nil {
+			if sErr := runStats(os.Stdout, args[i:]); sErr != nil {
 				fmt.Fprintf(os.Stderr, "stats: %v\n", sErr)
 				return true, cleanup, startupOptions{}, sErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "search":
-			if sErr := runSearch(os.Stdout, args); sErr != nil {
+			if sErr := runSearch(os.Stdout, args[i:]); sErr != nil {
 				fmt.Fprintf(os.Stderr, "search: %v\n", sErr)
 				return true, cleanup, startupOptions{}, sErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
+		case "list":
+			if lErr := runList(os.Stdout, args[i:]); lErr != nil {
+				fmt.Fprintf(os.Stderr, "list: %v\n", lErr)
+				return true, cleanup, startupOptions{}, lErr
+			}
+			return true, cleanup, startupOptions{}, nil
+
 		case "tags":
-			if tErr := runTags(os.Stdout, args); tErr != nil {
+			if tErr := runTags(os.Stdout, args[i:]); tErr != nil {
 				fmt.Fprintf(os.Stderr, "tags: %v\n", tErr)
 				return true, cleanup, startupOptions{}, tErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "notes":
-			if nErr := runNotes(os.Stdout, args); nErr != nil {
+			if nErr := runNotes(os.Stdout, args[i:]); nErr != nil {
 				fmt.Fprintf(os.Stderr, "notes: %v\n", nErr)
 				return true, cleanup, startupOptions{}, nErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "views":
-			if vErr := runViews(os.Stdout, args); vErr != nil {
+			if vErr := runViews(os.Stdout, args[i:]); vErr != nil {
 				fmt.Fprintf(os.Stderr, "views: %v\n", vErr)
 				return true, cleanup, startupOptions{}, vErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "config":
-			if cErr := runConfig(os.Stdout, args); cErr != nil {
+			if cErr := runConfig(os.Stdout, args[i:]); cErr != nil {
 				fmt.Fprintf(os.Stderr, "config: %v\n", cErr)
 				return true, cleanup, startupOptions{}, cErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "export":
-			if eErr := runExport(os.Stdout, args); eErr != nil {
+			if eErr := runExport(os.Stdout, args[i:]); eErr != nil {
 				fmt.Fprintf(os.Stderr, "export: %v\n", eErr)
 				return true, cleanup, startupOptions{}, eErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "info":
-			if iErr := runInfo(os.Stdout, args); iErr != nil {
+			if iErr := runInfo(os.Stdout, args[i:]); iErr != nil {
 				fmt.Fprintf(os.Stderr, "info: %v\n", iErr)
 				return true, cleanup, startupOptions{}, iErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "path":
-			if pErr := runPath(os.Stdout, args); pErr != nil {
+			if pErr := runPath(os.Stdout, args[i:]); pErr != nil {
 				fmt.Fprintf(os.Stderr, "path: %v\n", pErr)
 				return true, cleanup, startupOptions{}, pErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "compare":
-			if cErr := runCompare(os.Stdout, args); cErr != nil {
+			if cErr := runCompare(os.Stdout, args[i:]); cErr != nil {
 				fmt.Fprintf(os.Stderr, "compare: %v\n", cErr)
 				return true, cleanup, startupOptions{}, cErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "aliases":
-			if aErr := runAliases(os.Stdout, args); aErr != nil {
+			if aErr := runAliases(os.Stdout, args[i:]); aErr != nil {
 				fmt.Fprintf(os.Stderr, "aliases: %v\n", aErr)
 				return true, cleanup, startupOptions{}, aErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "alias":
-			if aErr := runAlias(os.Stdout, args); aErr != nil {
+			if aErr := runAlias(os.Stdout, args[i:]); aErr != nil {
 				fmt.Fprintf(os.Stderr, "alias: %v\n", aErr)
 				return true, cleanup, startupOptions{}, aErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "prune":
-			if pErr := runPrune(os.Stdout, args); pErr != nil {
+			if pErr := runPrune(os.Stdout, args[i:]); pErr != nil {
 				fmt.Fprintf(os.Stderr, "prune: %v\n", pErr)
 				return true, cleanup, startupOptions{}, pErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "tag":
-			if tErr := runTag(os.Stdout, args); tErr != nil {
+			if tErr := runTag(os.Stdout, args[i:]); tErr != nil {
 				fmt.Fprintf(os.Stderr, "tag: %v\n", tErr)
 				return true, cleanup, startupOptions{}, tErr
 			}
 			return true, cleanup, startupOptions{}, nil
 
 		case "watch":
-			if wErr := runWatch(os.Stdout, args); wErr != nil {
+			if wErr := runWatch(os.Stdout, args[i:]); wErr != nil {
 				fmt.Fprintf(os.Stderr, "watch: %v\n", wErr)
 				return true, cleanup, startupOptions{}, wErr
 			}
@@ -270,7 +287,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 		case "__complete":
 			// Hidden helper used by the shell completion scripts to fetch
 			// dynamic candidates. Deliberately omitted from help and usage.
-			runComplete(os.Stdout, args)
+			runComplete(os.Stdout, args[i:])
 			return true, cleanup, startupOptions{}, nil
 		case "--demo":
 			c, demoErr := setupDemo()
@@ -314,6 +331,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 
 		case "--current":
 			flags.current = true
+			positionalQueryStarted = true
 
 		case "--repo", "--branch", "--cwd", "--query":
 			value, next, ok := flagValue(args, i, arg)
@@ -333,6 +351,7 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			case "--query":
 				flags.query = value
 			}
+			positionalQueryStarted = true
 
 		default:
 			// Handle the inline forms (--repo=foo) and unknown flags.
@@ -350,11 +369,13 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 					default:
 						return true, cleanup, startupOptions{}, unknownFlag(arg)
 					}
+					positionalQueryStarted = true
 					continue
 				}
 				return true, cleanup, startupOptions{}, unknownFlag(arg)
 			}
 			flags.queryParts = append(flags.queryParts, arg)
+			positionalQueryStarted = true
 		}
 	}
 
@@ -405,7 +426,7 @@ func splitInlineFlag(arg string) (flag, value string, ok bool) {
 // assert every command here appears in each of them.
 var cliCommands = []string{
 	"help", "version", "open", "new", "doctor", "update", "completion",
-	"stats", "search", "tags", "notes", "views", "aliases", "alias",
+	"stats", "search", "list", "tags", "notes", "views", "aliases", "alias",
 	"compare", "prune", "tag", "watch", "config", "export", "info",
 	"path", "man",
 }
@@ -441,15 +462,17 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local bin="${COMP_WORDS[0]}"
-  local commands="help version open new doctor update completion stats search tags notes views aliases alias compare prune tag watch config export info path man"
-  local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query"
+  local commands="help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man"
+  local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --"
+  local cmd_index=1
+  [[ "${COMP_WORDS[1]}" == "--demo" ]] && cmd_index=2
 
-  if [[ "${COMP_CWORD}" -eq 1 ]]; then
+  if [[ "${COMP_CWORD}" -eq "${cmd_index}" ]]; then
     COMPREPLY=( $(compgen -W "${commands} ${flags}" -- "${cur}") )
     return 0
   fi
 
-  case "${COMP_WORDS[1]}" in
+  case "${COMP_WORDS[cmd_index]}" in
     completion)
       COMPREPLY=( $(compgen -W "$("${bin}" __complete shells)" -- "${cur}") )
       return 0
@@ -462,10 +485,14 @@ _dispatch_completion() {
       COMPREPLY=( $(compgen -W "--mode --agent --model --yolo" -- "${cur}") )
       return 0
       ;;
+    list)
+      COMPREPLY=( $(compgen -W "--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit" -- "${cur}") )
+      return 0
+      ;;
     config)
-      if [[ "${COMP_CWORD}" -eq 2 ]]; then
+      if [[ "${COMP_CWORD}" -eq $((cmd_index + 1)) ]]; then
         COMPREPLY=( $(compgen -W "list get set unset edit path validate schema export import" -- "${cur}") )
-      elif [[ "${COMP_WORDS[2]}" == "get" || "${COMP_WORDS[2]}" == "set" || "${COMP_WORDS[2]}" == "unset" ]]; then
+      elif [[ "${COMP_WORDS[cmd_index + 1]}" == "get" || "${COMP_WORDS[cmd_index + 1]}" == "set" || "${COMP_WORDS[cmd_index + 1]}" == "unset" ]]; then
         COMPREPLY=( $(compgen -W "$("${bin}" __complete config-keys)" -- "${cur}") )
       fi
       return 0
@@ -477,48 +504,56 @@ complete -F _dispatch_completion dispatch disp
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands flags configsubs shells aliases configkeys openflags newflags
+  local -a commands flags configsubs shells aliases configkeys openflags newflags listflags
   local bin=${words[1]}
-  commands=(help version open new doctor update completion stats search tags notes views aliases alias compare prune tag watch config export info path man)
+  local cmd_index=2
+  [[ ${words[2]} == --demo ]] && cmd_index=3
+  commands=(help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man)
   configsubs=(list get set unset edit path validate schema export import)
   openflags=(--mode --last --print --agent --model --yolo)
   newflags=(--mode --agent --model --yolo)
-  flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query)
+  listflags=(--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit)
+  flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --)
 
-  if (( CURRENT == 2 )); then
+  if (( CURRENT == cmd_index )); then
     _describe -t commands 'dispatch command' commands || _describe -t flags 'dispatch flag' flags
     return
   fi
 
-  if [[ ${words[2]} == completion ]]; then
+  if [[ ${words[cmd_index]} == completion ]]; then
     shells=(${(f)"$($bin __complete shells)"})
     _describe -t shells 'shell' shells
     return
   fi
 
-  if [[ ${words[2]} == open ]]; then
+  if [[ ${words[cmd_index]} == open ]]; then
     aliases=(${(f)"$($bin __complete aliases)"})
     _describe -t aliases 'session alias' aliases
     return
   fi
 
-  if [[ ${words[2]} == config ]]; then
-    if (( CURRENT == 3 )); then
+  if [[ ${words[cmd_index]} == config ]]; then
+    if (( CURRENT == cmd_index + 1 )); then
       _describe -t configsubs 'config subcommand' configsubs
-    elif [[ ${words[3]} == get || ${words[3]} == set || ${words[3]} == unset ]]; then
+    elif [[ ${words[cmd_index + 1]} == get || ${words[cmd_index + 1]} == set || ${words[cmd_index + 1]} == unset ]]; then
       configkeys=(${(f)"$($bin __complete config-keys)"})
       _describe -t configkeys 'config key' configkeys
     fi
     return
   fi
 
-  if [[ ${words[2]} == open ]]; then
+  if [[ ${words[cmd_index]} == open ]]; then
     _describe -t openflags 'open flag' openflags
     return
   fi
 
-  if [[ ${words[2]} == new ]]; then
+  if [[ ${words[cmd_index]} == new ]]; then
     _describe -t newflags 'new flag' newflags
+    return
+  fi
+
+  if [[ ${words[cmd_index]} == list ]]; then
+    _describe -t listflags 'list flag' listflags
     return
   fi
 }
@@ -528,60 +563,83 @@ _dispatch_completion "$@"
 const fishCompletionScript = `# fish completion for dispatch and disp
 function __dispatch_needs_command
   set -l cmd (commandline -opc)
-  test (count $cmd) -eq 1
+  if test (count $cmd) -eq 1
+    return 0
+  end
+  test (count $cmd) -eq 2; and test $cmd[2] = --demo
 end
 
 function __dispatch_after
   set -l cmd (commandline -opc)
-  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
+  set -l index 2
+  test (count $cmd) -ge 2; and test $cmd[2] = --demo; and set index 3
+  test (count $cmd) -ge $index; and test $cmd[$index] = $argv[1]
 end
 
 function __dispatch_config_key
   set -l cmd (commandline -opc)
-  test (count $cmd) -ge 3; and test $cmd[2] = config; and contains -- $cmd[3] get set unset
+  set -l index 2
+  test (count $cmd) -ge 2; and test $cmd[2] = --demo; and set index 3
+  test (count $cmd) -ge (math $index + 1); and test $cmd[$index] = config; and contains -- $cmd[(math $index + 1)] get set unset
 end
 
 function __dispatch_using_subcommand
   set -l cmd (commandline -opc)
-  test (count $cmd) -ge 2; and test $cmd[2] = $argv[1]
+  set -l index 2
+  test (count $cmd) -ge 2; and test $cmd[2] = --demo; and set index 3
+  test (count $cmd) -ge $index; and test $cmd[$index] = $argv[1]
 end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search tags notes views aliases alias compare prune tag watch config export info path man'
-  complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man'
+  complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
   complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo'
   complete -c $bin -n '__dispatch_after new' -a '--mode --agent --model --yolo'
+  complete -c $bin -n '__dispatch_after list' -a '--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit'
   complete -c $bin -n '__dispatch_after config' -a 'list get set unset edit path validate schema export import'
   complete -c $bin -n '__dispatch_config_key' -a "($bin __complete config-keys)"
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'tags', 'notes', 'views', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
-$script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'list', 'tags', 'notes', 'views', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
+$script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query', '--')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path', 'validate', 'schema', 'export', 'import')
 $script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
 $script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
+$script:DispatchListFlags = @('--json', '--jsonl', '--ids', '--paths', '--commands', '--csv', '--table', '--format', '-q', '--query', '--deep', '--repo', '--repository', '--branch', '--folder', '--tag', '--host', '--since', '--until', '--sort', '--order', '-n', '--limit')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $tokens = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })
     $bin = $tokens[0]
-    $values = if ($tokens.Count -ge 2 -and $tokens[1] -eq 'completion') {
+    $commandIndex = if ($tokens.Count -ge 2 -and $tokens[1] -eq '--demo') { 2 } else { 1 }
+    $command = if ($tokens.Count -gt $commandIndex) { $tokens[$commandIndex] } else { '' }
+    $queryMode = -not ($script:DispatchCommands -contains $command) -and (
+        ($tokens -contains '--' -and $wordToComplete -ne '--') -or
+        ($tokens | Where-Object { $_ -match '^--(?:current|cwd(?:=|$)|repo(?:=|$)|branch(?:=|$)|query(?:=|$))' })
+    )
+    if ($queryMode) {
+        if ([string]::IsNullOrEmpty($wordToComplete)) { "''" } else { $wordToComplete }
+        return
+    }
+    $values = if ($command -eq 'completion') {
         & $bin __complete shells
-    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'open') {
+    } elseif ($command -eq 'open') {
         (& $bin __complete aliases) + $script:DispatchOpenFlags
-    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'config') {
-        if ($tokens.Count -ge 3 -and @('get', 'set', 'unset') -contains $tokens[2]) {
+    } elseif ($command -eq 'config') {
+        if ($tokens.Count -gt ($commandIndex + 1) -and @('get', 'set', 'unset') -contains $tokens[$commandIndex + 1]) {
             & $bin __complete config-keys
         } else {
             $script:DispatchConfigSubcommands
         }
-    } elseif ($tokens.Count -ge 2 -and $tokens[1] -eq 'new') {
+    } elseif ($command -eq 'new') {
         $script:DispatchNewFlags
+    } elseif ($command -eq 'list') {
+        $script:DispatchListFlags
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }

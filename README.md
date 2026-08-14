@@ -467,6 +467,27 @@ dispatch watch --exec '[ "$DISPATCH_SESSION_STATE" = waiting ] && \
   curl -s -X POST "$WEBHOOK_URL" -d "session=$DISPATCH_SESSION_ID needs input"'
 ```
 
+### List
+
+List sessions under the current working directory in a readable table:
+
+```sh
+dispatch list
+dispatch list auth
+dispatch list --folder ../other-project
+dispatch list --limit 10
+dispatch list --json
+```
+
+`dispatch list` is a current-directory preset for `dispatch search`. Positional
+text remains a search query, `--folder <path>` selects another directory, and
+all search filters are available. Table output is the default; explicit output
+flags such as `--json`, `--jsonl`, `--csv`, `--ids`, `--paths`, and
+`--commands` override it.
+
+To launch the TUI with a query that starts with a command name, use `--`:
+`dispatch -- list bug`.
+
 ### Search (JSON)
 
 Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array by default:
@@ -495,6 +516,11 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--format json|csv|ids|table` chooses JSON output, CSV output, one session ID per line, or a readable table. `--csv`, `--ids`, and `--table` are shortcuts.
 
 Each JSON or CSV result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. CSV always prints a header row. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+
+CSV text fields that begin with spreadsheet formula triggers are prefixed with
+a single quote for safe opening in spreadsheet applications. Human-readable
+table output strips terminal control and escape sequences; JSON and JSONL keep
+the stored values unchanged.
 
 ### Man
 

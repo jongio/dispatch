@@ -103,6 +103,7 @@ var manCommands = []manEntry{
 	{"doctor [--json] [--strict]", "Print environment diagnostics. --strict exits non-zero on warnings."},
 	{"stats [flags]", "Print session totals and breakdowns by repository, branch, folder, and host type."},
 	{"search [query] [flags]", "Print matching sessions without the TUI."},
+	{"list [query] [flags]", "List sessions under the current directory in table format. Use --folder to select another directory."},
 	{"tags [--json|--csv|--markdown]", "List tags in use with per-tag session counts."},
 	{"aliases [--json]", "List session aliases with orphan detection."},
 	{"alias list [--json]", "List session aliases."},
@@ -126,6 +127,7 @@ var manCommands = []manEntry{
 var manFlags = []manEntry{
 	{"-h, --help", "Show the usage summary."},
 	{"-v, --version", "Print the version."},
+	{"--", "Treat remaining arguments as TUI query text."},
 	{"--demo", "Launch with demo data."},
 	{"--clear-cache", "Reset config to defaults."},
 	{"--reindex", "Rebuild the session store index."},

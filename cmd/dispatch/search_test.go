@@ -331,6 +331,18 @@ func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
 	}
 }
 
+func TestSearchTableCellSanitizesTerminalControls(t *testing.T) {
+	input := "\x1b]52;c;YXR0YWNr\x07\x1b[31mred\x1b[0m\ttext\b"
+	got := searchTableCell(input)
+
+	if strings.ContainsAny(got, "\x1b\x07\b") {
+		t.Fatalf("searchTableCell retained terminal control characters: %q", got)
+	}
+	if got != "red text" {
+		t.Errorf("searchTableCell() = %q, want %q", got, "red text")
+	}
+}
+
 func TestRunSearchCSVOutput(t *testing.T) {
 	sessions := []data.Session{
 		{
@@ -376,6 +388,31 @@ func TestRunSearchCSVEmptyPrintsHeader(t *testing.T) {
 	}
 	if got, want := buf.String(), "id,summary,cwd,repository,branch,created_at,updated_at,turn_count,file_count\n"; got != want {
 		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunSearchCSVSanitizesSpreadsheetFormulas(t *testing.T) {
+	sessions := []data.Session{{
+		ID:         "session-a",
+		Summary:    "\n=SUM(1,1)",
+		Cwd:        "+cmd",
+		Repository: "-repo",
+		Branch:     "@branch",
+	}}
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return sessions, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runSearch(&buf, []string{"search", "--csv"}); err != nil {
+		t.Fatalf("runSearch returned error: %v", err)
+	}
+
+	got := buf.String()
+	for _, want := range []string{"\"'\n=SUM(1,1)\"", `'+cmd`, `'-repo`, `'@branch`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("csv output missing sanitized value %q:\n%s", want, got)
+		}
 	}
 }
 

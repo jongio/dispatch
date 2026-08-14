@@ -45,6 +45,46 @@ func TestHandleArgs_HelpShort(t *testing.T) {
 	}
 }
 
+func TestHandleArgsList(t *testing.T) {
+	folder := t.TempDir()
+	withListGetwd(t, func() (string, error) { return folder, nil })
+
+	var captured data.FilterOptions
+	withSearchList(t, func(filter data.FilterOptions, _ data.SortOptions, _ int) ([]data.Session, error) {
+		captured = filter
+		return nil, nil
+	})
+
+	done, cleanup, _, err := handleArgs([]string{"list", "auth"}, io.Discard, nil)
+	if err != nil {
+		t.Fatalf("handleArgs returned error: %v", err)
+	}
+	if !done {
+		t.Error("expected done=true for list")
+	}
+	if cleanup != nil {
+		t.Error("expected cleanup=nil for list")
+	}
+	if captured.Folder != folder || captured.Query != "auth" {
+		t.Errorf("captured filter = %+v, want folder %q and query auth", captured, folder)
+	}
+}
+
+func TestHandleArgsListError(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+
+	done, cleanup, _, err := handleArgs([]string{"list", "--folder", missing}, io.Discard, nil)
+	if err == nil {
+		t.Fatal("handleArgs returned nil error, want invalid folder error")
+	}
+	if !done {
+		t.Error("expected done=true for list error")
+	}
+	if cleanup != nil {
+		t.Error("expected cleanup=nil for list error")
+	}
+}
+
 func TestHandleArgs_HelpCommand(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- nil
@@ -172,6 +212,40 @@ func TestHandleArgs_Completion(t *testing.T) {
 	}
 	if cleanup != nil {
 		t.Error("expected cleanup=nil for completion")
+	}
+}
+
+func TestHandleArgs_CompletionAfterGlobalFlag(t *testing.T) {
+	t.Setenv("DISPATCH_DB", os.Getenv("DISPATCH_DB"))
+	t.Setenv("DISPATCH_SESSION_STATE", os.Getenv("DISPATCH_SESSION_STATE"))
+
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Skip("could not find module root")
+		}
+		dir = parent
+	}
+	t.Chdir(dir)
+
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, cleanup, _, err := handleArgs([]string{"--demo", "completion", "bash"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !done {
+		t.Error("expected done=true for completion")
+	}
+	if cleanup != nil {
+		cleanup()
 	}
 }
 
@@ -408,6 +482,59 @@ func TestHandleArgs_MultiWordQuery(t *testing.T) {
 	}
 	if startup.Query != "fix auth bug" {
 		t.Errorf("query = %q, want %q", startup.Query, "fix auth bug")
+	}
+}
+
+func TestHandleArgs_QueryMayContainCommandName(t *testing.T) {
+	ch := make(chan *update.UpdateInfo, 1)
+
+	done, _, startup, err := handleArgs([]string{"fix", "list", "bug"}, io.Discard, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if done {
+		t.Error("expected done=false for a multi-word query")
+	}
+	if startup.Query != "fix list bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "fix list bug")
+	}
+}
+
+func TestHandleArgs_ForceQueryMayStartWithCommandName(t *testing.T) {
+	done, _, startup, err := handleArgs([]string{"--", "list", "bug"}, io.Discard, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if done {
+		t.Error("expected done=false for a forced query")
+	}
+	if startup.Query != "list bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "list bug")
+	}
+}
+
+func TestHandleArgs_ExplicitQueryMayContainCommandName(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "separate flag", args: []string{"--query", "fix", "list", "bug"}},
+		{name: "inline flag", args: []string{"--query=fix", "list", "bug"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			done, _, startup, err := handleArgs(tt.args, io.Discard, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if done {
+				t.Error("expected done=false for an explicit multi-word query")
+			}
+			if startup.Query != "fix list bug" {
+				t.Errorf("query = %q, want %q", startup.Query, "fix list bug")
+			}
+		})
 	}
 }
 

@@ -433,6 +433,8 @@ func TestCsvSafe(t *testing.T) {
 		"-2":          "'-2",
 		"@ref":        "'@ref",
 		"\ttab":       "'\ttab",
+		"\rreturn":    "'\rreturn",
+		"\nformula":   "'\nformula",
 	}
 	for in, want := range cases {
 		if got := csvSafe(in); got != want {

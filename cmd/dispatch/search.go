@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -66,13 +67,17 @@ type searchSession struct {
 // runSearch prints matching sessions as JSON without starting the TUI. args is
 // the full argument slice with args[0] == "search".
 func runSearch(w io.Writer, args []string) error {
-	if w == nil {
-		w = io.Discard
-	}
-
 	opts, err := parseSearchArgs(args)
 	if err != nil {
 		return err
+	}
+
+	return runSearchOptions(w, opts)
+}
+
+func runSearchOptions(w io.Writer, opts searchOptions) error {
+	if w == nil {
+		w = io.Discard
 	}
 
 	limit := opts.limit
@@ -185,10 +190,10 @@ func writeSearchCSV(w io.Writer, sessions []data.Session) error {
 	for _, s := range sessions {
 		if err := cw.Write([]string{
 			s.ID,
-			s.Summary,
-			s.Cwd,
-			s.Repository,
-			s.Branch,
+			csvSafe(s.Summary),
+			csvSafe(s.Cwd),
+			csvSafe(s.Repository),
+			csvSafe(s.Branch),
 			s.CreatedAt,
 			s.UpdatedAt,
 			strconv.Itoa(s.TurnCount),
@@ -251,6 +256,13 @@ func searchTableTime(s data.Session) string {
 }
 
 func searchTableCell(v string) string {
+	v = ansi.Strip(v)
+	v = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, v)
 	v = strings.Join(strings.Fields(v), " ")
 	if v == "" {
 		return "-"
@@ -262,12 +274,14 @@ func searchTableCell(v string) string {
 // "search". A single leading token that does not start with "-" is treated as
 // the search query, matching how the TUI seeds its search box.
 func parseSearchArgs(args []string) (searchOptions, error) {
-	opts := searchOptions{
+	return parseSearchArgsWithDefaults(args, searchOptions{
 		sort:   defaultSearchSort(),
 		limit:  searchDefaultLimit,
 		format: searchFormatJSON,
-	}
+	})
+}
 
+func parseSearchArgsWithDefaults(args []string, opts searchOptions) (searchOptions, error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "search" token

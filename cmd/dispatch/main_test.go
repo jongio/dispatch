@@ -82,6 +82,35 @@ func TestShowUpdateNotification_NilWriter(t *testing.T) {
 	showUpdateNotification(nil, ch)
 }
 
+func TestCleanupAfterHandleArgs(t *testing.T) {
+	t.Run("error runs cleanup", func(t *testing.T) {
+		called := false
+		got := cleanupAfterHandleArgs(context.Canceled, func() { called = true })
+		if !called {
+			t.Fatal("cleanup was not called for an error")
+		}
+		if got != nil {
+			t.Fatal("error path returned a cleanup function")
+		}
+	})
+
+	t.Run("success defers cleanup", func(t *testing.T) {
+		called := false
+		cleanup := func() { called = true }
+		got := cleanupAfterHandleArgs(nil, cleanup)
+		if called {
+			t.Fatal("cleanup ran before the successful command completed")
+		}
+		if got == nil {
+			t.Fatal("success path discarded cleanup function")
+		}
+		got()
+		if !called {
+			t.Fatal("returned cleanup function did not run")
+		}
+	})
+}
+
 func TestUpdateCheckDisabledTruthyValues(t *testing.T) {
 	for _, value := range []string{"1", "true", "TRUE", "yes", "on", " On "} {
 		t.Run(value, func(t *testing.T) {
@@ -475,7 +504,7 @@ func TestPrintUsage_Output(t *testing.T) {
 	<-readDone
 
 	output := buf.String()
-	for _, want := range []string{"dispatch", "help", "version", "update", "--demo"} {
+	for _, want := range []string{"dispatch", "help", "version", "update", "list [query]", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)
 		}
@@ -516,6 +545,7 @@ func TestSetupDemo_HappyPath(t *testing.T) {
 	// Preserve environment vars that setupDemo modifies.
 	t.Setenv("DISPATCH_DB", os.Getenv("DISPATCH_DB"))
 	t.Setenv("DISPATCH_SESSION_STATE", os.Getenv("DISPATCH_SESSION_STATE"))
+	t.Setenv("DISPATCH_DEMO", os.Getenv("DISPATCH_DEMO"))
 
 	// Find the module root.
 	dir, err := os.Getwd()
@@ -549,6 +579,9 @@ func TestSetupDemo_HappyPath(t *testing.T) {
 	}
 	if state := os.Getenv("DISPATCH_SESSION_STATE"); state == "" {
 		t.Error("DISPATCH_SESSION_STATE should be set after setupDemo")
+	}
+	if demo := os.Getenv("DISPATCH_DEMO"); demo != "1" {
+		t.Errorf("DISPATCH_DEMO = %q, want 1", demo)
 	}
 
 	// Verify the demo DB exists and was copied.

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+#### CLI
+- **`dispatch list`** — list sessions under the current directory in table form, with positional query text, an explicit `--folder` override, and the existing search filters and output formats. (#391)
+
+### Fixed
+
+- **Search/list safety and routing** — match only exact folders and true platform-native descendants, normalize Windows separator variants, protect CSV and terminal output from control-sequence injection, and keep command names inside multi-word TUI queries from hijacking dispatch.
+
 ## [v0.15.0] — 2026-08-12
 
 ### Added

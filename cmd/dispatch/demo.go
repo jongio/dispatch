@@ -49,6 +49,7 @@ var demoAttentionSessions = []demoAttention{
 // to now and fake session-state directories for attention status circles.
 // It returns a cleanup function that removes all temporary artifacts.
 func setupDemo() (cleanup func(), err error) {
+	previousDemo, hadPreviousDemo := os.LookupEnv("DISPATCH_DEMO")
 	srcDB := findDemoDB()
 	if srcDB == "" {
 		return nil, fmt.Errorf("demo db not found; set DISPATCH_DB or run from the repo root")
@@ -104,9 +105,17 @@ func setupDemo() (cleanup func(), err error) {
 	// Enable synthetic git state badges so all badge types are visible
 	// without requiring real git repos on disk.
 	_ = os.Setenv("DISPATCH_DEMO_GIT_STATES", "1")
+	_ = os.Setenv("DISPATCH_DEMO", "1")
 
 	ok = true
-	return func() { os.RemoveAll(tmpDir) }, nil
+	return func() {
+		os.RemoveAll(tmpDir)
+		if hadPreviousDemo {
+			_ = os.Setenv("DISPATCH_DEMO", previousDemo)
+		} else {
+			_ = os.Unsetenv("DISPATCH_DEMO")
+		}
+	}, nil
 }
 
 // copyDemoDB copies src to dst using a simple read/write.
