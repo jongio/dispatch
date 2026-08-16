@@ -15,7 +15,7 @@
   "dependencies": {
     "astro": "^7.2.1",
     "marked": "^18.0.9",
-    "sanitize-html": "^2.17.6"
+    "sanitize-html": "^2.17.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
