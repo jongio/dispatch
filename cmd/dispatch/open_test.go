@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -534,6 +536,31 @@ func TestParseOpenArgs_ScopeFlags(t *testing.T) {
 	}
 	if scope.Repository != "jongio/dispatch" {
 		t.Errorf("Repository = %q, want jongio/dispatch", scope.Repository)
+	}
+}
+
+func TestParseOpenArgs_ResolvesRelativeFolder(t *testing.T) {
+	base := t.TempDir()
+	folder := filepath.Join(base, "project")
+	if err := os.Mkdir(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(base)
+
+	_, _, _, _, _, _, scope, err := parseOpenArgs([]string{"open", "--folder", "project"})
+	if err != nil {
+		t.Fatalf("parseOpenArgs returned error: %v", err)
+	}
+	if scope == nil || scope.Folder != folder {
+		t.Fatalf("scope = %#v, want folder %q", scope, folder)
+	}
+}
+
+func TestParseOpenArgs_RejectsMissingFolder(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	_, _, _, _, _, _, _, err := parseOpenArgs([]string{"open", "--folder", missing})
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("error = %v, want missing-folder error", err)
 	}
 }
 

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,7 +47,7 @@ func TestHandleArgs_HelpShort(t *testing.T) {
 	}
 }
 
-func TestHandleArgsList(t *testing.T) {
+func TestHandleArgsResume(t *testing.T) {
 	folder := t.TempDir()
 	withListGetwd(t, func() (string, error) { return folder, nil })
 
@@ -55,33 +57,33 @@ func TestHandleArgsList(t *testing.T) {
 		return nil, nil
 	})
 
-	done, cleanup, _, err := handleArgs([]string{"list", "auth"}, io.Discard, nil)
+	done, cleanup, _, err := handleArgs([]string{"resume", "auth"}, io.Discard, nil)
 	if err != nil {
 		t.Fatalf("handleArgs returned error: %v", err)
 	}
 	if !done {
-		t.Error("expected done=true for list")
+		t.Error("expected done=true for resume")
 	}
 	if cleanup != nil {
-		t.Error("expected cleanup=nil for list")
+		t.Error("expected cleanup=nil for resume")
 	}
 	if captured.Folder != folder || captured.Query != "auth" {
 		t.Errorf("captured filter = %+v, want folder %q and query auth", captured, folder)
 	}
 }
 
-func TestHandleArgsListError(t *testing.T) {
+func TestHandleArgsResumeError(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing")
 
-	done, cleanup, _, err := handleArgs([]string{"list", "--folder", missing}, io.Discard, nil)
+	done, cleanup, _, err := handleArgs([]string{"resume", "--folder", missing}, io.Discard, nil)
 	if err == nil {
 		t.Fatal("handleArgs returned nil error, want invalid folder error")
 	}
 	if !done {
-		t.Error("expected done=true for list error")
+		t.Error("expected done=true for resume error")
 	}
 	if cleanup != nil {
-		t.Error("expected cleanup=nil for list error")
+		t.Error("expected cleanup=nil for resume error")
 	}
 }
 
@@ -488,28 +490,28 @@ func TestHandleArgs_MultiWordQuery(t *testing.T) {
 func TestHandleArgs_QueryMayContainCommandName(t *testing.T) {
 	ch := make(chan *update.UpdateInfo, 1)
 
-	done, _, startup, err := handleArgs([]string{"fix", "list", "bug"}, io.Discard, ch)
+	done, _, startup, err := handleArgs([]string{"fix", "resume", "bug"}, io.Discard, ch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if done {
 		t.Error("expected done=false for a multi-word query")
 	}
-	if startup.Query != "fix list bug" {
-		t.Errorf("query = %q, want %q", startup.Query, "fix list bug")
+	if startup.Query != "fix resume bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "fix resume bug")
 	}
 }
 
 func TestHandleArgs_ForceQueryMayStartWithCommandName(t *testing.T) {
-	done, _, startup, err := handleArgs([]string{"--", "list", "bug"}, io.Discard, nil)
+	done, _, startup, err := handleArgs([]string{"--", "resume", "bug"}, io.Discard, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if done {
 		t.Error("expected done=false for a forced query")
 	}
-	if startup.Query != "list bug" {
-		t.Errorf("query = %q, want %q", startup.Query, "list bug")
+	if startup.Query != "resume bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "resume bug")
 	}
 }
 
@@ -518,8 +520,8 @@ func TestHandleArgs_ExplicitQueryMayContainCommandName(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "separate flag", args: []string{"--query", "fix", "list", "bug"}},
-		{name: "inline flag", args: []string{"--query=fix", "list", "bug"}},
+		{name: "separate flag", args: []string{"--query", "fix", "resume", "bug"}},
+		{name: "inline flag", args: []string{"--query=fix", "resume", "bug"}},
 	}
 
 	for _, tt := range tests {
@@ -531,8 +533,8 @@ func TestHandleArgs_ExplicitQueryMayContainCommandName(t *testing.T) {
 			if done {
 				t.Error("expected done=false for an explicit multi-word query")
 			}
-			if startup.Query != "fix list bug" {
-				t.Errorf("query = %q, want %q", startup.Query, "fix list bug")
+			if startup.Query != "fix resume bug" {
+				t.Errorf("query = %q, want %q", startup.Query, "fix resume bug")
 			}
 		})
 	}
@@ -604,6 +606,67 @@ func TestHandleArgs_DemoFromRepoRoot(t *testing.T) {
 	}
 }
 
+func TestHandleArgs_DemoCleanupOnEarlyReturn(t *testing.T) {
+	t.Setenv("DISPATCH_DB", os.Getenv("DISPATCH_DB"))
+	t.Setenv("DISPATCH_SESSION_STATE", os.Getenv("DISPATCH_SESSION_STATE"))
+
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Skip("could not find module root")
+		}
+		dir = parent
+	}
+	t.Chdir(dir)
+
+	previousUpdate := runUpdateFn
+	runUpdateFn = func(context.Context, string) error { return nil }
+	t.Cleanup(func() { runUpdateFn = previousUpdate })
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{name: "help", args: []string{"--demo", "--help"}},
+		{name: "version", args: []string{"--demo", "version"}},
+		{name: "update", args: []string{"--demo", "update"}},
+		{name: "command error", args: []string{"--demo", "resume", "--format", "invalid"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ch := make(chan *update.UpdateInfo, 1)
+			done, cleanup, _, handleErr := handleArgs(tt.args, io.Discard, ch)
+			if !done {
+				t.Error("early-return demo command should set done=true")
+			}
+			if (handleErr != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr = %v", handleErr, tt.wantErr)
+			}
+			if cleanup == nil {
+				t.Fatal("demo early return should provide cleanup")
+			}
+
+			statePath := os.Getenv("DISPATCH_SESSION_STATE")
+			if statePath == "" {
+				t.Fatal("demo setup did not set DISPATCH_SESSION_STATE")
+			}
+			cleanup()
+			if _, statErr := os.Stat(statePath); !errors.Is(statErr, os.ErrNotExist) {
+				t.Errorf("demo state path still exists after cleanup: %v", statErr)
+			}
+		})
+	}
+}
+
 func TestHandleArgs_DemoNotFound(t *testing.T) {
 	t.Setenv("DISPATCH_DB", "")
 	t.Setenv("DISPATCH_SESSION_STATE", "")
@@ -617,6 +680,61 @@ func TestHandleArgs_DemoNotFound(t *testing.T) {
 	}
 	if !done {
 		t.Error("expected done=true on demo error")
+	}
+}
+
+func TestExtractDemoFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantArgs []string
+		wantDemo bool
+	}{
+		{
+			name:     "leading global flag",
+			args:     []string{"--demo", "resume"},
+			wantArgs: []string{"resume"},
+			wantDemo: true,
+		},
+		{
+			name:     "trailing command flag",
+			args:     []string{"resume", "--demo", "--json"},
+			wantArgs: []string{"resume", "--json"},
+			wantDemo: true,
+		},
+		{
+			name:     "query separator preserves demo text",
+			args:     []string{"--", "--demo"},
+			wantArgs: []string{"--", "--demo"},
+		},
+		{
+			name:     "query flag value preserves demo text",
+			args:     []string{"search", "--query", "--demo"},
+			wantArgs: []string{"search", "--query", "--demo"},
+		},
+		{
+			name:     "inline value does not consume demo flag",
+			args:     []string{"search", "--query=auth", "--demo"},
+			wantArgs: []string{"search", "--query=auth"},
+			wantDemo: true,
+		},
+		{
+			name:     "config positional value preserves demo text",
+			args:     []string{"config", "set", "resume_session_command", "--demo"},
+			wantArgs: []string{"config", "set", "resume_session_command", "--demo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotArgs, gotDemo := extractDemoFlag(tt.args)
+			if gotDemo != tt.wantDemo {
+				t.Errorf("demo = %v, want %v", gotDemo, tt.wantDemo)
+			}
+			if !slices.Equal(gotArgs, tt.wantArgs) {
+				t.Errorf("args = %q, want %q", gotArgs, tt.wantArgs)
+			}
+		})
 	}
 }
 

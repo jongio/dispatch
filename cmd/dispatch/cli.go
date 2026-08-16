@@ -80,6 +80,16 @@ func runVersion(w io.Writer, args []string) error {
 }
 
 func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.UpdateInfo) (done bool, cleanup func(), startup startupOptions, err error) {
+	args, demo := extractDemoFlag(args)
+	if demo {
+		c, demoErr := setupDemo()
+		if demoErr != nil {
+			fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
+			return true, nil, startupOptions{}, demoErr
+		}
+		cleanup = c
+	}
+
 	var flags startupFlags
 	positionalQueryStarted := false
 	for i := 0; i < len(args); i++ {
@@ -179,9 +189,9 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			}
 			return true, cleanup, startupOptions{}, nil
 
-		case "list":
+		case "resume":
 			if lErr := runList(os.Stdout, args[i:]); lErr != nil {
-				fmt.Fprintf(os.Stderr, "list: %v\n", lErr)
+				fmt.Fprintf(os.Stderr, "resume: %v\n", lErr)
 				return true, cleanup, startupOptions{}, lErr
 			}
 			return true, cleanup, startupOptions{}, nil
@@ -289,14 +299,6 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 			// dynamic candidates. Deliberately omitted from help and usage.
 			runComplete(os.Stdout, args[i:])
 			return true, cleanup, startupOptions{}, nil
-		case "--demo":
-			c, demoErr := setupDemo()
-			if demoErr != nil {
-				fmt.Fprintf(os.Stderr, "demo: %v\n", demoErr)
-				return true, cleanup, startupOptions{}, demoErr
-			}
-			cleanup = c
-
 		case "--clear-cache":
 			if cErr := configResetFn(); cErr != nil {
 				fmt.Fprintf(os.Stderr, "clear-cache: %v\n", cErr)
@@ -387,6 +389,49 @@ func handleArgs(args []string, origStderr io.Writer, updateCh <-chan *update.Upd
 	return false, cleanup, startup, nil
 }
 
+func extractDemoFlag(args []string) ([]string, bool) {
+	cleaned := make([]string, 0, len(args))
+	demo := false
+	command := ""
+	for i, arg := range args {
+		if arg == "--" {
+			cleaned = append(cleaned, args[i:]...)
+			break
+		}
+		if command == "" && !strings.HasPrefix(arg, "-") {
+			command = arg
+		}
+		if arg == "--demo" {
+			if command != "" && command != "resume" && command != "search" {
+				cleaned = append(cleaned, arg)
+				continue
+			}
+			if i > 0 && searchFlagConsumesValue(args[i-1]) {
+				cleaned = append(cleaned, arg)
+				continue
+			}
+			demo = true
+			continue
+		}
+		cleaned = append(cleaned, arg)
+	}
+	return cleaned, demo
+}
+
+func searchFlagConsumesValue(arg string) bool {
+	if strings.Contains(arg, "=") {
+		return false
+	}
+	switch arg {
+	case "--branch", "--folder", "--format", "--host", "--limit", "--order",
+		"--query", "--repo", "--repository", "--since", "--sort", "--tag",
+		"--until", "-n", "-q":
+		return true
+	default:
+		return false
+	}
+}
+
 // unknownFlag prints the usage banner and returns the unknown-flag error. It is
 // shared by the direct and inline flag parsing paths.
 func unknownFlag(arg string) error {
@@ -426,7 +471,7 @@ func splitInlineFlag(arg string) (flag, value string, ok bool) {
 // assert every command here appears in each of them.
 var cliCommands = []string{
 	"help", "version", "open", "new", "doctor", "update", "completion",
-	"stats", "search", "list", "tags", "notes", "views", "aliases", "alias",
+	"stats", "search", "resume", "tags", "notes", "views", "aliases", "alias",
 	"compare", "prune", "tag", "watch", "config", "export", "info",
 	"path", "man",
 }
@@ -462,7 +507,7 @@ const bashCompletionScript = `# bash completion for dispatch
 _dispatch_completion() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
   local bin="${COMP_WORDS[0]}"
-  local commands="help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man"
+  local commands="help version open new doctor update completion stats search resume tags notes views aliases alias compare prune tag watch config export info path man"
   local flags="-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --"
   local cmd_index=1
   [[ "${COMP_WORDS[1]}" == "--demo" ]] && cmd_index=2
@@ -478,14 +523,14 @@ _dispatch_completion() {
       return 0
       ;;
     open)
-      COMPREPLY=( $(compgen -W "$("${bin}" __complete aliases) --mode --last --print --agent --model --yolo" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "$("${bin}" __complete aliases) --mode --last --print --agent --model --yolo --repo --branch --folder --current" -- "${cur}") )
       return 0
       ;;
     new)
       COMPREPLY=( $(compgen -W "--mode --agent --model --yolo" -- "${cur}") )
       return 0
       ;;
-    list)
+    resume)
       COMPREPLY=( $(compgen -W "--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit" -- "${cur}") )
       return 0
       ;;
@@ -504,15 +549,15 @@ complete -F _dispatch_completion dispatch disp
 
 const zshCompletionScript = `#compdef dispatch disp
 _dispatch_completion() {
-  local -a commands flags configsubs shells aliases configkeys openflags newflags listflags
+  local -a commands flags configsubs shells aliases configkeys openflags newflags resumeflags
   local bin=${words[1]}
   local cmd_index=2
   [[ ${words[2]} == --demo ]] && cmd_index=3
-  commands=(help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man)
+  commands=(help version open new doctor update completion stats search resume tags notes views aliases alias compare prune tag watch config export info path man)
   configsubs=(list get set unset edit path validate schema export import)
-  openflags=(--mode --last --print --agent --model --yolo)
+  openflags=(--mode --last --print --agent --model --yolo --repo --branch --folder --current)
   newflags=(--mode --agent --model --yolo)
-  listflags=(--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit)
+  resumeflags=(--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit)
   flags=(-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --)
 
   if (( CURRENT == cmd_index )); then
@@ -529,6 +574,7 @@ _dispatch_completion() {
   if [[ ${words[cmd_index]} == open ]]; then
     aliases=(${(f)"$($bin __complete aliases)"})
     _describe -t aliases 'session alias' aliases
+    _describe -t openflags 'open flag' openflags
     return
   fi
 
@@ -542,18 +588,13 @@ _dispatch_completion() {
     return
   fi
 
-  if [[ ${words[cmd_index]} == open ]]; then
-    _describe -t openflags 'open flag' openflags
-    return
-  fi
-
   if [[ ${words[cmd_index]} == new ]]; then
     _describe -t newflags 'new flag' newflags
     return
   fi
 
-  if [[ ${words[cmd_index]} == list ]]; then
-    _describe -t listflags 'list flag' listflags
+  if [[ ${words[cmd_index]} == resume ]]; then
+    _describe -t resumeflags 'resume flag' resumeflags
     return
   fi
 }
@@ -592,25 +633,25 @@ end
 
 for bin in dispatch disp
   complete -c $bin -f
-  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search list tags notes views aliases alias compare prune tag watch config export info path man'
+  complete -c $bin -n '__dispatch_needs_command' -a 'help version open new doctor update completion stats search resume tags notes views aliases alias compare prune tag watch config export info path man'
   complete -c $bin -n '__dispatch_needs_command' -a '-h --help -v --version --demo --clear-cache --reindex --current --cwd --repo --branch --query --'
   complete -c $bin -n '__dispatch_after completion' -a "($bin __complete shells)"
   complete -c $bin -n '__dispatch_after open' -a "($bin __complete aliases)"
-  complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo'
+  complete -c $bin -n '__dispatch_after open' -a '--mode --last --print --agent --model --yolo --repo --branch --folder --current'
   complete -c $bin -n '__dispatch_after new' -a '--mode --agent --model --yolo'
-  complete -c $bin -n '__dispatch_after list' -a '--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit'
+  complete -c $bin -n '__dispatch_after resume' -a '--json --jsonl --ids --paths --commands --csv --table --format -q --query --deep --repo --repository --branch --folder --tag --host --since --until --sort --order -n --limit'
   complete -c $bin -n '__dispatch_after config' -a 'list get set unset edit path validate schema export import'
   complete -c $bin -n '__dispatch_config_key' -a "($bin __complete config-keys)"
 end
 `
 
 const powershellCompletionScript = `# PowerShell completion for dispatch
-$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'list', 'tags', 'notes', 'views', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
+$script:DispatchCommands = @('help', 'version', 'open', 'new', 'doctor', 'update', 'completion', 'stats', 'search', 'resume', 'tags', 'notes', 'views', 'aliases', 'alias', 'compare', 'prune', 'tag', 'watch', 'config', 'export', 'info', 'path', 'man')
 $script:DispatchFlags = @('-h', '--help', '-v', '--version', '--demo', '--clear-cache', '--reindex', '--current', '--cwd', '--repo', '--branch', '--query', '--')
 $script:DispatchConfigSubcommands = @('list', 'get', 'set', 'unset', 'edit', 'path', 'validate', 'schema', 'export', 'import')
-$script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo')
+$script:DispatchOpenFlags = @('--mode', '--last', '--print', '--agent', '--model', '--yolo', '--repo', '--branch', '--folder', '--current')
 $script:DispatchNewFlags = @('--mode', '--agent', '--model', '--yolo')
-$script:DispatchListFlags = @('--json', '--jsonl', '--ids', '--paths', '--commands', '--csv', '--table', '--format', '-q', '--query', '--deep', '--repo', '--repository', '--branch', '--folder', '--tag', '--host', '--since', '--until', '--sort', '--order', '-n', '--limit')
+$script:DispatchResumeFlags = @('--json', '--jsonl', '--ids', '--paths', '--commands', '--csv', '--table', '--format', '-q', '--query', '--deep', '--repo', '--repository', '--branch', '--folder', '--tag', '--host', '--since', '--until', '--sort', '--order', '-n', '--limit')
 
 Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
@@ -638,8 +679,8 @@ Register-ArgumentCompleter -Native -CommandName dispatch, disp -ScriptBlock {
         }
     } elseif ($command -eq 'new') {
         $script:DispatchNewFlags
-    } elseif ($command -eq 'list') {
-        $script:DispatchListFlags
+    } elseif ($command -eq 'resume') {
+        $script:DispatchResumeFlags
     } else {
         $script:DispatchCommands + $script:DispatchFlags
     }

@@ -150,16 +150,19 @@ func shiftDemoTimestamps(dbPath string) error {
 	defer db.Close()
 
 	// Find the newest updated_at.
-	var maxTS string
+	var maxTS sql.NullString
 	ctx := context.Background()
 	err = db.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM sessions`).Scan(&maxTS)
 	if err != nil {
 		return fmt.Errorf("demo db max ts: %w", err)
 	}
+	if !maxTS.Valid || maxTS.String == "" {
+		return nil
+	}
 
-	newest, err := time.Parse(time.RFC3339, maxTS)
+	newest, err := time.Parse(time.RFC3339, maxTS.String)
 	if err != nil {
-		return fmt.Errorf("demo db parse ts %q: %w", maxTS, err)
+		return fmt.Errorf("demo db parse ts %q: %w", maxTS.String, err)
 	}
 
 	// delta shifts all timestamps forward so newest becomes now-targetAge.

@@ -248,15 +248,15 @@ func TestHandleArgs_CurrentMayPrecedeCommandWordQuery(t *testing.T) {
 		return "jongio/dispatch", "main", nil
 	}
 
-	done, _, startup, err := handleArgs([]string{"--current", "list", "bug"}, io.Discard, nil)
+	done, _, startup, err := handleArgs([]string{"--current", "resume", "bug"}, io.Discard, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if done {
 		t.Error("expected done=false for --current query")
 	}
-	if startup.Query != "list bug" {
-		t.Errorf("query = %q, want %q", startup.Query, "list bug")
+	if startup.Query != "resume bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "resume bug")
 	}
 }
 

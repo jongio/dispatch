@@ -9,11 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 #### CLI
-- **`dispatch list`** — list sessions under the current directory in table form, with positional query text, an explicit `--folder` override, and the existing search filters and output formats. (#391)
+- **`dispatch resume`** — select and resume any matching session under the current directory from an aligned table showing full session ID, summary, repository, and branch columns. Large result sets can be revealed in batches from the picker. Positional query text and an explicit `--folder` override remain available. (#391)
 
 ### Fixed
 
-- **Search/list safety and routing** — match only exact folders and true platform-native descendants, normalize Windows separator variants, protect CSV and terminal output from control-sequence injection, and keep command names inside multi-word TUI queries from hijacking dispatch.
+- **Search/resume safety and routing** — match only exact folders and true platform-native descendants, normalize Windows separator variants, protect CSV and terminal output from control-sequence injection, and keep command names inside multi-word TUI queries from hijacking dispatch.
 
 ## [v0.15.0] — 2026-08-12
 

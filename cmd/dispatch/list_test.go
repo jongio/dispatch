@@ -3,13 +3,18 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/platform"
 )
 
 func withListGetwd(t *testing.T, fn func() (string, error)) {
@@ -26,11 +31,18 @@ func withListDemoMode(t *testing.T, enabled bool) {
 	t.Cleanup(func() { listDemoModeFn = previous })
 }
 
+func withListSelector(t *testing.T, fn func(io.Writer, []data.Session) (data.Session, bool, error)) {
+	t.Helper()
+	previous := listSelectFn
+	listSelectFn = fn
+	t.Cleanup(func() { listSelectFn = previous })
+}
+
 func TestParseListArgsDefaultsToWorkingDirectory(t *testing.T) {
 	folder := t.TempDir()
 	withListGetwd(t, func() (string, error) { return folder, nil })
 
-	opts, err := parseListArgs([]string{"list"})
+	opts, err := parseListArgs([]string{"resume"})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
@@ -42,19 +54,25 @@ func TestParseListArgsDefaultsToWorkingDirectory(t *testing.T) {
 func TestParseListArgsDefaultsToTable(t *testing.T) {
 	withListGetwd(t, func() (string, error) { return t.TempDir(), nil })
 
-	opts, err := parseListArgs([]string{"list"})
+	opts, err := parseListArgs([]string{"resume"})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
 	if opts.format != searchFormatTable {
 		t.Errorf("format = %q, want %q", opts.format, searchFormatTable)
 	}
+	if opts.formatExplicit {
+		t.Error("default table format should not bypass the interactive picker")
+	}
+	if opts.limit != 0 {
+		t.Errorf("limit = %d, want all matching sessions", opts.limit)
+	}
 }
 
 func TestParseListArgsExplicitFolder(t *testing.T) {
 	folder := t.TempDir()
 
-	opts, err := parseListArgs([]string{"list", "--folder", folder})
+	opts, err := parseListArgs([]string{"resume", "--folder", folder})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
@@ -71,7 +89,7 @@ func TestParseListArgsRelativeFolder(t *testing.T) {
 	}
 	t.Chdir(base)
 
-	opts, err := parseListArgs([]string{"list", "--folder", "project"})
+	opts, err := parseListArgs([]string{"resume", "--folder", "project"})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
@@ -83,7 +101,7 @@ func TestParseListArgsRelativeFolder(t *testing.T) {
 func TestParseListArgsPositionalQuery(t *testing.T) {
 	withListGetwd(t, func() (string, error) { return t.TempDir(), nil })
 
-	opts, err := parseListArgs([]string{"list", "auth", "bug"})
+	opts, err := parseListArgs([]string{"resume", "auth", "bug"})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
@@ -100,13 +118,13 @@ func TestParseListArgsOutputOverrides(t *testing.T) {
 		args []string
 		want searchOutputFormat
 	}{
-		{name: "json", args: []string{"list", "--json"}, want: searchFormatJSON},
-		{name: "jsonl", args: []string{"list", "--jsonl"}, want: searchFormatJSONL},
-		{name: "csv", args: []string{"list", "--csv"}, want: searchFormatCSV},
-		{name: "ids", args: []string{"list", "--ids"}, want: searchFormatIDs},
-		{name: "paths", args: []string{"list", "--paths"}, want: searchFormatPaths},
-		{name: "commands", args: []string{"list", "--commands"}, want: searchFormatCommands},
-		{name: "format", args: []string{"list", "--format", "json"}, want: searchFormatJSON},
+		{name: "json", args: []string{"resume", "--json"}, want: searchFormatJSON},
+		{name: "jsonl", args: []string{"resume", "--jsonl"}, want: searchFormatJSONL},
+		{name: "csv", args: []string{"resume", "--csv"}, want: searchFormatCSV},
+		{name: "ids", args: []string{"resume", "--ids"}, want: searchFormatIDs},
+		{name: "paths", args: []string{"resume", "--paths"}, want: searchFormatPaths},
+		{name: "commands", args: []string{"resume", "--commands"}, want: searchFormatCommands},
+		{name: "format", args: []string{"resume", "--format", "json"}, want: searchFormatJSON},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -124,7 +142,7 @@ func TestParseListArgsOutputOverrides(t *testing.T) {
 func TestParseListArgsReusesSearchFilters(t *testing.T) {
 	folder := t.TempDir()
 	opts, err := parseListArgs([]string{
-		"list", "auth", "--folder", folder, "--repo", "jongio/dispatch",
+		"resume", "auth", "--folder", folder, "--repo", "jongio/dispatch",
 		"--branch", "main", "--host", "cli", "--tag", "work", "--deep",
 		"--limit", "10", "--sort", "turns", "--order", "asc",
 		"--since", "2026-01-01", "--until", "2026-12-31",
@@ -153,7 +171,7 @@ func TestParseListArgsReusesSearchFilters(t *testing.T) {
 
 func TestParseListArgsMissingFolder(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing")
-	_, err := parseListArgs([]string{"list", "--folder", missing})
+	_, err := parseListArgs([]string{"resume", "--folder", missing})
 	if err == nil || !strings.Contains(err.Error(), "folder") || !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("error = %v, want actionable not-exist folder error", err)
 	}
@@ -165,7 +183,7 @@ func TestParseListArgsRejectsFile(t *testing.T) {
 		t.Fatalf("os.WriteFile returned error: %v", err)
 	}
 
-	_, err := parseListArgs([]string{"list", "--folder", path})
+	_, err := parseListArgs([]string{"resume", "--folder", path})
 	if err == nil || !strings.Contains(err.Error(), "is not a directory") {
 		t.Fatalf("error = %v, want not-a-directory error", err)
 	}
@@ -175,7 +193,7 @@ func TestParseListArgsWorkingDirectoryError(t *testing.T) {
 	wantErr := errors.New("working directory unavailable")
 	withListGetwd(t, func() (string, error) { return "", wantErr })
 
-	_, err := parseListArgs([]string{"list"})
+	_, err := parseListArgs([]string{"resume"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want wrapped %v", err, wantErr)
 	}
@@ -184,7 +202,7 @@ func TestParseListArgsWorkingDirectoryError(t *testing.T) {
 func TestParseListArgsDemoMode(t *testing.T) {
 	withListDemoMode(t, true)
 
-	opts, err := parseListArgs([]string{"list"})
+	opts, err := parseListArgs([]string{"resume"})
 	if err != nil {
 		t.Fatalf("parseListArgs returned error: %v", err)
 	}
@@ -193,7 +211,7 @@ func TestParseListArgsDemoMode(t *testing.T) {
 	}
 
 	synthetic := `D:\code\project-alpha\api`
-	opts, err = parseListArgs([]string{"list", "--folder", synthetic})
+	opts, err = parseListArgs([]string{"resume", "--folder", synthetic})
 	if err != nil {
 		t.Fatalf("parseListArgs rejected synthetic demo folder: %v", err)
 	}
@@ -202,7 +220,7 @@ func TestParseListArgsDemoMode(t *testing.T) {
 	}
 }
 
-func TestRunListReusesSearchPipeline(t *testing.T) {
+func TestRunListSelectsAndResumesSession(t *testing.T) {
 	folder := t.TempDir()
 	withListGetwd(t, func() (string, error) { return folder, nil })
 
@@ -217,16 +235,39 @@ func TestRunListReusesSearchPipeline(t *testing.T) {
 			UpdatedAt:  "2026-08-13T12:00:00Z",
 		}}, nil
 	})
+	withListSelector(t, func(_ io.Writer, sessions []data.Session) (data.Session, bool, error) {
+		if len(sessions) != 1 || sessions[0].ID != "1234567890abcdef" {
+			t.Fatalf("selector sessions = %#v", sessions)
+		}
+		return sessions[0], true, nil
+	})
+	previousLoad := openLoadConfigFn
+	previousLaunch := openInteractiveLaunchFn
+	openLoadConfigFn = func() (*config.Config, error) {
+		return &config.Config{LaunchMode: config.LaunchModeInPlace}, nil
+	}
+	var launched *data.Session
+	openInteractiveLaunchFn = func(_ io.Writer, _ *config.Config, session *data.Session, mode string) error {
+		launched = session
+		if mode != config.LaunchModeInPlace {
+			t.Errorf("mode = %q, want inplace", mode)
+		}
+		return nil
+	}
+	t.Cleanup(func() {
+		openLoadConfigFn = previousLoad
+		openInteractiveLaunchFn = previousLaunch
+	})
 
 	var output bytes.Buffer
-	if err := runList(&output, []string{"list", "auth"}); err != nil {
+	if err := runList(&output, []string{"resume", "auth"}); err != nil {
 		t.Fatalf("runList returned error: %v", err)
 	}
 	if captured.Folder != folder || captured.Query != "auth" {
 		t.Errorf("captured filter = %+v, want folder %q and query auth", captured, folder)
 	}
-	if !strings.Contains(output.String(), "ID") || !strings.Contains(output.String(), "1234567890ab") {
-		t.Errorf("output did not use table renderer:\n%s", output.String())
+	if launched == nil || launched.ID != "1234567890abcdef" {
+		t.Errorf("launched session = %#v", launched)
 	}
 }
 
@@ -237,7 +278,7 @@ func TestRunListCSVUsesSafeRenderer(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	if err := runList(&output, []string{"list", "--csv"}); err != nil {
+	if err := runList(&output, []string{"resume", "--csv"}); err != nil {
 		t.Fatalf("runList returned error: %v", err)
 	}
 	if !strings.Contains(output.String(), `"'=SUM(1,1)"`) {
@@ -250,8 +291,205 @@ func TestRunListNilWriter(t *testing.T) {
 	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return []data.Session{{ID: "session-id"}}, nil
 	})
+	withListSelector(t, func(io.Writer, []data.Session) (data.Session, bool, error) {
+		return data.Session{}, false, nil
+	})
 
-	if err := runList(nil, []string{"list"}); err != nil {
+	if err := runList(nil, []string{"resume"}); err != nil {
 		t.Fatalf("runList returned error with nil writer: %v", err)
+	}
+}
+
+func TestRunListNilWriterWithNoSessions(t *testing.T) {
+	withListGetwd(t, func() (string, error) { return t.TempDir(), nil })
+	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
+		return nil, nil
+	})
+
+	if err := runList(nil, []string{"resume"}); err != nil {
+		t.Fatalf("runList returned error with nil writer and no sessions: %v", err)
+	}
+}
+
+func TestListPickerShowsFullIDAndSelectsWithEnter(t *testing.T) {
+	session := data.Session{
+		ID:         "12345678-90ab-cdef-1234-567890abcdef",
+		Repository: "jongio/dispatch",
+		Branch:     "feature/list",
+		Summary:    "Fix auth",
+	}
+	model := newListPickerModel([]data.Session{session})
+
+	view := model.View().Content
+	if !strings.Contains(view, session.ID) {
+		t.Errorf("picker view omitted full session ID:\n%s", view)
+	}
+	for _, header := range []string{"SESSION ID", "REPOSITORY", "BRANCH", "SUMMARY"} {
+		if !strings.Contains(view, header) {
+			t.Errorf("picker view omitted table header %q:\n%s", header, view)
+		}
+	}
+	idIndex := strings.Index(view, "SESSION ID")
+	summaryIndex := strings.Index(view, "SUMMARY")
+	repoIndex := strings.Index(view, "REPOSITORY")
+	branchIndex := strings.Index(view, "BRANCH")
+	if idIndex >= summaryIndex || summaryIndex >= repoIndex || repoIndex >= branchIndex {
+		t.Errorf("picker headers are not ordered ID, summary, repository, branch:\n%s", view)
+	}
+	for _, detail := range []string{session.Repository, "featu…", session.Summary} {
+		if !strings.Contains(view, detail) {
+			t.Errorf("picker view omitted %q:\n%s", detail, view)
+		}
+	}
+
+	result, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter should quit the picker")
+	}
+	selected := result.(listPickerModel)
+	if !selected.selected || selected.cursor != 0 {
+		t.Errorf("selected model = %#v", selected)
+	}
+}
+
+func TestListPickerFitsNarrowTerminalWithWideText(t *testing.T) {
+	model := newListPickerModel([]data.Session{{
+		ID:         "12345678-90ab-cdef-1234-567890abcdef",
+		Summary:    "\x1b[31m修复登录问题 🚀 with a very long summary\x1b[0m",
+		Repository: "jongio/a-very-long-repository-name",
+		Branch:     "feature/a-very-long-branch-name",
+	}})
+	model.width = 80
+
+	view := model.View().Content
+	if strings.Contains(view, "\x1b") {
+		t.Fatalf("picker leaked terminal control sequences:\n%s", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if width := ansi.StringWidth(line); width > model.width {
+			t.Errorf("rendered line width = %d, want <= %d:\n%s", width, model.width, line)
+		}
+	}
+}
+
+func TestDefaultOpenInteractiveLaunchBlocksMissingWorkspace(t *testing.T) {
+	session := data.Session{ID: "session-id", Cwd: filepath.Join(t.TempDir(), "missing")}
+	err := defaultOpenInteractiveLaunch(io.Discard, &config.Config{}, &session, config.LaunchModeTab)
+	if err == nil || !strings.Contains(err.Error(), "workspace folder no longer exists") {
+		t.Fatalf("error = %v, want missing-workspace error", err)
+	}
+}
+
+func TestDefaultOpenInteractiveLaunchPromptsForMultipleShells(t *testing.T) {
+	folder := t.TempDir()
+	session := data.Session{ID: "session-id", Cwd: folder}
+	shells := []platform.ShellInfo{
+		{Name: "first", Path: "first.exe"},
+		{Name: "second", Path: "second.exe"},
+	}
+	previousDetect := openDetectShellsFn
+	previousSelect := openSelectShellFn
+	previousLaunch := openLaunchFn
+	openDetectShellsFn = func() []platform.ShellInfo { return shells }
+	openSelectShellFn = func(_ io.Writer, got []platform.ShellInfo) (platform.ShellInfo, bool, error) {
+		if len(got) != len(shells) {
+			t.Fatalf("shells = %#v, want %#v", got, shells)
+		}
+		return platform.ShellInfo{}, false, nil
+	}
+	openLaunchFn = func(io.Writer, *config.Config, *data.Session, string) error {
+		t.Fatal("direct launcher should not run when shell selection is cancelled")
+		return nil
+	}
+	t.Cleanup(func() {
+		openDetectShellsFn = previousDetect
+		openSelectShellFn = previousSelect
+		openLaunchFn = previousLaunch
+	})
+
+	if err := defaultOpenInteractiveLaunch(io.Discard, &config.Config{}, &session, config.LaunchModeTab); err != nil {
+		t.Fatalf("defaultOpenInteractiveLaunch returned error: %v", err)
+	}
+}
+
+func TestDefaultOpenInteractiveLaunchUsesDetectedSingleShell(t *testing.T) {
+	folder := t.TempDir()
+	session := data.Session{ID: "session-id", Cwd: folder}
+	shell := platform.ShellInfo{Name: "only", Path: "only.exe"}
+
+	previousDetect := openDetectShellsFn
+	previousLaunch := openLaunchFn
+	previousLaunchWithShell := openLaunchWithShellFn
+	openDetectShellsFn = func() []platform.ShellInfo { return []platform.ShellInfo{shell} }
+	openLaunchFn = func(io.Writer, *config.Config, *data.Session, string) error {
+		t.Fatal("single detected shell should not be re-resolved")
+		return nil
+	}
+	var launched platform.ShellInfo
+	openLaunchWithShellFn = func(_ io.Writer, _ *config.Config, _ *data.Session, _ string, got platform.ShellInfo) error {
+		launched = got
+		return nil
+	}
+	t.Cleanup(func() {
+		openDetectShellsFn = previousDetect
+		openLaunchFn = previousLaunch
+		openLaunchWithShellFn = previousLaunchWithShell
+	})
+
+	if err := defaultOpenInteractiveLaunch(io.Discard, &config.Config{}, &session, config.LaunchModeTab); err != nil {
+		t.Fatalf("defaultOpenInteractiveLaunch returned error: %v", err)
+	}
+	if launched.Name != shell.Name || launched.Path != shell.Path {
+		t.Errorf("launched shell = %#v, want %#v", launched, shell)
+	}
+}
+
+func TestListPickerNavigation(t *testing.T) {
+	model := newListPickerModel([]data.Session{{ID: "first"}, {ID: "second"}})
+	result, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	moved := result.(listPickerModel)
+	if moved.cursor != 1 {
+		t.Errorf("cursor = %d, want 1", moved.cursor)
+	}
+	result, _ = moved.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	cancelled := result.(listPickerModel)
+	if cancelled.selected || !cancelled.quitting {
+		t.Errorf("cancelled model = %#v", cancelled)
+	}
+}
+
+func TestListPickerShowsMoreSessions(t *testing.T) {
+	model := newListPickerModel(make([]data.Session, 101))
+	model.height = 200
+
+	view := model.View().Content
+	for _, want := range []string{
+		"Select a session (50 of 101)",
+		"Show 50 more sessions",
+		"51 remaining",
+		"m more",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("picker view omitted %q:\n%s", want, view)
+		}
+	}
+
+	model.cursor = model.visible
+	result, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatal("Enter on show-more row should keep the picker open")
+	}
+	expanded := result.(listPickerModel)
+	if expanded.visible != 100 || expanded.selected || expanded.quitting {
+		t.Errorf("expanded model = %#v", expanded)
+	}
+
+	result, _ = expanded.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	all := result.(listPickerModel)
+	if all.visible != 101 || all.hasMore() {
+		t.Errorf("fully expanded model = %#v", all)
+	}
+	if strings.Contains(all.View().Content, "more sessions") {
+		t.Errorf("fully expanded picker still offers more sessions:\n%s", all.View().Content)
 	}
 }

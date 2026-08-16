@@ -680,6 +680,31 @@ func (c *captureCtx) captureFeatures(subDir string) []Screenshot {
 		addOverlay("git-status", m)
 	}
 
+	rows := make([]components.SessionPickerRow, len(c.sessions))
+	for i, session := range c.sessions {
+		rows[i] = components.SessionPickerRow{
+			ID:         components.SanitizeTerminalText(session.ID),
+			Repository: components.SanitizeTerminalText(session.Repository),
+			Branch:     components.SanitizeTerminalText(session.Branch),
+			Summary:    components.SanitizeTerminalText(session.Summary),
+		}
+	}
+	t := styles.CurrentTheme()
+	shots = append(shots, Screenshot{
+		Name:   "resume-picker",
+		SubDir: subDir,
+		ANSI: components.SessionPickerView{
+			Rows:    rows,
+			Cursor:  0,
+			Visible: min(len(rows), components.DefaultSessionPickerBatchSize),
+			Width:   c.width,
+			Height:  c.height,
+		}.Render(),
+		FG:      t.Text,
+		BG:      t.Background,
+		Palette: t.ANSIPalette,
+	})
+
 	return shots
 }
 
@@ -936,13 +961,16 @@ func freshenDB(srcPath string) (string, func(), error) {
 	}
 	defer db.Close()
 
-	var maxTS string
+	var maxTS sql.NullString
 	ctx := context.Background()
 	if err := db.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM sessions`).Scan(&maxTS); err != nil {
 		cleanup()
 		return "", noop, err
 	}
-	newest, err := time.Parse(time.RFC3339, maxTS)
+	if !maxTS.Valid || maxTS.String == "" {
+		return tmpPath, cleanup, nil
+	}
+	newest, err := time.Parse(time.RFC3339, maxTS.String)
 	if err != nil {
 		cleanup()
 		return "", noop, err

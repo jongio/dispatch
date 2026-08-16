@@ -130,6 +130,10 @@ Commands:
                           (one per line; pairs with search --ids)
   open --repo R [--mode M]
                           Resume the most recent session matching a scope filter
+  open --branch B [--mode M]
+  open --folder F [--mode M]
+  open --current [--mode M]
+                          Scope by branch, folder, or the current Git context
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json] [--strict]
@@ -137,7 +141,7 @@ Commands:
                           output, --strict to exit non-zero on warnings)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, JSONL, CSV, IDs, paths, commands, or a table
-  list [query] [flags]    List sessions under the current directory in table format
+  resume [query] [flags]  Select and resume a session under the current directory
   tags [--json|--csv|--markdown]
                           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
@@ -152,7 +156,7 @@ Commands:
   info <id> [--json|--markdown] [--refs]
                           Print a concise session summary
   path <id|--last|--current>
-                          Print only a session's working directory (for cd "$(dispatch path x)")
+                          Print a session's working directory; IDs may be aliases or prefixes
   compare <a> <b> [--json]
                           Compare two sessions side by side
   tag <id> [flags]        Add, remove, set, or list tags on a session
@@ -215,10 +219,12 @@ Search flags:
   --order <asc|desc>      Sort direction
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
 
-List flags:
+Resume flags:
   Accepts the search flags above. --folder <path> overrides the current
-  directory, positional text remains a query, and table output is the default.
-  Explicit output flags such as --json, --ids, or --csv override the default.
+  directory, positional text remains a query, and all matches are shown in an
+  interactive picker. Enter resumes the selected session through the normal
+  TUI launch path. Explicit output flags such as --table, --json, --ids, or
+  --csv use non-interactive output instead.
 
 Views commands:
   views [list] [--json|--csv]

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // searchListSessionsFn loads sessions for the search command. It is a package
@@ -42,11 +42,12 @@ const (
 
 // searchOptions holds the parsed flags for the search command.
 type searchOptions struct {
-	filter data.FilterOptions
-	sort   data.SortOptions
-	limit  int
-	format searchOutputFormat
-	tag    string
+	filter         data.FilterOptions
+	sort           data.SortOptions
+	limit          int
+	format         searchOutputFormat
+	formatExplicit bool
+	tag            string
 }
 
 // searchSession is the machine-readable shape emitted for each matching
@@ -80,16 +81,7 @@ func runSearchOptions(w io.Writer, opts searchOptions) error {
 		w = io.Discard
 	}
 
-	limit := opts.limit
-	if limit <= 0 {
-		limit = searchAllLimit
-	}
-
-	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
-	if err != nil {
-		return err
-	}
-	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
+	sessions, err := loadSearchSessions(opts)
 	if err != nil {
 		return err
 	}
@@ -125,6 +117,23 @@ func runSearchOptions(w io.Writer, opts searchOptions) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(results)
+}
+
+func loadSearchSessions(opts searchOptions) ([]data.Session, error) {
+	limit := opts.limit
+	if limit <= 0 {
+		limit = searchAllLimit
+	}
+
+	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
+	if err != nil {
+		return nil, err
+	}
+	return sessions, nil
 }
 
 func writeSearchJSONL(w io.Writer, sessions []data.Session) error {
@@ -256,14 +265,7 @@ func searchTableTime(s data.Session) string {
 }
 
 func searchTableCell(v string) string {
-	v = ansi.Strip(v)
-	v = strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f {
-			return ' '
-		}
-		return r
-	}, v)
-	v = strings.Join(strings.Fields(v), " ")
+	v = components.SanitizeTerminalText(v)
 	if v == "" {
 		return "-"
 	}
@@ -305,18 +307,25 @@ func parseSearchArgsWithDefaults(args []string, opts searchOptions) (searchOptio
 		switch {
 		case name == "--json":
 			opts.format = searchFormatJSON
+			opts.formatExplicit = true
 		case name == "--jsonl":
 			opts.format = searchFormatJSONL
+			opts.formatExplicit = true
 		case name == "--ids":
 			opts.format = searchFormatIDs
+			opts.formatExplicit = true
 		case name == "--table":
 			opts.format = searchFormatTable
+			opts.formatExplicit = true
 		case name == "--csv":
 			opts.format = searchFormatCSV
+			opts.formatExplicit = true
 		case name == "--paths":
 			opts.format = searchFormatPaths
+			opts.formatExplicit = true
 		case name == "--commands":
 			opts.format = searchFormatCommands
+			opts.formatExplicit = true
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -327,6 +336,7 @@ func parseSearchArgsWithDefaults(args []string, opts searchOptions) (searchOptio
 				return searchOptions{}, err
 			}
 			opts.format = format
+			opts.formatExplicit = true
 			i = ni
 		case name == "--deep":
 			opts.filter.DeepSearch = true

@@ -504,7 +504,7 @@ func TestPrintUsage_Output(t *testing.T) {
 	<-readDone
 
 	output := buf.String()
-	for _, want := range []string{"dispatch", "help", "version", "update", "list [query]", "--demo"} {
+	for _, want := range []string{"dispatch", "help", "version", "update", "resume [query]", "--demo"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("printUsage() should mention %q, got:\n%s", want, output)
 		}

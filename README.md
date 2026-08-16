@@ -20,7 +20,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 
 - **Full-text search** (`/`) — FTS5 full-text search with BM25 ranking when available, falling back to LIKE for older CLI versions. Two-tier: quick search (summaries, branches, repos, directories) returns results instantly; deep search (turns, checkpoints, files, refs) kicks in after 300ms. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
-- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
+- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose summary or conversation turns contain any excluded word (case-insensitive) are hidden from the list
 - **Sorting** (`s` / `S`) — 4 fields (updated, folder, name, attention) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created` and `turns` values
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
@@ -162,7 +162,7 @@ alias dc='dispatch --current'
 3. Navigate with arrow keys or `j`/`k`
 4. Press `p` to toggle the preview pane and read the conversation
 5. Press `Enter` to resume the selected session (opens in a new tab by default)
-6. Use `Tab` to cycle grouping modes (folder → repo → branch → date → flat)
+6. Use `Tab` to cycle grouping modes (list → folder → repo → branch → date → host)
 7. Press `s` to cycle sort fields, `S` to flip direction
 8. Press `,` to open settings — change theme, launch mode, model, and more
 
@@ -467,23 +467,24 @@ dispatch watch --exec '[ "$DISPATCH_SESSION_STATE" = waiting ] && \
   curl -s -X POST "$WEBHOOK_URL" -d "session=$DISPATCH_SESSION_ID needs input"'
 ```
 
-### List
+### Resume
 
-List sessions under the current working directory in a readable table:
+Select and resume a session under the current working directory:
 
 ```sh
-dispatch list
-dispatch list auth
-dispatch list --folder ../other-project
-dispatch list --limit 10
-dispatch list --json
+dispatch resume
+dispatch resume auth
+dispatch resume --folder ../other-project
+dispatch resume --demo
 ```
 
-`dispatch list` is a current-directory preset for `dispatch search`. Positional
+`dispatch resume` is a current-directory session picker. Positional
 text remains a search query, `--folder <path>` selects another directory, and
-all search filters are available. Table output is the default; explicit output
-flags such as `--json`, `--jsonl`, `--csv`, `--ids`, `--paths`, and
-`--commands` override it.
+all search filters are available. By default it shows every match in an
+interactive table with columns for the full session ID, summary, repository,
+and branch; pressing Enter resumes the selected session through the same launch
+path as the main TUI. The first 50 matches are shown initially; select the
+show-more row or press `m` to reveal the next batch.
 
 To launch the TUI with a query that starts with a command name, use `--`:
 `dispatch -- list bug`.

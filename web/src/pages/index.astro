@@ -41,8 +41,14 @@ const base = import.meta.env.BASE_URL;
           screenshotSrc="one-half-light/search-active.png"
         />
         <FeatureCard
+          title="Resume from the CLI"
+          description="Run dispatch resume to pick from sessions in the current folder. See the full session ID, summary, repository, and branch before resuming through your configured launch mode."
+          screenshotSrc="one-half-light/resume-picker.png"
+          screenshotAlt="Terminal session picker showing session IDs, summaries, repositories, and branches"
+        />
+        <FeatureCard
           title="Sort, Group & Filter"
-          description="Sort by 5 fields, group by folder/repo/branch/date, filter by time range. Directory exclusion panel with hierarchical tree toggles."
+          description="Sort by 4 fields, group by folder/repo/branch/date, filter by time range. Directory exclusion panel with hierarchical tree toggles."
           screenshotSrc="one-half-light/pivot-folder.png"
         />
         <FeatureCard
@@ -51,8 +57,8 @@ const base = import.meta.env.BASE_URL;
           screenshotSrc="one-half-light/preview-panel.png"
         />
         <FeatureCard
-          title="Five Launch Modes"
-          description="Resume in-place, open in a new tab, new window, split pane, or resume an interrupted session. Configurable defaults with per-session keyboard and mouse overrides."
+          title="Four Launch Modes"
+          description="Resume in-place, open in a new tab, new window, or split pane. Interrupted sessions also have a dedicated resume action. Configurable defaults include keyboard and mouse overrides."
         >
           <div class="launch-modes">
             <div class="mode-tile">

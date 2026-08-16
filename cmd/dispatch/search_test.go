@@ -332,14 +332,14 @@ func TestRunSearchTableEmptyPrintsHeader(t *testing.T) {
 }
 
 func TestSearchTableCellSanitizesTerminalControls(t *testing.T) {
-	input := "\x1b]52;c;YXR0YWNr\x07\x1b[31mred\x1b[0m\ttext\b"
+	input := "\x1b]52;c;YXR0YWNr\x07\x1b[31mred\x1b[0m\ttext\b\u202etxt.exe"
 	got := searchTableCell(input)
 
-	if strings.ContainsAny(got, "\x1b\x07\b") {
+	if strings.ContainsAny(got, "\x1b\x07\b\u202e") {
 		t.Fatalf("searchTableCell retained terminal control characters: %q", got)
 	}
-	if got != "red text" {
-		t.Errorf("searchTableCell() = %q, want %q", got, "red text")
+	if got != "red text txt.exe" {
+		t.Errorf("searchTableCell() = %q, want %q", got, "red text txt.exe")
 	}
 }
 

@@ -47,16 +47,16 @@ func TestCompletionScriptsCoverAllCommands(t *testing.T) {
 	}
 }
 
-func TestCompletionScriptsCoverListFlags(t *testing.T) {
+func TestCompletionScriptsCoverResumeFlags(t *testing.T) {
 	scripts := []struct {
 		shell string
 		start string
 		end   string
 	}{
-		{"bash", "    list)", "    config)"},
-		{"zsh", "  listflags=(", "  flags=("},
-		{"fish", "  complete -c $bin -n '__dispatch_after list'", "\n"},
-		{"powershell", "$script:DispatchListFlags = @(", "\n"},
+		{"bash", "    resume)", "    config)"},
+		{"zsh", "  resumeflags=(", "  flags=("},
+		{"fish", "  complete -c $bin -n '__dispatch_after resume'", "\n"},
+		{"powershell", "$script:DispatchResumeFlags = @(", "\n"},
 	}
 	flags := []string{
 		"--json", "--jsonl", "--ids", "--paths", "--commands", "--csv",
@@ -75,19 +75,39 @@ func TestCompletionScriptsCoverListFlags(t *testing.T) {
 		content := allScripts[script.shell]
 		start := strings.Index(content, script.start)
 		if start < 0 {
-			t.Fatalf("%s completion script is missing list section", script.shell)
+			t.Fatalf("%s completion script is missing resume section", script.shell)
 		}
 		content = content[start+len(script.start):]
 		end := strings.Index(content, script.end)
 		if end < 0 {
-			t.Fatalf("%s completion script list section has no terminator", script.shell)
+			t.Fatalf("%s completion script resume section has no terminator", script.shell)
 		}
-		listSection := content[:end]
+		resumeSection := content[:end]
 		for _, flag := range flags {
-			if !wholeWordInScript(listSection, flag) {
-				t.Errorf("%s completion script is missing list flag %q", script.shell, flag)
+			if !wholeWordInScript(resumeSection, flag) {
+				t.Errorf("%s completion script is missing resume flag %q", script.shell, flag)
 			}
 		}
+	}
+}
+
+func TestCompletionScriptsCoverOpenScopeFlags(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		script string
+	}{
+		{name: "bash", script: bashCompletionScript},
+		{name: "zsh", script: zshCompletionScript},
+		{name: "fish", script: fishCompletionScript},
+		{name: "powershell", script: powershellCompletionScript},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, flag := range []string{"--repo", "--branch", "--folder", "--current"} {
+				if !wholeWordInScript(tt.script, flag) {
+					t.Errorf("completion script is missing open scope flag %q", flag)
+				}
+			}
+		})
 	}
 }
 
