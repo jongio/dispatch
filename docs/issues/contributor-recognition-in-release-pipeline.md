@@ -186,4 +186,4 @@ Your first contribution gets a special "New contributor" callout!
 - Contributing guide: `CONTRIBUTING.md`
 - Changelog: `CHANGELOG.md`
 - Magefile: `magefile.go`
-- Prior art: [all-contributors](https://github.com/all-contributors/all-contributors), [GitHub auto-generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)
+- Prior art: [All Contributors](https://allcontributors.org), [GitHub auto-generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)

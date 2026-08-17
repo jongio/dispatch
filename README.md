@@ -484,7 +484,8 @@ all search filters are available. By default it quickly loads the first 50
 matches into an interactive table with columns for the full session ID, summary,
 repository, and branch; pressing Enter resumes the selected session through the
 same launch path as the main TUI. Select the show-more row or press `m` to query
-the next batch.
+the next batch. `--limit <n>` caps the total number available to the picker;
+without it, resume has no total cap.
 
 To launch the TUI with a query that starts with a command name, use `--`:
 `dispatch -- list bug`.

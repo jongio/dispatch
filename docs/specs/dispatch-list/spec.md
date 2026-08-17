@@ -200,7 +200,7 @@ GATE EVIDENCE:
   command: go build ./... && golangci-lint run ./...
   exit_code: 0
   scope: Go CLI/TUI implementation, screenshots, Astro documentation, completions, help, and man output
-  output: Build passed; lint reported 0 issues; all 40 planned test rows are automated.
+  output: Build passed; lint reported 0 issues; all 47 planned test rows are automated.
 ```
 
 ```text

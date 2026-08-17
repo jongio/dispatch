@@ -221,10 +221,11 @@ Search flags:
 
 Resume flags:
   Accepts the search flags above. --folder <path> overrides the current
-  directory, positional text remains a query, and all matches are shown in an
-  interactive picker. Enter resumes the selected session through the normal
-  TUI launch path. Explicit output flags such as --table, --json, --ids, or
-  --csv use non-interactive output instead.
+  directory and positional text remains a query. The interactive picker loads
+  50 matches initially and queries more on demand; --limit caps the total and
+  defaults to no cap for resume. Enter resumes the selected session through the
+  normal TUI launch path. Explicit output flags such as --table, --json, --ids,
+  or --csv use non-interactive output instead.
 
 Views commands:
   views [list] [--json|--csv]
