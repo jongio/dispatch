@@ -1284,6 +1284,14 @@ func (s *Store) ResolveIDPrefix(ctx context.Context, prefix string) (string, err
 func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter FilterOptions, sort SortOptions, limit int) ([]SessionGroup, error) {
 	var fb filterBuilder
 	fb.hasFTS = s.hasFTS5
+	useTurnStatsJoin := sort.Field != SortByCreated &&
+		sort.Field != SortByTurns &&
+		sort.Field != SortByName &&
+		sort.Field != SortByFolder
+	fb.expandDatePredicates = !useTurnStatsJoin
+	if useTurnStatsJoin {
+		fb.lastActiveExpr = lastActiveJoinedExpr
+	}
 	fb.apply(s.withAutoExclusions(filter))
 
 	expr := pivotExpr(pivot)
@@ -1292,8 +1300,21 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	if pivot == PivotByHost && !s.hasHostType {
 		expr = "''"
 	}
+	columns := s.sessionColumns()
+	joins := ""
+	sortExpr := sortColumn(sort.Field)
+	if useTurnStatsJoin {
+		columns = s.sessionColumnsJoined()
+		joins = turnStatsJoin
+		if expr == lastActiveExpr {
+			expr = lastActiveJoinedExpr
+		}
+		if sortExpr == lastActiveExpr {
+			sortExpr = lastActiveJoinedExpr
+		}
+	}
 	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
-		expr, s.sessionColumns(), fb.joinSQL(), fb.whereSQL(), sortColumn(sort.Field), sortDir(sort.Order))
+		expr, columns, joins+fb.joinSQL(), fb.whereSQL(), sortExpr, sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultGroupLimit
@@ -1307,8 +1328,8 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	}
 	defer func() { _ = rows.Close() }()
 
-	groupMap := make(map[string]*SessionGroup)
-	var order []string
+	groupIndexes := make(map[string]int)
+	var result []SessionGroup
 
 	for rows.Next() {
 		var label string
@@ -1330,23 +1351,19 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 			}
 		}
 
-		g, ok := groupMap[label]
+		index, ok := groupIndexes[label]
 		if !ok {
-			g = &SessionGroup{Label: label}
-			groupMap[label] = g
-			order = append(order, label)
+			index = len(result)
+			groupIndexes[label] = index
+			result = append(result, SessionGroup{Label: label})
 		}
-		g.Sessions = append(g.Sessions, sess)
-		g.Count = len(g.Sessions)
+		result[index].Sessions = append(result[index].Sessions, sess)
+		result[index].Count = len(result[index].Sessions)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating grouped session rows: %w", err)
 	}
 
-	result := make([]SessionGroup, 0, len(order))
-	for _, label := range order {
-		result = append(result, *groupMap[label])
-	}
 	return result, nil
 }
 

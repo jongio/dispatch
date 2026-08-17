@@ -38,6 +38,7 @@ CON
 # ── Project-specific ────────────────────────────────────────
 .copilot/
 .claude/skills/
+/gotuiperf.yaml
 
 # ── Web (Astro) ─────────────────────────────────────────────
 web/node_modules/
