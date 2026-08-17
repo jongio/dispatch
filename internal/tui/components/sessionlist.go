@@ -717,39 +717,50 @@ func (s SessionList) View() string {
 		return lipgloss.Place(s.width, s.height, lipgloss.Center, lipgloss.Center, msg)
 	}
 
-	var lines []string
+	var view strings.Builder
+	if s.width > 0 && s.height > 0 {
+		view.Grow(s.height*(s.width+1) - 1)
+	}
+	physicalLines := 0
 	end := min(s.scrollOffset+s.height, len(s.visItems))
-	for vi := s.scrollOffset; vi < end; vi++ {
+	for vi := s.scrollOffset; vi < end && physicalLines < s.height; vi++ {
 		idx := s.visItems[vi]
 		item := s.allItems[idx]
 		selected := vi == s.cursor
 
+		var row string
 		if item.isFolder {
-			lines = append(lines, s.renderFolderRow(item, selected))
+			row = s.renderFolderRow(item, selected)
 		} else if item.isQuickStart {
-			lines = append(lines, s.renderQuickStartRow(item.quickStart, selected))
+			row = s.renderQuickStartRow(item.quickStart, selected)
 		} else {
 			_, hidden := s.hiddenSet[item.session.ID]
 			_, favorited := s.favoritedSet[item.session.ID]
-			lines = append(lines, s.renderSessionRow(item.session, selected, hidden, favorited))
+			row = s.renderSessionRow(item.session, selected, hidden, favorited)
 		}
+		physicalLines += writePhysicalLines(&view, row, s.height-physicalLines)
 	}
-	// Pad to full height.
-	for len(lines) < s.height {
-		lines = append(lines, s.pad())
+	for physicalLines < s.height {
+		physicalLines += writePhysicalLines(&view, s.pad(), 1)
 	}
-	// Safety net: ensure exactly s.height newline-delimited lines.
-	// A wrapped row from lipgloss could produce embedded newlines.
-	joined := strings.Join(lines, "\n")
-	all := strings.Split(joined, "\n")
-	if len(all) > s.height {
-		all = all[:s.height]
-	} else {
-		for len(all) < s.height {
-			all = append(all, s.pad())
+	return view.String()
+}
+
+func writePhysicalLines(view *strings.Builder, row string, limit int) int {
+	written := 0
+	for written < limit {
+		line, rest, found := strings.Cut(row, "\n")
+		if view.Len() > 0 {
+			view.WriteByte('\n')
 		}
+		view.WriteString(line)
+		written++
+		if !found {
+			break
+		}
+		row = rest
 	}
-	return strings.Join(all, "\n")
+	return written
 }
 
 // ---------------------------------------------------------------------------
@@ -759,7 +770,7 @@ func (s SessionList) View() string {
 // rebuildVisible recomputes the visible item indices from allItems based on
 // the current expanded state of each folder.
 func (s *SessionList) rebuildVisible() {
-	s.visItems = nil
+	s.visItems = s.visItems[:0]
 	inCollapsedFolder := false
 	for i, item := range s.allItems {
 		if item.isFolder {
@@ -1080,7 +1091,7 @@ func (s SessionList) applyRowStyle(line string, selected, hidden, favorited, wai
 	if favorited {
 		return styles.FavoritedStyle.Render(padded)
 	}
-	return lipgloss.NewStyle().Render(padded)
+	return padded
 }
 
 // renderDot returns a styled 2-character string (icon + space). When selected

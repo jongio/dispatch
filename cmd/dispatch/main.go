@@ -35,11 +35,12 @@ func main() {
 	}
 
 	done, demoCleanup, startup, err := handleArgs(os.Args[1:], origStderr, updateCh)
-	if demoCleanup != nil {
-		defer demoCleanup()
-	}
+	demoCleanup = cleanupAfterHandleArgs(err, demoCleanup)
 	if err != nil {
 		os.Exit(1)
+	}
+	if demoCleanup != nil {
+		defer demoCleanup()
 	}
 	if done {
 		return
@@ -76,6 +77,16 @@ func main() {
 	// After TUI exits, show update notification if the background
 	// check found a newer release.
 	showUpdateNotification(origStderr, updateCh)
+}
+
+func cleanupAfterHandleArgs(err error, cleanup func()) func() {
+	if err == nil {
+		return cleanup
+	}
+	if cleanup != nil {
+		cleanup()
+	}
+	return nil
 }
 
 func startUpdateCheck(ctx context.Context, currentVersion string) <-chan *update.UpdateInfo {
@@ -119,6 +130,10 @@ Commands:
                           (one per line; pairs with search --ids)
   open --repo R [--mode M]
                           Resume the most recent session matching a scope filter
+  open --branch B [--mode M]
+  open --folder F [--mode M]
+  open --current [--mode M]
+                          Scope by branch, folder, or the current Git context
   new [dir] [--mode M]    Start a new session in a directory (default: current)
   completion <shell>      Print shell completion (bash, zsh, fish, powershell)
   doctor [--json] [--strict]
@@ -126,6 +141,7 @@ Commands:
                           output, --strict to exit non-zero on warnings)
   stats [flags]           Print session totals and breakdowns
   search [query] [flags]  Print matching sessions as JSON, JSONL, CSV, IDs, paths, commands, or a table
+  resume [query] [flags]  Select and resume a session under the current directory
   tags [--json|--csv|--markdown]
                           List tags in use with per-tag session counts
   aliases [--json]        List session aliases with orphan detection
@@ -140,7 +156,7 @@ Commands:
   info <id> [--json|--markdown] [--refs]
                           Print a concise session summary
   path <id|--last|--current>
-                          Print only a session's working directory (for cd "$(dispatch path x)")
+                          Print a session's working directory; IDs may be aliases or prefixes
   compare <a> <b> [--json]
                           Compare two sessions side by side
   tag <id> [flags]        Add, remove, set, or list tags on a session
@@ -202,6 +218,14 @@ Search flags:
   --sort <field>          Sort results by a field
   --order <asc|desc>      Sort direction
   --limit <n>             Cap the number of results (default 50, 0 for no limit)
+
+Resume flags:
+  Accepts the search flags above. --folder <path> overrides the current
+  directory and positional text remains a query. The interactive picker loads
+  50 matches initially and queries more on demand; --limit caps the total and
+  defaults to no cap for resume. Enter resumes the selected session through the
+  normal TUI launch path. Explicit output flags such as --table, --json, --ids,
+  or --csv use non-interactive output instead.
 
 Views commands:
   views [list] [--json|--csv]
@@ -265,6 +289,7 @@ Watch flags:
 Flags:
   -h, --help              Show this help message
   -v, --version           Print the version
+  --                      Treat remaining arguments as TUI query text
   --demo                  Launch with demo data
   --clear-cache           Reset config to defaults
   --reindex               Rebuild the session store index

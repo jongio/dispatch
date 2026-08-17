@@ -220,7 +220,7 @@ type Config struct {
 	ResumeSessionCommand string `json:"resume_session_command,omitempty"`
 
 	// ExcludedWords is a list of words used to filter sessions from the
-	// dispatch list. Sessions whose summary or turn content contains any
+	// dispatch resume. Sessions whose summary or turn content contains any
 	// of these words (case-insensitive) are hidden from the session list.
 	ExcludedWords []string `json:"excluded_words,omitempty"`
 

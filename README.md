@@ -20,7 +20,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 
 - **Full-text search** (`/`) — Two-tier search: quick search (summaries, branches, repos, directories) returns results instantly; deep search scans all user-visible session metadata and content fields after 300ms. FTS5 adds indexed matches when available without replacing the source-field scan. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
-- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose name or conversation turns contain any excluded word (case-insensitive) are hidden from the list
+- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose summary or conversation turns contain any excluded word (case-insensitive) are hidden from the list
 - **Sorting** (`s` / `S`) — 4 fields (updated, folder, name, attention) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created` and `turns` values
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
@@ -162,7 +162,7 @@ alias dc='dispatch --current'
 3. Navigate with arrow keys or `j`/`k`
 4. Press `p` to toggle the preview pane and read the conversation
 5. Press `Enter` to resume the selected session (opens in a new tab by default)
-6. Use `Tab` to cycle grouping modes (folder → repo → branch → date → flat)
+6. Use `Tab` to cycle grouping modes (list → folder → repo → branch → date → host)
 7. Press `s` to cycle sort fields, `S` to flip direction
 8. Press `,` to open settings — change theme, launch mode, model, and more
 
@@ -467,6 +467,29 @@ dispatch watch --exec '[ "$DISPATCH_SESSION_STATE" = waiting ] && \
   curl -s -X POST "$WEBHOOK_URL" -d "session=$DISPATCH_SESSION_ID needs input"'
 ```
 
+### Resume
+
+Select and resume a session under the current working directory:
+
+```sh
+dispatch resume
+dispatch resume auth
+dispatch resume --folder ../other-project
+dispatch resume --demo
+```
+
+`dispatch resume` is a current-directory session picker. Positional
+text remains a search query, `--folder <path>` selects another directory, and
+all search filters are available. By default it quickly loads the first 50
+matches into an interactive table with columns for the full session ID, summary,
+repository, and branch; pressing Enter resumes the selected session through the
+same launch path as the main TUI. Select the show-more row or press `m` to query
+the next batch. `--limit <n>` caps the total number available to the picker;
+without it, resume has no total cap.
+
+To launch the TUI with a query that starts with a command name, use `--`:
+`dispatch -- resume bug`.
+
 ### Search (JSON)
 
 Query the session store from scripts without opening the TUI. `dispatch search` prints matching sessions as a JSON array by default:
@@ -495,6 +518,11 @@ The query can be passed as a positional argument or with `--query`. Filters mirr
 - `--format json|csv|ids|table` chooses JSON output, CSV output, one session ID per line, or a readable table. `--csv`, `--ids`, and `--table` are shortcuts.
 
 Each JSON or CSV result includes `id`, `summary`, `cwd`, `repository`, `branch`, `created_at`, `updated_at`, `turn_count`, and `file_count`. No JSON matches prints `[]`; no ID matches prints nothing. CSV always prints a header row. Invalid flags or an unreadable store exit non-zero with a message on stderr.
+
+CSV text fields that begin with spreadsheet formula triggers are prefixed with
+a single quote for safe opening in spreadsheet applications. Human-readable
+table output strips terminal control and escape sequences; JSON and JSONL keep
+the stored values unchanged.
 
 ### Man
 

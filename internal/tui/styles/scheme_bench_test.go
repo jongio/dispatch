@@ -12,7 +12,7 @@ func BenchmarkDeriveTheme(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		DeriveTheme(cs)
+		benchSinkTheme = DeriveTheme(cs)
 	}
 }
 
@@ -22,7 +22,7 @@ func BenchmarkDeriveThemeLight(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		DeriveTheme(cs)
+		benchSinkTheme = DeriveTheme(cs)
 	}
 }
 
@@ -32,7 +32,7 @@ func BenchmarkDeriveThemeAllBuiltins(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				DeriveTheme(cs)
+				benchSinkTheme = DeriveTheme(cs)
 			}
 		})
 	}
@@ -48,7 +48,7 @@ func BenchmarkContrastText(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			contrastText("#111111")
+			benchSinkString = contrastText("#111111")
 		}
 	})
 
@@ -57,7 +57,7 @@ func BenchmarkContrastText(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			contrastText("#FAFAFA")
+			benchSinkString = contrastText("#FAFAFA")
 		}
 	})
 
@@ -66,7 +66,7 @@ func BenchmarkContrastText(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			contrastText("#5A56E0")
+			benchSinkString = contrastText("#5A56E0")
 		}
 	})
 }
@@ -80,7 +80,7 @@ func BenchmarkBlendHex(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			blendHex("#111111", "#FAFAFA", 0.5)
+			benchSinkString = blendHex("#111111", "#FAFAFA", 0.5)
 		}
 	})
 
@@ -88,7 +88,7 @@ func BenchmarkBlendHex(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			blendHex("#DC2626", "#16A34A", 0.25)
+			benchSinkString = blendHex("#DC2626", "#16A34A", 0.25)
 		}
 	})
 
@@ -96,7 +96,7 @@ func BenchmarkBlendHex(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			blendHex("#5A56E0", "#5A56E0", 0.0)
+			benchSinkString = blendHex("#5A56E0", "#5A56E0", 0.0)
 		}
 	})
 }
@@ -121,7 +121,7 @@ func BenchmarkWcagLuminance(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				wcagLuminance(c.hex)
+				benchSinkFloat64 = wcagLuminance(c.hex)
 			}
 		})
 	}
@@ -139,7 +139,7 @@ func BenchmarkContrastRatio(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		contrastRatio(l1, l2)
+		benchSinkFloat64 = contrastRatio(l1, l2)
 	}
 }
 
@@ -152,7 +152,7 @@ func BenchmarkIsDarkHex(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			isDarkHex("#111111")
+			benchSinkBool = isDarkHex("#111111")
 		}
 	})
 
@@ -160,7 +160,7 @@ func BenchmarkIsDarkHex(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for range b.N {
-			isDarkHex("#FAFAFA")
+			benchSinkBool = isDarkHex("#FAFAFA")
 		}
 	})
 }
@@ -175,7 +175,7 @@ func BenchmarkPalette(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		cs.Palette()
+		benchSinkPalette = cs.Palette()
 	}
 }
 
@@ -189,6 +189,15 @@ func BenchmarkValidate(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		_ = cs.Validate()
+		errBenchSink = cs.Validate()
 	}
 }
+
+var (
+	benchSinkBool    bool
+	benchSinkFloat64 float64
+	benchSinkPalette [16]string
+	benchSinkString  string
+	benchSinkTheme   *Theme
+	errBenchSink     error
+)

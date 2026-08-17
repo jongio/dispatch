@@ -21,6 +21,7 @@ func BenchmarkSetSessions(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				sl.SetSessions(sessions)
+				benchSinkInt = len(sl.allItems)
 			}
 		})
 	}
@@ -47,6 +48,7 @@ func BenchmarkSetGroups(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				sl.SetGroups(groups)
+				benchSinkInt = len(sl.allItems)
 			}
 		})
 	}
@@ -67,7 +69,7 @@ func BenchmarkView(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				sl.View()
+				benchSinkString = sl.View()
 			}
 		})
 	}
@@ -82,7 +84,7 @@ func BenchmarkViewGrouped(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.View()
+		benchSinkString = sl.View()
 	}
 }
 
@@ -99,7 +101,9 @@ func BenchmarkMoveDown(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
+		sl.cursor = 100
 		sl.MoveDown()
+		benchSinkInt = sl.cursor
 	}
 }
 
@@ -116,7 +120,9 @@ func BenchmarkMoveUp(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
+		sl.cursor = 100
 		sl.MoveUp()
+		benchSinkInt = sl.cursor
 	}
 }
 
@@ -129,7 +135,7 @@ func BenchmarkSelected(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.Selected()
+		benchSinkSession, benchSinkBool = sl.Selected()
 	}
 }
 
@@ -152,6 +158,7 @@ func BenchmarkSetHiddenSessions(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		sl.SetHiddenSessions(hidden)
+		benchSinkMap = sl.hiddenSet
 	}
 }
 
@@ -171,7 +178,7 @@ func BenchmarkToggleFolder(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.ToggleFolder()
+		benchSinkBool = sl.ToggleFolder()
 	}
 }
 
@@ -194,7 +201,7 @@ func BenchmarkViewAfterHide(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.View()
+		benchSinkString = sl.View()
 	}
 }
 
@@ -212,7 +219,7 @@ func BenchmarkSessionCount(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				sl.SessionCount()
+				benchSinkInt = sl.SessionCount()
 			}
 		})
 	}
@@ -231,7 +238,7 @@ func BenchmarkViewSmallViewport(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.View()
+		benchSinkString = sl.View()
 	}
 }
 
@@ -244,14 +251,14 @@ func BenchmarkViewLargeViewport(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		sl.View()
+		benchSinkString = sl.View()
 	}
 }
 
-// sink prevents the compiler from optimizing away benchmark results.
-var sink any
-
-func init() {
-	_ = sink
-	_ = data.Session{}
-}
+var (
+	benchSinkBool    bool
+	benchSinkInt     int
+	benchSinkMap     map[string]struct{}
+	benchSinkSession data.Session
+	benchSinkString  string
+)

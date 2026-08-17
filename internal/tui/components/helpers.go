@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // emptyPlaceholder is the en-dash displayed when a value is missing or empty.
@@ -19,6 +20,30 @@ const emptyPlaceholder = "–"
 // ---------------------------------------------------------------------------
 // Text helpers shared by multiple components.
 // ---------------------------------------------------------------------------
+
+// SanitizeTerminalText strips terminal controls and Unicode bidi controls
+// before untrusted text is displayed in a terminal.
+func SanitizeTerminalText(value string) string {
+	value = ansi.Strip(value)
+	value = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f || isBidiControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func isBidiControl(r rune) bool {
+	switch r {
+	case '\u061c', '\u200e', '\u200f',
+		'\u202a', '\u202b', '\u202c', '\u202d', '\u202e',
+		'\u2066', '\u2067', '\u2068', '\u2069':
+		return true
+	default:
+		return false
+	}
+}
 
 // Truncate returns s trimmed to at most width runes, appending "…" when
 // truncation occurs.

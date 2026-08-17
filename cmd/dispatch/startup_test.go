@@ -241,6 +241,25 @@ func TestHandleArgs_Current(t *testing.T) {
 	}
 }
 
+func TestHandleArgs_CurrentMayPrecedeCommandWordQuery(t *testing.T) {
+	orig := detectGitRepoFn
+	t.Cleanup(func() { detectGitRepoFn = orig })
+	detectGitRepoFn = func(string) (string, string, error) {
+		return "jongio/dispatch", "main", nil
+	}
+
+	done, _, startup, err := handleArgs([]string{"--current", "resume", "bug"}, io.Discard, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if done {
+		t.Error("expected done=false for --current query")
+	}
+	if startup.Query != "resume bug" {
+		t.Errorf("query = %q, want %q", startup.Query, "resume bug")
+	}
+}
+
 func TestHandleArgs_CurrentNonGit(t *testing.T) {
 	orig := detectGitRepoFn
 	t.Cleanup(func() { detectGitRepoFn = orig })

@@ -432,15 +432,15 @@ func writeStatsCSV(w io.Writer, report statsReport) error {
 
 // csvSafe neutralizes spreadsheet formula injection (CWE-1236). encoding/csv
 // only applies RFC 4180 quoting, not formula-trigger escaping, so a field
-// beginning with =, +, -, @, tab, or CR would be evaluated as a formula when
-// the CSV is opened in Excel/Sheets/LibreOffice. Prefix such values with a
-// single quote so they render as literal text.
+// beginning with =, +, -, @, tab, CR, or LF would be evaluated as a formula
+// when the CSV is opened in Excel/Sheets/LibreOffice. Prefix such values with
+// a single quote so they render as literal text.
 func csvSafe(s string) string {
 	if s == "" {
 		return s
 	}
 	switch s[0] {
-	case '=', '+', '-', '@', '\t', '\r':
+	case '=', '+', '-', '@', '\t', '\r', '\n':
 		return "'" + s
 	default:
 		return s

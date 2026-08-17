@@ -70,7 +70,7 @@ import ConfigTable from '../components/ConfigTable.astro';
         { key: 'resume_session_command', type: 'string', default: '""', description: 'Resume session command ({sessionId} is replaced). Defaults to copilot --resume.' },
         { key: 'new_session_command', type: 'string', default: '""', description: 'Command to launch new sessions ({cwd} is replaced). Defaults to copilot.' },
         { key: 'excluded_dirs', type: 'array', default: '[]', description: 'Directory paths to hide from the session list.' },
-        { key: 'excluded_words', type: 'array', default: '[]', description: 'Words to filter sessions by. Sessions whose name or turn content contains any word (case-insensitive) are hidden.' },
+        { key: 'excluded_words', type: 'array', default: '[]', description: 'Words to filter sessions by. Sessions whose summary or turn content contains any word (case-insensitive) are hidden.' },
         { key: 'attention_threshold', type: 'string', default: '"15m"', description: 'Duration after which an inactive running session is marked stale instead of waiting/active.' },
         { key: 'notify_on_waiting', type: 'bool', default: 'false', description: 'Ring the terminal bell and show a footer message when a session enters the waiting state.' },
         { key: 'auto_refresh_seconds', type: 'int', default: '(unset)', description: 'Session-list poll interval in seconds. Unset uses the default (2s); 0 disables polling; a positive value sets the interval (minimum 1s).' },

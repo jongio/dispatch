@@ -40,6 +40,31 @@ import Carousel from '../components/Carousel.astro';
       </div>
     </section>
 
+    <!-- Resume from the CLI -->
+    <section class="section" id="resume">
+      <div class="feature-section reverse">
+        <div class="feature-text">
+          <h2>Resume from the CLI</h2>
+          <p>
+            <code>dispatch resume</code> opens a keyboard-navigable table for
+            sessions in the current folder. Each row shows its full session
+            ID, summary, repository, and branch before launching through the
+            same resume path as the main TUI.
+          </p>
+          <ul>
+            <li><kbd>↑</kbd> / <kbd>↓</kbd> or <kbd>j</kbd> / <kbd>k</kbd> to move</li>
+            <li><kbd>Enter</kbd> to resume the selected session</li>
+            <li><kbd>m</kbd> to reveal more matches in large result sets</li>
+            <li><code>--folder &lt;path&gt;</code> to select another workspace</li>
+            <li><code>dispatch resume --demo</code> for demo data</li>
+          </ul>
+        </div>
+        <div class="feature-screenshots">
+          <Screenshot src="one-half-light/resume-picker.png" alt="Dispatch resume session table showing full IDs, summaries, repositories, and branches" caption="Selecting a session with dispatch resume" />
+        </div>
+      </div>
+    </section>
+
     <!-- Directory Filtering -->
     <section class="section" id="filter">
       <div class="feature-section reverse">
@@ -395,17 +420,15 @@ import Carousel from '../components/Carousel.astro';
           <p>
             <kbd>h</kbd> hides the currently selected session.
             <kbd>H</kbd> (Shift+H) toggles visibility of all hidden sessions.
-            Hidden sessions appear dimmed when visible. The footer shows the
-            hidden count with an eye icon.
+            Hidden sessions appear dimmed when visible.
           </p>
           <ul>
             <li>Per-session persistence — hiding state saved to config</li>
-            <li>Hidden count displayed in footer with 👁 indicator</li>
             <li>Dimmed styling differentiates hidden from active sessions</li>
           </ul>
         </div>
         <div class="feature-screenshots">
-          <Screenshot src="one-half-light/hidden-sessions.png" alt="Session list with hidden sessions shown dimmed and eye indicator in footer" caption="Hidden sessions shown dimmed with eye indicator" />
+          <Screenshot src="one-half-light/hidden-sessions.png" alt="Session list with hidden sessions shown dimmed" caption="Hidden sessions shown dimmed" />
         </div>
       </div>
     </section>

@@ -12,6 +12,7 @@ import (
 
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // searchListSessionsFn loads sessions for the search command. It is a package
@@ -41,11 +42,12 @@ const (
 
 // searchOptions holds the parsed flags for the search command.
 type searchOptions struct {
-	filter data.FilterOptions
-	sort   data.SortOptions
-	limit  int
-	format searchOutputFormat
-	tag    string
+	filter         data.FilterOptions
+	sort           data.SortOptions
+	limit          int
+	format         searchOutputFormat
+	formatExplicit bool
+	tag            string
 }
 
 // searchSession is the machine-readable shape emitted for each matching
@@ -66,25 +68,20 @@ type searchSession struct {
 // runSearch prints matching sessions as JSON without starting the TUI. args is
 // the full argument slice with args[0] == "search".
 func runSearch(w io.Writer, args []string) error {
-	if w == nil {
-		w = io.Discard
-	}
-
 	opts, err := parseSearchArgs(args)
 	if err != nil {
 		return err
 	}
 
-	limit := opts.limit
-	if limit <= 0 {
-		limit = searchAllLimit
+	return runSearchOptions(w, opts)
+}
+
+func runSearchOptions(w io.Writer, opts searchOptions) error {
+	if w == nil {
+		w = io.Discard
 	}
 
-	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
-	if err != nil {
-		return err
-	}
-	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
+	sessions, err := loadSearchSessions(opts)
 	if err != nil {
 		return err
 	}
@@ -120,6 +117,26 @@ func runSearch(w io.Writer, args []string) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(results)
+}
+
+func loadSearchSessions(opts searchOptions) ([]data.Session, error) {
+	limit := opts.limit
+	if limit <= 0 || opts.tag != "" {
+		limit = searchAllLimit
+	}
+
+	sessions, err := searchListSessionsFn(opts.filter, opts.sort, limit)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
+	if err != nil {
+		return nil, err
+	}
+	if opts.limit > 0 && len(sessions) > opts.limit {
+		sessions = sessions[:opts.limit]
+	}
+	return sessions, nil
 }
 
 func writeSearchJSONL(w io.Writer, sessions []data.Session) error {
@@ -185,10 +202,10 @@ func writeSearchCSV(w io.Writer, sessions []data.Session) error {
 	for _, s := range sessions {
 		if err := cw.Write([]string{
 			s.ID,
-			s.Summary,
-			s.Cwd,
-			s.Repository,
-			s.Branch,
+			csvSafe(s.Summary),
+			csvSafe(s.Cwd),
+			csvSafe(s.Repository),
+			csvSafe(s.Branch),
 			s.CreatedAt,
 			s.UpdatedAt,
 			strconv.Itoa(s.TurnCount),
@@ -251,7 +268,7 @@ func searchTableTime(s data.Session) string {
 }
 
 func searchTableCell(v string) string {
-	v = strings.Join(strings.Fields(v), " ")
+	v = components.SanitizeTerminalText(v)
 	if v == "" {
 		return "-"
 	}
@@ -262,12 +279,14 @@ func searchTableCell(v string) string {
 // "search". A single leading token that does not start with "-" is treated as
 // the search query, matching how the TUI seeds its search box.
 func parseSearchArgs(args []string) (searchOptions, error) {
-	opts := searchOptions{
+	return parseSearchArgsWithDefaults(args, searchOptions{
 		sort:   defaultSearchSort(),
 		limit:  searchDefaultLimit,
 		format: searchFormatJSON,
-	}
+	})
+}
 
+func parseSearchArgsWithDefaults(args []string, opts searchOptions) (searchOptions, error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "search" token
@@ -291,18 +310,25 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 		switch {
 		case name == "--json":
 			opts.format = searchFormatJSON
+			opts.formatExplicit = true
 		case name == "--jsonl":
 			opts.format = searchFormatJSONL
+			opts.formatExplicit = true
 		case name == "--ids":
 			opts.format = searchFormatIDs
+			opts.formatExplicit = true
 		case name == "--table":
 			opts.format = searchFormatTable
+			opts.formatExplicit = true
 		case name == "--csv":
 			opts.format = searchFormatCSV
+			opts.formatExplicit = true
 		case name == "--paths":
 			opts.format = searchFormatPaths
+			opts.formatExplicit = true
 		case name == "--commands":
 			opts.format = searchFormatCommands
+			opts.formatExplicit = true
 		case name == "--format":
 			v, ni, err := takeValue(i, "--format", inlineOrEmpty(inline, hasInline))
 			if err != nil {
@@ -313,6 +339,7 @@ func parseSearchArgs(args []string) (searchOptions, error) {
 				return searchOptions{}, err
 			}
 			opts.format = format
+			opts.formatExplicit = true
 			i = ni
 		case name == "--deep":
 			opts.filter.DeepSearch = true

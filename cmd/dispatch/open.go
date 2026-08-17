@@ -10,21 +10,27 @@ import (
 	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/jongio/dispatch/internal/config"
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/platform"
+	"github.com/jongio/dispatch/internal/tui/components"
 )
 
 // Function variables allow test substitution of external calls, matching the
 // pattern used elsewhere in this package (see cli.go).
 var (
-	openLoadConfigFn     = config.Load
-	openGetSessionFn     = defaultOpenGetSession
-	openGetLastSessionFn = defaultOpenGetLastSession
-	openLaunchFn         = defaultOpenLaunch
-	openResumeCmdFn      = platform.BuildResumeCommandString
-	openListSessionsFn   = defaultOpenListScopedSessions
-	openDetectGitFn      = detectGitContext
+	openLoadConfigFn        = config.Load
+	openGetSessionFn        = defaultOpenGetSession
+	openGetLastSessionFn    = defaultOpenGetLastSession
+	openLaunchFn            = defaultOpenLaunch
+	openLaunchWithShellFn   = defaultOpenLaunchWithShell
+	openInteractiveLaunchFn = defaultOpenInteractiveLaunch
+	openDetectShellsFn      = platform.DetectShells
+	openSelectShellFn       = runOpenShellPicker
+	openResumeCmdFn         = platform.BuildResumeCommandString
+	openListSessionsFn      = defaultOpenListScopedSessions
+	openDetectGitFn         = detectGitContext
 
 	// openStdin is the reader used by --stdin batch resume. It is a package
 	// variable so tests can feed it a fixed list of IDs.
@@ -309,6 +315,13 @@ func parseOpenArgs(args []string) (id, mode string, last, printCmd, stdin bool, 
 		if len(positionals) > 0 {
 			return "", "", false, false, false, launchOverrides{}, nil, errors.New("open with scope filters does not take a session ID")
 		}
+		if folder != "" && !listDemoModeFn() {
+			resolvedFolder, fErr := resolveListFolder(folder)
+			if fErr != nil {
+				return "", "", false, false, false, launchOverrides{}, nil, fErr
+			}
+			folder = resolvedFolder
+		}
 		filter := data.FilterOptions{
 			Repository: repo,
 			Branch:     branch,
@@ -470,6 +483,16 @@ func defaultOpenLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode
 	if shell.Path == "" {
 		return errors.New("no shell detected on this system")
 	}
+	return defaultOpenLaunchWithShell(w, cfg, sess, mode, shell)
+}
+
+func defaultOpenLaunchWithShell(
+	w io.Writer,
+	cfg *config.Config,
+	sess *data.Session,
+	mode string,
+	shell platform.ShellInfo,
+) error {
 	rc := platform.ResumeConfig{
 		YoloMode:             cfg.YoloMode,
 		Agent:                cfg.Agent,
@@ -485,6 +508,96 @@ func defaultOpenLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode
 	}
 	fmt.Fprintf(w, "Launched session %s\n", sess.ID)
 	return nil
+}
+
+// defaultOpenInteractiveLaunch preserves the TUI's single-session launch
+// behavior: missing workspaces are blocked and users without a configured
+// default choose among multiple detected shells.
+func defaultOpenInteractiveLaunch(w io.Writer, cfg *config.Config, sess *data.Session, mode string) error {
+	if sess.Cwd != "" {
+		if _, err := os.Stat(sess.Cwd); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return errors.New("cannot launch: workspace folder no longer exists")
+			}
+			return fmt.Errorf("checking workspace folder: %w", err)
+		}
+	}
+
+	if mode == config.LaunchModeInPlace || cfg.DefaultShell != "" {
+		return openLaunchFn(w, cfg, sess, mode)
+	}
+
+	shells := openDetectShellsFn()
+	if len(shells) == 0 {
+		return openLaunchFn(w, cfg, sess, mode)
+	}
+	if len(shells) == 1 {
+		return openLaunchWithShellFn(w, cfg, sess, mode, shells[0])
+	}
+
+	shell, selected, err := openSelectShellFn(w, shells)
+	if err != nil || !selected {
+		return err
+	}
+	return openLaunchWithShellFn(w, cfg, sess, mode, shell)
+}
+
+type openShellPickerModel struct {
+	picker   components.ShellPicker
+	selected platform.ShellInfo
+	ok       bool
+	quitting bool
+}
+
+func newOpenShellPickerModel(shells []platform.ShellInfo) openShellPickerModel {
+	picker := components.NewShellPicker()
+	picker.SetShells(shells, "")
+	picker.SetSize(80, 24)
+	return openShellPickerModel{picker: picker}
+}
+
+func (m openShellPickerModel) Init() tea.Cmd { return nil }
+
+func (m openShellPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.picker.SetSize(msg.Width, msg.Height)
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "up", "k":
+			m.picker.MoveUp()
+		case "down", "j":
+			m.picker.MoveDown()
+		case "enter":
+			m.selected, m.ok = m.picker.Selected()
+			m.quitting = true
+			return m, tea.Quit
+		case "esc", "q", "ctrl+c":
+			m.quitting = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m openShellPickerModel) View() tea.View {
+	if m.quitting {
+		return tea.NewView("")
+	}
+	return tea.NewView(m.picker.View())
+}
+
+func runOpenShellPicker(w io.Writer, shells []platform.ShellInfo) (platform.ShellInfo, bool, error) {
+	program := tea.NewProgram(newOpenShellPickerModel(shells), tea.WithInput(os.Stdin), tea.WithOutput(w))
+	result, err := program.Run()
+	if err != nil {
+		return platform.ShellInfo{}, false, err
+	}
+	model, ok := result.(openShellPickerModel)
+	if !ok || !model.ok {
+		return platform.ShellInfo{}, false, nil
+	}
+	return model.selected, true, nil
 }
 
 // resolveOpenShell picks the configured shell by name, falling back to the
