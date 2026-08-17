@@ -87,6 +87,9 @@ jobs:
           go run -tags screenshots ./cmd/screenshots --check --out .screenshots-check
           rm -rf .screenshots-check
 
+      - name: Test screenshot build tag
+        run: go test -tags screenshots ./... -count=1
+
       - name: Test with coverage
         run: go test -coverprofile=coverage.out ./...
 

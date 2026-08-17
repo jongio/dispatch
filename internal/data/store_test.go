@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -429,6 +430,77 @@ func TestListSessionsExcludesTempDir(t *testing.T) {
 	}
 }
 
+func TestListSessionsFolderOverridesAutoExclusions(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	home := filepath.Join(string(filepath.Separator)+"home", "user")
+	tempProject := filepath.Join(string(filepath.Separator)+"tmp", "project")
+	hiddenProject := filepath.Join(home, ".devx", "project")
+	s.tempDir = filepath.Join(string(filepath.Separator), "tmp")
+	s.homeDir = home
+
+	for id, cwd := range map[string]string{
+		"temp":    tempProject,
+		"hidden":  hiddenProject,
+		"sibling": filepath.Join(string(filepath.Separator)+"tmp2", "project"),
+	} {
+		seedSession(t, s.db, id, cwd, "", "", id, "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+		seedTurn(t, s.db, id, 0, id, "done", "2024-01-01T00:00:00Z")
+	}
+
+	for _, tt := range []struct {
+		name   string
+		folder string
+		wantID string
+	}{
+		{name: "temp project", folder: tempProject, wantID: "temp"},
+		{name: "temp project case variant", folder: filepath.Join(string(filepath.Separator)+"TMP", "PROJECT"), wantID: "temp"},
+		{name: "hidden home project", folder: hiddenProject, wantID: "hidden"},
+		{name: "hidden home case variant", folder: filepath.Join(string(filepath.Separator)+"HOME", "USER", ".DEVX", "PROJECT"), wantID: "hidden"},
+		{name: "temp sibling", folder: filepath.Join(string(filepath.Separator)+"tmp2", "project"), wantID: "sibling"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sessions, err := s.ListSessions(context.Background(), FilterOptions{Folder: tt.folder}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+			if err != nil {
+				t.Fatalf("ListSessions: %v", err)
+			}
+			if len(sessions) != 1 || sessions[0].ID != tt.wantID {
+				t.Fatalf("expected only %s session, got %#v", tt.wantID, sessions)
+			}
+		})
+	}
+}
+
+func TestListSessionsExcludesWindowsMixedSeparatorDirs(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows path separator behavior")
+	}
+
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	s.tempDir = `C:\Temp`
+	s.homeDir = `C:\Users\user`
+
+	seedSession(t, s.db, "temp", "C:/Temp/work/session", "", "",
+		"Temp work", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "temp", 0, "temp", "done", "2024-01-01T00:00:00Z")
+	seedSession(t, s.db, "dot", "C:/Users/user/.config/work", "", "",
+		"Hidden work", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "dot", 0, "hidden", "done", "2024-01-01T00:00:00Z")
+	seedSession(t, s.db, "real", "C:/Users/user/code/project", "owner/repo", "main",
+		"Real work", "2024-01-02T00:00:00Z", "2024-01-02T01:00:00Z")
+	seedTurn(t, s.db, "real", 0, "work", "done", "2024-01-02T00:00:00Z")
+
+	sessions, err := s.ListSessions(context.Background(), FilterOptions{}, SortOptions{Field: SortByUpdated, Order: Descending}, 0)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].ID != "real" {
+		t.Fatalf("expected only real session, got %#v", sessions)
+	}
+}
+
 func TestGroupSessionsExcludesTempDir(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
@@ -760,6 +832,18 @@ func TestFilterByFolder(t *testing.T) {
 	s := newTestStore(t)
 	defer func() { _ = s.Close() }()
 	populateTestData(t, s)
+	seedSession(t, s.db, "sess-child", "/home/user/project-a/subdir", "owner/repo-a", "main",
+		"Child folder", "2024-01-13T08:00:00Z", "2024-01-13T08:00:00Z")
+	seedTurn(t, s.db, "sess-child", 0, "Child work", "Done.", "2024-01-13T08:00:00Z")
+	seedSession(t, s.db, "sess-sibling", "/home/user/project-a-old", "owner/repo-a", "main",
+		"Sibling prefix", "2024-01-13T09:00:00Z", "2024-01-13T09:00:00Z")
+	seedTurn(t, s.db, "sess-sibling", 0, "Sibling work", "Done.", "2024-01-13T09:00:00Z")
+	seedSession(t, s.db, "sess-case", "/HOME/USER/PROJECT-A", "owner/repo-a", "main",
+		"Case variant", "2024-01-13T10:00:00Z", "2024-01-13T10:00:00Z")
+	seedTurn(t, s.db, "sess-case", 0, "Case work", "Done.", "2024-01-13T10:00:00Z")
+	seedSession(t, s.db, "sess-backslash", `/home/user/project-a\secret`, "owner/repo-a", "main",
+		"Backslash sibling", "2024-01-13T11:00:00Z", "2024-01-13T11:00:00Z")
+	seedTurn(t, s.db, "sess-backslash", 0, "Backslash work", "Done.", "2024-01-13T11:00:00Z")
 
 	sessions, err := s.ListSessions(
 		context.Background(),
@@ -769,9 +853,113 @@ func TestFilterByFolder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSessions with folder filter: %v", err)
 	}
-	// sess-1 and sess-3 are in /home/user/project-a.
+	// Exact and descendant folders match; a sibling sharing the prefix does not.
+	wantCount := 4
+	if runtime.GOOS == "windows" {
+		wantCount++
+	}
+	if len(sessions) != wantCount {
+		t.Fatalf("expected %d sessions in project-a subtree, got %d", wantCount, len(sessions))
+	}
+	gotIDs := make(map[string]bool, len(sessions))
+	for _, session := range sessions {
+		gotIDs[session.ID] = true
+		if session.ID == "sess-sibling" {
+			t.Fatal("folder filter matched sibling prefix project-a-old")
+		}
+		if runtime.GOOS != "windows" && session.ID == "sess-backslash" {
+			t.Fatal("folder filter treated a Unix backslash as a descendant separator")
+		}
+	}
+	for _, wantID := range []string{"sess-1", "sess-3", "sess-child", "sess-case"} {
+		if !gotIDs[wantID] {
+			t.Errorf("folder filter omitted expected session %s", wantID)
+		}
+	}
+	if runtime.GOOS == "windows" && !gotIDs["sess-backslash"] {
+		t.Error("Windows folder filter omitted a backslash descendant")
+	}
+
+	sessions, err = s.ListSessions(
+		context.Background(),
+		FilterOptions{Folder: "/home/user/project-a/"},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with trailing folder separator: %v", err)
+	}
+	if len(sessions) != wantCount {
+		t.Fatalf("expected %d sessions with trailing folder separator, got %d", wantCount, len(sessions))
+	}
+
+	sessions, err = s.ListSessions(
+		context.Background(),
+		FilterOptions{Folder: "/"},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with root folder: %v", err)
+	}
+	if len(sessions) != 8 {
+		t.Fatalf("expected all 8 sessions under root, got %d", len(sessions))
+	}
+}
+
+func TestFilterByFolderWindowsMixedSeparators(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows path separator behavior")
+	}
+
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+	seedSession(t, s.db, "sess-exact", "C:/code/project", "owner/repo", "main",
+		"Exact mixed separator", "2024-01-13T08:00:00Z", "2024-01-13T08:00:00Z")
+	seedTurn(t, s.db, "sess-exact", 0, "Exact work", "Done.", "2024-01-13T08:00:00Z")
+	seedSession(t, s.db, "sess-child", `C:\code/project\subdir`, "owner/repo", "main",
+		"Child mixed separator", "2024-01-13T09:00:00Z", "2024-01-13T09:00:00Z")
+	seedTurn(t, s.db, "sess-child", 0, "Child work", "Done.", "2024-01-13T09:00:00Z")
+
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{Folder: `C:\code\project`},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions with mixed separators: %v", err)
+	}
 	if len(sessions) != 2 {
-		t.Fatalf("expected 2 sessions in project-a, got %d", len(sessions))
+		t.Fatalf("expected exact and child sessions, got %d", len(sessions))
+	}
+	gotIDs := map[string]bool{}
+	for _, session := range sessions {
+		gotIDs[session.ID] = true
+	}
+	if !gotIDs["sess-exact"] || !gotIDs["sess-child"] {
+		t.Fatalf("expected sess-exact and sess-child, got %#v", gotIDs)
+	}
+}
+
+func TestFilterByWindowsStyleFolderOnAnyHost(t *testing.T) {
+	s := newTestStore(t)
+	defer func() { _ = s.Close() }()
+
+	seedSession(t, s.db, "windows-child", `D:\code\project-alpha\api`, "", "",
+		"Windows child", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "windows-child", 0, "work", "done", "2024-01-01T00:00:00Z")
+	seedSession(t, s.db, "windows-sibling", `D:\code\project-alpha-old`, "", "",
+		"Windows sibling", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z")
+	seedTurn(t, s.db, "windows-sibling", 0, "work", "done", "2024-01-01T00:00:00Z")
+
+	sessions, err := s.ListSessions(
+		context.Background(),
+		FilterOptions{Folder: `D:\code\project-alpha`},
+		SortOptions{Field: SortByUpdated, Order: Descending}, 0,
+	)
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].ID != "windows-child" {
+		t.Fatalf("expected only windows-child, got %#v", sessions)
 	}
 }
 

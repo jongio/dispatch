@@ -56,6 +56,17 @@ test('primary navigation reaches the features page', async ({ page, isMobile }) 
   await expect(page.getByRole('heading', { level: 1, name: 'Features' })).toBeVisible();
 });
 
+test('resume picker screenshot is published', async ({ page }) => {
+  await page.goto('features/');
+
+  await expect(page.getByRole('heading', { level: 2, name: 'Resume from the CLI' })).toBeVisible();
+  const screenshot = page.getByRole('img', {
+    name: 'Dispatch resume session table showing full IDs, summaries, repositories, and branches',
+  }).first();
+  await expect(screenshot).toBeVisible();
+  await expect.poll(() => screenshot.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+});
+
 test('skip link moves focus to main content', async ({ page, browserName }) => {
   await page.goto('./');
 

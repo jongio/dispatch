@@ -228,6 +228,9 @@ func Preflight() error {
 	if err := run("go", "test", "./...", "-count=1"); err != nil {
 		return fmt.Errorf("test: %w", err)
 	}
+	if err := run("go", "test", "-tags", "screenshots", "./...", "-count=1"); err != nil {
+		return fmt.Errorf("screenshot-tag test: %w", err)
+	}
 
 	fmt.Println("\n=== 8/13 Testing (race detector) ===")
 	if raceDetectorAvailable() {

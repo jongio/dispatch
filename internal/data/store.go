@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -388,8 +389,18 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 		}
 	}
 	if f.Folder != "" {
-		fb.wheres = append(fb.wheres, `s.cwd LIKE ? ESCAPE '\'`)
-		fb.args = append(fb.args, escapeLIKE(f.Folder)+"%")
+		windows := runtime.GOOS == "windows" || usesWindowsPathSyntax(f.Folder)
+		patterns := folderMatchPatterns(f.Folder, windows)
+		column := "s.cwd"
+		if windows {
+			column = `REPLACE(s.cwd, '\', '/')`
+		}
+		clauses := make([]string, len(patterns))
+		for i, pattern := range patterns {
+			clauses[i] = column + ` LIKE ? ESCAPE '\'`
+			fb.args = append(fb.args, pattern)
+		}
+		fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " OR ")+")")
 	}
 	if f.Repository != "" {
 		fb.wheres = append(fb.wheres, "s.repository = ?")
@@ -432,8 +443,24 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 	}
 	if len(f.ExcludedDirs) > 0 {
 		for _, dir := range f.ExcludedDirs {
-			fb.wheres = append(fb.wheres, `s.cwd NOT LIKE ? ESCAPE '\'`)
-			fb.args = append(fb.args, escapeLIKE(dir)+"%")
+			windows := runtime.GOOS == "windows"
+			column := "s.cwd"
+			if windows {
+				column = `REPLACE(s.cwd, '\', '/')`
+				dir = strings.ReplaceAll(dir, `\`, "/")
+			}
+			if strings.HasSuffix(dir, "/.") {
+				fb.wheres = append(fb.wheres, column+` NOT LIKE ? ESCAPE '\'`)
+				fb.args = append(fb.args, escapeLIKE(dir)+"%")
+				continue
+			}
+			patterns := folderMatchPatterns(dir, windows)
+			clauses := make([]string, len(patterns))
+			for i, pattern := range patterns {
+				clauses[i] = column + ` NOT LIKE ? ESCAPE '\'`
+				fb.args = append(fb.args, pattern)
+			}
+			fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " AND ")+")")
 		}
 	}
 	if len(f.ExcludedWords) > 0 {
@@ -445,6 +472,33 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 			fb.args = append(fb.args, pattern, pattern)
 		}
 	}
+}
+
+func folderMatchPatterns(folder string, windows bool) []string {
+	if windows {
+		folder = strings.ReplaceAll(folder, `\`, "/")
+	}
+
+	base := strings.TrimRight(folder, "/")
+	exactFolder := base
+	if exactFolder == "" || strings.HasSuffix(exactFolder, ":") {
+		exactFolder = folder
+	}
+
+	return []string{
+		escapeLIKE(exactFolder),
+		escapeLIKE(base+"/") + "%",
+	}
+}
+
+func usesWindowsPathSyntax(path string) bool {
+	if strings.HasPrefix(path, `\\`) {
+		return true
+	}
+	if len(path) < 3 || path[1] != ':' || (path[2] != '\\' && path[2] != '/') {
+		return false
+	}
+	return (path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')
 }
 
 func (fb *filterBuilder) joinSQL() string {
@@ -589,16 +643,58 @@ func scanGroupedSession(sc scanner, label *string) (Session, error) {
 func (s *Store) withAutoExclusions(f FilterOptions) FilterOptions {
 	// Copy the slice to avoid mutating the caller's.
 	dirs := append([]string(nil), f.ExcludedDirs...)
-	if s.tempDir != "" {
+	if s.tempDir != "" && !folderWithin(f.Folder, s.tempDir) {
 		dirs = append(dirs, s.tempDir)
 	}
 	if s.homeDir != "" {
 		// Exclude hidden dotfolders directly under home.
 		// filepath.Join would strip the trailing ".", so we build the prefix manually.
-		dirs = append(dirs, s.homeDir+string(filepath.Separator)+".")
+		hiddenPrefix := s.homeDir + string(filepath.Separator) + "."
+		if !pathPrefixMatch(f.Folder, hiddenPrefix) {
+			dirs = append(dirs, hiddenPrefix)
+		}
 	}
 	f.ExcludedDirs = dirs
 	return f
+}
+
+func folderWithin(folder, ancestor string) bool {
+	if folder == "" || ancestor == "" {
+		return false
+	}
+	folder = foldASCIICase(folder)
+	ancestor = foldASCIICase(ancestor)
+	if runtime.GOOS == "windows" {
+		folder = strings.ReplaceAll(folder, `\`, "/")
+		ancestor = strings.ReplaceAll(ancestor, `\`, "/")
+	}
+	rel, err := filepath.Rel(filepath.Clean(ancestor), filepath.Clean(folder))
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func pathPrefixMatch(path, prefix string) bool {
+	if path == "" || prefix == "" {
+		return false
+	}
+	path = foldASCIICase(path)
+	prefix = foldASCIICase(prefix)
+	if runtime.GOOS == "windows" {
+		path = strings.ReplaceAll(path, `\`, "/")
+		prefix = strings.ReplaceAll(prefix, `\`, "/")
+	}
+	return strings.HasPrefix(path, prefix)
+}
+
+func foldASCIICase(value string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'A' && r <= 'Z' {
+			return r + ('a' - 'A')
+		}
+		return r
+	}, value)
 }
 
 // ListSessions returns sessions matching the filter, ordered and limited as
@@ -609,7 +705,8 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 	useTurnStatsJoin := sort.Field != SortByCreated &&
 		sort.Field != SortByTurns &&
 		sort.Field != SortByName &&
-		sort.Field != SortByFolder
+		sort.Field != SortByFolder &&
+		filter.Folder == ""
 	fb.expandDatePredicates = !useTurnStatsJoin
 	if useTurnStatsJoin {
 		fb.lastActiveExpr = lastActiveJoinedExpr
@@ -627,7 +724,7 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 		}
 	}
 	q := "SELECT " + columns + " FROM sessions s" + joins + fb.joinSQL() + fb.whereSQL()
-	q += fmt.Sprintf(" ORDER BY %s %s", sortExpr, sortDir(sort.Order))
+	q += fmt.Sprintf(" ORDER BY %s %s, s.id ASC", sortExpr, sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultQueryLimit
