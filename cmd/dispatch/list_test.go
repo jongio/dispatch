@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,11 +32,24 @@ func withListDemoMode(t *testing.T, enabled bool) {
 	t.Cleanup(func() { listDemoModeFn = previous })
 }
 
-func withListSelector(t *testing.T, fn func(io.Writer, []data.Session) (data.Session, bool, error)) {
+func withListSelector(
+	t *testing.T,
+	fn func(io.Writer, []data.Session, bool, int, listPageLoader) (data.Session, bool, error),
+) {
 	t.Helper()
 	previous := listSelectFn
 	listSelectFn = fn
 	t.Cleanup(func() { listSelectFn = previous })
+}
+
+func newListPickerModel(sessions []data.Session) listPickerModel {
+	initialCount := min(len(sessions), listPickerPageSize)
+	initial := sessions[:initialCount]
+	loader := func(count int) ([]data.Session, bool, error) {
+		count = min(count, len(sessions))
+		return sessions[:count], count < len(sessions), nil
+	}
+	return newPagedListPickerModel(initial, initialCount < len(sessions), len(sessions), loader)
 }
 
 func TestParseListArgsDefaultsToWorkingDirectory(t *testing.T) {
@@ -235,9 +249,18 @@ func TestRunListSelectsAndResumesSession(t *testing.T) {
 			UpdatedAt:  "2026-08-13T12:00:00Z",
 		}}, nil
 	})
-	withListSelector(t, func(_ io.Writer, sessions []data.Session) (data.Session, bool, error) {
+	withListSelector(t, func(
+		_ io.Writer,
+		sessions []data.Session,
+		hasMore bool,
+		limit int,
+		_ listPageLoader,
+	) (data.Session, bool, error) {
 		if len(sessions) != 1 || sessions[0].ID != "1234567890abcdef" {
 			t.Fatalf("selector sessions = %#v", sessions)
+		}
+		if hasMore || limit != 0 {
+			t.Fatalf("selector pagination = hasMore %v, limit %d", hasMore, limit)
 		}
 		return sessions[0], true, nil
 	})
@@ -291,7 +314,7 @@ func TestRunListNilWriter(t *testing.T) {
 	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return []data.Session{{ID: "session-id"}}, nil
 	})
-	withListSelector(t, func(io.Writer, []data.Session) (data.Session, bool, error) {
+	withListSelector(t, func(io.Writer, []data.Session, bool, int, listPageLoader) (data.Session, bool, error) {
 		return data.Session{}, false, nil
 	})
 
@@ -464,9 +487,8 @@ func TestListPickerShowsMoreSessions(t *testing.T) {
 
 	view := model.View().Content
 	for _, want := range []string{
-		"Select a session (50 of 101)",
+		"Select a session (50 loaded)",
 		"Show 50 more sessions",
-		"51 remaining",
 		"m more",
 	} {
 		if !strings.Contains(view, want) {
@@ -476,20 +498,173 @@ func TestListPickerShowsMoreSessions(t *testing.T) {
 
 	model.cursor = model.visible
 	result, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd != nil {
-		t.Fatal("Enter on show-more row should keep the picker open")
+	if cmd == nil {
+		t.Fatal("Enter on show-more row should load the next page")
 	}
+	loading := result.(listPickerModel)
+	if !loading.loading || loading.selected || loading.quitting {
+		t.Errorf("loading model = %#v", loading)
+	}
+	result, _ = loading.Update(cmd())
 	expanded := result.(listPickerModel)
-	if expanded.visible != 100 || expanded.selected || expanded.quitting {
+	if expanded.visible != 100 || expanded.hasMore() == false {
 		t.Errorf("expanded model = %#v", expanded)
 	}
 
-	result, _ = expanded.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	result, cmd = expanded.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if cmd == nil {
+		t.Fatal("m should load the final page")
+	}
+	result, _ = result.(listPickerModel).Update(cmd())
 	all := result.(listPickerModel)
 	if all.visible != 101 || all.hasMore() {
 		t.Errorf("fully expanded model = %#v", all)
 	}
 	if strings.Contains(all.View().Content, "more sessions") {
 		t.Errorf("fully expanded picker still offers more sessions:\n%s", all.View().Content)
+	}
+}
+
+func TestRunListLoadsOnlyInitialPage(t *testing.T) {
+	withListGetwd(t, func() (string, error) { return t.TempDir(), nil })
+
+	var limits []int
+	withSearchList(t, func(_ data.FilterOptions, _ data.SortOptions, limit int) ([]data.Session, error) {
+		limits = append(limits, limit)
+		sessions := make([]data.Session, limit)
+		for i := range sessions {
+			sessions[i].ID = fmt.Sprintf("session-%03d", i)
+		}
+		return sessions, nil
+	})
+	withListSelector(t, func(
+		_ io.Writer,
+		sessions []data.Session,
+		hasMore bool,
+		_ int,
+		loader listPageLoader,
+	) (data.Session, bool, error) {
+		if len(sessions) != 50 || !hasMore {
+			t.Fatalf("initial page = %d sessions, hasMore %v", len(sessions), hasMore)
+		}
+		next, nextHasMore, err := loader(100)
+		if err != nil {
+			t.Fatalf("load next page: %v", err)
+		}
+		if len(next) != 100 || !nextHasMore {
+			t.Fatalf("next page = %d sessions, hasMore %v", len(next), nextHasMore)
+		}
+		return data.Session{}, false, nil
+	})
+
+	if err := runList(io.Discard, []string{"resume"}); err != nil {
+		t.Fatalf("runList returned error: %v", err)
+	}
+	if len(limits) != 2 || limits[0] != 51 || limits[1] != 101 {
+		t.Fatalf("query limits = %v, want [51 101]", limits)
+	}
+}
+
+func TestLoadListPageScansUntilTaggedPageIsFull(t *testing.T) {
+	tagged := make(map[string][]string)
+	for i := 0; i < 60; i++ {
+		tagged[fmt.Sprintf("session-%03d", i*2)] = []string{"work"}
+	}
+	previousConfigLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: tagged}, nil
+	}
+	t.Cleanup(func() { configLoadFn = previousConfigLoad })
+
+	var limits []int
+	withSearchList(t, func(_ data.FilterOptions, _ data.SortOptions, limit int) ([]data.Session, error) {
+		limits = append(limits, limit)
+		sessions := make([]data.Session, limit)
+		for i := range sessions {
+			sessions[i].ID = fmt.Sprintf("session-%03d", i)
+		}
+		return sessions, nil
+	})
+
+	sessions, hasMore, err := loadListPage(searchOptions{tag: "work"}, 50)
+	if err != nil {
+		t.Fatalf("loadListPage returned error: %v", err)
+	}
+	if len(sessions) != 50 || !hasMore {
+		t.Fatalf("tagged page = %d sessions, hasMore %v", len(sessions), hasMore)
+	}
+	if len(limits) < 2 || limits[0] != 51 || limits[len(limits)-1] < 101 {
+		t.Fatalf("scan limits = %v, want progressive scan beyond 100 rows", limits)
+	}
+}
+
+func TestLoadListPageAppliesLimitAfterTagFiltering(t *testing.T) {
+	tagged := map[string][]string{
+		"session-010": {"work"},
+		"session-011": {"work"},
+		"session-012": {"work"},
+	}
+	previousConfigLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: tagged}, nil
+	}
+	t.Cleanup(func() { configLoadFn = previousConfigLoad })
+
+	withSearchList(t, func(_ data.FilterOptions, _ data.SortOptions, limit int) ([]data.Session, error) {
+		count := min(limit, 12)
+		sessions := make([]data.Session, count)
+		for i := range sessions {
+			sessions[i].ID = fmt.Sprintf("session-%03d", i)
+		}
+		return sessions, nil
+	})
+
+	sessions, hasMore, err := loadListPage(searchOptions{tag: "work", limit: 2}, 2)
+	if err != nil {
+		t.Fatalf("loadListPage returned error: %v", err)
+	}
+	if len(sessions) != 2 || sessions[0].ID != "session-010" || sessions[1].ID != "session-011" {
+		t.Fatalf("tagged limited sessions = %#v", sessions)
+	}
+	if hasMore {
+		t.Fatal("explicit limit should not offer more sessions")
+	}
+}
+
+func TestListPickerMoreShortcutPreservesCursor(t *testing.T) {
+	model := newListPickerModel(make([]data.Session, 101))
+	model.cursor = 4
+
+	result, cmd := model.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if cmd == nil {
+		t.Fatal("m should load another page")
+	}
+	result, _ = result.(listPickerModel).Update(cmd())
+	expanded := result.(listPickerModel)
+	if expanded.cursor != 4 {
+		t.Fatalf("cursor = %d, want 4", expanded.cursor)
+	}
+}
+
+func TestListPickerHandlesEmptyReload(t *testing.T) {
+	model := newPagedListPickerModel(
+		[]data.Session{{ID: "session-001"}},
+		true,
+		0,
+		func(int) ([]data.Session, bool, error) { return nil, false, nil },
+	)
+	model.cursor = model.visible
+
+	result, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter on show-more row should start loading")
+	}
+	result, _ = result.(listPickerModel).Update(cmd())
+	reloaded := result.(listPickerModel)
+	if reloaded.cursor < 0 || reloaded.offset < 0 || reloaded.hasMore() {
+		t.Fatalf("empty reload model = %#v", reloaded)
+	}
+	if view := reloaded.View().Content; !strings.Contains(view, "Select a session (0)") {
+		t.Fatalf("empty reload view = %q", view)
 	}
 }

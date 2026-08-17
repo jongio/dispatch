@@ -58,13 +58,19 @@ New and modified command logic should have at least 80% line coverage.
 | T38 | `open --folder` resolves relative paths and rejects missing directories consistently | reconciliation | unit | `cmd/dispatch/open_test.go` -> `TestParseOpenArgs_ResolvesRelativeFolder`, `TestParseOpenArgs_RejectsMissingFolder` | automated |
 | T39 | Empty demo databases remain valid screenshot inputs | reconciliation | tagged integration | `internal/tui/screenshot_test.go` -> `TestCaptureScreenshots_EmptyDB` | automated |
 | T40 | Website publishes the resume screenshot and feature content across supported browsers | AC-13 | browser | `web/tests/site.spec.ts` -> `resume picker screenshot is published` | automated |
+| T41 | Interactive resume initially queries only 51 rows and grows the bounded query when more is requested | AC-2, AC-3 | unit | `cmd/dispatch/list_test.go` -> `TestRunListLoadsOnlyInitialPage` | automated |
+| T42 | Sparse tag filters progressively scan until a complete picker page is available | AC-3, AC-7 | unit | `cmd/dispatch/list_test.go` -> `TestLoadListPageScansUntilTaggedPageIsFull` | automated |
+| T43 | Explicit limits cap tagged matches after tag filtering rather than raw database candidates | AC-7 | unit | `cmd/dispatch/list_test.go` -> `TestLoadListPageAppliesLimitAfterTagFiltering` | automated |
+| T44 | An empty asynchronous reload leaves the picker in a safe empty state | AC-3 | unit | `cmd/dispatch/list_test.go` -> `TestListPickerHandlesEmptyReload` | automated |
+| T45 | Explicit tagged output applies its limit after tag filtering | AC-7 | unit | `cmd/dispatch/search_test.go` -> `TestLoadSearchSessionsAppliesLimitAfterTagFiltering` | automated |
+| T46 | The `m` shortcut preserves the current picker selection while loading more | AC-3 | unit | `cmd/dispatch/list_test.go` -> `TestListPickerMoreShortcutPreservesCursor` | automated |
 
 ## Functionality Inventory (Phase 3 reconciliation)
 
 | # | Functionality introduced | Location | Covered by | Status |
 |---|--------------------------|----------|------------|--------|
 | F1 | Dispatch the new top-level `resume` command and propagate errors | `cmd/dispatch/cli.go:172` | T12 | covered |
-| F2 | Parse resume as an all-results interactive search preset | `cmd/dispatch/list.go` | T2, T5, T6, T7 | covered |
+| F2 | Parse resume as an incrementally loaded interactive search preset | `cmd/dispatch/list.go` | T2, T2a, T5, T6, T7, T41, T42, T43, T44, T45, T46 | covered |
 | F3 | Default folder scope to the process working directory | `cmd/dispatch/list.go:48` | T1, T10 | covered |
 | F4 | Resolve and validate explicit relative or absolute folders | `cmd/dispatch/list.go:48` | T3, T4, T8, T9 | covered |
 | F5 | Execute resume through the existing search loader and TUI-equivalent resume path | `cmd/dispatch/list.go`, `cmd/dispatch/open.go` | T11, T15, T33 | covered |
@@ -93,6 +99,7 @@ New and modified command logic should have at least 80% line coverage.
 | F28 | Treat an empty screenshot database as a valid empty state | `internal/tui/screenshot.go`, `cmd/dispatch/demo.go` | T39 | covered |
 | F29 | Publish deterministic resume-picker screenshots and website references | `internal/tui/screenshot.go`, `web/src/pages/index.astro`, `web/src/pages/features.astro`, `web/src/pages/cli.astro` | T40 | covered |
 | F30 | Strip Unicode bidi controls from terminal-displayed session metadata | `internal/tui/components/helpers.go`, `cmd/dispatch/search.go` | T23 | covered |
+| F31 | Bound initial resume startup to one 50-row page plus a more-results sentinel | `cmd/dispatch/list.go` | T41, T42, T43, T44 | covered |
 
 ## Gaps & Additions
 
@@ -121,3 +128,4 @@ New and modified command logic should have at least 80% line coverage.
 - [x] Empty screenshot databases failed on nullable `MAX(updated_at)` -> added T39 and nullable timestamp handling.
 - [x] Website publication of the new picker needed browser coverage -> added T40.
 - [x] Unicode bidi controls could visually spoof terminal metadata -> expanded T23 and centralized terminal sanitization.
+- [x] Eagerly loading every resume match delayed first render on large stores -> added T41, T42 and on-demand bounded queries.

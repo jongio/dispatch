@@ -560,6 +560,42 @@ func TestRunSearchNoLimitUsesCeiling(t *testing.T) {
 	}
 }
 
+func TestLoadSearchSessionsAppliesLimitAfterTagFiltering(t *testing.T) {
+	tagged := map[string][]string{
+		"session-003": {"work"},
+		"session-004": {"work"},
+		"session-005": {"work"},
+	}
+	previousConfigLoad := configLoadFn
+	configLoadFn = func() (*config.Config, error) {
+		return &config.Config{SessionTags: tagged}, nil
+	}
+	t.Cleanup(func() { configLoadFn = previousConfigLoad })
+
+	var gotLimit int
+	withSearchList(t, func(_ data.FilterOptions, _ data.SortOptions, limit int) ([]data.Session, error) {
+		gotLimit = limit
+		return []data.Session{
+			{ID: "session-001"},
+			{ID: "session-002"},
+			{ID: "session-003"},
+			{ID: "session-004"},
+			{ID: "session-005"},
+		}, nil
+	})
+
+	sessions, err := loadSearchSessions(searchOptions{tag: "work", limit: 2})
+	if err != nil {
+		t.Fatalf("loadSearchSessions returned error: %v", err)
+	}
+	if gotLimit != searchAllLimit {
+		t.Fatalf("query limit = %d, want %d", gotLimit, searchAllLimit)
+	}
+	if len(sessions) != 2 || sessions[0].ID != "session-003" || sessions[1].ID != "session-004" {
+		t.Fatalf("sessions = %#v", sessions)
+	}
+}
+
 func TestRunSearchPropagatesStoreError(t *testing.T) {
 	withSearchList(t, func(data.FilterOptions, data.SortOptions, int) ([]data.Session, error) {
 		return nil, errors.New("store boom")

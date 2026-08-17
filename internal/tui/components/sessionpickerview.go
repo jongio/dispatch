@@ -21,19 +21,26 @@ const DefaultSessionPickerBatchSize = 50
 // SessionPickerView renders the terminal content shared by the resume command
 // and deterministic website screenshots.
 type SessionPickerView struct {
-	Rows    []SessionPickerRow
-	Cursor  int
-	Offset  int
-	Visible int
-	Width   int
-	Height  int
-	IDWidth int
+	Rows      []SessionPickerRow
+	Cursor    int
+	Offset    int
+	Visible   int
+	Width     int
+	Height    int
+	IDWidth   int
+	HasMore   bool
+	Loading   bool
+	MoreCount int
 }
 
 func (v SessionPickerView) Render() string {
 	var b strings.Builder
 	if v.hasMore() {
-		fmt.Fprintf(&b, "Select a session (%d of %d)\n\n", v.Visible, len(v.Rows))
+		if v.Visible < len(v.Rows) {
+			fmt.Fprintf(&b, "Select a session (%d of %d)\n\n", v.Visible, len(v.Rows))
+		} else {
+			fmt.Fprintf(&b, "Select a session (%d loaded)\n\n", v.Visible)
+		}
 	} else {
 		fmt.Fprintf(&b, "Select a session (%d)\n\n", len(v.Rows))
 	}
@@ -63,9 +70,19 @@ func (v SessionPickerView) Render() string {
 			prefix = "> "
 		}
 		if i == v.Visible {
-			remaining := len(v.Rows) - v.Visible
-			count := min(DefaultSessionPickerBatchSize, remaining)
-			fmt.Fprintf(&b, "%sShow %d more sessions (%d remaining)\n", prefix, count, remaining)
+			if v.Loading {
+				fmt.Fprintf(&b, "%sLoading more sessions…\n", prefix)
+			} else if v.Visible < len(v.Rows) {
+				remaining := len(v.Rows) - v.Visible
+				count := min(DefaultSessionPickerBatchSize, remaining)
+				fmt.Fprintf(&b, "%sShow %d more sessions (%d remaining)\n", prefix, count, remaining)
+			} else {
+				count := v.MoreCount
+				if count <= 0 {
+					count = DefaultSessionPickerBatchSize
+				}
+				fmt.Fprintf(&b, "%sShow %d more sessions\n", prefix, count)
+			}
 			continue
 		}
 		row := v.Rows[i]
@@ -89,7 +106,7 @@ func (v SessionPickerView) Render() string {
 }
 
 func (v SessionPickerView) hasMore() bool {
-	return v.Visible < len(v.Rows)
+	return v.HasMore || v.Visible < len(v.Rows)
 }
 
 func (v SessionPickerView) selectableCount() int {

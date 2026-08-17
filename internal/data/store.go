@@ -724,7 +724,7 @@ func (s *Store) ListSessions(ctx context.Context, filter FilterOptions, sort Sor
 		}
 	}
 	q := "SELECT " + columns + " FROM sessions s" + joins + fb.joinSQL() + fb.whereSQL()
-	q += fmt.Sprintf(" ORDER BY %s %s", sortExpr, sortDir(sort.Order))
+	q += fmt.Sprintf(" ORDER BY %s %s, s.id ASC", sortExpr, sortDir(sort.Order))
 
 	if limit <= 0 {
 		limit = defaultQueryLimit

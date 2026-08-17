@@ -121,7 +121,7 @@ func runSearchOptions(w io.Writer, opts searchOptions) error {
 
 func loadSearchSessions(opts searchOptions) ([]data.Session, error) {
 	limit := opts.limit
-	if limit <= 0 {
+	if limit <= 0 || opts.tag != "" {
 		limit = searchAllLimit
 	}
 
@@ -132,6 +132,9 @@ func loadSearchSessions(opts searchOptions) ([]data.Session, error) {
 	sessions, err = loadAndFilterSessionsByTag(sessions, opts.tag)
 	if err != nil {
 		return nil, err
+	}
+	if opts.limit > 0 && len(sessions) > opts.limit {
+		sessions = sessions[:opts.limit]
 	}
 	return sessions, nil
 }

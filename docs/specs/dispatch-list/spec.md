@@ -25,7 +25,7 @@ text, and would make sibling commands interpret the same token differently.
 - The picker initially shows 50 matches and lets the user reveal additional
   sessions in batches.
 - Enter resumes the selected session through the existing TUI launch path.
-- All matching sessions are loaded unless the user supplies `--limit`.
+- Only the first batch is queried initially; later batches load on demand.
 - Explicit output flags retain non-interactive search rendering.
 - `--folder <path>` overrides the current directory and accepts relative paths.
 - Positional arguments retain the existing search-query meaning.
@@ -36,7 +36,7 @@ text, and would make sibling commands interpret the same token differently.
 ## Acceptance Criteria
 
 1. `dispatch resume` scopes results to the current working directory.
-2. An interactive table shows every match with aligned full session ID,
+2. An interactive table shows each loaded match with aligned full session ID,
    summary, repository, and branch columns in that order.
 3. When more than 50 sessions match, the picker offers a selectable show-more
    row and an `m` shortcut to reveal the next batch.
@@ -69,8 +69,10 @@ It uses the process working directory when `--folder` is omitted, resolves the
 effective folder to a clean absolute path, validates that it exists and is a
 directory, and then executes the existing search pipeline.
 
-The resume command loads every matching session by default and presents a
-keyboard-navigable picker containing each full session ID and summary. Enter
+The resume command queries only the first 50 matching sessions plus a sentinel
+row used to detect whether more results exist. It presents a keyboard-navigable
+picker containing each full session ID and summary, and queries progressively
+larger bounded pages only when the user requests another batch. Enter
 passes the selected session to the same launch function used by `dispatch open`
 and the main TUI. Existing format selectors such as `--table`, `--json`,
 `--jsonl`, `--csv`, `--ids`, `--paths`, `--commands`, and `--format` bypass

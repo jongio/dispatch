@@ -21,6 +21,14 @@ var (
 
 const listPickerPageSize = components.DefaultSessionPickerBatchSize
 
+type listPageLoader func(count int) ([]data.Session, bool, error)
+
+type listPageMsg struct {
+	sessions []data.Session
+	hasMore  bool
+	err      error
+}
+
 // runList opens an interactive picker for sessions under the selected folder.
 // Explicit output flags retain the non-interactive search renderers.
 func runList(w io.Writer, args []string) error {
@@ -37,7 +45,11 @@ func runList(w io.Writer, args []string) error {
 		return runSearchOptions(w, opts)
 	}
 
-	sessions, err := loadSearchSessions(opts)
+	initialCount := listPickerPageSize
+	if opts.limit > 0 {
+		initialCount = min(initialCount, opts.limit)
+	}
+	sessions, hasMore, err := loadListPage(opts, initialCount)
 	if err != nil {
 		return err
 	}
@@ -49,7 +61,10 @@ func runList(w io.Writer, args []string) error {
 		return errors.New(msg)
 	}
 
-	selected, ok, err := listSelectFn(w, sessions)
+	loader := func(count int) ([]data.Session, bool, error) {
+		return loadListPage(opts, count)
+	}
+	selected, ok, err := listSelectFn(w, sessions, hasMore, opts.limit, loader)
 	if err != nil || !ok {
 		return err
 	}
@@ -60,6 +75,70 @@ func runList(w io.Writer, args []string) error {
 	}
 	mode := resolveOpenMode("", cfg)
 	return openInteractiveLaunchFn(w, cfg, &selected, mode)
+}
+
+func loadListPage(opts searchOptions, count int) ([]data.Session, bool, error) {
+	if count <= 0 {
+		return nil, false, nil
+	}
+
+	cappedCount := count
+	if opts.limit > 0 {
+		cappedCount = min(cappedCount, opts.limit)
+	}
+	probeForMore := opts.limit == 0 || cappedCount < opts.limit
+	queryLimit := cappedCount
+	if probeForMore {
+		queryLimit++
+	}
+
+	if opts.tag != "" {
+		return loadTaggedListPage(opts, cappedCount, queryLimit, probeForMore)
+	}
+
+	pageOpts := opts
+	pageOpts.limit = queryLimit
+	sessions, err := loadSearchSessions(pageOpts)
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := probeForMore && len(sessions) > cappedCount
+	if hasMore {
+		sessions = sessions[:cappedCount]
+	}
+	return sessions, hasMore, nil
+}
+
+func loadTaggedListPage(
+	opts searchOptions,
+	count int,
+	queryLimit int,
+	probeForMore bool,
+) ([]data.Session, bool, error) {
+	cfg, err := configLoadFn()
+	if err != nil {
+		return nil, false, fmt.Errorf("loading config: %w", err)
+	}
+
+	maxScan := searchAllLimit
+	scanLimit := min(maxScan, max(queryLimit, listPickerPageSize+1))
+
+	for {
+		sessions, err := searchListSessionsFn(opts.filter, opts.sort, scanLimit)
+		if err != nil {
+			return nil, false, err
+		}
+		filtered := filterSessionsByTag(sessions, cfg, opts.tag)
+		if len(filtered) >= queryLimit || len(sessions) < scanLimit || scanLimit >= maxScan {
+			hasMore := probeForMore && len(filtered) > count
+			if len(filtered) > count {
+				filtered = filtered[:count]
+			}
+			return filtered, hasMore, nil
+		}
+		scanLimit = min(maxScan, scanLimit*2)
+	}
 }
 
 // parseListArgs reuses search parsing with list-specific defaults.
@@ -112,19 +191,30 @@ func resolveListFolder(folder string) (string, error) {
 }
 
 type listPickerModel struct {
-	sessions []data.Session
-	rows     []components.SessionPickerRow
-	idWidth  int
-	cursor   int
-	offset   int
-	width    int
-	height   int
-	visible  int
-	selected bool
-	quitting bool
+	sessions  []data.Session
+	rows      []components.SessionPickerRow
+	idWidth   int
+	cursor    int
+	offset    int
+	width     int
+	height    int
+	visible   int
+	limit     int
+	selected  bool
+	quitting  bool
+	loading   bool
+	loadErr   error
+	hasNext   bool
+	loader    listPageLoader
+	selectNew bool
 }
 
-func newListPickerModel(sessions []data.Session) listPickerModel {
+func newPagedListPickerModel(
+	sessions []data.Session,
+	hasMore bool,
+	limit int,
+	loader listPageLoader,
+) listPickerModel {
 	rows := make([]components.SessionPickerRow, len(sessions))
 	idWidth := 0
 	for i, session := range sessions {
@@ -140,9 +230,12 @@ func newListPickerModel(sessions []data.Session) listPickerModel {
 		sessions: sessions,
 		rows:     rows,
 		idWidth:  idWidth,
-		visible:  min(len(sessions), listPickerPageSize),
+		visible:  len(sessions),
+		limit:    limit,
 		width:    100,
 		height:   24,
+		hasNext:  hasMore,
+		loader:   loader,
 	}
 }
 
@@ -153,6 +246,35 @@ func (m listPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.ensureVisible()
+	case listPageMsg:
+		width := m.width
+		height := m.height
+		previousCursor := m.cursor
+		previousCount := len(m.sessions)
+		selectNew := m.selectNew
+		m.loading = false
+		if msg.err != nil {
+			m.loadErr = msg.err
+			m.quitting = true
+			return m, tea.Quit
+		}
+		if len(msg.sessions) == 0 {
+			m.sessions = nil
+			m.rows = nil
+			m.visible = 0
+			m.cursor = 0
+			m.offset = 0
+			m.hasNext = false
+			return m, nil
+		}
+		m = newPagedListPickerModel(msg.sessions, msg.hasMore, m.limit, m.loader)
+		m.width = width
+		m.height = height
+		m.cursor = previousCursor
+		if selectNew {
+			m.cursor = min(len(m.sessions)-1, previousCount)
+		}
 		m.ensureVisible()
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -173,11 +295,10 @@ func (m listPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = m.selectableCount() - 1
 			m.ensureVisible()
 		case "m":
-			m.showMore()
+			return m, m.showMore(false)
 		case "enter":
 			if m.hasMore() && m.cursor == m.visible {
-				m.showMore()
-				return m, nil
+				return m, m.showMore(true)
 			}
 			m.selected = m.cursor >= 0 && m.cursor < m.visible
 			m.quitting = true
@@ -196,13 +317,16 @@ func (m listPickerModel) View() tea.View {
 	}
 
 	content := components.SessionPickerView{
-		Rows:    m.rows,
-		Cursor:  m.cursor,
-		Offset:  m.offset,
-		Visible: m.visible,
-		Width:   m.width,
-		Height:  m.height,
-		IDWidth: m.idWidth,
+		Rows:      m.rows,
+		Cursor:    m.cursor,
+		Offset:    m.offset,
+		Visible:   m.visible,
+		Width:     m.width,
+		Height:    m.height,
+		IDWidth:   m.idWidth,
+		HasMore:   m.hasMore(),
+		Loading:   m.loading,
+		MoreCount: m.moreCount(),
 	}.Render()
 	return tea.NewView(content)
 }
@@ -222,7 +346,7 @@ func (m *listPickerModel) ensureVisible() {
 }
 
 func (m listPickerModel) hasMore() bool {
-	return m.visible < len(m.sessions)
+	return m.hasNext
 }
 
 func (m listPickerModel) selectableCount() int {
@@ -233,25 +357,52 @@ func (m listPickerModel) selectableCount() int {
 	return count
 }
 
-func (m *listPickerModel) showMore() {
-	if !m.hasMore() {
-		return
+func (m *listPickerModel) showMore(selectNew bool) tea.Cmd {
+	if !m.hasMore() || m.loading || m.loader == nil {
+		return nil
 	}
-	m.visible = min(len(m.sessions), m.visible+listPickerPageSize)
-	m.ensureVisible()
+	m.loading = true
+	m.selectNew = selectNew
+	count := len(m.sessions) + listPickerPageSize
+	if m.limit > 0 {
+		count = min(count, m.limit)
+	}
+	loader := m.loader
+	return func() tea.Msg {
+		sessions, hasMore, err := loader(count)
+		return listPageMsg{sessions: sessions, hasMore: hasMore, err: err}
+	}
 }
 
-func runListPicker(w io.Writer, sessions []data.Session) (data.Session, bool, error) {
+func (m listPickerModel) moreCount() int {
+	count := listPickerPageSize
+	if m.limit > 0 {
+		count = min(count, m.limit-len(m.sessions))
+	}
+	return max(0, count)
+}
+
+func runListPicker(
+	w io.Writer,
+	sessions []data.Session,
+	hasMore bool,
+	limit int,
+	loader listPageLoader,
+) (data.Session, bool, error) {
 	if w == nil {
 		w = io.Discard
 	}
-	program := tea.NewProgram(newListPickerModel(sessions), tea.WithInput(os.Stdin), tea.WithOutput(w))
+	model := newPagedListPickerModel(sessions, hasMore, limit, loader)
+	program := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(w))
 	result, err := program.Run()
 	if err != nil {
 		return data.Session{}, false, err
 	}
 	model, ok := result.(listPickerModel)
 	if !ok || !model.selected || model.cursor < 0 || model.cursor >= len(model.sessions) {
+		if ok && model.loadErr != nil {
+			return data.Session{}, false, model.loadErr
+		}
 		return data.Session{}, false, nil
 	}
 	return model.sessions[model.cursor], true, nil
