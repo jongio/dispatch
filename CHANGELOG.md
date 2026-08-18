@@ -6,14 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.16.0] — 2026-08-18
+
 ### Added
 
 #### CLI
-- **`dispatch resume`** — select and resume any matching session under the current directory from an aligned table showing full session ID, summary, repository, and branch columns. Large result sets can be revealed in batches from the picker. Positional query text and an explicit `--folder` override remain available. (#391)
+- **`dispatch resume`** — interactively select and resume folder-scoped sessions from a searchable table with full session metadata, incremental result batches, and shared launch behavior. (#392)
+
+### Changed
+
+- **Session-list and grouped-query performance** — reduce query scans and rendering allocations, improving grouping, rendering, and folder toggling. (#395)
+- **Toolchain and dependencies** — require Go 1.26.6 and refresh Go and website dependencies.
 
 ### Fixed
 
-- **Search/resume safety and routing** — match only exact folders and true platform-native descendants, normalize Windows separator variants, protect CSV and terminal output from control-sequence injection, and keep command names inside multi-word TUI queries from hijacking dispatch.
+- **Search completeness and filtering** — search all user-visible session content fields, preserve uncapped free-text results, and restore excluded-word filtering.
+- **Search/resume safety and routing** — match exact folders and native descendants, normalize Windows paths, sanitize CSV and terminal output, and prevent command names in multi-word queries from hijacking Dispatch.
+- **Background refresh UI** — hide the loading indicator during automatic session reloads.
 
 ## [v0.15.0] — 2026-08-12
 
