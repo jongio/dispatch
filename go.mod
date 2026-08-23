@@ -15,7 +15,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.1
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
-	modernc.org/sqlite v1.56.0
+	modernc.org/sqlite v1.57.0
 )
 
 require (
