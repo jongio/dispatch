@@ -145,14 +145,6 @@ func (m matcher) columnSQL(column string) string {
 	return "(" + raw + like + " AND " + normalized + ")"
 }
 
-// argsPerColumn reports how many bound values columnSQL consumes.
-func (m matcher) argsPerColumn() int {
-	if m.guard != "" {
-		return 2
-	}
-	return 1
-}
-
 // appendArgs appends one column's bound values, in the order columnSQL
 // consumes them.
 func (m matcher) appendArgs(dst []any) []any {
