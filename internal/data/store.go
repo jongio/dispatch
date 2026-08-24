@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -320,6 +321,88 @@ const lastActiveJoinedExpr = `MAX(
 	COALESCE(s.created_at, '')
 )`
 
+// contentClause describes one searchable content source: a set of columns,
+// reached either directly on the session row or through an EXISTS subquery.
+// Keeping the columns declarative lets every caller render the same source
+// list with or without Unicode case folding.
+type contentClause struct {
+	from    string // subquery source, e.g. "turns t2"; empty for session columns
+	on      string // subquery join predicate
+	columns []string
+}
+
+// sql renders the clause. Each column contributes one comparison, bound in
+// column order.
+func (c contentClause) sql(m matcher) string {
+	parts := make([]string, len(c.columns))
+	for i, col := range c.columns {
+		parts[i] = m.columnSQL(col)
+	}
+	joined := strings.Join(parts, " OR ")
+	if c.from == "" {
+		if len(parts) == 1 {
+			return joined
+		}
+		return "(" + joined + ")"
+	}
+	return "EXISTS (SELECT 1 FROM " + c.from + " WHERE " + c.on + " AND (" + joined + "))"
+}
+
+// conversationClauses match the text a user reads inside a session: its
+// summary plus the turn and checkpoint content behind it. Deep search and the
+// excluded-word filter are inverse operations over this same list, so they
+// cannot drift apart: anything search can find, exclusion can hide.
+var conversationClauses = []contentClause{
+	{columns: []string{"s.summary"}},
+	{
+		from:    "turns t2",
+		on:      "t2.session_id = s.id",
+		columns: []string{"t2.user_message", "t2.assistant_response"},
+	},
+	{
+		from: "checkpoints cp",
+		on:   "cp.session_id = s.id",
+		columns: []string{
+			"cp.title", "cp.overview", "cp.history", "cp.work_done",
+			"cp.technical_details", "cp.important_files", "cp.next_steps",
+		},
+	},
+}
+
+// workspaceClauses match the artifacts a session touched. Search covers them
+// so that a file path or PR number finds the session; the excluded-word
+// filter deliberately does not, because hiding a session by a path it touched
+// is the job of excluded_dirs.
+var workspaceClauses = []contentClause{
+	{
+		from:    "session_files sf2",
+		on:      "sf2.session_id = s.id",
+		columns: []string{"sf2.file_path", "sf2.tool_name"},
+	},
+	{
+		from:    "session_refs sr2",
+		on:      "sr2.session_id = s.id",
+		columns: []string{"sr2.ref_type", "sr2.ref_value"},
+	},
+}
+
+// sessionMetadataClauses match a session's identity fields. Search covers
+// them; exclusion does not, so that excluding a common word cannot wipe out
+// every session that happens to live in a matching repository or folder.
+var sessionMetadataClauses = []contentClause{
+	{columns: []string{"s.branch"}},
+	{columns: []string{"s.repository"}},
+	{columns: []string{"s.cwd"}},
+}
+
+// quickSearchClauses are the session-level fields scanned without JOINs.
+var quickSearchClauses = []contentClause{
+	{columns: []string{"s.summary", "s.branch", "s.repository", "s.cwd"}},
+}
+
+// hostTypeClause is appended to deep search on schemas that have the column.
+var hostTypeClause = contentClause{columns: []string{"s.host_type"}}
+
 // filterBuilder accumulates JOIN and WHERE clauses with parameterised args.
 type filterBuilder struct {
 	joins                []string
@@ -353,33 +436,18 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 			` OR EXISTS (SELECT 1 FROM session_refs sr3 WHERE sr3.session_id = s.id))`)
 
 	if f.Query != "" {
-		pattern := "%" + escapeLIKE(f.Query) + "%"
+		m := newMatcher(f.Query)
 		if f.DeepSearch {
 			// Deep mode scans every modeled source-table field directly. The
 			// search index is additive because it can be stale or incomplete.
-			clauses := []string{
-				`s.summary LIKE ? ESCAPE '\'`,
-				`s.branch LIKE ? ESCAPE '\'`,
-				`s.repository LIKE ? ESCAPE '\'`,
-				`s.cwd LIKE ? ESCAPE '\'`,
-				`EXISTS (SELECT 1 FROM turns t2 WHERE t2.session_id = s.id AND (` +
-					`t2.user_message LIKE ? ESCAPE '\' OR t2.assistant_response LIKE ? ESCAPE '\'))`,
-				`EXISTS (SELECT 1 FROM checkpoints cp WHERE cp.session_id = s.id AND (` +
-					`cp.title LIKE ? ESCAPE '\' OR cp.overview LIKE ? ESCAPE '\' OR cp.history LIKE ? ESCAPE '\' OR ` +
-					`cp.work_done LIKE ? ESCAPE '\' OR cp.technical_details LIKE ? ESCAPE '\' OR ` +
-					`cp.important_files LIKE ? ESCAPE '\' OR cp.next_steps LIKE ? ESCAPE '\'))`,
-				`EXISTS (SELECT 1 FROM session_files sf2 WHERE sf2.session_id = s.id AND (` +
-					`sf2.file_path LIKE ? ESCAPE '\' OR sf2.tool_name LIKE ? ESCAPE '\'))`,
-				`EXISTS (SELECT 1 FROM session_refs sr2 WHERE sr2.session_id = s.id AND (` +
-					`sr2.ref_type LIKE ? ESCAPE '\' OR sr2.ref_value LIKE ? ESCAPE '\'))`,
-			}
-			for range 17 {
-				fb.args = append(fb.args, pattern)
-			}
+			sources := make([]contentClause, 0, 9)
+			sources = append(sources, conversationClauses...)
+			sources = append(sources, workspaceClauses...)
+			sources = append(sources, sessionMetadataClauses...)
 			if fb.hasHostType {
-				clauses = append(clauses, `s.host_type LIKE ? ESCAPE '\'`)
-				fb.args = append(fb.args, pattern)
+				sources = append(sources, hostTypeClause)
 			}
+			clauses := fb.appendMatchClauses(sources, m)
 
 			if ftsTerms := escapeFTS5Terms(f.Query); fb.hasFTS && ftsTerms != "" {
 				clauses = append(clauses, `s.id IN (SELECT session_id FROM search_index WHERE content MATCH ?)`)
@@ -388,9 +456,8 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 			fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " OR ")+")")
 		} else {
 			// Quick mode: search only session-level fields (no JOINs).
-			fb.wheres = append(fb.wheres,
-				`(s.summary LIKE ? ESCAPE '\' OR s.branch LIKE ? ESCAPE '\' OR s.repository LIKE ? ESCAPE '\' OR s.cwd LIKE ? ESCAPE '\')`)
-			fb.args = append(fb.args, pattern, pattern, pattern, pattern)
+			clauses := fb.appendMatchClauses(quickSearchClauses, m)
+			fb.wheres = append(fb.wheres, "("+strings.Join(clauses, " OR ")+")")
 		}
 	}
 	if f.Folder != "" {
@@ -474,15 +541,27 @@ func (fb *filterBuilder) apply(f FilterOptions) {
 			if word == "" {
 				continue
 			}
-			pattern := "%" + escapeLIKE(strings.ToLower(word)) + "%"
-			fb.wheres = append(fb.wheres,
-				`(LOWER(COALESCE(s.summary,'')) NOT LIKE ? ESCAPE '\'`+
-					` AND NOT EXISTS (SELECT 1 FROM turns t3 WHERE t3.session_id = s.id`+
-					` AND (LOWER(COALESCE(t3.user_message,'')) LIKE ? ESCAPE '\'`+
-					` OR LOWER(COALESCE(t3.assistant_response,'')) LIKE ? ESCAPE '\')))`)
-			fb.args = append(fb.args, pattern, pattern, pattern)
+			// Hide the session when the word appears anywhere deep search
+			// would find it in the conversation, not just in the summary or
+			// a turn. NOT(a OR b OR c) keeps the predicate list identical to
+			// the search side.
+			clauses := fb.appendMatchClauses(conversationClauses, newMatcher(word))
+			fb.wheres = append(fb.wheres, "NOT ("+strings.Join(clauses, " OR ")+")")
 		}
 	}
+}
+
+// appendMatchClauses renders each clause and records its bound values, in
+// clause and column order.
+func (fb *filterBuilder) appendMatchClauses(clauses []contentClause, m matcher) []string {
+	rendered := make([]string, 0, len(clauses))
+	for _, c := range clauses {
+		rendered = append(rendered, c.sql(m))
+		for range len(c.columns) {
+			fb.args = m.appendArgs(fb.args)
+		}
+	}
+	return rendered
 }
 
 func folderMatchPatterns(folder string, windows bool) []string {
@@ -1428,7 +1507,12 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 			sortExpr = lastActiveJoinedExpr
 		}
 	}
-	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY pivot_label, %s %s",
+	// Order by the session sort, not the pivot label. The row cap below is a
+	// budget of sessions to display, so it has to keep the ones the sort puts
+	// first; ordering by label instead would spend the whole budget on
+	// whichever label happens to sort first and hide every other group.
+	// Groups are re-ordered by label after grouping.
+	q := fmt.Sprintf("SELECT %s AS pivot_label, %s FROM sessions s%s%s ORDER BY %s %s, s.id ASC",
 		expr, columns, joins+fb.joinSQL(), fb.whereSQL(), sortExpr, sortDir(sort.Order))
 
 	if limit == 0 {
@@ -1480,6 +1564,12 @@ func (s *Store) GroupSessions(ctx context.Context, pivot PivotField, filter Filt
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating grouped session rows: %w", err)
 	}
+
+	// Groups arrive in "first session seen" order because the query is sorted
+	// by session, not by label. Restore the label ordering callers rely on.
+	slices.SortFunc(result, func(a, b SessionGroup) int {
+		return strings.Compare(a.Label, b.Label)
+	})
 
 	return result, nil
 }

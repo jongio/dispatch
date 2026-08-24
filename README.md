@@ -20,7 +20,7 @@ Dispatch reads your local Copilot CLI session store and presents every past sess
 
 - **Full-text search** (`/`) — Two-tier search: quick search (summaries, branches, repos, directories) returns results instantly; deep search scans all user-visible session metadata and content fields after 300ms. FTS5 adds indexed matches when available without replacing the source-field scan. Searching a number (e.g. "42", "#42", "PR42") also matches session refs (PRs, issues, commits)
 - **Directory filtering** (`f`) — hierarchical tree panel for toggling directory exclusion, persisted to config
-- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose summary or conversation turns contain any excluded word (case-insensitive) are hidden from the list
+- **Word filtering** (Settings panel) — comma-separated list of words to exclude sessions by content. Sessions whose summary, conversation turns, or checkpoint content contain any excluded word are hidden from the list. Matching is case-insensitive (including accented and non-Latin text) and matches the phrase as displayed in the list, so line breaks in the stored text do not break a multi-word phrase. Each comma-separated entry is one phrase, so `Task, Invoke` excludes either word while `Task Invoke` excludes only the phrase
 - **Sorting** (`s` / `S`) — 4 fields (updated, folder, name, attention) with toggleable direction. Sort applies within each group; configuration also accepts the legacy `created` and `turns` values
 - **Grouping modes** (`Tab`) — list, folder, repo, branch, date, host. Displayed as collapsible trees with session counts
 - **Time range filtering** (`1`–`4`) — 1 hour, 1 day, 7 days, all
@@ -750,7 +750,7 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `preview_position` | string | `"right"` | Position of the preview pane: `right`, `bottom`, `left`, `top` |
 | `redact_preview_secrets` | bool | `false` | Mask common secret patterns (bearer tokens, GitHub PATs, connection strings, `.env` secrets) with `[redacted]` in the preview pane. Rendering only; stored session data is never modified |
 | `conversation_newest_first` | bool | `true` | Show newest conversation turns first in preview |
-| `max_sessions` | int | `100` | Maximum sessions to load |
+| `max_sessions` | int | `100` | Maximum sessions to load. In grouped views this is the total across all groups |
 | `yoloMode` | bool | `false` | Pass `--allow-all` to Copilot CLI (auto-confirm commands) |
 | `agent` | string | `""` | Pass `--agent <name>` to Copilot CLI |
 | `model` | string | `""` | Pass `--model <name>` to Copilot CLI |
@@ -759,7 +759,7 @@ Use `dispatch config validate --path <file>` to check another config file withou
 | `resume_session_command` | string | `""` | Custom resume command (`{sessionId}` is replaced). Defaults to `copilot --resume` |
 | `new_session_command` | string | `""` | Command to launch new sessions (`{cwd}` is replaced). Defaults to `copilot` |
 | `excluded_dirs` | array | `[]` | Directory paths to hide from session list |
-| `excluded_words` | array | `[]` | Comma-separated words; sessions containing any word are hidden |
+| `excluded_words` | array | `[]` | Phrases to hide; a session is hidden when its summary, turns, or checkpoints contain one (case-insensitive) |
 | `attention_threshold` | string | `"15m"` | Duration after which an inactive running session is marked stale |
 | `notify_on_waiting` | bool | `false` | Ring the terminal bell and show a footer message when a session enters the waiting state |
 | `auto_refresh_seconds` | int | *(unset)* | Session-list poll interval in seconds. Unset uses the default (2s); `0` disables polling; a positive value sets the interval (minimum 1s). Applies on next launch |
