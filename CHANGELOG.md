@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.16.1] — 2026-08-24
+
 ### Fixed
 
 - **Grouped views collapsing to a single group** — grouped queries ordered rows by pivot label before applying `max_sessions`, so the entire row budget was spent on whichever label sorted first and every other group disappeared. The cap now keeps the sessions the active sort puts first, and groups are ordered by label afterwards. This also restores the `all` time range, which appeared to stop partway through history for the same reason.
