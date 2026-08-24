@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- **Grouped views collapsing to a single group** — grouped queries ordered rows by pivot label before applying `max_sessions`, so the entire row budget was spent on whichever label sorted first and every other group disappeared. The cap now keeps the sessions the active sort puts first, and groups are ordered by label afterwards. This also restores the `all` time range, which appeared to stop partway through history for the same reason.
+- **Excluded words not hiding sessions** — the filter matched raw stored text while the list displays summaries with whitespace collapsed, so a phrase typed exactly as shown (`Task Invoke` against a stored `## Task\n\nInvoke…`) never matched. Matching now normalizes both sides, folds case for accented and non-Latin text, and covers checkpoint content in addition to summaries and turns.
+- **Group collapse state lost on refresh** — an absent expand entry meant both "never shown" and "user collapsed", so the background refresh re-expanded anything collapsed and made the collapse-all key appear to toggle at random. Groups now track whether they have already been given their default state. This also fixes `default_collapsed`, which was reverted by the first refresh.
+
 ## [v0.16.0] — 2026-08-18
 
 ### Added

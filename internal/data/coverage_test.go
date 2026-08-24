@@ -140,7 +140,7 @@ func TestFilterBuilder_QueryDeepSearchFTS(t *testing.T) {
 	if !strings.Contains(where, "search_index WHERE content MATCH ?") {
 		t.Errorf("FTS deep search should use the search_index table, got: %s", where)
 	}
-	if !strings.Contains(where, "t2.user_message LIKE") {
+	if !strings.Contains(where, "COALESCE(t2.user_message,'') LIKE") {
 		t.Error("FTS deep search should keep the LIKE clauses for substring matches")
 	}
 	if fb.args[len(fb.args)-1] != `"test"` {

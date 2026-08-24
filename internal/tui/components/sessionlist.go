@@ -43,6 +43,7 @@ type SessionList struct {
 	allItems       []displayItem                    // every item (folders + sessions)
 	visItems       []int                            // indices into allItems that are currently visible
 	expanded       map[string]struct{}              // folder path → expanded state (tree mode)
+	knownGroups    map[string]struct{}              // folder path → already given its default state
 	hiddenSet      map[string]struct{}              // session ID → hidden sessions
 	favoritedSet   map[string]struct{}              // session ID → favorited sessions
 	attentionMap   map[string]data.AttentionStatus  // session ID → attention status
@@ -69,8 +70,9 @@ type SessionList struct {
 // NewSessionList returns an empty SessionList.
 func NewSessionList() SessionList {
 	return SessionList{
-		expanded: make(map[string]struct{}),
-		selected: make(map[string]struct{}),
+		expanded:    make(map[string]struct{}),
+		knownGroups: make(map[string]struct{}),
+		selected:    make(map[string]struct{}),
 	}
 }
 
@@ -109,11 +111,19 @@ func (s *SessionList) SetGroups(groups []data.SessionGroup) {
 
 // SetGroupsWithQuickStarts replaces the list content with grouped sessions and
 // optional "New session" rows under a dedicated group.
+//
+// This runs on every reload, including the background auto-refresh, so it must
+// preserve the expand/collapse state the user chose. Only a group that has
+// never been shown before gets the expanded default: an absent entry in
+// `expanded` otherwise means the user collapsed it.
 func (s *SessionList) SetGroupsWithQuickStarts(groups []data.SessionGroup, quickStarts []QuickStart) {
 	s.allItems = nil
 	s.selected = make(map[string]struct{})
 	if s.expanded == nil {
 		s.expanded = make(map[string]struct{})
+	}
+	if s.knownGroups == nil {
+		s.knownGroups = make(map[string]struct{})
 	}
 	for _, g := range groups {
 		s.allItems = append(s.allItems, displayItem{
@@ -121,23 +131,28 @@ func (s *SessionList) SetGroupsWithQuickStarts(groups []data.SessionGroup, quick
 			folderPath: g.Label,
 			count:      g.Count,
 		})
-		// Default to expanded on first encounter.
-		if _, ok := s.expanded[g.Label]; !ok {
-			s.expanded[g.Label] = struct{}{}
-		}
+		s.applyDefaultExpansion(g.Label)
 		for _, sess := range g.Sessions {
 			s.allItems = append(s.allItems, displayItem{session: sess})
 		}
 	}
 	if len(quickStarts) > 0 {
 		s.allItems = append(s.allItems, displayItem{isFolder: true, folderPath: quickStartGroupLabel, count: len(quickStarts)})
-		if _, ok := s.expanded[quickStartGroupLabel]; !ok {
-			s.expanded[quickStartGroupLabel] = struct{}{}
-		}
+		s.applyDefaultExpansion(quickStartGroupLabel)
 		s.appendQuickStarts(quickStarts)
 	}
 	s.treeMode = true
 	s.rebuildVisible()
+}
+
+// applyDefaultExpansion expands a group the first time it is displayed and
+// leaves the user's choice alone on every later reload.
+func (s *SessionList) applyDefaultExpansion(label string) {
+	if _, known := s.knownGroups[label]; known {
+		return
+	}
+	s.knownGroups[label] = struct{}{}
+	s.expanded[label] = struct{}{}
 }
 
 func (s *SessionList) appendQuickStarts(quickStarts []QuickStart) {
