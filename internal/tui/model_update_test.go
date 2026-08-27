@@ -4448,22 +4448,22 @@ func TestAttentionPriority(t *testing.T) {
 // Launch validation — graceful error handling for bad config
 // ---------------------------------------------------------------------------
 
-func TestResolveShellAndLaunch_UnknownShellName_FallsBackSilently(t *testing.T) {
+func TestResolveShellAndLaunch_UnknownShellName_WarnsAndUsesDefault(t *testing.T) {
 	m := newTestModel()
 	m.cfg.DefaultShell = "nonexistent-shell-999"
 	m.shells = nil
-	// An unknown configured shell name does NOT set statusErr: findShellByName
-	// silently falls back to platform.DefaultShell(), which resolves to a valid
-	// shell (cmd.exe on Windows), so the launch proceeds without any warning.
-	// This is inconsistent with the empty-path case below, which does warn.
-	// This test is named for what it actually verifies, not for the warning a
-	// reader might expect.
+	// An unknown configured shell name still launches, using the platform
+	// default, but it must say so. Substituting a different shell without
+	// telling the user leaves them believing their configured shell applied.
 	cmd := m.resolveShellAndLaunch("s1", "/test", config.LaunchModeTab)
 	if cmd == nil {
 		t.Fatal("unknown shell name should fall back to the platform default and return a launch cmd")
 	}
-	if m.statusErr != "" {
-		t.Errorf("unknown shell name should fall back silently, but statusErr = %q", m.statusErr)
+	if m.statusErr == "" {
+		t.Fatal("unknown shell name should report the substitution, but statusErr was empty")
+	}
+	if !strings.Contains(m.statusErr, "nonexistent-shell-999") {
+		t.Errorf("statusErr = %q, want it to name the configured shell that was not found", m.statusErr)
 	}
 }
 

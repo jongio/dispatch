@@ -402,6 +402,12 @@ func applyLegacyDefaults(isDark bool) {
 	GitMissingStyle = lipgloss.NewStyle().Foreground(le).Bold(true)
 
 	// Build a Theme struct so CurrentTheme() is never nil.
+	//
+	// The style fields must mirror the exported variables assigned above.
+	// CurrentTheme() is the only snapshot callers can take, so if these were
+	// left zero, the round-trip SetTheme(CurrentTheme()) would blank every
+	// exported style rather than restoring it. A zero lipgloss.Style also
+	// drops padding, which silently changes rendered widths.
 	primary := "#7C6FF4"
 	text := "#E4E4E7"
 	if !isDark {
@@ -422,6 +428,69 @@ func applyLegacyDefaults(isDark bool) {
 		StatusBg:   "#18181B",
 		HeaderBg:   "#111111",
 		IsDark:     isDark,
+
+		TitleStyle:       TitleStyle,
+		SubtitleStyle:    SubtitleStyle,
+		HeaderStyle:      HeaderStyle,
+		SelectedStyle:    SelectedStyle,
+		NormalStyle:      NormalStyle,
+		DimmedStyle:      DimmedStyle,
+		HiddenStyle:      HiddenStyle,
+		FavoritedStyle:   FavoritedStyle,
+		WaitingRowStyle:  WaitingRowStyle,
+		GroupHeaderStyle: GroupHeaderStyle,
+
+		BadgeStyle:       BadgeStyle,
+		ActiveBadgeStyle: ActiveBadgeStyle,
+
+		PreviewBorder: PreviewBorderStyle,
+		PreviewTitle:  PreviewTitleStyle,
+		PreviewLabel:  PreviewLabelStyle,
+		PreviewValue:  PreviewValueStyle,
+
+		OverlayStyle: OverlayStyle,
+		OverlayTitle: OverlayTitleStyle,
+
+		StatusBar:         StatusBarStyle,
+		SearchPrompt:      SearchPromptStyle,
+		ErrorStyle:        ErrorStyle,
+		SuccessStyle:      SuccessStyle,
+		DimStyle:          DimStyle,
+		KeyStyle:          KeyStyle,
+		SpinnerStyle:      SpinnerStyle,
+		SeparatorStyle:    SeparatorStyle,
+		ConfigLabel:       ConfigLabelStyle,
+		ConfigValue:       ConfigValueStyle,
+		ConfigDimmedValue: ConfigDimmedValue,
+
+		ChatUserBubble:      ChatUserBubbleStyle,
+		ChatAssistantBubble: ChatAssistantBubbleStyle,
+		ChatUserLabel:       ChatUserLabelStyle,
+		ChatAssistantLabel:  ChatAssistantLabelStyle,
+
+		AttentionWaitingStyle:     AttentionWaitingStyle,
+		AttentionActiveStyle:      AttentionActiveStyle,
+		AttentionStaleStyle:       AttentionStaleStyle,
+		AttentionIdleStyle:        AttentionIdleStyle,
+		AttentionInterruptedStyle: AttentionInterruptedStyle,
+		AttentionWorkingStyle:     AttentionWorkingStyle,
+		AttentionThinkingStyle:    AttentionThinkingStyle,
+		AttentionCompactingStyle:  AttentionCompactingStyle,
+
+		PlanIndicatorStyle: PlanIndicatorStyle,
+		NoteIndicatorStyle: NoteIndicatorStyle,
+		TagIndicatorStyle:  TagIndicatorStyle,
+
+		WorkCompleteStyle:   WorkCompleteStyle,
+		WorkIncompleteStyle: WorkIncompleteStyle,
+		WorkAnalyzingStyle:  WorkAnalyzingStyle,
+
+		GitCleanStyle:     GitCleanStyle,
+		GitDirtyStyle:     GitDirtyStyle,
+		GitUntrackedStyle: GitUntrackedStyle,
+		GitAheadStyle:     GitAheadStyle,
+		GitBehindStyle:    GitBehindStyle,
+		GitMissingStyle:   GitMissingStyle,
 	}
 }
 

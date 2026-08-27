@@ -3970,9 +3970,16 @@ const maxBatchLaunch = 50
 // selection state, and returns a tea.Batch of all commands. At most
 // maxBatchLaunch sessions are launched to prevent resource exhaustion.
 func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cmd {
+	// Clear any stale status, such as the multi-select count, up front. Doing
+	// this at the end instead would wipe the messages set below and the one the
+	// caller sets afterwards, which is how the limit notice and the resume
+	// notice both became unreachable.
+	m.statusInfo = ""
+
+	limited := false
 	if len(sessions) > maxBatchLaunch {
 		sessions = sessions[:maxBatchLaunch]
-		m.statusInfo = fmt.Sprintf("Launching first %d sessions (limit)", maxBatchLaunch)
+		limited = true
 	}
 	var cmds []tea.Cmd
 	skipped := 0
@@ -3987,8 +3994,11 @@ func (m *Model) batchLaunchSessions(sessions []data.Session, mode string) tea.Cm
 		}
 	}
 
-	// Keep selections intact after launch — user can deselect with 'd'.
-	m.statusInfo = ""
+	// Selections are intentionally kept intact after launch: the user can
+	// deselect with 'd'.
+	if limited {
+		m.statusInfo = fmt.Sprintf("Launching first %d sessions (limit)", maxBatchLaunch)
+	}
 	if skipped > 0 {
 		m.statusErr = fmt.Sprintf("Skipped %d session(s): workspace folder no longer exists", skipped)
 	}
@@ -4047,10 +4057,13 @@ func (m *Model) resolveShellAndLaunch(sessionID, cwd, mode string) tea.Cmd {
 	launchStyle := launchStyleForMode(mode)
 
 	if m.cfg.DefaultShell != "" {
-		sh := m.findShellByName(m.cfg.DefaultShell)
+		sh, found := m.findShellByName(m.cfg.DefaultShell)
 		if sh.Path == "" {
 			m.statusErr = fmt.Sprintf("Cannot launch: shell %q not found", m.cfg.DefaultShell)
 			return nil
+		}
+		if !found {
+			m.statusErr = fmt.Sprintf("Shell %q not detected; launching %s instead", m.cfg.DefaultShell, sh.Name)
 		}
 		return m.launchExternal(sh, sessionID, cwd, launchStyle)
 	}
@@ -4071,15 +4084,18 @@ func (m *Model) resolveShellAndLaunch(sessionID, cwd, mode string) tea.Cmd {
 	return nil
 }
 
-// findShellByName returns the detected ShellInfo matching name, or the
-// platform default if no match is found.
-func (m *Model) findShellByName(name string) platform.ShellInfo {
+// findShellByName returns the detected ShellInfo matching name. The second
+// result reports whether an exact match was found. When it is false the caller
+// still receives the platform default so a launch can proceed, but it must tell
+// the user which shell was actually used: silently substituting a different
+// shell than the one configured leaves the user believing their setting applied.
+func (m *Model) findShellByName(name string) (platform.ShellInfo, bool) {
 	for _, sh := range m.shells {
 		if sh.Name == name {
-			return sh
+			return sh, true
 		}
 	}
-	return platform.DefaultShell()
+	return platform.DefaultShell(), false
 }
 
 // resolveShellAndLaunchDirect launches a session without showing the shell
@@ -4090,8 +4106,11 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 	launchStyle := launchStyleForMode(mode)
 
 	var sh platform.ShellInfo
+	shellMissing := false
 	if m.cfg.DefaultShell != "" {
-		sh = m.findShellByName(m.cfg.DefaultShell)
+		var found bool
+		sh, found = m.findShellByName(m.cfg.DefaultShell)
+		shellMissing = !found
 	} else if len(m.shells) > 0 {
 		sh = m.shells[0]
 	} else {
@@ -4101,6 +4120,9 @@ func (m *Model) resolveShellAndLaunchDirect(sessionID, cwd, mode string) tea.Cmd
 	if sh.Path == "" {
 		m.statusErr = "Cannot launch: no shell detected on this system"
 		return nil
+	}
+	if shellMissing {
+		m.statusErr = fmt.Sprintf("Shell %q not detected; launching %s instead", m.cfg.DefaultShell, sh.Name)
 	}
 
 	return m.launchExternal(sh, sessionID, cwd, launchStyle)
@@ -4671,8 +4693,13 @@ func (m Model) handleResumeInterrupted() (tea.Model, tea.Cmd) {
 		mode = config.LaunchModeTab
 	}
 
-	m.statusInfo = fmt.Sprintf("Resuming %d interrupted sessions", len(sessions))
 	cmd := m.batchLaunchSessions(sessions, mode)
+	// Set this after the batch, which resets the stale selection status first.
+	// If the batch truncated the list its own limit notice is the more
+	// important message, so it wins.
+	if m.statusInfo == "" {
+		m.statusInfo = fmt.Sprintf("Resuming %d interrupted sessions", len(sessions))
+	}
 	return m, cmd
 }
 
@@ -4917,13 +4944,11 @@ func checkNerdFontCmd() tea.Cmd {
 	}
 }
 
-// openFileCmd opens a file using the platform default application. It checks
-// that the file exists before attempting to open it.
+// openFileCmd opens a file using the platform default application. Validation
+// of the path lives in platform.OpenFile so the failure message is consistent
+// with openDirCmd.
 func (m Model) openFileCmd(path string) tea.Cmd {
 	return func() tea.Msg {
-		if _, err := os.Stat(path); err != nil {
-			return fileOpenedMsg{path: path, err: fmt.Errorf("file not found: %s", path)}
-		}
 		err := platform.OpenFile(path)
 		return fileOpenedMsg{path: path, err: err}
 	}

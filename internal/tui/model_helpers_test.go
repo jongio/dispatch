@@ -896,7 +896,10 @@ func TestFindShellByName_Found(t *testing.T) {
 		{Name: "bash", Path: "/bin/bash"},
 		{Name: "zsh", Path: "/bin/zsh"},
 	}
-	got := m.findShellByName("zsh")
+	got, found := m.findShellByName("zsh")
+	if !found {
+		t.Error("findShellByName(zsh) found = false, want true for a detected shell")
+	}
 	if got.Name != "zsh" || got.Path != "/bin/zsh" {
 		t.Errorf("findShellByName(zsh) = %v", got)
 	}
@@ -907,9 +910,15 @@ func TestFindShellByName_NotFound(t *testing.T) {
 	m.shells = []platform.ShellInfo{
 		{Name: "bash", Path: "/bin/bash"},
 	}
-	got := m.findShellByName("nonexistent")
+	got, found := m.findShellByName("nonexistent")
+	if found {
+		t.Error("findShellByName(nonexistent) found = true, want false so callers can report the substitution")
+	}
 	if got.Path == "" {
-		t.Error("not found → should return DefaultShell with non-empty Path")
+		t.Error("not found should still return DefaultShell with a non-empty Path")
+	}
+	if got.Name == "nonexistent" {
+		t.Error("not found should return the platform default, not echo the requested name")
 	}
 }
 

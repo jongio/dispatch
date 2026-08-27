@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -162,6 +163,8 @@ func TestBatchLaunchSessions_Empty(t *testing.T) {
 func TestBatchLaunchSessions_UnderLimit(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.cfg = config.Default()
+	// A stale selection status must not survive the launch.
+	m.statusInfo = "2 selected"
 
 	sessions := []data.Session{
 		{ID: "s1", Cwd: "/tmp/a"},
@@ -173,7 +176,8 @@ func TestBatchLaunchSessions_UnderLimit(t *testing.T) {
 	if cmd == nil {
 		t.Error("batchLaunchSessions with valid sessions should return a non-nil command")
 	}
-	// statusInfo should be cleared
+	// Under the limit there is nothing to report, so the stale status is gone
+	// and no new one replaces it.
 	if m.statusInfo != "" {
 		t.Errorf("statusInfo should be empty, got %q", m.statusInfo)
 	}
@@ -194,7 +198,14 @@ func TestBatchLaunchSessions_ExceedsLimit(t *testing.T) {
 	if cmd == nil {
 		t.Error("batchLaunchSessions exceeding limit should still return a non-nil command")
 	}
-	// After batch launch, statusInfo is cleared (the limit message is set then cleared)
+	// The truncation notice must actually reach the user. It was previously
+	// set and then cleared before returning, so it could never be displayed.
+	if m.statusInfo == "" {
+		t.Fatal("statusInfo is empty; the batch limit notice must survive the call")
+	}
+	if !strings.Contains(m.statusInfo, strconv.Itoa(maxBatchLaunch)) {
+		t.Errorf("statusInfo = %q, want it to report the %d session limit", m.statusInfo, maxBatchLaunch)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -895,6 +906,14 @@ func TestHandleResumeInterrupted_WithInterrupted(t *testing.T) {
 	}
 	if rm.statusErr != "" {
 		t.Errorf("statusErr = %q, want empty (nothing should be skipped)", rm.statusErr)
+	}
+	// The resume notice must survive: batchLaunchSessions previously cleared
+	// statusInfo on the way out, so this message could never be displayed.
+	if rm.statusInfo == "" {
+		t.Fatal("statusInfo is empty; the resume notice must survive the batch launch")
+	}
+	if !strings.Contains(rm.statusInfo, "Resuming") {
+		t.Errorf("statusInfo = %q, want it to report the resume", rm.statusInfo)
 	}
 }
 

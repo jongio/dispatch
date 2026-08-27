@@ -26,7 +26,21 @@ func openCommand(ctx context.Context, path string) *exec.Cmd {
 // OpenFile opens the given file path using the platform default application.
 // On Windows it uses explorer.exe (avoids cmd.exe metacharacter injection),
 // on macOS "open", and on Linux "xdg-open".
+//
+// Like OpenDir, it returns an error if the path is empty or does not exist, so
+// callers get a clear message instead of a silent success. The OS openers do
+// not report a missing path through the exit status: explorer detaches
+// immediately and surfaces its own error window, so without this check a bad
+// path looks identical to a successful open. A directory is still accepted,
+// since every opener handles one and rejecting it would break callers that
+// pass a path they have not classified.
 func OpenFile(path string) error {
+	if path == "" {
+		return fmt.Errorf("no file to open")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("file not found: %s", path)
+	}
 	return openCommand(context.Background(), path).Start()
 }
 
