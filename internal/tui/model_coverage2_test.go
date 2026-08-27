@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jongio/dispatch/internal/data"
+	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
 // ---------------------------------------------------------------------------
@@ -276,8 +277,16 @@ func TestDeepSearchCmdCov_NilStore(t *testing.T) {
 func TestCloseStore_NoStore(t *testing.T) {
 	m := newTestModel()
 	m.store = nil
+	m.sessionsLoading = true
 
 	m.closeStore() // should not panic
+
+	if m.sessionsLoading {
+		t.Error("closeStore should clear sessionsLoading")
+	}
+	if m.store != nil {
+		t.Error("closeStore should leave store nil")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +339,9 @@ func TestHandleHeaderClick_Y0_SearchBar(t *testing.T) {
 	// Click on x=80 (well past the title) on line 0 — should focus search.
 	result, _ := m.handleHeaderClick(80, 0)
 	rm := result.(Model)
-	_ = rm
+	if !rm.searchBar.Focused() {
+		t.Error("clicking the header search area should focus the search bar")
+	}
 }
 
 func TestHandleHeaderClick_Y0_TitleArea(t *testing.T) {
@@ -368,7 +379,9 @@ func TestHandleKey_QuestionMark(t *testing.T) {
 	msg := tea.KeyPressMsg{Code: '?', Text: "?"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	_ = rm // verify no panic; ? may open help or attention picker
+	if rm.state != stateHelpOverlay {
+		t.Errorf("pressing '?' should open the help overlay: state = %v, want %v", rm.state, stateHelpOverlay)
+	}
 }
 
 func TestHandleKey_Slash_Search(t *testing.T) {
@@ -379,7 +392,9 @@ func TestHandleKey_Slash_Search(t *testing.T) {
 	msg := tea.KeyPressMsg{Code: '/', Text: "/"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	_ = rm // search should be activated
+	if !rm.searchBar.Focused() {
+		t.Error("pressing '/' should focus the search bar")
+	}
 }
 
 func TestHandleKey_S_Sort(t *testing.T) {
@@ -626,9 +641,19 @@ func TestUpdateCov_ClearStatusMsg(t *testing.T) {
 func TestUpdate_FontCheckMsg(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 
+	// handleFontCheck pushes the detected state into global styles; start from
+	// the opposite value so the change is observable, and restore afterward.
+	orig := styles.NerdFontEnabled()
+	t.Cleanup(func() { styles.SetNerdFontEnabled(orig) })
+	styles.SetNerdFontEnabled(false)
+
 	result, _ := m.Update(fontCheckMsg{installed: true})
 	rm := result.(Model)
-	_ = rm // just verify no panic
+	_ = rm
+
+	if !styles.NerdFontEnabled() {
+		t.Error("fontCheckMsg{installed: true} should enable nerd-font glyphs")
+	}
 }
 
 func TestUpdate_AttentionScannedMsg(t *testing.T) {

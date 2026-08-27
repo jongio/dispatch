@@ -209,36 +209,77 @@ func TestGroupOrder_DatePivot_AlwaysDescending(t *testing.T) {
 // resolveTheme
 // ---------------------------------------------------------------------------
 
+// setThemeBaseline sets a known baseline scheme (Campbell) so that resolveTheme's
+// effect (or lack of one) is observable via CurrentTheme().SchemeName. It returns
+// the baseline scheme name.
+//
+// Restoring is deliberately not SetTheme(CurrentTheme()). At process start the
+// exported style variables are assigned directly by applyLegacyDefaults, which
+// then builds a Theme carrying only colour fields, so its style fields are the
+// zero Style. Replaying that Theme through SetTheme would blank every exported
+// style, and because a zero Style has no padding the rendered widths change,
+// which silently breaks unrelated layout tests that run later in the same
+// process. ApplyAutoTheme rebuilds the complete default state through the same
+// path init() uses, so nothing leaks out of these tests.
+func setThemeBaseline(t *testing.T) string {
+	t.Helper()
+	origDark := styles.CurrentTheme().IsDark
+	t.Cleanup(func() { styles.ApplyAutoTheme(origDark) })
+	styles.SetTheme(styles.DeriveTheme(styles.Campbell))
+	return styles.CurrentTheme().SchemeName
+}
+
 func TestResolveTheme_AutoDoesNothing(t *testing.T) {
+	baseline := setThemeBaseline(t)
 	cfg := config.Default()
 	cfg.Theme = "auto"
-	// Should not panic or modify styles
 	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != baseline {
+		t.Errorf("auto theme should not change the active scheme: SchemeName = %q, want %q", got, baseline)
+	}
 }
 
 func TestResolveTheme_EmptyDoesNothing(t *testing.T) {
+	baseline := setThemeBaseline(t)
 	cfg := config.Default()
 	cfg.Theme = ""
 	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != baseline {
+		t.Errorf("empty theme should not change the active scheme: SchemeName = %q, want %q", got, baseline)
+	}
 }
 
 func TestResolveTheme_BuiltinScheme(t *testing.T) {
-	cfg := config.Default()
-	// Use a known built-in scheme name if available
+	baseline := setThemeBaseline(t)
 	names := styles.BuiltinSchemeNames()
-	if len(names) > 0 {
-		cfg.Theme = names[0]
-		resolveTheme(cfg) // should not panic
+	if len(names) == 0 {
+		t.Fatal("expected built-in schemes to be registered")
+	}
+	// Pick a built-in scheme that differs from the baseline so the change is observable.
+	want := names[0]
+	if want == baseline {
+		want = names[len(names)-1]
+	}
+	cfg := config.Default()
+	cfg.Theme = want
+	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != want {
+		t.Errorf("built-in scheme not applied: SchemeName = %q, want %q", got, want)
 	}
 }
 
 func TestResolveTheme_UnknownScheme(t *testing.T) {
+	baseline := setThemeBaseline(t)
 	cfg := config.Default()
 	cfg.Theme = "nonexistent-scheme-xyz"
-	resolveTheme(cfg) // should not panic, falls back to defaults
+	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != baseline {
+		t.Errorf("unknown scheme should fall back to defaults: SchemeName = %q, want %q", got, baseline)
+	}
 }
 
 func TestResolveTheme_UserDefinedScheme(t *testing.T) {
+	setThemeBaseline(t)
 	cfg := config.Default()
 	cfg.Theme = "MyCustomScheme"
 	cfg.Schemes = []config.ColorScheme{
@@ -252,16 +293,23 @@ func TestResolveTheme_UserDefinedScheme(t *testing.T) {
 			BrightCyan: "#61D6D6", BrightWhite: "#F2F2F2",
 		},
 	}
-	resolveTheme(cfg) // should apply the custom scheme
+	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != "MyCustomScheme" {
+		t.Errorf("user-defined scheme not applied: SchemeName = %q, want %q", got, "MyCustomScheme")
+	}
 }
 
 func TestResolveTheme_InvalidUserScheme(t *testing.T) {
+	baseline := setThemeBaseline(t)
 	cfg := config.Default()
 	cfg.Theme = "BadScheme"
 	cfg.Schemes = []config.ColorScheme{
 		{Name: "BadScheme"}, // empty colors → Validate() fails
 	}
-	resolveTheme(cfg) // should not panic, skips invalid scheme
+	resolveTheme(cfg)
+	if got := styles.CurrentTheme().SchemeName; got != baseline {
+		t.Errorf("invalid scheme should be skipped: SchemeName = %q, want %q", got, baseline)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -848,7 +896,10 @@ func TestFindShellByName_Found(t *testing.T) {
 		{Name: "bash", Path: "/bin/bash"},
 		{Name: "zsh", Path: "/bin/zsh"},
 	}
-	got := m.findShellByName("zsh")
+	got, found := m.findShellByName("zsh")
+	if !found {
+		t.Error("findShellByName(zsh) found = false, want true for a detected shell")
+	}
 	if got.Name != "zsh" || got.Path != "/bin/zsh" {
 		t.Errorf("findShellByName(zsh) = %v", got)
 	}
@@ -859,9 +910,15 @@ func TestFindShellByName_NotFound(t *testing.T) {
 	m.shells = []platform.ShellInfo{
 		{Name: "bash", Path: "/bin/bash"},
 	}
-	got := m.findShellByName("nonexistent")
+	got, found := m.findShellByName("nonexistent")
+	if found {
+		t.Error("findShellByName(nonexistent) found = true, want false so callers can report the substitution")
+	}
 	if got.Path == "" {
-		t.Error("not found → should return DefaultShell with non-empty Path")
+		t.Error("not found should still return DefaultShell with a non-empty Path")
+	}
+	if got.Name == "nonexistent" {
+		t.Error("not found should return the platform default, not echo the requested name")
 	}
 }
 

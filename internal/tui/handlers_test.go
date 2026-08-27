@@ -8,6 +8,7 @@ import (
 
 	"github.com/jongio/dispatch/internal/data"
 	"github.com/jongio/dispatch/internal/tui/components"
+	"github.com/jongio/dispatch/internal/tui/styles"
 )
 
 var errTestOpenDir = errors.New("directory not found: /tmp/work")
@@ -169,14 +170,37 @@ func TestHandleBackgroundColor_WithAutoTheme(t *testing.T) {
 
 func TestHandleBackgroundColor_WithNamedTheme(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	m.cfg.Theme = "dracula"
 
-	msg := tea.BackgroundColorMsg{}
-	m2, _ := m.handleBackgroundColor(msg)
+	// Establish a known baseline scheme so we can detect whether the
+	// handler wrongly re-applies the auto theme (which resets the active
+	// scheme name to "Default").
+	//
+	// Restoring via SetTheme(orig) would not work here: the process-start
+	// theme carries only colour fields, so replaying it blanks every
+	// exported style and changes rendered widths for later tests.
+	// ApplyAutoTheme rebuilds the same complete state init() does.
+	origDark := styles.CurrentTheme().IsDark
+	t.Cleanup(func() { styles.ApplyAutoTheme(origDark) })
+	styles.SetTheme(styles.DeriveTheme(styles.Campbell))
+	before := styles.CurrentTheme().SchemeName
 
-	// Named theme should not trigger auto-theme application, but
-	// hasDarkBackground is always set for other uses.
-	_ = m2.hasDarkBackground
+	m.cfg.Theme = "dracula" // a named (non-empty, non-auto) theme
+
+	msg := tea.BackgroundColorMsg{} // nil color is treated as dark
+	m2, cmd := m.handleBackgroundColor(msg)
+
+	// The dark-background flag is always set from the message.
+	if !m2.hasDarkBackground {
+		t.Error("hasDarkBackground should be true for a dark background color")
+	}
+	// A named theme must NOT trigger auto-theme application, so the active
+	// scheme name must be left untouched.
+	if got := styles.CurrentTheme().SchemeName; got != before {
+		t.Errorf("named theme re-applied auto theme: SchemeName = %q, want %q", got, before)
+	}
+	if cmd != nil {
+		t.Error("handleBackgroundColor should return nil cmd")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -199,12 +223,18 @@ func TestHandleSessionsChanged_WithNilStore(t *testing.T) {
 
 func TestHandleSessionsChanged_WithNilDBWatchCh(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
-	m.store = nil
+	m.store = openBehavioralFlowStore(t)
 	m.dbWatchCh = nil
 
-	// Should not panic even with nil channel.
-	m2, _ := m.handleSessionsChanged()
-	_ = m2
+	// With a nil watch channel, waitForDBChangeCmd returns nil, but the
+	// store is set so a load command must still be produced. tea.Batch
+	// drops the nil watch command and returns the surviving load command.
+	m2, cmd := m.handleSessionsChanged()
+
+	if cmd == nil {
+		t.Error("handleSessionsChanged should still return the load cmd with a nil watch channel")
+	}
+	_ = m2 // model passes through unchanged
 }
 
 func TestHandleSessionsChanged_LoadingIndicator(t *testing.T) {
@@ -248,12 +278,12 @@ func TestHandleAttentionTick_ReturnsCmd(t *testing.T) {
 
 	m2, cmd := m.handleAttentionTick()
 
-	// scanAttentionCmd returns nil when there are no sessions with valid cwds,
-	// or a tea.Cmd that scans attention states.
-	// The model should pass through unchanged.
-	_ = m2
-	// cmd may be nil (no sessions with state dirs) or non-nil — both valid.
-	_ = cmd
+	// scanAttentionCmd always returns a non-nil command that scans
+	// attention states, regardless of the current sessions.
+	if cmd == nil {
+		t.Error("handleAttentionTick should always return a non-nil scan cmd")
+	}
+	_ = m2 // model passes through unchanged
 }
 
 func TestHandleAttentionTick_EmptySessions(t *testing.T) {

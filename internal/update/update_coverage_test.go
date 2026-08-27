@@ -852,14 +852,38 @@ func TestValidateVersion_Parallel(t *testing.T) {
 
 func TestReleaseUpdateLock_Nil(t *testing.T) {
 	t.Parallel()
-	// Should not panic.
-	releaseUpdateLock(nil)
+	// A nil lock is a no-op: it must not panic and must not touch the
+	// filesystem. Place a sentinel file and confirm it survives the call.
+	// (Removing the nil guard would panic here, failing the test.)
+	dir := t.TempDir()
+	sentinel := filepath.Join(dir, "sentinel.lock")
+	if err := os.WriteFile(sentinel, []byte("keep"), cacheFilePerm); err != nil {
+		t.Fatalf("writing sentinel: %v", err)
+	}
+
+	releaseUpdateLock(nil) // must not panic
+
+	if _, err := os.Stat(sentinel); err != nil {
+		t.Errorf("releaseUpdateLock(nil) must not remove unrelated files: %v", err)
+	}
 }
 
 func TestReleaseUpdateLock_EmptyPath(t *testing.T) {
 	t.Parallel()
-	// Should not panic.
-	releaseUpdateLock(&updateLock{path: ""})
+	// An empty lock path is a no-op: the guard short-circuits before any
+	// os.Remove call. The primary contract is no-panic; we additionally
+	// assert an unrelated pre-existing file is left untouched.
+	dir := t.TempDir()
+	sentinel := filepath.Join(dir, "sentinel.lock")
+	if err := os.WriteFile(sentinel, []byte("keep"), cacheFilePerm); err != nil {
+		t.Fatalf("writing sentinel: %v", err)
+	}
+
+	releaseUpdateLock(&updateLock{path: ""}) // must not panic
+
+	if _, err := os.Stat(sentinel); err != nil {
+		t.Errorf("releaseUpdateLock with empty path must not remove unrelated files: %v", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1049,15 +1073,41 @@ func TestCopyFile_DstDirMissing(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestWriteCache_EmptyPath(t *testing.T) {
-	t.Parallel()
-	// When path is empty AND cachePath() can't resolve, writeCache should
-	// silently return without panic.
-	writeCache("", &updateCache{
-		CheckedAt:      time.Now(),
-		LatestVersion:  "1.0.0",
+	// When path is empty, writeCache resolves the default cache location via
+	// cachePath()/ConfigDir and writes there. Point the config dir at a temp
+	// location and assert the cache file lands at the resolved path with the
+	// data we passed. (setConfigDir uses t.Setenv, so no t.Parallel.)
+	tmpDir := t.TempDir()
+	setConfigDir(t, tmpDir)
+
+	dir, err := configDirForTest(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := filepath.Join(dir, cacheFileName)
+	if _, err := os.Stat(wantPath); err == nil {
+		t.Fatalf("cache file already exists before writeCache: %s", wantPath)
+	}
+
+	cache := &updateCache{
+		CheckedAt:      time.Now().Truncate(time.Second),
+		LatestVersion:  "1.2.3",
 		CurrentVersion: "1.0.0",
-	})
-	// No assertion — just verify no panic.
+	}
+	writeCache("", cache)
+
+	raw, err := os.ReadFile(wantPath)
+	if err != nil {
+		t.Fatalf("writeCache(\"\") should write to the resolved cache path %s: %v", wantPath, err)
+	}
+	var got updateCache
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("cache file is not valid JSON: %v", err)
+	}
+	if got.LatestVersion != cache.LatestVersion || got.CurrentVersion != cache.CurrentVersion {
+		t.Errorf("cache = {latest %q, current %q}, want {latest %q, current %q}",
+			got.LatestVersion, got.CurrentVersion, cache.LatestVersion, cache.CurrentVersion)
+	}
 }
 
 func TestWriteCache_ExplicitPath(t *testing.T) {
@@ -1332,19 +1382,25 @@ func TestAcquireUpdateLock_CreatesMetadata(t *testing.T) {
 
 func TestWriteCache_UnwritableDir(t *testing.T) {
 	t.Parallel()
-	// Path in a non-existent deeply nested location.
-	// writeCache should silently fail (no panic, no error return).
-	badPath := filepath.Join(t.TempDir(), "no", "permissions", "cache.json")
-	writeCache(badPath, &updateCache{
+	// Make writeCache's os.MkdirAll fail deterministically on every OS by
+	// using a regular file as a parent directory component: MkdirAll cannot
+	// create a directory whose ancestor is a file. writeCache is best-effort,
+	// so it must not panic and must not leave a cache file behind.
+	tmpDir := t.TempDir()
+	blocker := filepath.Join(tmpDir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), cacheFilePerm); err != nil {
+		t.Fatalf("writing blocker file: %v", err)
+	}
+	dstPath := filepath.Join(blocker, "cache.json") // parent "blocker" is a file
+
+	writeCache(dstPath, &updateCache{
 		CheckedAt:      time.Now(),
 		LatestVersion:  "1.0.0",
 		CurrentVersion: "1.0.0",
 	})
-	// Verify it was actually written (MkdirAll succeeds for nested dirs
-	// in a temp directory). This tests the success path through MkdirAll.
-	if _, err := os.Stat(badPath); err != nil {
-		// If it failed, that's OK — writeCache is best-effort.
-		t.Log("writeCache failed for nested path (expected in some environments)")
+
+	if _, err := os.Stat(dstPath); err == nil {
+		t.Error("writeCache must not create a cache file when the parent directory is unwritable")
 	}
 }
 

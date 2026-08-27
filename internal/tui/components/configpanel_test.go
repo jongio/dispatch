@@ -418,9 +418,11 @@ func TestConfigPanel_View_ResumeSessionCommandHelp(t *testing.T) {
 func TestConfigPanel_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	cp := NewConfigPanel()
-	_ = cp.View() // zero size
+	_ = cp.View() // zero size must not panic
 	cp.SetSize(80, 40)
-	_ = cp.View()
+	if got := cp.View(); got == "" {
+		t.Error("View() with a size should render a non-empty overlay")
+	}
 }
 
 // ---------------------------------------------------------------------------

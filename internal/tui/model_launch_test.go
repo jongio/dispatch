@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -162,6 +163,8 @@ func TestBatchLaunchSessions_Empty(t *testing.T) {
 func TestBatchLaunchSessions_UnderLimit(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.cfg = config.Default()
+	// A stale selection status must not survive the launch.
+	m.statusInfo = "2 selected"
 
 	sessions := []data.Session{
 		{ID: "s1", Cwd: "/tmp/a"},
@@ -173,7 +176,8 @@ func TestBatchLaunchSessions_UnderLimit(t *testing.T) {
 	if cmd == nil {
 		t.Error("batchLaunchSessions with valid sessions should return a non-nil command")
 	}
-	// statusInfo should be cleared
+	// Under the limit there is nothing to report, so the stale status is gone
+	// and no new one replaces it.
 	if m.statusInfo != "" {
 		t.Errorf("statusInfo should be empty, got %q", m.statusInfo)
 	}
@@ -194,7 +198,14 @@ func TestBatchLaunchSessions_ExceedsLimit(t *testing.T) {
 	if cmd == nil {
 		t.Error("batchLaunchSessions exceeding limit should still return a non-nil command")
 	}
-	// After batch launch, statusInfo is cleared (the limit message is set then cleared)
+	// The truncation notice must actually reach the user. It was previously
+	// set and then cleared before returning, so it could never be displayed.
+	if m.statusInfo == "" {
+		t.Fatal("statusInfo is empty; the batch limit notice must survive the call")
+	}
+	if !strings.Contains(m.statusInfo, strconv.Itoa(maxBatchLaunch)) {
+		t.Errorf("statusInfo = %q, want it to report the %d session limit", m.statusInfo, maxBatchLaunch)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -461,8 +472,15 @@ func TestHandleReindexClick_NilCancel(t *testing.T) {
 	btnX := startX + (overlayW-len(btnLabel))/2
 
 	msg := tea.MouseReleaseMsg{X: btnX + 1, Y: btnY, Button: tea.MouseLeft}
-	// Should not panic with nil cancel handle
+	// Should not panic with nil cancel handle, and the cancel path should run.
 	m.handleReindexClick(msg)
+
+	if m.reindexing {
+		t.Error("clicking Cancel should stop reindexing even with a nil cancel handle")
+	}
+	if m.statusInfo != statusReindexCancelled {
+		t.Errorf("statusInfo = %q, want %q", m.statusInfo, statusReindexCancelled)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +842,14 @@ func TestHandleJumpNextAttention_WithWaiting(t *testing.T) {
 
 	result, _ := m.handleJumpNextAttention()
 	rm := result.(Model)
-	_ = rm
+	// The only waiting session is s2 at index 1; the cursor should jump to it
+	// and the detail should be reloaded (detailVersion bumped).
+	if got := rm.sessionList.Cursor(); got != 1 {
+		t.Errorf("cursor = %d, want 1 (waiting session s2)", got)
+	}
+	if rm.detailVersion != m.detailVersion+1 {
+		t.Errorf("detailVersion = %d, want %d", rm.detailVersion, m.detailVersion+1)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -872,9 +897,24 @@ func TestHandleResumeInterrupted_WithInterrupted(t *testing.T) {
 		"s2": data.AttentionIdle,
 	}
 
-	result, _ := m.handleResumeInterrupted()
+	result, cmd := m.handleResumeInterrupted()
 	rm := result.(Model)
-	_ = rm
+	// s1 is interrupted and present in the loaded sessions, so a batch launch
+	// command must be produced and nothing should be reported as skipped.
+	if cmd == nil {
+		t.Error("expected a batch launch cmd for the interrupted session, got nil")
+	}
+	if rm.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty (nothing should be skipped)", rm.statusErr)
+	}
+	// The resume notice must survive: batchLaunchSessions previously cleared
+	// statusInfo on the way out, so this message could never be displayed.
+	if rm.statusInfo == "" {
+		t.Fatal("statusInfo is empty; the resume notice must survive the batch launch")
+	}
+	if !strings.Contains(rm.statusInfo, "Resuming") {
+		t.Errorf("statusInfo = %q, want it to report the resume", rm.statusInfo)
+	}
 }
 
 func TestHandleResumeInterrupted_InterruptedNotInView(t *testing.T) {

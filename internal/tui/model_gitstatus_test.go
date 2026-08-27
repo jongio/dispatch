@@ -169,9 +169,30 @@ func TestDemoGitStatuses(t *testing.T) {
 // TestSyncPreviewGitStatus_NilDetail verifies syncing with no loaded detail is
 // safe and clears the preview's git status.
 func TestSyncPreviewGitStatus_NilDetail(t *testing.T) {
-	m := newTestModel()
+	m := newTestModelWithSize(120, 30)
+
+	// Give the preview a rendered detail and a populated git status so its
+	// git section is visible, proving there is state to clear.
+	m.preview.SetSize(80, 40)
+	m.preview.SetDetail(&data.SessionDetail{
+		Session: data.Session{ID: "sess-1", Branch: "main", Cwd: "/home/me/proj"},
+	})
+	m.preview.SetGitStatus(platform.GitStatus{
+		Exists: true, IsRepo: true, Branch: "main",
+		Upstream: "origin/main", HasUpstream: true, Ahead: 3, Behind: 2,
+	})
+	if !strings.Contains(m.preview.View(), "Push/Pull") {
+		t.Fatal("setup: preview should render a git section before clearing")
+	}
+
+	// Syncing with no loaded detail must clear the git status (and must not
+	// panic dereferencing a nil detail).
 	m.detail = nil
-	m.syncPreviewGitStatus() // must not panic
+	m.syncPreviewGitStatus()
+
+	if strings.Contains(m.preview.View(), "Push/Pull") {
+		t.Error("syncPreviewGitStatus with nil detail should clear the preview git section")
+	}
 }
 
 func TestGitStatusKeybinding(t *testing.T) {

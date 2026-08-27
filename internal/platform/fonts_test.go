@@ -3,6 +3,7 @@ package platform
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -116,12 +117,35 @@ func TestHasNerdFontFiles_TableDriven(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// IsNerdFontInstalled (smoke test)
+// IsNerdFontInstalled
 // ---------------------------------------------------------------------------
 
-func TestIsNerdFontInstalled_ReturnsBool(t *testing.T) {
-	t.Parallel()
-	// Result depends on system; verify no crash and log result for visibility.
-	installed := IsNerdFontInstalled()
-	t.Logf("IsNerdFontInstalled() = %v", installed)
+func TestIsNerdFontInstalled_DetectsFontInUserDir(t *testing.T) {
+	// Point the per-user font directory at a temp dir that contains a Nerd
+	// Font so IsNerdFontInstalled has a deterministic answer regardless of
+	// what is actually installed on the host. The dispatcher must route to
+	// the OS-appropriate helper and report true.
+	home := t.TempDir()
+	var fontDir string
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("LOCALAPPDATA", home)
+		fontDir = filepath.Join(home, "Microsoft", "Windows", "Fonts")
+	case "darwin":
+		t.Setenv("HOME", home)
+		fontDir = filepath.Join(home, "Library", "Fonts")
+	default:
+		t.Setenv("HOME", home)
+		fontDir = filepath.Join(home, ".local", "share", "fonts")
+	}
+	if err := os.MkdirAll(fontDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fontDir, "JetBrainsMonoNerdFont-Regular.ttf"), []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !IsNerdFontInstalled() {
+		t.Error("IsNerdFontInstalled() = false, want true when a Nerd Font .ttf is present in the user font directory")
+	}
 }

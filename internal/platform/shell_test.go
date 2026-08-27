@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -559,15 +560,42 @@ func TestNewResumeCmd_IgnoresInvalidCwd(t *testing.T) {
 // FindCLIBinary
 // ---------------------------------------------------------------------------
 
-func TestFindCLIBinary_ReturnsStringOrEmpty(t *testing.T) {
-	// FindCLIBinary should either find a binary or return empty.
-	// We can't guarantee ghcs/copilot is installed, but we verify
-	// it doesn't panic and returns a valid result.
-	result := FindCLIBinary()
-	// Result is either empty or a path.
-	if result != "" {
-		// If found, it should be an absolute path or at least non-empty.
-		t.Logf("FindCLIBinary found: %s", result)
+func TestFindCLIBinary_FindsOnPathAndEmptyWhenAbsent(t *testing.T) {
+	// Negative: with PATH pointing at an empty dir, neither copilot nor ghcs
+	// can be resolved, so FindCLIBinary must return "".
+	t.Setenv("PATH", t.TempDir())
+	if got := FindCLIBinary(); got != "" {
+		t.Errorf("FindCLIBinary() = %q, want \"\" when copilot/ghcs are not on PATH", got)
+	}
+
+	// Positive: create a fake "copilot" executable on a controlled PATH and
+	// confirm FindCLIBinary resolves to it. A non-empty result must be an
+	// absolute path to a file that actually exists on disk.
+	dir := t.TempDir()
+	name := "copilot"
+	if runtime.GOOS == "windows" {
+		name = "copilot.exe"
+		// Ensure .EXE is a recognized executable extension for LookPath.
+		t.Setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
+	}
+	fake := filepath.Join(dir, name)
+	if err := os.WriteFile(fake, []byte(""), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	got := FindCLIBinary()
+	if got == "" {
+		t.Fatal("FindCLIBinary() = \"\", want the fake copilot resolved from PATH")
+	}
+	if !filepath.IsAbs(got) {
+		t.Errorf("FindCLIBinary() = %q, want an absolute path", got)
+	}
+	if filepath.Dir(got) != dir {
+		t.Errorf("FindCLIBinary() = %q, want a path inside %q", got, dir)
+	}
+	if _, err := os.Stat(got); err != nil {
+		t.Errorf("FindCLIBinary() = %q, but that path does not exist: %v", got, err)
 	}
 }
 

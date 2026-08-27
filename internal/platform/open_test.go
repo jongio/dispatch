@@ -8,16 +8,39 @@ import (
 	"testing"
 )
 
-func TestOpenFile_NonExistentPath(t *testing.T) {
+func TestOpenFile_EmptyPath(t *testing.T) {
 	t.Parallel()
-	// OpenFile should not panic even for a non-existent path.
-	// It will start the OS opener which may fail silently or report
-	// an error through its own UI. We only verify no Go-level panic.
-	err := OpenFile("/nonexistent/path/that/does/not/exist.txt")
-	// On Windows cmd /c start returns immediately without error even for
-	// missing paths; on Linux/macOS xdg-open/open may or may not error.
-	// We just verify no panic occurred.
-	_ = err
+	if err := OpenFile(""); err == nil {
+		t.Error("OpenFile(\"\") = nil, want an error for an empty path")
+	}
+}
+
+func TestOpenFile_MissingPath(t *testing.T) {
+	t.Parallel()
+	// The OS openers detach and report a missing path through their own UI,
+	// not through the exit status, so OpenFile must reject it up front or a
+	// bad path is indistinguishable from a successful open.
+	missing := filepath.Join(t.TempDir(), "does-not-exist.txt")
+	if err := OpenFile(missing); err == nil {
+		t.Error("OpenFile() = nil, want an error for a path that does not exist")
+	}
+}
+
+func TestOpenFile_ErrorWhenOpenerUnavailable(t *testing.T) {
+	// Past validation, OpenFile launches the platform opener
+	// (explorer/open/xdg-open) and returns that process's start error. Use a
+	// file that really exists so validation passes, then point PATH at an
+	// empty dir so the opener cannot be resolved, and confirm the launch
+	// failure is surfaced rather than swallowed.
+	// (Cannot use t.Parallel with t.Setenv.)
+	existing := filepath.Join(t.TempDir(), "real.txt")
+	if err := os.WriteFile(existing, []byte("x"), 0o600); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	if err := OpenFile(existing); err == nil {
+		t.Error("OpenFile() = nil, want an error when the platform opener cannot be started")
+	}
 }
 
 func TestOpenCommand_PerOS(t *testing.T) {

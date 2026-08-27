@@ -373,3 +373,46 @@ func TestSetTheme_UpdatesExportedVars(t *testing.T) {
 		t.Error("TitleStyle.Render produced empty string after SetTheme")
 	}
 }
+
+// TestSetTheme_CurrentThemeRoundTrips proves that snapshotting the active theme
+// and replaying it restores the exported styles unchanged.
+//
+// applyLegacyDefaults assigns the exported style variables directly, so if the
+// Theme it builds did not also carry those styles, this round-trip would copy
+// zero Styles over every exported variable instead of restoring them. That
+// failure is silent: a zero lipgloss.Style still renders, it just loses padding
+// and colour, which changes rendered widths for anything laid out afterwards.
+// Several tests here and in internal/tui rely on exactly this save and restore.
+func TestSetTheme_CurrentThemeRoundTrips(t *testing.T) {
+	ApplyAutoTheme(true)
+	t.Cleanup(func() { ApplyAutoTheme(true) })
+
+	snapshot := CurrentTheme()
+	styleByName := func() map[string]string {
+		return map[string]string{
+			"TitleStyle":         TitleStyle.Render("x"),
+			"StatusBarStyle":     StatusBarStyle.Render("x"),
+			"PreviewBorderStyle": PreviewBorderStyle.Render("x"),
+			"BadgeStyle":         BadgeStyle.Render("x"),
+			"SelectedStyle":      SelectedStyle.Render("x"),
+			"GitDirtyStyle":      GitDirtyStyle.Render("x"),
+		}
+	}
+	want := styleByName()
+
+	// Guard the guard: if the defaults rendered as bare text, the comparison
+	// below would pass even against a blanked style and prove nothing.
+	if want["TitleStyle"] == "x" && want["StatusBarStyle"] == "x" {
+		t.Fatal("legacy default styles render as plain text, so this test cannot detect a blanked style")
+	}
+
+	// Switch away, then replay the snapshot taken before the switch.
+	SetTheme(DeriveTheme(Campbell))
+	SetTheme(snapshot)
+
+	for name, got := range styleByName() {
+		if got != want[name] {
+			t.Errorf("%s not restored by SetTheme(CurrentTheme()): got %q, want %q", name, got, want[name])
+		}
+	}
+}

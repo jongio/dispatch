@@ -488,7 +488,7 @@ func TestQuickSearchFoldsNonASCIICase(t *testing.T) {
 // case-variant in the stored text is a non-ASCII character (Turkish "İ").
 func TestNeedsNormalization(t *testing.T) {
 	if !normReady {
-		t.Skip("match normalization function not registered")
+		t.Fatal("match normalization function not registered: needsNormalization would then return false for every term, making the whole normalization matching path dead code and this table wrong")
 	}
 	cases := []struct {
 		term string

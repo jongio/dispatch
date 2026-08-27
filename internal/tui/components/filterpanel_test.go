@@ -259,14 +259,16 @@ func TestFilterPanel_View_WithFolders(t *testing.T) {
 func TestFilterPanel_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	fp := NewFilterPanel()
-	// Zero size.
+	// Zero size must not panic.
 	_ = fp.View()
 	// With size.
 	fp.SetSize(80, 40)
 	_ = fp.View()
 	// With folders.
 	fp.SetFolders([]string{"/a/b", "/a/c", "/d/e"}, nil)
-	_ = fp.View()
+	if got := fp.View(); got == "" {
+		t.Error("View() with a size and folders should render a non-empty overlay")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -291,8 +293,21 @@ func TestFilterPanel_ActiveBadges_WithExclusions(t *testing.T) {
 func TestFilterPanel_SetActive_NoOp(t *testing.T) {
 	t.Parallel()
 	fp := NewFilterPanel()
-	// Should not panic.
+	fp.SetFolders([]string{"/home/x", "/home/y"}, []string{"/home/x"})
+
+	// SetActive is a documented no-op: the applied exclusions and active
+	// state must be identical before and after the call.
+	beforeActive := fp.HasActive()
+	beforeApplied := strings.Join(fp.applied, ",")
+
 	fp.SetActive(FilterFolder, "test")
+
+	if fp.HasActive() != beforeActive {
+		t.Errorf("SetActive mutated HasActive: got %v, want %v", fp.HasActive(), beforeActive)
+	}
+	if after := strings.Join(fp.applied, ","); after != beforeApplied {
+		t.Errorf("SetActive mutated applied: got %q, want %q", after, beforeApplied)
+	}
 }
 
 func TestFilterPanel_Toggle_BackwardCompat(t *testing.T) {

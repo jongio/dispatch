@@ -212,9 +212,11 @@ func TestFilePicker_View_ShowsWarning(t *testing.T) {
 func TestFilePicker_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	fp := NewFilePicker()
-	_ = fp.View() // zero files, zero size
+	_ = fp.View() // zero files, zero size must not panic
 	fp.SetSize(80, 40)
 	_ = fp.View() // with size but no files
 	fp.SetFiles([]data.SessionFile{{FilePath: "test.go"}})
-	_ = fp.View() // full setup
+	if got := fp.View(); got == "" {
+		t.Error("View() with a size and files should render a non-empty overlay")
+	}
 }

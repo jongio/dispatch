@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -51,22 +52,32 @@ func TestAnsiRegex_StripsSGR(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestChronicleReindex_CancelledContext(t *testing.T) {
-	// Use an already-cancelled context. If the binary is not found,
-	// ErrCopilotNotFound is returned before ctx is checked — that's fine.
-	// If the binary IS found, the cancelled ctx should cause
-	// ErrReindexCancelled after startPTY returns.
+	// An already-cancelled context must never yield a successful reindex.
+	// Two deterministic outcomes are possible depending on the environment:
+	//   - the Copilot binary is missing, so ErrCopilotNotFound is returned
+	//     before the context is even consulted; or
+	//   - the binary is found, and the cancelled context short-circuits the
+	//     first collect() via its ctx.Done() branch (ErrReindexCancelled),
+	//     or PTY startup fails.
+	// In every case the result is a NON-NIL error, and the call returns
+	// promptly instead of running the full multi-minute reindex timeline
+	// (startupWait + reindexTimeout + exitWait ~= 145s). Both properties are
+	// what "cancellation honored" means here.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	var lines []string
-	err := ChronicleReindex(ctx, func(line string) {
-		lines = append(lines, line)
-	})
+	done := make(chan error, 1)
+	go func() {
+		done <- ChronicleReindex(ctx, func(string) {})
+	}()
 
-	// Either ErrCopilotNotFound (no binary) or ErrReindexCancelled (binary found + ctx cancel)
-	if err != nil && err != ErrCopilotNotFound && err != ErrReindexCancelled {
-		// Also accept PTY startup errors when context is cancelled
-		t.Logf("ChronicleReindex with cancelled ctx: %v (acceptable)", err)
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("ChronicleReindex with a cancelled context returned nil; a cancelled reindex must not report success")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("ChronicleReindex did not honor context cancellation within 30s (work was not stopped early)")
 	}
 }
 
@@ -75,21 +86,27 @@ func TestChronicleReindex_CancelledContext(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestChronicleReindex_NilCallback(t *testing.T) {
-	// Verify nil onLine callback doesn't panic, regardless of whether
-	// the copilot binary is installed. Use an already-cancelled context
-	// so the function returns quickly even if the binary is found.
+	// Passing a nil onLine callback must never panic: the internal status()
+	// and emit() helpers guard every callback invocation with a nil check.
+	// With an already-cancelled context the call also returns promptly with
+	// a non-nil error (either ErrCopilotNotFound or ErrReindexCancelled), so
+	// we assert both the no-panic contract (implicit) and the non-nil,
+	// bounded-time return.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	err := ChronicleReindex(ctx, nil)
-	// Any of these outcomes is acceptable:
-	// - ErrCopilotNotFound (binary not installed)
-	// - ErrReindexCancelled (binary found, context cancelled)
-	// - other error (PTY start failed)
-	// The only unacceptable outcome is a panic (which would crash the test).
-	if err == nil {
-		// nil is also acceptable — means it completed before noticing cancellation.
-		t.Log("ChronicleReindex returned nil (completed before cancellation)")
+	done := make(chan error, 1)
+	go func() {
+		done <- ChronicleReindex(ctx, nil) // nil callback must not panic
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("ChronicleReindex(ctx, nil) with a cancelled context returned nil; expected a non-nil error")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("ChronicleReindex(ctx, nil) did not return within 30s")
 	}
 }
 

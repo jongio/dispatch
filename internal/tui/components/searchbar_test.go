@@ -114,7 +114,9 @@ func TestSearchBar_SetWidth(t *testing.T) {
 func TestSearchBar_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	sb := NewSearchBar()
-	_ = sb.View()
+	if got := sb.View(); got == "" {
+		t.Error("View() should render a non-empty bar (prompt is always shown)")
+	}
 }
 
 func TestSearchBar_View_ShowsResultCount(t *testing.T) {

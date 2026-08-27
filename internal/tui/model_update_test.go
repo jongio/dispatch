@@ -170,9 +170,16 @@ func TestUpdate_SpinnerTick(t *testing.T) {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	m.spinner = s
-	// Just verify it doesn't panic and returns a model.
-	result, _ := m.Update(s.Tick())
-	_ = result.(Model)
+	result, cmd := m.Update(s.Tick())
+	rm := result.(Model)
+	// A spinner tick must schedule the next tick so the animation continues,
+	// and advance the current frame.
+	if cmd == nil {
+		t.Error("spinner tick should return a non-nil cmd to schedule the next frame")
+	}
+	if rm.spinner.View() == m.spinner.View() {
+		t.Error("spinner tick should advance the animation frame")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1036,7 +1043,16 @@ func TestHandleKey_JumpHomeEnd(t *testing.T) {
 func TestCloseStore_NilStore(t *testing.T) {
 	m := newTestModel()
 	m.store = nil
+	m.sessionsLoading = true
+
 	m.closeStore() // should not panic
+
+	if m.sessionsLoading {
+		t.Error("closeStore should clear sessionsLoading")
+	}
+	if m.store != nil {
+		t.Error("closeStore should leave store nil")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1454,13 +1470,18 @@ func TestLaunchWithMode_NoSelection(t *testing.T) {
 
 func TestLaunchWithMode_InPlace(t *testing.T) {
 	m := newTestModel()
+	// A valid resume template makes NewResumeCmd deterministic (no real CLI needed).
+	m.cfg.ResumeSessionCommand = "echo {sessionId}"
 	m.sessionList.SetSessions([]data.Session{{ID: "s1", Cwd: "/test"}})
-	// launchInPlace may fail since there's no real copilot CLI, but
-	// we just need to verify it doesn't panic and returns a cmd or nil.
+
 	cmd := m.launchWithMode(config.LaunchModeInPlace)
-	// Could be nil if platform.NewResumeCmd fails, that's ok.
-	// The key assertion is no panic; cmd value depends on platform.
-	_ = cmd == nil // suppress unused warning while documenting the check
+
+	if cmd == nil {
+		t.Error("launchWithMode(in-place) with a valid resume template should return a non-nil cmd")
+	}
+	if m.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty", m.statusErr)
+	}
 }
 
 func TestLaunchWithMode_External_SingleShell(t *testing.T) {
@@ -1665,28 +1686,52 @@ func TestHandleConfigKey_EscapeClosesPanel(t *testing.T) {
 }
 
 func TestHandleConfigKey_UpDown(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModel()
 	m.state = stateConfigPanel
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetValues(components.ConfigValues{})
 
-	// Down
-	result, _ := m.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
-	_ = result.(Model)
+	// Down moves the cursor from the Yolo row (0) to the Agent row (1);
+	// pressing Enter on a text field begins editing.
+	down, _ := m.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	dm := down.(Model)
+	edited, _ := dm.handleConfigKey(enterKeyMsg())
+	em := edited.(Model)
+	if !em.configPanel.IsEditing() {
+		t.Error("Down then Enter should begin editing the Agent text field")
+	}
 
-	// Up
-	result, _ = m.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyUp})
-	_ = result.(Model)
+	// From the Agent row, Up returns to the Yolo row (0); pressing Enter there
+	// toggles the boolean instead of entering edit mode.
+	up, _ := dm.handleConfigKey(tea.KeyPressMsg{Code: tea.KeyUp})
+	um := up.(Model)
+	toggled, _ := um.handleConfigKey(enterKeyMsg())
+	ym := toggled.(Model)
+	if ym.configPanel.IsEditing() {
+		t.Error("Up to the Yolo row then Enter should not enter edit mode")
+	}
+	if !ym.configPanel.Values().YoloMode {
+		t.Error("Enter on the Yolo row should toggle YoloMode on")
+	}
 }
 
 func TestHandleConfigKey_Enter(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModel()
 	m.state = stateConfigPanel
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetValues(components.ConfigValues{})
 
+	// Cursor starts on the Yolo row; Enter toggles it on and persists to cfg.
 	result, _ := m.handleConfigKey(enterKeyMsg())
-	_ = result.(Model)
+	rm := result.(Model)
+	if !rm.configPanel.Values().YoloMode {
+		t.Error("Enter on the Yolo row should toggle YoloMode on in the panel")
+	}
+	if !rm.cfg.YoloMode {
+		t.Error("Enter on the Yolo row should persist YoloMode to cfg")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -2778,16 +2823,36 @@ func TestHandleKey_ShellPicker_UpDown(t *testing.T) {
 		{Name: "zsh", Path: "/bin/zsh"},
 	}, "")
 
-	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	_ = result.(Model)
+	// Down advances the highlight from the first shell (bash) to zsh.
+	down, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	dm := down.(Model)
+	if sh, ok := dm.shellPicker.Selected(); !ok || sh.Name != "zsh" {
+		t.Errorf("after Down, selected shell = %q, want zsh", sh.Name)
+	}
 
-	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-	_ = result.(Model)
+	// Up from that position returns the highlight to bash.
+	up, _ := dm.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	um := up.(Model)
+	if sh, ok := um.shellPicker.Selected(); !ok || sh.Name != "bash" {
+		t.Errorf("after Up, selected shell = %q, want bash", sh.Name)
+	}
 }
 
 // ---------------------------------------------------------------------------
 // handleKey: filter panel state
 // ---------------------------------------------------------------------------
+
+// filterPanelModel returns a model in stateFilterPanel with one parent group
+// ("/home/proj") holding two expanded children (alpha, beta). The navigation
+// items are ordered [group, alpha, beta] with the cursor on the group header.
+func filterPanelModel() Model {
+	m := newTestModel()
+	m.state = stateFilterPanel
+	m.filterPanel = components.NewFilterPanel()
+	m.filterPanel.SetSize(80, 30)
+	m.filterPanel.SetFolders([]string{"/home/proj/alpha", "/home/proj/beta"}, nil)
+	return m
+}
 
 func TestHandleKey_FilterPanel_Escape(t *testing.T) {
 	m := newTestModel()
@@ -2800,28 +2865,63 @@ func TestHandleKey_FilterPanel_Escape(t *testing.T) {
 }
 
 func TestHandleKey_FilterPanel_UpDown(t *testing.T) {
-	m := newTestModel()
-	m.state = stateFilterPanel
-	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	_ = result.(Model)
-	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-	_ = result.(Model)
+	m := filterPanelModel()
+
+	// Down moves the cursor from the group header onto the first child
+	// (alpha); toggling there excludes only that directory.
+	down, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	dm := down.(Model)
+	sc, _ := dm.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
+	scm := sc.(Model)
+	child := scm.filterPanel.Apply()
+	if len(child) != 1 || !strings.HasSuffix(child[0], "alpha") {
+		t.Errorf("Down then Space should exclude only alpha, got %v", child)
+	}
+
+	// From the child, Up returns to the group header; toggling there
+	// excludes every child in the group (alpha and beta).
+	up, _ := dm.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	um := up.(Model)
+	sg, _ := um.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
+	sgm := sg.(Model)
+	group := sgm.filterPanel.Apply()
+	if len(group) != 2 {
+		t.Errorf("Up to group then Space should exclude both children, got %v", group)
+	}
 }
 
 func TestHandleKey_FilterPanel_LeftRight(t *testing.T) {
-	m := newTestModel()
-	m.state = stateFilterPanel
-	result, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
-	_ = result.(Model)
-	result, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	_ = result.(Model)
+	m := filterPanelModel()
+	if !strings.Contains(ansi.Strip(m.filterPanel.View()), "alpha") {
+		t.Fatal("setup: expanded group should list child alpha")
+	}
+
+	// Left collapses the group under the cursor, hiding its children.
+	left, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	lm := left.(Model)
+	if strings.Contains(ansi.Strip(lm.filterPanel.View()), "alpha") {
+		t.Error("Left should collapse the group and hide child alpha")
+	}
+
+	// Right re-expands the collapsed group, showing its children again.
+	right, _ := lm.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	rm := right.(Model)
+	if !strings.Contains(ansi.Strip(rm.filterPanel.View()), "alpha") {
+		t.Error("Right should re-expand the group and show child alpha")
+	}
 }
 
 func TestHandleKey_FilterPanel_Space(t *testing.T) {
-	m := newTestModel()
-	m.state = stateFilterPanel
+	m := filterPanelModel()
+
+	// The cursor starts on the group header; Space toggles exclusion for
+	// the whole group, so both children become excluded.
 	result, _ := m.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
-	_ = result.(Model)
+	rm := result.(Model)
+	excluded := rm.filterPanel.Apply()
+	if len(excluded) != 2 {
+		t.Errorf("Space on group header should exclude both children, got %v", excluded)
+	}
 }
 
 func TestHandleKey_FilterPanel_Enter(t *testing.T) {
@@ -2896,35 +2996,63 @@ func TestHandleKey_SearchFocused_CharKeysDoNotLeak(t *testing.T) {
 func TestHandleMouse_WheelUp(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
+	before := m.detailVersion
 	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 5, Y: 10}
 	result, _ := m.Update(msg)
-	_ = result.(Model)
+	rm := result.(Model)
+	// Wheeling over the list (no preview) scrolls the list and bumps the
+	// detail version so the selected session's detail reloads.
+	if rm.detailVersion != before+1 {
+		t.Errorf("wheel up over list: detailVersion = %d, want %d", rm.detailVersion, before+1)
+	}
 }
 
 func TestHandleMouse_WheelDown(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.sessionList.SetSessions([]data.Session{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}})
+	before := m.detailVersion
 	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 5, Y: 10}
 	result, _ := m.Update(msg)
-	_ = result.(Model)
+	rm := result.(Model)
+	if rm.detailVersion != before+1 {
+		t.Errorf("wheel down over list: detailVersion = %d, want %d", rm.detailVersion, before+1)
+	}
 }
 
 func TestHandleMouse_WheelUp_OverPreview(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
+	m.preview.SetPlanContent(strings.Repeat("plan line\n", 100))
+	m.preview.ShowPlanView()
+	m.preview.ScrollDown(5)
+	before := m.preview.ScrollOffset()
+	want := before - 3
+	if want < 0 {
+		want = 0
+	}
 	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: m.layout.listWidth + 5, Y: 10}
 	result, _ := m.Update(msg)
-	_ = result.(Model)
+	rm := result.(Model)
+	// Wheeling up over the preview scrolls its content up by 3 (clamped at 0).
+	if got := rm.preview.ScrollOffset(); got != want {
+		t.Errorf("wheel up over preview: ScrollOffset = %d, want %d (from %d)", got, want, before)
+	}
 }
 
 func TestHandleMouse_WheelDown_OverPreview(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
 	m.showPreview = true
 	m.recalcLayout()
+	m.preview.SetPlanContent(strings.Repeat("plan line\n", 100))
+	m.preview.ShowPlanView()
 	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: m.layout.listWidth + 5, Y: 10}
 	result, _ := m.Update(msg)
-	_ = result.(Model)
+	rm := result.(Model)
+	// Wheeling down over the preview scrolls its content down by 3.
+	if got := rm.preview.ScrollOffset(); got != 3 {
+		t.Errorf("wheel down over preview: ScrollOffset = %d, want 3", got)
+	}
 }
 
 func TestHandleMouse_NotSessionList(t *testing.T) {
@@ -2940,13 +3068,18 @@ func TestHandleMouse_NotSessionList(t *testing.T) {
 
 func TestHandleMouse_LeftClick_HeaderArea(t *testing.T) {
 	m := newTestModelWithSize(120, 30)
+	// Release on the header row (Y=0) to the right of the title focuses
+	// the search bar.
 	msg := tea.MouseReleaseMsg{
 		Button: tea.MouseLeft,
-		X:      5,
+		X:      100,
 		Y:      0,
 	}
 	result, _ := m.Update(msg)
-	_ = result.(Model)
+	rm := result.(Model)
+	if !rm.searchBar.Focused() {
+		t.Error("clicking the header search area should focus the search bar")
+	}
 }
 
 func TestHandleMouse_LeftClick_BelowContent(t *testing.T) {
@@ -2982,10 +3115,33 @@ func TestHandleMouse_LeftClick_NotRelease(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHandleHeaderClick_BadgeLine(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModelWithSize(120, 30)
-	// Click on badge line (Y=1) at X=0 — might not hit anything.
-	result, _ := m.handleHeaderClick(0, 1)
-	_ = result.(Model)
+
+	// Find an X on the badge line (Y=1) that maps to a time-range badge
+	// other than the current selection, click it, and confirm the time
+	// range switches to that badge's label and a reload cmd is returned.
+	var clickX int
+	var wantRange string
+	for x := 0; x < 120; x++ {
+		if rest, ok := strings.CutPrefix(m.badgeClickAction(x), "time:"); ok && rest != m.timeRange {
+			clickX = x
+			wantRange = rest
+			break
+		}
+	}
+	if wantRange == "" {
+		t.Fatal("setup: no clickable time-range badge found on the badge line")
+	}
+
+	result, cmd := m.handleHeaderClick(clickX, 1)
+	rm := result.(Model)
+	if rm.timeRange != wantRange {
+		t.Errorf("clicking time badge: timeRange = %q, want %q", rm.timeRange, wantRange)
+	}
+	if cmd == nil {
+		t.Error("clicking a time badge should return a reload cmd")
+	}
 }
 
 func TestHandleHeaderClick_SeparatorLine(t *testing.T) {
@@ -3201,7 +3357,12 @@ func TestHandleMouse_DoubleClick_WithCtrl(t *testing.T) {
 		Mod:    tea.ModCtrl,
 	}
 	result2, _ := rm1.Update(msg2)
-	_ = result2.(Model)
+	rm2 := result2.(Model)
+	// The second release on the same row is a double-click, which clears
+	// the pending single-click regardless of the Ctrl modifier.
+	if rm2.click.pendingClickVersion != 0 {
+		t.Errorf("Ctrl double-click should reset pendingClickVersion, got %d", rm2.click.pendingClickVersion)
+	}
 }
 
 func TestHandleMouse_DoubleClick_WithShift(t *testing.T) {
@@ -3225,7 +3386,12 @@ func TestHandleMouse_DoubleClick_WithShift(t *testing.T) {
 		Mod:    tea.ModShift,
 	}
 	result2, _ := rm1.Update(msg2)
-	_ = result2.(Model)
+	rm2 := result2.(Model)
+	// The second release on the same row is a double-click, which clears
+	// the pending single-click regardless of the Shift modifier.
+	if rm2.click.pendingClickVersion != 0 {
+		t.Errorf("Shift double-click should reset pendingClickVersion, got %d", rm2.click.pendingClickVersion)
+	}
 }
 
 func TestHandleMouse_LeftClick_InPreviewPane(t *testing.T) {
@@ -3487,7 +3653,7 @@ func TestHandleConfigKey_EditingMode_Escape(t *testing.T) {
 	m.configPanel.MoveDown() // to agent field
 	m.configPanel.HandleEnter()
 	if !m.configPanel.IsEditing() {
-		t.Skip("could not enter editing mode")
+		t.Fatal("setup: HandleEnter did not enter editing mode")
 	}
 	result, _ := m.Update(escKeyMsg())
 	rm := result.(Model)
@@ -3497,6 +3663,7 @@ func TestHandleConfigKey_EditingMode_Escape(t *testing.T) {
 }
 
 func TestHandleConfigKey_EditingMode_Enter(t *testing.T) {
+	setupTempConfigDir(t)
 	m := newTestModelWithSize(120, 30)
 	m.state = stateConfigPanel
 	m.configPanel = components.NewConfigPanel()
@@ -3504,7 +3671,7 @@ func TestHandleConfigKey_EditingMode_Enter(t *testing.T) {
 	m.configPanel.MoveDown()
 	m.configPanel.HandleEnter()
 	if !m.configPanel.IsEditing() {
-		t.Skip("could not enter editing mode")
+		t.Fatal("setup: HandleEnter did not enter editing mode")
 	}
 	result, _ := m.Update(enterKeyMsg())
 	rm := result.(Model)
@@ -3518,14 +3685,22 @@ func TestHandleConfigKey_EditingMode_TypeChar(t *testing.T) {
 	m.state = stateConfigPanel
 	m.configPanel = components.NewConfigPanel()
 	m.configPanel.SetSize(120, 30)
-	m.configPanel.MoveDown()
+	m.configPanel.MoveDown() // to agent field (a text field)
 	m.configPanel.HandleEnter()
 	if !m.configPanel.IsEditing() {
-		t.Skip("could not enter editing mode")
+		t.Fatal("setup: HandleEnter did not enter editing mode")
 	}
-	// Type a character while in editing mode
+	// Typing a character while editing feeds the config panel's text input
+	// and stays in editing mode; the character lands in the edit buffer.
 	result, _ := m.Update(runeKeyMsg('x'))
-	_ = result.(Model)
+	rm := result.(Model)
+	if !rm.configPanel.IsEditing() {
+		t.Error("typing a character should remain in editing mode")
+	}
+	rm.configPanel.ConfirmEdit()
+	if got := rm.configPanel.Values().Agent; got != "x" {
+		t.Errorf("typed character not captured: Agent = %q, want %q", got, "x")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -4273,17 +4448,22 @@ func TestAttentionPriority(t *testing.T) {
 // Launch validation — graceful error handling for bad config
 // ---------------------------------------------------------------------------
 
-func TestResolveShellAndLaunch_InvalidShell_SetsStatusErr(t *testing.T) {
+func TestResolveShellAndLaunch_UnknownShellName_WarnsAndUsesDefault(t *testing.T) {
 	m := newTestModel()
 	m.cfg.DefaultShell = "nonexistent-shell-999"
-	// No shells detected, so findShellByName falls back to DefaultShell()
-	// which should have a path, but if the configured name is wrong
-	// the user should get feedback.
 	m.shells = nil
+	// An unknown configured shell name still launches, using the platform
+	// default, but it must say so. Substituting a different shell without
+	// telling the user leaves them believing their configured shell applied.
 	cmd := m.resolveShellAndLaunch("s1", "/test", config.LaunchModeTab)
-	// On a real system DefaultShell() returns a valid path, so cmd should be non-nil.
 	if cmd == nil {
-		t.Log("resolveShellAndLaunch returned nil; DefaultShell() may have failed on this platform")
+		t.Fatal("unknown shell name should fall back to the platform default and return a launch cmd")
+	}
+	if m.statusErr == "" {
+		t.Fatal("unknown shell name should report the substitution, but statusErr was empty")
+	}
+	if !strings.Contains(m.statusErr, "nonexistent-shell-999") {
+		t.Errorf("statusErr = %q, want it to name the configured shell that was not found", m.statusErr)
 	}
 }
 
@@ -4321,11 +4501,15 @@ func TestResolveShellAndLaunchDirect_NoShells_UsesDefault(t *testing.T) {
 	m := newTestModel()
 	m.cfg.DefaultShell = ""
 	m.shells = nil
-	// DefaultShell() should succeed on any real OS, so cmd should be non-nil.
+	// With no configured or detected shells, the direct launch path uses
+	// platform.DefaultShell() (cmd.exe on Windows), which has a valid path,
+	// so it returns a launch cmd without setting an error.
 	cmd := m.resolveShellAndLaunchDirect("s1", "/test", config.LaunchModeTab)
-	// DefaultShell() should succeed on any real OS, so cmd should be non-nil.
 	if cmd == nil {
-		t.Log("resolveShellAndLaunchDirect returned nil; DefaultShell() may have failed on this platform")
+		t.Fatal("no shells should fall back to the platform default and return a launch cmd")
+	}
+	if m.statusErr != "" {
+		t.Errorf("default-shell fallback should not set statusErr, got %q", m.statusErr)
 	}
 }
 
