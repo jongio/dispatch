@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.16.2] - 2026-08-27
+
+### Fixed
+
+- **Opening a missing file reported success**: `OpenFile` handed the path straight to the platform opener, and those openers detach and report a bad path through their own UI rather than through an exit status, so a file that did not exist looked identical to a successful open. It now validates the path before launching, matching the check `OpenDir` and `OpenURL` already performed.
+- **A configured shell that is not installed was silently replaced**: an unknown `default_shell` fell back to the platform default without any message, so the setting appeared to have applied while a different shell actually launched. The substitution is now reported in the status line, consistent with the existing warning for a shell whose path cannot be resolved.
+- **Batch launch status messages never appeared**: the multi-select limit notice and the resume-interrupted notice were both cleared on the way out of the batch launch, so neither could ever reach the status bar. The stale selection status is now cleared on entry instead, leaving later messages intact.
+
+### Changed
+
+- **Dependencies**: sqlite 1.57.0, bubbletea 2.0.9, and bubbles 2.2.1, plus astro 7.2.4 and marked 18.0.10 for the website.
+- **npm install policy**: website installs now enforce a minimum release age, so a freshly published package is not adopted immediately, and esbuild's install script is denied because its platform binary already arrives as an optional dependency and the script is not needed to build.
+
 ## [v0.16.1] — 2026-08-24
 
 ### Fixed
