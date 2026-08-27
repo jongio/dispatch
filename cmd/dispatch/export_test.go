@@ -148,6 +148,50 @@ func TestRunExport_StdoutJSON(t *testing.T) {
 	}
 }
 
+func TestRunExport_IncludesPlan(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) {
+		d := sampleDetail()
+		d.Plan = "# Goal\n\nShip the widget fix.\n"
+		return d, nil
+	})
+
+	// Markdown output carries a Plan section.
+	var md bytes.Buffer
+	if err := runExport(&md, []string{"export", "ses-001", "--stdout"}); err != nil {
+		t.Fatalf("runExport md: %v", err)
+	}
+	if !strings.Contains(md.String(), "## Plan") || !strings.Contains(md.String(), "Ship the widget fix.") {
+		t.Errorf("markdown output missing plan, got:\n%s", md.String())
+	}
+
+	// JSON output carries the plan field.
+	var js bytes.Buffer
+	if err := runExport(&js, []string{"export", "ses-001", "--stdout", "--format", "json"}); err != nil {
+		t.Fatalf("runExport json: %v", err)
+	}
+	var got data.SessionDetail
+	if err := json.Unmarshal(js.Bytes(), &got); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if !strings.Contains(got.Plan, "Ship the widget fix.") {
+		t.Errorf("json plan = %q, want it to contain the plan body", got.Plan)
+	}
+}
+
+func TestRunExport_OmitsPlanWhenAbsent(t *testing.T) {
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return sampleDetail(), nil })
+
+	var js bytes.Buffer
+	if err := runExport(&js, []string{"export", "ses-001", "--stdout", "--format", "json"}); err != nil {
+		t.Fatalf("runExport json: %v", err)
+	}
+	// Plan is tagged omitempty, so an absent plan must not appear at all
+	// rather than serializing as an empty string.
+	if strings.Contains(js.String(), "\"plan\"") {
+		t.Errorf("json should omit plan when empty, got:\n%s", js.String())
+	}
+}
+
 func TestRunExport_RedactsStdout(t *testing.T) {
 	detail := sampleDetail()
 	detail.Turns = []data.Turn{
@@ -162,6 +206,28 @@ func TestRunExport_RedactsStdout(t *testing.T) {
 	out := buf.String()
 	if strings.Contains(out, "abcdefghijklmnopqrstuvwxyz123456") || strings.Contains(out, "super-secret-token") {
 		t.Fatalf("redacted export leaked a secret:\n%s", out)
+	}
+	if !strings.Contains(out, "[redacted]") {
+		t.Fatalf("redacted export missing placeholder:\n%s", out)
+	}
+}
+
+func TestRunExport_RedactsPlan(t *testing.T) {
+	// A plan is prose the user wrote and is a likely place for a pasted
+	// token, so --redact has to cover it the same way it covers turns.
+	// The env-style pattern is line-anchored, so the assignment sits at the
+	// start of its own line the way it would in a real pasted snippet.
+	detail := sampleDetail()
+	detail.Plan = "# Goal\n\nDeploy with:\n\nAPI_TOKEN=super-secret-token\n"
+	withExportDetail(t, func(string) (*data.SessionDetail, error) { return detail, nil })
+
+	var buf bytes.Buffer
+	if err := runExport(&buf, []string{"export", "ses-001", "--stdout", "--redact"}); err != nil {
+		t.Fatalf("runExport: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "super-secret-token") {
+		t.Fatalf("redacted export leaked a secret from the plan:\n%s", out)
 	}
 	if !strings.Contains(out, "[redacted]") {
 		t.Fatalf("redacted export missing placeholder:\n%s", out)

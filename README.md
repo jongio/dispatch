@@ -312,7 +312,7 @@ Named views come from the `views` array in `config.json`. `dispatch views use <n
 
 ### Export
 
-Save a full session (metadata and the complete conversation) to a file with `dispatch export <id>`:
+Save a full session (metadata, the plan if one exists, and the complete conversation) to a file with `dispatch export <id>`:
 
 ```sh
 dispatch export 0a1b2c3d
@@ -324,7 +324,7 @@ dispatch export 0a1b2c3d --redact --stdout
 dispatch export 0a1b2c3d --out ./exports
 ```
 
-By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--format html` for a self-contained web page you can open in a browser, or `--format text` for plain text. Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined.
+By default the session is written as Markdown to the exports directory. Use `--format json` for machine-readable output, `--format html` for a self-contained web page you can open in a browser, or `--format text` for plain text. Use `--stdout` to print to the terminal instead of writing a file, `--out <dir>` to choose the destination directory, and `--redact` to mask common secret patterns before writing. `--stdout` and `--out` cannot be combined. When the session has a `plan.md`, its content is included as a Plan section in every format, and as a `plan` field in JSON.
 
 #### Batch Export
 

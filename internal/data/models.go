@@ -289,4 +289,8 @@ type SessionDetail struct {
 	Checkpoints []Checkpoint  `json:"checkpoints"`
 	Files       []SessionFile `json:"files"`
 	Refs        []SessionRef  `json:"refs"`
+	// Plan holds the session's plan.md content when one exists. It is filled
+	// in on demand by the export command and stays empty otherwise, so it is
+	// omitted from JSON when absent.
+	Plan string `json:"plan,omitempty"`
 }

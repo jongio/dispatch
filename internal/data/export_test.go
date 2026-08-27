@@ -293,6 +293,115 @@ func TestRenderMarkdown_MinimalDetail(t *testing.T) {
 	if strings.Contains(md, "## References") {
 		t.Error("references section should be absent with no refs")
 	}
+	if strings.Contains(md, "## Plan") {
+		t.Error("plan section should be absent when Plan is empty")
+	}
+}
+
+func TestRenderMarkdown_Plan(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{ID: "plan-session", Summary: "Has a plan"},
+		Turns: []Turn{
+			{TurnIndex: 0, UserMessage: "start", AssistantResponse: "ok"},
+		},
+		Plan: "# Goal\n\nShip the feature.\n",
+	}
+
+	md := RenderMarkdown(detail)
+
+	if !strings.Contains(md, "## Plan") {
+		t.Fatal("missing plan section")
+	}
+	if !strings.Contains(md, "Ship the feature.") {
+		t.Error("missing plan body")
+	}
+	// The plan should render before the conversation so it reads as context.
+	if strings.Index(md, "## Plan") > strings.Index(md, "## Conversation") {
+		t.Error("plan section should appear before conversation")
+	}
+}
+
+func TestRenderText_Plan(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{ID: "plan-session", Summary: "Has a plan"},
+		Turns: []Turn{
+			{TurnIndex: 0, UserMessage: "start", AssistantResponse: "ok"},
+		},
+		Plan: "# Goal\n\nShip the feature.\n",
+	}
+
+	txt := RenderText(detail)
+
+	if !strings.Contains(txt, "Plan") {
+		t.Fatal("missing plan section")
+	}
+	if !strings.Contains(txt, "Ship the feature.") {
+		t.Error("missing plan body")
+	}
+	if strings.Index(txt, "Plan") > strings.Index(txt, "Conversation") {
+		t.Error("plan section should appear before conversation")
+	}
+}
+
+func TestRenderText_NoPlanSectionWhenEmpty(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{ID: "no-plan", Summary: "No plan"},
+		Turns:   []Turn{{TurnIndex: 0, UserMessage: "start"}},
+	}
+
+	if strings.Contains(RenderText(detail), "\nPlan\n") {
+		t.Error("plan section should be absent when Plan is empty")
+	}
+}
+
+func TestRenderHTML_Plan(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{ID: "plan-session", Summary: "Has a plan"},
+		Turns: []Turn{
+			{TurnIndex: 0, UserMessage: "start", AssistantResponse: "ok"},
+		},
+		Plan: "# Goal\n\nShip the feature.\n",
+	}
+
+	out := RenderHTML(detail)
+
+	if !strings.Contains(out, "<h2>Plan</h2>") {
+		t.Fatal("missing plan heading")
+	}
+	if !strings.Contains(out, "Ship the feature.") {
+		t.Error("missing plan body")
+	}
+	if strings.Index(out, "<h2>Plan</h2>") > strings.Index(out, "<h2>Conversation</h2>") {
+		t.Error("plan section should appear before conversation")
+	}
+}
+
+func TestRenderHTML_EscapesPlan(t *testing.T) {
+	// Plan content is user-supplied, so it must be escaped like every other
+	// value rather than injected into the page as markup.
+	detail := &SessionDetail{
+		Session: Session{ID: "plan-session", Summary: "Has a plan"},
+		Plan:    "<script>alert('x')</script>",
+	}
+
+	out := RenderHTML(detail)
+
+	if strings.Contains(out, "<script>alert") {
+		t.Error("plan content was not escaped")
+	}
+	if !strings.Contains(out, "&lt;script&gt;") {
+		t.Error("expected the plan body to be HTML-escaped")
+	}
+}
+
+func TestRenderHTML_NoPlanSectionWhenEmpty(t *testing.T) {
+	detail := &SessionDetail{
+		Session: Session{ID: "no-plan", Summary: "No plan"},
+	}
+
+	if strings.Contains(RenderHTML(detail), "<h2>Plan</h2>") {
+		t.Error("plan section should be absent when Plan is empty")
+	}
 }
 
 func TestExportSession(t *testing.T) {
