@@ -67,6 +67,12 @@ func RenderMarkdown(detail *SessionDetail) string {
 	fmt.Fprintf(&b, "| Files | %d |\n", s.FileCount)
 	b.WriteString("\n")
 
+	// ── Plan ──
+	if detail.Plan != "" {
+		b.WriteString("## Plan\n\n")
+		b.WriteString(strings.TrimRight(detail.Plan, "\n") + "\n\n")
+	}
+
 	// ── Conversation ──
 	if len(detail.Turns) > 0 {
 		b.WriteString("## Conversation\n\n")
@@ -150,6 +156,12 @@ func RenderText(detail *SessionDetail) string {
 	fmt.Fprintf(&b, "Last Active: %s\n", s.LastActiveAt)
 	fmt.Fprintf(&b, "Turns: %d\n", s.TurnCount)
 	fmt.Fprintf(&b, "Files: %d\n\n", s.FileCount)
+
+	// Plan, before the conversation so it reads as context.
+	if detail.Plan != "" {
+		b.WriteString("Plan\n\n")
+		b.WriteString(strings.TrimRight(detail.Plan, "\n") + "\n\n")
+	}
 
 	if len(detail.Turns) > 0 {
 		b.WriteString("Conversation\n\n")
@@ -259,6 +271,14 @@ func RenderHTML(detail *SessionDetail) string {
 	fmt.Fprintf(&b, "<tr><td>Turns</td><td>%d</td></tr>\n", s.TurnCount)
 	fmt.Fprintf(&b, "<tr><td>Files</td><td>%d</td></tr>\n", s.FileCount)
 	b.WriteString("</table>\n")
+
+	// Plan, before the conversation so it reads as context. The body is
+	// escaped like every other user-supplied value and wrapped in <pre> so
+	// the plan's own Markdown layout survives.
+	if detail.Plan != "" {
+		b.WriteString("<h2>Plan</h2>\n")
+		fmt.Fprintf(&b, "<pre>%s</pre>\n", esc(strings.TrimRight(detail.Plan, "\n")))
+	}
 
 	// Conversation.
 	if len(detail.Turns) > 0 {

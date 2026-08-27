@@ -262,6 +262,11 @@ func redactedSessionDetail(detail *data.SessionDetail) *data.SessionDetail {
 	redacted.Session.Branch = platform.RedactSecrets(redacted.Session.Branch)
 	redacted.Session.Summary = platform.RedactSecrets(redacted.Session.Summary)
 
+	// The plan is copied by the struct assignment above, so it has to be
+	// redacted explicitly. A plan is prose the user wrote and is a likely
+	// place for a pasted token, so leaving it raw would defeat --redact.
+	redacted.Plan = platform.RedactSecrets(detail.Plan)
+
 	if len(detail.Turns) > 0 {
 		redacted.Turns = append([]data.Turn(nil), detail.Turns...)
 		for i := range redacted.Turns {
@@ -340,6 +345,7 @@ func writeExportFile(dir, id, format, content string) (string, error) {
 // session store. The ID may be a full session ID or a unique short prefix. It
 // returns (nil, nil) when no session matches, and an *data.AmbiguousIDPrefixError
 // when a short prefix matches more than one session.
+// When the session has a plan.md file, its content is attached to the detail.
 func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 	store, err := data.Open()
 	if err != nil {
@@ -362,6 +368,15 @@ func defaultExportGetDetail(id string) (*data.SessionDetail, error) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	// Attach the session's plan.md when present. A missing or unreadable plan
+	// is normal (most sessions have none), so read errors are ignored and the
+	// plan is simply left out of the export.
+	if detail != nil {
+		if plan, perr := data.ReadPlanContent(detail.Session.ID); perr == nil {
+			detail.Plan = plan
+		}
 	}
 	return detail, nil
 }
