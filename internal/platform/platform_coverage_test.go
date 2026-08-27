@@ -156,15 +156,23 @@ func TestCovBuildResumeCommandString_ResumeSessionCommandEmptyAfterExpand(t *tes
 }
 
 func TestCovBuildResumeCommandString_NoCLIBinary(t *testing.T) {
-	// Without resume session command, depends on CLI binary presence
+	// With no copilot/ghcs reachable via PATH, FindCLIBinary returns "" and
+	// buildResumeCommandString must report ErrCLINotFound.
+	t.Setenv("PATH", t.TempDir())
 	_, err := buildResumeCommandString("test-session", ResumeConfig{})
-	// May succeed or fail depending on PATH
-	t.Logf("buildResumeCommandString (no custom cmd): err=%v", err)
+	if !errors.Is(err, ErrCLINotFound) {
+		t.Errorf("buildResumeCommandString with no CLI binary = %v, want ErrCLINotFound", err)
+	}
 }
 
 func TestCovBuildResumeCommandString_NoCLIBinaryNoSession(t *testing.T) {
+	// Same contract as above but with an empty session ID: the missing-binary
+	// branch is still reached and ErrCLINotFound is returned.
+	t.Setenv("PATH", t.TempDir())
 	_, err := buildResumeCommandString("", ResumeConfig{})
-	t.Logf("buildResumeCommandString (no session, no custom cmd): err=%v", err)
+	if !errors.Is(err, ErrCLINotFound) {
+		t.Errorf("buildResumeCommandString with no CLI binary (no session) = %v, want ErrCLINotFound", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +439,28 @@ func TestCovDefaultTerminal(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCovIsNerdFontInstalled(t *testing.T) {
-	_ = IsNerdFontInstalled()
+	// Positive: a Nerd Font under LOCALAPPDATA makes detection deterministic.
+	// WINDIR is isolated to an empty temp dir so system fonts cannot
+	// interfere with the negative case below.
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	t.Setenv("WINDIR", t.TempDir())
+	fontDir := filepath.Join(dir, "Microsoft", "Windows", "Fonts")
+	if err := os.MkdirAll(fontDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fontDir, "JetBrainsMonoNerdFont.ttf"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !IsNerdFontInstalled() {
+		t.Error("IsNerdFontInstalled() = false, want true with a Nerd Font under LOCALAPPDATA")
+	}
+
+	// Negative: with both font roots empty, detection must be false.
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	if IsNerdFontInstalled() {
+		t.Error("IsNerdFontInstalled() = true, want false when no font directory contains a Nerd Font")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -527,16 +556,53 @@ func TestCovIsNerdFontInstalledWindows_UserFontPresent(t *testing.T) {
 
 func TestCovIsNerdFontInstalledWindows_EmptyLocalAppData(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", "")
-	// Should skip user fonts and check system fonts
-	_ = isNerdFontInstalledWindows()
+
+	// Detection still works via WINDIR/Fonts when LOCALAPPDATA is empty.
+	fakeWin := t.TempDir()
+	winFonts := filepath.Join(fakeWin, "Fonts")
+	if err := os.MkdirAll(winFonts, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(winFonts, "MyNerdFont.ttf"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WINDIR", fakeWin)
+	if !isNerdFontInstalledWindows() {
+		t.Error("expected detection via WINDIR when LOCALAPPDATA is empty")
+	}
+
+	// And false when WINDIR has no fonts either.
+	t.Setenv("WINDIR", t.TempDir())
+	if isNerdFontInstalledWindows() {
+		t.Error("expected no detection when LOCALAPPDATA is empty and WINDIR has no fonts")
+	}
 }
 
 func TestCovIsNerdFontInstalledWindows_EmptyWinDir(t *testing.T) {
+	// A Nerd Font under LOCALAPPDATA makes detection deterministically true
+	// even though WINDIR is empty (which triggers the C:\Windows fallback).
 	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir) // no fonts here
+	t.Setenv("LOCALAPPDATA", dir)
+	fontDir := filepath.Join(dir, "Microsoft", "Windows", "Fonts")
+	if err := os.MkdirAll(fontDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fontDir, "MyNerdFont.ttf"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("WINDIR", "")
-	// Falls back to C:\Windows
-	_ = isNerdFontInstalledWindows()
+	if !isNerdFontInstalledWindows() {
+		t.Error("expected detection via LOCALAPPDATA even with WINDIR empty")
+	}
+
+	// With LOCALAPPDATA emptied too, the only remaining source is the
+	// C:\Windows fallback, so the result must equal a direct check of it.
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	got := isNerdFontInstalledWindows()
+	want := hasNerdFontFiles(`C:\Windows\Fonts`)
+	if got != want {
+		t.Errorf("with WINDIR empty and no user fonts, got %v, want %v (C:\\Windows\\Fonts fallback)", got, want)
+	}
 }
 
 // ===========================================================================
@@ -610,13 +676,23 @@ func TestCovDetectWTColorScheme_InvalidJSON(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", dir)
 
 	settingsDir := filepath.Join(dir, "Packages", "Microsoft.WindowsTerminal_8wekyb3d8bbwe", "LocalState")
-	_ = os.MkdirAll(settingsDir, 0o755)
-	_ = os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte("{invalid}"), 0o644)
+	if err := os.MkdirAll(settingsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte("{invalid}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	// Should continue past invalid JSON (try next path)
-	scheme, _ := DetectWTColorScheme()
-	// May be nil since no valid settings found
-	_ = scheme
+	// Invalid JSON in the only settings file must not yield a color scheme.
+	// DetectWTColorScheme skips unparseable files and, finding nothing valid,
+	// returns (nil, nil) rather than surfacing the parse error.
+	scheme, err := DetectWTColorScheme()
+	if err != nil {
+		t.Errorf("DetectWTColorScheme() error = %v, want nil (per-file parse errors are swallowed)", err)
+	}
+	if scheme != nil {
+		t.Errorf("DetectWTColorScheme() scheme = %+v, want nil for invalid JSON", scheme)
+	}
 }
 
 func TestCovDetectWTColorScheme_NoSettings(t *testing.T) {

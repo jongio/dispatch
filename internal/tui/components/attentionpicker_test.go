@@ -315,9 +315,11 @@ func TestAttentionPicker_View_ShowsCounts(t *testing.T) {
 func TestAttentionPicker_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	p := NewAttentionPicker()
-	_ = p.View() // zero size
+	_ = p.View() // zero size must not panic
 	p.SetSize(80, 40)
-	_ = p.View() // with size
+	if got := p.View(); got == "" {
+		t.Error("View() with a size should render a non-empty overlay")
+	}
 }
 
 // ---------------------------------------------------------------------------

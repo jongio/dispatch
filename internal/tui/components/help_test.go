@@ -146,9 +146,11 @@ func TestHelpOverlay_View_ContainsCloseHint(t *testing.T) {
 func TestHelpOverlay_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	h := testHelpOverlay()
-	_ = h.View() // zero size
+	_ = h.View() // zero size must not panic
 	h.SetSize(80, 40)
-	_ = h.View()
+	if got := h.View(); got == "" {
+		t.Error("View() with a size should render a non-empty overlay")
+	}
 }
 
 func TestShortcutRowsUseWidthAwareColumns(t *testing.T) {

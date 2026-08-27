@@ -391,14 +391,12 @@ func TestSessionList_SetPivotField(t *testing.T) {
 	t.Parallel()
 	s := NewSessionList()
 
-	s.SetPivotField("folder")
-	// Verify indirectly: SetPivotField stores the pivot, which affects View() rendering.
-	// We just ensure it doesn't panic and can be called with various values.
-	s.SetPivotField("repo")
-	s.SetPivotField("branch")
-	s.SetPivotField("date")
-	s.SetPivotField("")
-	s.SetPivotField("unknown")
+	for _, pivot := range []string{"folder", "repo", "branch", "date", "", "unknown"} {
+		s.SetPivotField(pivot)
+		if s.pivotField != pivot {
+			t.Errorf("SetPivotField(%q): pivotField = %q, want %q", pivot, s.pivotField, pivot)
+		}
+	}
 }
 
 func TestSessionList_SetFavoritedSessions(t *testing.T) {
@@ -427,8 +425,18 @@ func TestSessionList_SetFavoritedSessions(t *testing.T) {
 func TestSessionList_SetFavoritedSessions_Empty(t *testing.T) {
 	t.Parallel()
 	s := NewSessionList()
+
+	// Populate first, then clear with nil to prove the setter overwrites
+	// the stored set rather than ignoring its argument.
+	s.SetFavoritedSessions(map[string]struct{}{"s1": {}})
+	if len(s.favoritedSet) != 1 {
+		t.Fatalf("precondition: favoritedSet size = %d, want 1", len(s.favoritedSet))
+	}
+
 	s.SetFavoritedSessions(nil)
-	// Should not panic
+	if s.favoritedSet != nil {
+		t.Errorf("SetFavoritedSessions(nil) should clear the set, got %v", s.favoritedSet)
+	}
 }
 
 func TestSessionList_SetFavoritedSessions_WithGroupView(t *testing.T) {
@@ -736,5 +744,19 @@ func TestPlanDot_HasPlan(t *testing.T) {
 func TestFilterPanel_SetActive_Cov(t *testing.T) {
 	t.Parallel()
 	fp := NewFilterPanel()
-	fp.SetActive(FilterCategory(0), "something") // should not panic
+	fp.SetFolders([]string{"/work/a", "/work/b"}, []string{"/work/a", "/work/b"})
+
+	// SetActive is a no-op kept for backward compatibility; it must not
+	// touch the applied exclusion set.
+	beforeActive := fp.HasActive()
+	beforeApplied := strings.Join(fp.applied, ",")
+
+	fp.SetActive(FilterCategory(0), "something")
+
+	if fp.HasActive() != beforeActive {
+		t.Errorf("SetActive mutated HasActive: got %v, want %v", fp.HasActive(), beforeActive)
+	}
+	if after := strings.Join(fp.applied, ","); after != beforeApplied {
+		t.Errorf("SetActive mutated applied: got %q, want %q", after, beforeApplied)
+	}
 }

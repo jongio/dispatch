@@ -461,8 +461,15 @@ func TestHandleReindexClick_NilCancel(t *testing.T) {
 	btnX := startX + (overlayW-len(btnLabel))/2
 
 	msg := tea.MouseReleaseMsg{X: btnX + 1, Y: btnY, Button: tea.MouseLeft}
-	// Should not panic with nil cancel handle
+	// Should not panic with nil cancel handle, and the cancel path should run.
 	m.handleReindexClick(msg)
+
+	if m.reindexing {
+		t.Error("clicking Cancel should stop reindexing even with a nil cancel handle")
+	}
+	if m.statusInfo != statusReindexCancelled {
+		t.Errorf("statusInfo = %q, want %q", m.statusInfo, statusReindexCancelled)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +831,14 @@ func TestHandleJumpNextAttention_WithWaiting(t *testing.T) {
 
 	result, _ := m.handleJumpNextAttention()
 	rm := result.(Model)
-	_ = rm
+	// The only waiting session is s2 at index 1; the cursor should jump to it
+	// and the detail should be reloaded (detailVersion bumped).
+	if got := rm.sessionList.Cursor(); got != 1 {
+		t.Errorf("cursor = %d, want 1 (waiting session s2)", got)
+	}
+	if rm.detailVersion != m.detailVersion+1 {
+		t.Errorf("detailVersion = %d, want %d", rm.detailVersion, m.detailVersion+1)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -872,9 +886,16 @@ func TestHandleResumeInterrupted_WithInterrupted(t *testing.T) {
 		"s2": data.AttentionIdle,
 	}
 
-	result, _ := m.handleResumeInterrupted()
+	result, cmd := m.handleResumeInterrupted()
 	rm := result.(Model)
-	_ = rm
+	// s1 is interrupted and present in the loaded sessions, so a batch launch
+	// command must be produced and nothing should be reported as skipped.
+	if cmd == nil {
+		t.Error("expected a batch launch cmd for the interrupted session, got nil")
+	}
+	if rm.statusErr != "" {
+		t.Errorf("statusErr = %q, want empty (nothing should be skipped)", rm.statusErr)
+	}
 }
 
 func TestHandleResumeInterrupted_InterruptedNotInView(t *testing.T) {

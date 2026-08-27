@@ -547,16 +547,61 @@ func TestBuildResumeArgs_EmptySession(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIsNerdFontInstalledWindows_WINDIRFallback(t *testing.T) {
-	// Clear WINDIR to exercise the fallback to C:\Windows.
+	// LOCALAPPDATA holds no fonts, so the WINDIR-derived directory is the
+	// only signal path.
+	empty := t.TempDir()
+	t.Setenv("LOCALAPPDATA", empty)
+
+	// Place a Nerd Font under a fake WINDIR/Fonts and confirm detection sees
+	// it when WINDIR points there.
+	fakeWin := t.TempDir()
+	winFonts := filepath.Join(fakeWin, "Fonts")
+	if err := os.MkdirAll(winFonts, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(winFonts, "MyNerdFont.ttf"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WINDIR", fakeWin)
+	if !isNerdFontInstalledWindows() {
+		t.Fatal("expected Nerd Font to be detected via WINDIR/Fonts when WINDIR is set")
+	}
+
+	// Clearing WINDIR must fall back to C:\Windows (NOT the fake dir), so the
+	// font placed under fakeWin must no longer be found. The result must match
+	// an independent check of the real fallback directory.
 	t.Setenv("WINDIR", "")
-	// Just verify it doesn't panic — result depends on installed fonts.
-	_ = isNerdFontInstalledWindows()
+	got := isNerdFontInstalledWindows()
+	want := hasNerdFontFiles(`C:\Windows\Fonts`)
+	if got != want {
+		t.Errorf("with WINDIR unset, isNerdFontInstalledWindows() = %v, want %v (C:\\Windows\\Fonts fallback)", got, want)
+	}
 }
 
 func TestIsNerdFontInstalledWindows_NoLocalAppData(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", "")
-	// Should still work using WINDIR/system fonts.
-	_ = isNerdFontInstalledWindows()
+
+	// With a Nerd Font under WINDIR/Fonts, detection must still succeed even
+	// though LOCALAPPDATA is unset (the empty user path is skipped).
+	fakeWin := t.TempDir()
+	winFonts := filepath.Join(fakeWin, "Fonts")
+	if err := os.MkdirAll(winFonts, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(winFonts, "MyNerdFont.ttf"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WINDIR", fakeWin)
+	if !isNerdFontInstalledWindows() {
+		t.Error("expected detection via WINDIR/Fonts when LOCALAPPDATA is unset")
+	}
+
+	// With no fonts reachable anywhere, detection must be false: an empty
+	// LOCALAPPDATA must be skipped, not treated as a valid font root.
+	t.Setenv("WINDIR", t.TempDir())
+	if isNerdFontInstalledWindows() {
+		t.Error("expected no detection when neither LOCALAPPDATA nor WINDIR has a Nerd Font")
+	}
 }
 
 // ---------------------------------------------------------------------------

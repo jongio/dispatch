@@ -39,10 +39,13 @@ func TestNoteInput_FocusAndBlur(t *testing.T) {
 func TestNoteInput_SetWidth(t *testing.T) {
 	t.Parallel()
 	ni := NewNoteInput()
-	// Should not panic.
-	ni.SetWidth(80)
-	ni.SetWidth(10)
-	ni.SetWidth(0)
+
+	for _, w := range []int{80, 10, 0} {
+		ni.SetWidth(w)
+		if ni.width != w {
+			t.Errorf("SetWidth(%d): width = %d, want %d", w, ni.width, w)
+		}
+	}
 }
 
 func TestNoteInput_View(t *testing.T) {

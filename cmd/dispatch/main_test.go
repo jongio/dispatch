@@ -72,14 +72,33 @@ func TestShowUpdateNotification_ChannelEmpty(t *testing.T) {
 }
 
 func TestShowUpdateNotification_NilWriter(t *testing.T) {
-	t.Parallel()
+	// A nil writer must not panic; the function falls back to os.Stderr.
+	// Capture os.Stderr to prove the notification is actually written there.
+	// (Global os.Stderr capture rules out t.Parallel.)
 	ch := make(chan *update.UpdateInfo, 1)
 	ch <- &update.UpdateInfo{
 		CurrentVersion: "1.0.0",
 		LatestVersion:  "2.0.0",
 	}
-	// Should not panic when w is nil (falls back to os.Stderr).
-	showUpdateNotification(nil, ch)
+
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stderr = w
+	showUpdateNotification(nil, ch) // must not panic
+	_ = w.Close()
+	os.Stderr = origStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("reading captured stderr: %v", err)
+	}
+	got := string(out)
+	if !strings.Contains(got, "v1.0.0") || !strings.Contains(got, "v2.0.0") {
+		t.Errorf("nil writer should fall back to os.Stderr and write the update notice, got: %q", got)
+	}
 }
 
 func TestCleanupAfterHandleArgs(t *testing.T) {

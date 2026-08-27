@@ -212,9 +212,11 @@ func TestShellPicker_View_UsesPathWhenNameEmpty(t *testing.T) {
 func TestShellPicker_View_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	sp := NewShellPicker()
-	_ = sp.View() // zero shells, zero size
+	_ = sp.View() // zero shells, zero size must not panic
 	sp.SetSize(80, 40)
 	_ = sp.View() // with size but no shells
 	sp.SetShells([]platform.ShellInfo{{Name: "pwsh", Path: "pwsh.exe"}}, "")
-	_ = sp.View() // full setup
+	if got := sp.View(); got == "" {
+		t.Error("View() with a size and shells should render a non-empty overlay")
+	}
 }

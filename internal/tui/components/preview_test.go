@@ -319,7 +319,7 @@ func TestPreviewPanelScrollUpAfterDown(t *testing.T) {
 	p.ScrollDown(5)
 	prev := p.scroll
 	if prev <= 0 {
-		t.Skipf("Content not long enough to scroll, totalLines=%d, viewport=%d", p.totalLines, p.height-2)
+		t.Fatalf("ScrollDown(5) should advance scroll on a 10-turn fixture, got scroll=%d (totalLines=%d, viewport=%d)", prev, p.totalLines, p.height-2)
 	}
 	p.ScrollUp(2)
 	if p.scroll >= prev {

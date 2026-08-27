@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -425,16 +426,51 @@ func TestSessionList_SetHiddenSessions(t *testing.T) {
 
 func TestFilterPanel_SetOptions(t *testing.T) {
 	t.Parallel()
-	fp := NewFilterPanel()
 	folders := []string{"/a/b", "/a/c"}
-	fp.SetOptions(folders, nil, nil)
-	// SetOptions is a shim for SetFolders — should not panic
+
+	viaOptions := NewFilterPanel()
+	viaOptions.SetOptions(folders, nil, nil)
+
+	// SetOptions is a shim for SetFolders, so it must build the same tree.
+	viaFolders := NewFilterPanel()
+	viaFolders.SetFolders(folders, nil)
+
+	if len(viaOptions.groups) != len(viaFolders.groups) {
+		t.Fatalf("SetOptions built %d groups, want %d (same as SetFolders)", len(viaOptions.groups), len(viaFolders.groups))
+	}
+	if len(viaOptions.groups) != 1 {
+		t.Fatalf("expected 1 group for folders under a common parent, got %d", len(viaOptions.groups))
+	}
+	if got, want := len(viaOptions.navItems), len(viaFolders.navItems); got != want {
+		t.Errorf("SetOptions navItems = %d, want %d", got, want)
+	}
+	// 1 group header + 2 children.
+	if got := len(viaOptions.navItems); got != 3 {
+		t.Errorf("SetOptions navItems = %d, want 3 (1 header + 2 children)", got)
+	}
 }
 
 func TestFilterPanel_SetActive(t *testing.T) {
 	t.Parallel()
 	fp := NewFilterPanel()
-	fp.SetActive(FilterFolder, "test") // no-op, should not panic
+	fp.SetFolders([]string{"/work/a", "/work/b"}, []string{"/work/a"})
+
+	// SetActive is a documented no-op; calling it must not change any state.
+	wantActive := fp.HasActive()
+	wantApplied := strings.Join(fp.applied, ",")
+	wantNav := len(fp.navItems)
+
+	fp.SetActive(FilterFolder, "test")
+
+	if fp.HasActive() != wantActive {
+		t.Errorf("SetActive changed HasActive: got %v, want %v", fp.HasActive(), wantActive)
+	}
+	if got := strings.Join(fp.applied, ","); got != wantApplied {
+		t.Errorf("SetActive changed applied: got %q, want %q", got, wantApplied)
+	}
+	if got := len(fp.navItems); got != wantNav {
+		t.Errorf("SetActive changed navItems: got %d, want %d", got, wantNav)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -699,7 +735,8 @@ func TestSearchBar_Update(t *testing.T) {
 	sb.Focus()
 	msg := tea.KeyPressMsg{Code: 'h', Text: "h"}
 	sb2, _ := sb.Update(msg)
-	// Value may or may not contain 'h' depending on textinput state,
-	// but should not panic.
-	_ = sb2.Value()
+	// Update delegates to the focused textinput, so typing 'h' must insert it.
+	if got := sb2.Value(); got != "h" {
+		t.Errorf("after typing 'h', Value() = %q, want %q", got, "h")
+	}
 }

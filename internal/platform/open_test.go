@@ -8,16 +8,16 @@ import (
 	"testing"
 )
 
-func TestOpenFile_NonExistentPath(t *testing.T) {
-	t.Parallel()
-	// OpenFile should not panic even for a non-existent path.
-	// It will start the OS opener which may fail silently or report
-	// an error through its own UI. We only verify no Go-level panic.
-	err := OpenFile("/nonexistent/path/that/does/not/exist.txt")
-	// On Windows cmd /c start returns immediately without error even for
-	// missing paths; on Linux/macOS xdg-open/open may or may not error.
-	// We just verify no panic occurred.
-	_ = err
+func TestOpenFile_ErrorWhenOpenerUnavailable(t *testing.T) {
+	// OpenFile does not pre-validate the path; it launches the platform
+	// opener (explorer/open/xdg-open) and returns that process's start
+	// error. Point PATH at an empty dir so the opener cannot be resolved,
+	// then confirm OpenFile surfaces the launch failure rather than
+	// swallowing it. (Cannot use t.Parallel with t.Setenv.)
+	t.Setenv("PATH", t.TempDir())
+	if err := OpenFile(filepath.Join("nonexistent", "path", "does", "not", "exist.txt")); err == nil {
+		t.Error("OpenFile() = nil, want an error when the platform opener cannot be started")
+	}
 }
 
 func TestOpenCommand_PerOS(t *testing.T) {

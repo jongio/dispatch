@@ -254,10 +254,10 @@ func TestRunMode(t *testing.T) {
 // Main subprocess tests — test argument parsing via exit codes
 // ---------------------------------------------------------------------------
 
-func TestMain_NoArgs(t *testing.T) {
-	if len(os.Args) < 1 {
-		t.Skip("os.Args not available")
-	}
+// TestUsageStringContainsHeader verifies the usage constant carries the
+// "Usage:" header that main() prints when invoked with no arguments. The
+// no-args path itself is exercised by TestMainSubprocess_NoArgs below.
+func TestUsageStringContainsHeader(t *testing.T) {
 	if !strings.Contains(usage, "Usage:") {
 		t.Error("usage should contain 'Usage:'")
 	}

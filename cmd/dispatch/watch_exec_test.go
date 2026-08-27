@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jongio/dispatch/internal/data"
 )
@@ -97,12 +100,49 @@ func TestFireWatchHook_InvokesExec(t *testing.T) {
 }
 
 func TestFireWatchHook_ErrorDoesNotBlock(t *testing.T) {
+	// The name promises that a hook returning an error does not block the
+	// watch loop and does not panic; the error must instead be surfaced to
+	// stderr. Assert all three: the hook is invoked, fireWatchHook returns
+	// promptly (checked via a timeout), and the error reaches stderr.
+	called := false
 	prev := watchExecFn
-	watchExecFn = func(context.Context, string, []string) error { return errors.New("boom") }
+	watchExecFn = func(context.Context, string, []string) error {
+		called = true
+		return errors.New("boom")
+	}
 	t.Cleanup(func() { watchExecFn = prev })
 
-	// A failing hook must not panic; the error is written to stderr.
-	fireWatchHook(context.Background(), "bad", "id", "waiting", "none", data.Session{})
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stderr = w
+
+	done := make(chan struct{})
+	go func() {
+		fireWatchHook(context.Background(), "bad", "session-xyz", "waiting", "none", data.Session{})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		os.Stderr = origStderr
+		t.Fatal("fireWatchHook blocked when the hook returned an error")
+	}
+
+	_ = w.Close()
+	os.Stderr = origStderr
+
+	out, _ := io.ReadAll(r)
+
+	if !called {
+		t.Error("fireWatchHook did not invoke the hook command")
+	}
+	if !strings.Contains(string(out), "boom") {
+		t.Errorf("fireWatchHook should report the hook error to stderr, got: %q", string(out))
+	}
 }
 
 func TestHookShell(t *testing.T) {

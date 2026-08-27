@@ -139,24 +139,43 @@ func TestSessionStatePath_WithOverride(t *testing.T) {
 }
 
 func TestSessionStatePath_EmptyOverride(t *testing.T) {
+	// With no override, sessionStatePath falls back to the user's home
+	// directory joined with sessionStateRel. Pin the home env so the
+	// fallback is deterministic and hermetic.
+	home := t.TempDir()
 	t.Setenv("DISPATCH_SESSION_STATE", "")
+	t.Setenv("HOME", home)        // Unix / macOS
+	t.Setenv("USERPROFILE", home) // Windows
 
 	got := sessionStatePath()
-	if got == "" {
-		// When no override is set, sessionStatePath uses os.UserHomeDir + sessionStateRel.
-		// It should only be empty if UserHomeDir fails.
-		t.Log("sessionStatePath returned empty — UserHomeDir may have failed")
+	want := filepath.Join(home, sessionStateRel)
+	if got != want {
+		t.Errorf("sessionStatePath() = %q, want %q", got, want)
 	}
 }
 
 func TestSessionStatePath_UNCPath(t *testing.T) {
-	// UNC paths (\\server\share) should be rejected on Windows
+	// UNC paths (\\server\share) are a security boundary: on Windows they
+	// must be rejected so session state cannot be read from an attacker
+	// controlled network share. On other platforms backslashes are ordinary
+	// filename characters, so filepath.Clean is a no-op and the override is
+	// returned unchanged (not rejected). Both branches assert.
 	t.Setenv("DISPATCH_SESSION_STATE", `\\server\share\path`)
 
 	got := sessionStatePath()
-	// On Windows: should return "" (UNC paths rejected)
-	// On non-Windows: UNC path is just a regular path
-	_ = got
+	if runtime.GOOS == "windows" {
+		if got != "" {
+			t.Errorf("sessionStatePath() = %q, want %q (UNC paths must be rejected on Windows)", got, "")
+		}
+		return
+	}
+	want := filepath.Clean(`\\server\share\path`)
+	if got == "" {
+		t.Errorf("sessionStatePath() rejected a non-UNC path on %s; want %q", runtime.GOOS, want)
+	}
+	if got != want {
+		t.Errorf("sessionStatePath() = %q, want %q", got, want)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -164,15 +183,18 @@ func TestSessionStatePath_UNCPath(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPlanFilePath_NoStateDir(t *testing.T) {
-	// Set DISPATCH_SESSION_STATE to empty to force sessionStatePath to use home dir
-	// but set HOME to non-existent to make it fail
+	// Force sessionStatePath to fail resolution: an empty override combined
+	// with empty home env makes os.UserHomeDir error, so sessionStatePath
+	// returns "". PlanFilePath must then return an error rather than a bogus
+	// path built on an unresolved state directory.
 	t.Setenv("DISPATCH_SESSION_STATE", "")
-	t.Setenv("HOME", "/nonexistent-path-12345")
-	t.Setenv("USERPROFILE", "/nonexistent-path-12345")
+	t.Setenv("HOME", "")        // Unix / macOS
+	t.Setenv("USERPROFILE", "") // Windows
 
 	_, err := PlanFilePath("valid-session-id")
-	// May or may not error depending on platform
-	_ = err
+	if err == nil {
+		t.Error("PlanFilePath should return an error when the session-state dir cannot be resolved")
+	}
 }
 
 func TestReadPlanContent_NoStateDir(t *testing.T) {
