@@ -26,5 +26,8 @@
   },
   "overrides": {
     "volar-service-yaml": "0.0.71"
+  },
+  "allowScripts": {
+    "esbuild": false
   }
 }
