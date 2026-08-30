@@ -20,7 +20,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@playwright/test": "^1.62.1",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/sanitize-html": "^2.16.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
