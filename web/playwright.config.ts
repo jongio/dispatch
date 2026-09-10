@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.DISPATCH_BASE_URL ?? 'http://127.0.0.1:4321/dispatch/';
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
@@ -8,7 +10,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 4,
   reporter: 'line',
   use: {
-    baseURL: 'http://127.0.0.1:4321/dispatch/',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -34,7 +36,7 @@ export default defineConfig({
     : {
         command:
           'node ./node_modules/astro/bin/astro.mjs preview --host 127.0.0.1 --port 4321',
-        url: 'http://127.0.0.1:4321/dispatch/',
+        url: baseURL,
         reuseExistingServer: false,
       },
 });
