@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 
 const host = '127.0.0.1';
-const port = '4321';
+const port = await findAvailablePort();
 const baseURL = `http://${host}:${port}/dispatch/`;
 
 const server = spawn(
@@ -13,12 +14,38 @@ const server = spawn(
     host,
     '--port',
     port,
+    '--strictPort',
   ],
   { stdio: 'inherit', windowsHide: true },
 );
 
+async function findAvailablePort() {
+  const listener = createServer();
+  await new Promise((resolve, reject) => {
+    listener.once('error', reject);
+    listener.listen(0, host, resolve);
+  });
+
+  const address = listener.address();
+  if (!address || typeof address === 'string') {
+    listener.close();
+    throw new Error('Could not allocate a local port for Astro preview');
+  }
+
+  await new Promise((resolve, reject) => {
+    listener.close(error => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+  return String(address.port);
+}
+
 async function waitForServer() {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
       throw new Error(`Astro preview exited with code ${server.exitCode}`);
@@ -56,7 +83,11 @@ try {
     {
       stdio: 'inherit',
       windowsHide: true,
-      env: { ...process.env, DISPATCH_EXTERNAL_WEB_SERVER: '1' },
+      env: {
+        ...process.env,
+        DISPATCH_EXTERNAL_WEB_SERVER: '1',
+        DISPATCH_BASE_URL: baseURL,
+      },
     },
   );
   exitCode = await new Promise((resolve, reject) => {
