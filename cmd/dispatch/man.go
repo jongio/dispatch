@@ -110,7 +110,7 @@ var manCommands = []manEntry{
 	{"alias <id> <name>", "Set, reassign, clear (--clear), or remove (--remove) a session alias."},
 	{"views [list] [--json|--csv]", "List configured named views."},
 	{"views use <name|default>", "Set or clear the active named view."},
-	{"notes [command]", "List, get, set, or clear session notes."},
+	{"notes [list] [--json|--csv|--markdown]", "List, get, set, or clear session notes."},
 	{"config <get|set|unset|list|edit|path|validate|schema|export|import>", "Read, change, validate, document, or transfer preferences."},
 	{"export <id> [flags]", "Export a session as Markdown, JSON, HTML, or plain text."},
 	{"info <id> [--json] [--refs]", "Print a concise session summary."},
