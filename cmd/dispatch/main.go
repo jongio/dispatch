@@ -157,7 +157,7 @@ Commands:
                           Print a concise session summary
   path <id|--last|--current>
                           Print a session's working directory; IDs may be aliases or prefixes
-  compare <a> <b> [--json]
+  compare <a> <b> [--json|--markdown]
                           Compare two sessions side by side
   tag <id> [flags]        Add, remove, set, or list tags on a session
   prune [--apply] [--json]
