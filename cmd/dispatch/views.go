@@ -24,7 +24,7 @@ func runViews(w io.Writer, args []string) error {
 	if len(rest) > 0 {
 		rest = rest[1:]
 	}
-	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" {
+	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" || rest[0] == "--markdown" {
 		return runViewsList(w, rest)
 	}
 
@@ -39,6 +39,7 @@ func runViews(w io.Writer, args []string) error {
 func runViewsList(w io.Writer, args []string) error {
 	jsonOut := false
 	csvOut := false
+	markdownOut := false
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
 	}
@@ -48,12 +49,14 @@ func runViewsList(w io.Writer, args []string) error {
 			jsonOut = true
 		case "--csv":
 			csvOut = true
+		case "--markdown":
+			markdownOut = true
 		default:
 			return fmt.Errorf("views list does not take arguments, got %q", arg)
 		}
 	}
-	if jsonOut && csvOut {
-		return fmt.Errorf("--json and --csv cannot be combined")
+	if (jsonOut && csvOut) || (jsonOut && markdownOut) || (csvOut && markdownOut) {
+		return fmt.Errorf("--json, --csv, and --markdown cannot be combined")
 	}
 
 	cfg, err := configLoadFn()
@@ -68,6 +71,10 @@ func runViewsList(w io.Writer, args []string) error {
 	}
 	if csvOut {
 		return writeViewsCSV(w, report)
+	}
+	if markdownOut {
+		writeViewsMarkdown(w, report)
+		return nil
 	}
 	writeViewsText(w, report)
 	return nil
@@ -155,6 +162,27 @@ func writeViewsCSV(w io.Writer, report viewsReport) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func writeViewsMarkdown(w io.Writer, report viewsReport) {
+	fmt.Fprintln(w, "# Dispatch views")
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Active: %s\n", markdownCell(report.ActiveView))
+	if len(report.Views) == 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "No named views found.")
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| Active | Name | Settings |")
+	fmt.Fprintln(w, "|---|---|---|")
+	for _, v := range report.Views {
+		active := ""
+		if v.Name == report.ActiveView {
+			active = "*"
+		}
+		fmt.Fprintf(w, "| %s | %s | %s |\n", active, markdownCell(v.Name), markdownCell(describeView(v)))
+	}
 }
 
 func describeView(v config.NamedView) string {
