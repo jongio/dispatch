@@ -105,13 +105,16 @@ func TestParseCompareArgs(t *testing.T) {
 		args      []string
 		wantLeft  string
 		wantRight string
-		wantJSON  bool
+		wantFmt   compareOutputFormat
 		wantErr   bool
 	}{
-		{name: "two ids", args: []string{"compare", "a", "b"}, wantLeft: "a", wantRight: "b"},
-		{name: "two ids with json", args: []string{"compare", "a", "b", "--json"}, wantLeft: "a", wantRight: "b", wantJSON: true},
-		{name: "json between ids", args: []string{"compare", "a", "--json", "b"}, wantLeft: "a", wantRight: "b", wantJSON: true},
-		{name: "json before ids", args: []string{"compare", "--json", "a", "b"}, wantLeft: "a", wantRight: "b", wantJSON: true},
+		{name: "two ids", args: []string{"compare", "a", "b"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatText},
+		{name: "two ids with json", args: []string{"compare", "a", "b", "--json"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatJSON},
+		{name: "json between ids", args: []string{"compare", "a", "--json", "b"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatJSON},
+		{name: "json before ids", args: []string{"compare", "--json", "a", "b"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatJSON},
+		{name: "two ids with markdown", args: []string{"compare", "a", "b", "--markdown"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatMarkdown},
+		{name: "markdown before ids", args: []string{"compare", "--markdown", "a", "b"}, wantLeft: "a", wantRight: "b", wantFmt: compareFormatMarkdown},
+		{name: "json and markdown conflict", args: []string{"compare", "a", "b", "--json", "--markdown"}, wantErr: true},
 		{name: "no args", args: []string{"compare"}, wantErr: true},
 		{name: "one arg", args: []string{"compare", "a"}, wantErr: true},
 		{name: "three args", args: []string{"compare", "a", "b", "c"}, wantErr: true},
@@ -120,7 +123,7 @@ func TestParseCompareArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			leftID, rightID, asJSON, err := parseCompareArgs(tt.args)
+			leftID, rightID, format, err := parseCompareArgs(tt.args)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected an error")
@@ -136,8 +139,8 @@ func TestParseCompareArgs(t *testing.T) {
 			if rightID != tt.wantRight {
 				t.Errorf("rightID = %q, want %q", rightID, tt.wantRight)
 			}
-			if asJSON != tt.wantJSON {
-				t.Errorf("asJSON = %v, want %v", asJSON, tt.wantJSON)
+			if format != tt.wantFmt {
+				t.Errorf("format = %q, want %q", format, tt.wantFmt)
 			}
 		})
 	}
@@ -225,6 +228,63 @@ func TestRunCompare_JSON(t *testing.T) {
 	}
 	if len(got.Right.CheckpointTitles) != 1 {
 		t.Errorf("right checkpoint_titles = %v, want 1 entry", got.Right.CheckpointTitles)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Markdown output
+// ---------------------------------------------------------------------------
+
+func TestRunCompare_Markdown(t *testing.T) {
+	withCompareDetail(t, compareLoader())
+
+	var buf bytes.Buffer
+	if err := runCompare(&buf, []string{"compare", "ses-left", "ses-right", "--markdown"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, want := range []string{
+		"# Session comparison",
+		"| Side | Session |",
+		"ses-left",
+		"ses-right",
+		"## Metadata",
+		"| Field | Left | Right |",
+		"| summary |",
+		"Add auth",
+		"Fix login",
+		"## Files only in left",
+		"- src/auth.go",
+		"## Files only in right",
+		"- src/login.go",
+		"## Refs only in left",
+		"- commit:abc123",
+		"## Checkpoint titles (left)",
+		"- Setup auth",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("markdown output missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRunCompare_MarkdownIdentical(t *testing.T) {
+	withCompareDetail(t, func(string) (*data.SessionDetail, error) {
+		return compareSampleLeft(), nil
+	})
+
+	var buf bytes.Buffer
+	if err := runCompare(&buf, []string{"compare", "ses-left", "ses-left", "--markdown"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "Metadata is identical.") {
+		t.Errorf("expected identical metadata note, got:\n%s", out)
+	}
+	if !strings.Contains(out, "_(none)_") {
+		t.Errorf("expected empty-list marker for identical sessions, got:\n%s", out)
 	}
 }
 

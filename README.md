@@ -348,9 +348,10 @@ Compare two sessions side by side with `dispatch compare`:
 ```sh
 dispatch compare 0a1b2c3d 9f8e7d6c
 dispatch compare 0a1b2c3d 9f8e7d6c --json
+dispatch compare 0a1b2c3d 9f8e7d6c --markdown
 ```
 
-The output shows metadata differences (summary, branch, turn count), files that appear in only one session, ref differences, and checkpoint title lists. Use `--json` for machine-readable output. Session IDs accept the same prefix shorthand as `open` and `export`.
+The output shows metadata differences (summary, branch, turn count), files that appear in only one session, ref differences, and checkpoint title lists. Use `--json` for machine-readable output or `--markdown` to paste the comparison into an issue or PR. Session IDs accept the same prefix shorthand as `open` and `export`.
 
 ### Info
 
