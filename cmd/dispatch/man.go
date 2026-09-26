@@ -108,7 +108,7 @@ var manCommands = []manEntry{
 	{"aliases [--json]", "List session aliases with orphan detection."},
 	{"alias list [--json]", "List session aliases."},
 	{"alias <id> <name>", "Set, reassign, clear (--clear), or remove (--remove) a session alias."},
-	{"views [list] [--json|--csv]", "List configured named views."},
+	{"views [list] [--json|--csv|--markdown]", "List configured named views."},
 	{"views use <name|default>", "Set or clear the active named view."},
 	{"notes [command]", "List, get, set, or clear session notes."},
 	{"config <get|set|unset|list|edit|path|validate|schema|export|import>", "Read, change, validate, document, or transfer preferences."},
