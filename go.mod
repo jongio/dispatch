@@ -13,7 +13,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/lucasb-eyer/go-colorful v1.4.1
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 	golang.org/x/sys v0.48.0
 	modernc.org/sqlite v1.59.0
 )
