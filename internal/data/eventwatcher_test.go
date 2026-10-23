@@ -140,6 +140,7 @@ func TestEventWatcher_IgnoresInvalidSessionIDs(t *testing.T) {
 	if err := os.MkdirAll(badDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	eventsPath := filepath.Join(badDir, "events.jsonl")
 	if err := os.WriteFile(eventsPath, []byte(fmt.Sprintf(`{"type":"assistant.turn_end","timestamp":"%s"}`+"\n", recentTimestamp())), 0o644); err != nil {
 		t.Fatal(err)
@@ -152,6 +153,27 @@ func TestEventWatcher_IgnoresInvalidSessionIDs(t *testing.T) {
 	defer ew.mu.Unlock()
 	if len(ew.dirty) != 0 {
 		t.Fatalf("invalid session scheduled %d classifications, want 0", len(ew.dirty))
+	}
+}
+
+func TestEventWatcher_SchedulesRecoveryScanForLockRemoveAndRename(t *testing.T) {
+	stateDir := t.TempDir()
+	sessionDir := filepath.Join(stateDir, "lock-session")
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(sessionDir, "inuse.1234.test.lock")
+
+	for _, op := range []fsnotify.Op{fsnotify.Remove, fsnotify.Rename} {
+		ew := NewEventWatcher(nil, 15*time.Minute, false)
+		ew.handleEvent(fsnotify.Event{Name: lockPath, Op: op}, stateDir)
+		ew.mu.Lock()
+		_, scheduled := ew.dirty["lock-session"]
+		ew.mu.Unlock()
+		if !scheduled {
+			t.Errorf("lock %v did not schedule recovery scan", op)
+		}
+		ew.Stop()
 	}
 }
 

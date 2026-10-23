@@ -161,6 +161,19 @@ func TestUpdate_WindowSizeMsg(t *testing.T) {
 	}
 }
 
+func TestUpdate_WindowSizeMsgResizesOpenRecoveryView(t *testing.T) {
+	m := newTestModel()
+	m.state = stateRecoveryView
+	m.recoveryView.SetSize(20, 10)
+	before := m.recoveryView.View()
+
+	result, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	rm := result.(Model)
+	if after := rm.recoveryView.View(); after == before {
+		t.Fatal("open recovery view did not respond to resize")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Update: spinner.TickMsg
 // ---------------------------------------------------------------------------

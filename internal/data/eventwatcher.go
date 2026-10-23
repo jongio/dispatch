@@ -173,8 +173,8 @@ func (ew *EventWatcher) loop(stateDir string) {
 
 // handleEvent processes a single fsnotify event.
 func (ew *EventWatcher) handleEvent(event fsnotify.Event, stateDir string) {
-	// We care about Write and Create events on files inside session dirs.
-	if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+	// Recovery needs lock deletion and replacement as well as appends.
+	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
 		return
 	}
 

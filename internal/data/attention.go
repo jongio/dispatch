@@ -34,6 +34,7 @@ const lastChunkSize = 4096
 type sessionEvent struct {
 	Type      string `json:"type"`
 	Timestamp string `json:"timestamp"`
+	ID        string `json:"id"`
 }
 
 // maxLockFileSize is the maximum size in bytes accepted for a lock file.
@@ -283,29 +284,9 @@ func findSessionPID(dir string) pidResult {
 		if err != nil {
 			continue
 		}
-
-		pidStr := strings.TrimSpace(string(raw))
-
-		// Validate: non-empty, pure ASCII digits only.
-		if len(pidStr) == 0 {
-			slog.Warn("attention: empty lock file", "path", lockPath)
-			continue
-		}
-		valid := true
-		for _, b := range pidStr {
-			if b < '0' || b > '9' {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			slog.Warn("attention: non-numeric lock content", "path", lockPath, "content", pidStr)
-			continue
-		}
-
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil || pid <= 0 || pid > maxPID {
-			slog.Warn("attention: invalid PID in lock", "path", lockPath, "pid", pid)
+		pid, ok := parseLockPID(string(raw))
+		if !ok {
+			slog.Warn("attention: invalid PID in lock", "path", lockPath)
 			continue
 		}
 
@@ -315,6 +296,23 @@ func findSessionPID(dir string) pidResult {
 		hasStale = true
 	}
 	return pidResult{hasStale: hasStale}
+}
+
+func parseLockPID(raw string) (int, bool) {
+	pidStr := strings.TrimSpace(raw)
+	if pidStr == "" {
+		return 0, false
+	}
+	for _, b := range pidStr {
+		if b < '0' || b > '9' {
+			return 0, false
+		}
+	}
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil || pid <= 0 || pid > maxPID {
+		return 0, false
+	}
+	return pid, true
 }
 
 // FindSessionPID returns the live PID for the given session ID, or 0 if
@@ -334,6 +332,7 @@ func FindSessionPID(sessionID string) int {
 type SessionEvent struct {
 	Type      string
 	Timestamp string
+	ID        string
 }
 
 // LastSessionEvent returns the most recent event type and timestamp for

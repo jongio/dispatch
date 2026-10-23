@@ -26,6 +26,8 @@ func (m Model) handleEventWatcherUpdate(msg eventWatcherUpdateMsg) (Model, tea.C
 
 	prev := m.attentionMap[msg.sessionID]
 	m.attentionMap[msg.sessionID] = msg.status
+	m.recoveryCandidates = msg.recoveryCandidates
+	m.recoveryView.SetCandidates(m.recoveryCandidates)
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 
 	// Update preview if the changed session is currently selected.

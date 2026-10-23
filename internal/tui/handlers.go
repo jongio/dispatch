@@ -52,6 +52,9 @@ func (m Model) handleResize(msg tea.WindowSizeMsg) (Model, tea.Cmd) { //nolint:u
 	if m.state == stateGitStatusView {
 		m.gitStatusView.SetSize(m.width, m.height)
 	}
+	if m.state == stateRecoveryView {
+		m.recoveryView.SetSize(m.width, m.height)
+	}
 	return m, nil
 }
 
@@ -582,6 +585,8 @@ func (m Model) handleAttentionQuickScanned(msg attentionQuickScannedMsg) (Model,
 
 func (m Model) handleAttentionScanned(msg attentionScannedMsg) (Model, tea.Cmd) {
 	m.attentionMap = msg.statuses
+	m.recoveryCandidates = msg.recoveryCandidates
+	m.recoveryView.SetCandidates(m.recoveryCandidates)
 	m.sessionList.SetAttentionStatuses(m.attentionMap)
 	// Update preview panel status if a session is selected.
 	if m.detail != nil {

@@ -136,6 +136,7 @@ const (
 	stateCompareView              // compare two sessions overlay
 	stateCmdPalette               // command palette overlay
 	stateGitStatusView            // git status overlay for a session's folder
+	stateRecoveryView             // interrupted and stalled session recovery
 )
 
 // Pivot mode constants used by Model.pivot to control session grouping.
@@ -323,6 +324,7 @@ type Model struct {
 	compareView     components.CompareView
 	gitStatusView   components.GitStatusView
 	cmdPalette      components.CmdPalette
+	recoveryView    components.RecoveryView
 	spinner         spinner.Model
 
 	// UI toggles.
@@ -375,8 +377,11 @@ type Model struct {
 	// bell, so re-entering waiting notifies again but a steady waiting state
 	// does not. attentionScanned becomes true after the first scan so the
 	// initial population never rings the bell.
-	waitingNotified  map[string]struct{}
-	attentionScanned bool
+	waitingNotified    map[string]struct{}
+	attentionScanned   bool
+	recoveryTracker    *data.RecoveryTracker
+	recoveryCandidates map[string]data.RecoveryCandidate
+	recoveryGeneration map[string]uint64
 
 	// Plan status tracking — scanned from session-state directories.
 	planMap     map[string]bool
@@ -478,6 +483,7 @@ func NewModel() Model {
 		tagsSet[id] = struct{}{}
 	}
 
+	recoveryTracker := data.NewRecoveryTracker()
 	m := Model{
 		state:            stateLoading,
 		cfg:              cfg,
@@ -496,27 +502,30 @@ func NewModel() Model {
 		notesSet:        notesSet,
 		tagsSet:         tagsSet,
 
-		sessionList:     components.NewSessionList(),
-		searchBar:       components.NewSearchBar(),
-		noteInput:       components.NewNoteInput(),
-		tagInput:        components.NewTagInput(),
-		aliasInput:      components.NewAliasInput(),
-		filterPanel:     components.NewFilterPanel(),
-		preview:         components.NewPreviewPanel(),
-		help:            components.NewHelpOverlayWithBindings(keys.HelpGroups(), keys.ShortHelp()),
-		shellPicker:     components.NewShellPicker(),
-		configPanel:     cp,
-		spinner:         s,
-		attentionPicker: components.NewAttentionPicker(),
-		viewPicker:      components.NewViewPicker(),
-		launchSetPicker: components.NewLaunchSetPicker(),
-		filePicker:      components.NewFilePicker(),
-		compareView:     components.NewCompareView(),
-		gitStatusView:   components.NewGitStatusView(),
-		cmdPalette:      components.NewCmdPalette(),
-		attentionFilter: make(map[data.AttentionStatus]struct{}),
-		waitingNotified: make(map[string]struct{}),
-		dbWatchCh:       make(chan struct{}, 1),
+		sessionList:        components.NewSessionList(),
+		searchBar:          components.NewSearchBar(),
+		noteInput:          components.NewNoteInput(),
+		tagInput:           components.NewTagInput(),
+		aliasInput:         components.NewAliasInput(),
+		filterPanel:        components.NewFilterPanel(),
+		preview:            components.NewPreviewPanel(),
+		help:               components.NewHelpOverlayWithBindings(keys.HelpGroups(), keys.ShortHelp()),
+		shellPicker:        components.NewShellPicker(),
+		configPanel:        cp,
+		spinner:            s,
+		attentionPicker:    components.NewAttentionPicker(),
+		viewPicker:         components.NewViewPicker(),
+		launchSetPicker:    components.NewLaunchSetPicker(),
+		filePicker:         components.NewFilePicker(),
+		compareView:        components.NewCompareView(),
+		gitStatusView:      components.NewGitStatusView(),
+		cmdPalette:         components.NewCmdPalette(),
+		recoveryView:       components.NewRecoveryView(),
+		attentionFilter:    make(map[data.AttentionStatus]struct{}),
+		waitingNotified:    make(map[string]struct{}),
+		recoveryTracker:    recoveryTracker,
+		recoveryGeneration: make(map[string]uint64),
+		dbWatchCh:          make(chan struct{}, 1),
 	}
 
 	m.dbWatcher = data.NewDBWatcher(func() {
@@ -539,8 +548,11 @@ func NewModel() Model {
 	m.eventWatchCh = make(chan eventWatcherUpdateMsg, 16)
 	m.eventWatcher = data.NewEventWatcher(func(id string, status data.AttentionStatus) {
 		lastEvent := data.LastSessionEvent(id)
+		recoveryCandidates := recoveryTracker.Scan(cfg.EffectiveAttentionThreshold(), cfg.WorkspaceRecovery)
 		select {
-		case m.eventWatchCh <- eventWatcherUpdateMsg{sessionID: id, status: status, lastEvent: lastEvent}:
+		case m.eventWatchCh <- eventWatcherUpdateMsg{
+			sessionID: id, status: status, lastEvent: lastEvent, recoveryCandidates: recoveryCandidates,
+		}:
 		default:
 		}
 	}, cfg.EffectiveAttentionThreshold(), cfg.WorkspaceRecovery)
@@ -690,6 +702,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case focusWindowResultMsg:
 		return m.handleFocusWindowResult(msg)
+
+	case recoveryCompletedMsg:
+		return m.handleRecoveryCompleted(msg)
+
+	case recoveryVerifiedMsg:
+		return m.handleRecoveryVerified(msg)
 
 	// ----- Export done -----------------------------------------------------
 	case exportDoneMsg:
@@ -852,6 +870,9 @@ func (m Model) View() tea.View {
 
 		case stateCmdPalette:
 			content = m.cmdPalette.View()
+
+		case stateRecoveryView:
+			content = m.recoveryView.View()
 
 		default: // stateSessionList
 			if m.reindexing && len(m.reindexLog) > 0 {
@@ -1124,6 +1145,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+
+	case stateRecoveryView:
+		return m.handleRecoveryKey(msg)
 
 	default:
 		// stateLoading and stateSessionList fall through to the
@@ -4348,20 +4372,26 @@ func (m Model) scanAttentionQuickCmd() tea.Cmd {
 func (m Model) scanAttentionCmd() tea.Cmd {
 	threshold := m.cfg.EffectiveAttentionThreshold()
 	wr := m.cfg.WorkspaceRecovery
+	recoveryTracker := m.recoveryTracker
+	if recoveryTracker == nil {
+		recoveryTracker = data.NewRecoveryTracker()
+	}
 	var previewID string
 	if m.detail != nil {
 		previewID = m.detail.Session.ID
 	}
 	return func() tea.Msg {
 		statuses := data.ScanAttention(threshold, wr)
+		recoveryCandidates := recoveryTracker.Scan(threshold, wr)
 		var lastEvent data.SessionEvent
 		if previewID != "" {
 			lastEvent = data.LastSessionEvent(previewID)
 		}
 		return attentionScannedMsg{
-			statuses:       statuses,
-			previewID:      previewID,
-			previewLastEvt: lastEvent,
+			statuses:           statuses,
+			recoveryCandidates: recoveryCandidates,
+			previewID:          previewID,
+			previewLastEvt:     lastEvent,
 		}
 	}
 }
