@@ -416,7 +416,8 @@ func devVersion() string {
 func killStale() {
 	fmt.Println("\n=== Killing stale processes ===")
 	if runtime.GOOS == "windows" {
-		script := fmt.Sprintf(`Get-Process %s -ErrorAction SilentlyContinue | Stop-Process -Force`, binName)
+		binPath := strings.ReplaceAll(filepath.Join(projectDir(), "bin", binaryName()), "'", "''")
+		script := fmt.Sprintf(`Get-Process | Where-Object { $_.Path -eq '%s' } | ForEach-Object { Stop-Process -Id $_.Id -Force }`, binPath)
 		exec.Command("powershell", "-NoProfile", "-Command", script).Run()
 	} else {
 		exec.Command("pkill", "-f", binaryName()).Run()
