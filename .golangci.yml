@@ -61,7 +61,7 @@ linters:
           - unparam
           - errcheck
       # External library enum types — only a relevant subset is handled.
-      - text: "missing cases in switch of type tea\\.Mouse"
+      - text: "missing cases in switch of type (tea|ansi)\\.Mouse"
         linters:
           - exhaustive
       - text: "missing cases in switch of type .*copilot\\.SessionEventType"

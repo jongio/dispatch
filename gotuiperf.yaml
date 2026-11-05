@@ -1,0 +1,28 @@
+schemaVersion: 1
+rounds: 10
+benchtime: 100ms
+invocationTimeout: 3m
+maxOutputBytes: 8388608
+packages:
+  - path: internal/data
+    benchmarks: "^Benchmark"
+  - path: internal/tui/components
+    benchmarks: "^Benchmark"
+  - path: internal/tui/styles
+    benchmarks: "^Benchmark"
+metrics:
+  - unit: ns/op
+    direction: lower
+    thresholdPercent: 10
+    method: distribution
+    alpha: 0.05
+  - unit: B/op
+    direction: lower
+    thresholdPercent: 5
+    method: distribution
+    alpha: 0.05
+  - unit: allocs/op
+    direction: lower
+    thresholdPercent: 2
+    method: distribution
+    alpha: 0.05
