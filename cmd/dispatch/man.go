@@ -115,7 +115,7 @@ var manCommands = []manEntry{
 	{"export <id> [flags]", "Export a session as Markdown, JSON, HTML, or plain text."},
 	{"info <id> [--json] [--refs]", "Print a concise session summary."},
 	{"path <id|--last|--current>", "Print a session's working directory. IDs may be aliases or unique prefixes."},
-	{"compare <a> <b> [--json]", "Compare two sessions side by side."},
+	{"compare <a> <b> [--json|--markdown]", "Compare two sessions side by side."},
 	{"tag <id> [flags]", "Add, remove, set, or list tags on a session."},
 	{"prune [--apply] [--json]", "Report (or remove) config entries for missing sessions."},
 	{"watch [--once] [flags]", "Monitor session attention state."},

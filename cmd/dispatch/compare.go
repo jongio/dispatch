@@ -51,14 +51,24 @@ type metadataDiff struct {
 	Right string `json:"right"`
 }
 
-// runCompare prints a comparison of two sessions as text, or as JSON with
-// --json. args is the full argument slice with args[0] == "compare".
+// compareOutputFormat selects how runCompare renders the comparison.
+type compareOutputFormat string
+
+const (
+	compareFormatText     compareOutputFormat = "text"
+	compareFormatJSON     compareOutputFormat = "json"
+	compareFormatMarkdown compareOutputFormat = "markdown"
+)
+
+// runCompare prints a comparison of two sessions as text, as JSON with --json,
+// or as Markdown with --markdown. args is the full argument slice with
+// args[0] == "compare".
 func runCompare(w io.Writer, args []string) error {
 	if w == nil {
 		w = io.Discard
 	}
 
-	leftID, rightID, asJSON, err := parseCompareArgs(args)
+	leftID, rightID, format, err := parseCompareArgs(args)
 	if err != nil {
 		return err
 	}
@@ -80,41 +90,59 @@ func runCompare(w io.Writer, args []string) error {
 	}
 
 	cmp := buildComparison(leftDetail, rightDetail)
-	if asJSON {
+	switch format {
+	case compareFormatJSON:
 		return writeCompareJSON(w, cmp)
+	case compareFormatMarkdown:
+		return writeCompareMarkdown(w, cmp)
+	default:
+		return writeCompareText(w, cmp)
 	}
-	return writeCompareText(w, cmp)
 }
 
-// parseCompareArgs extracts the two session IDs and the --json flag from the
-// compare subcommand arguments. args[0] is expected to be "compare".
-func parseCompareArgs(args []string) (leftID, rightID string, asJSON bool, err error) {
+// parseCompareArgs extracts the two session IDs and the output format from the
+// compare subcommand arguments. args[0] is expected to be "compare". --json and
+// --markdown select a format and cannot be combined.
+func parseCompareArgs(args []string) (leftID, rightID string, format compareOutputFormat, err error) {
 	rest := args
 	if len(rest) > 0 {
 		rest = rest[1:] // drop the "compare" token
 	}
 
+	jsonOut := false
+	markdownOut := false
 	var positionals []string
 	for _, arg := range rest {
 		switch {
 		case arg == "--json":
-			asJSON = true
+			jsonOut = true
+		case arg == "--markdown":
+			markdownOut = true
 		case strings.HasPrefix(arg, "-"):
-			return "", "", false, fmt.Errorf("unknown flag: %s", arg)
+			return "", "", "", fmt.Errorf("unknown flag: %s", arg)
 		default:
 			positionals = append(positionals, arg)
 		}
 	}
 
+	if jsonOut && markdownOut {
+		return "", "", "", errors.New("--json and --markdown cannot be combined")
+	}
+	format = compareFormatText
+	switch {
+	case jsonOut:
+		format = compareFormatJSON
+	case markdownOut:
+		format = compareFormatMarkdown
+	}
+
 	switch len(positionals) {
-	case 0:
-		return "", "", false, errors.New("compare requires two session IDs")
-	case 1:
-		return "", "", false, errors.New("compare requires two session IDs")
+	case 0, 1:
+		return "", "", "", errors.New("compare requires two session IDs")
 	case 2:
-		return positionals[0], positionals[1], asJSON, nil
+		return positionals[0], positionals[1], format, nil
 	default:
-		return "", "", false, fmt.Errorf("compare accepts exactly two session IDs, got %d", len(positionals))
+		return "", "", "", fmt.Errorf("compare accepts exactly two session IDs, got %d", len(positionals))
 	}
 }
 
@@ -278,5 +306,51 @@ func writeCompareList(b *strings.Builder, label string, items []string) {
 		for _, item := range items {
 			fmt.Fprintf(b, "  %s\n", item)
 		}
+	}
+}
+
+// writeCompareMarkdown renders the comparison as Markdown so it can be pasted
+// into issues, PRs, or reports.
+func writeCompareMarkdown(w io.Writer, cmp sessionComparison) error {
+	var b strings.Builder
+
+	b.WriteString("# Session comparison\n\n")
+	b.WriteString("| Side | Session |\n")
+	b.WriteString("|---|---|\n")
+	fmt.Fprintf(&b, "| Left | %s |\n", markdownCell(cmp.Left.ID))
+	fmt.Fprintf(&b, "| Right | %s |\n", markdownCell(cmp.Right.ID))
+
+	b.WriteString("\n## Metadata\n\n")
+	if len(cmp.MetadataDiffs) == 0 {
+		b.WriteString("Metadata is identical.\n")
+	} else {
+		b.WriteString("| Field | Left | Right |\n")
+		b.WriteString("|---|---|---|\n")
+		for _, d := range cmp.MetadataDiffs {
+			fmt.Fprintf(&b, "| %s | %s | %s |\n", markdownCell(d.Field), markdownCell(d.Left), markdownCell(d.Right))
+		}
+	}
+
+	writeCompareMarkdownList(&b, "Checkpoint titles (left)", cmp.Left.CheckpointTitles)
+	writeCompareMarkdownList(&b, "Checkpoint titles (right)", cmp.Right.CheckpointTitles)
+	writeCompareMarkdownList(&b, "Files only in left", cmp.FilesOnlyLeft)
+	writeCompareMarkdownList(&b, "Files only in right", cmp.FilesOnlyRight)
+	writeCompareMarkdownList(&b, "Refs only in left", cmp.RefsOnlyLeft)
+	writeCompareMarkdownList(&b, "Refs only in right", cmp.RefsOnlyRight)
+
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+// writeCompareMarkdownList appends a Markdown section with a bulleted list, or
+// an italic "(none)" when the slice is empty.
+func writeCompareMarkdownList(b *strings.Builder, heading string, items []string) {
+	fmt.Fprintf(b, "\n## %s\n\n", heading)
+	if len(items) == 0 {
+		b.WriteString("_(none)_\n")
+		return
+	}
+	for _, item := range items {
+		fmt.Fprintf(b, "- %s\n", markdownCell(item))
 	}
 }
