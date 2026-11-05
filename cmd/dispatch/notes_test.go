@@ -143,6 +143,71 @@ func TestRunNotesListCSV(t *testing.T) {
 	}
 }
 
+func TestRunNotesListMarkdown(t *testing.T) {
+	withConfigSeams(t, notedConfig())
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return notedSessions(), nil })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "--markdown"}); err != nil {
+		t.Fatalf("runNotes markdown: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"# Dispatch notes",
+		"Notes: 2",
+		"| ID | Summary | Note |",
+		"|---|---|---|",
+		"| a | Auth fix | follow up |",
+		"| b | Build command | ready to ship |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Markdown output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "orphan note") {
+		t.Fatalf("orphan note should not appear:\n%s", out)
+	}
+}
+
+func TestRunNotesListMarkdownEmpty(t *testing.T) {
+	cfg := config.Default()
+	withConfigSeams(t, cfg)
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) { return notedSessions(), nil })
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "list", "--markdown"}); err != nil {
+		t.Fatalf("runNotes markdown empty: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "# Dispatch notes") || !strings.Contains(out, "No notes found.") {
+		t.Fatalf("empty markdown output = %q", out)
+	}
+	if strings.Contains(out, "| ID |") {
+		t.Fatalf("empty markdown should not print a table:\n%s", out)
+	}
+}
+
+func TestRunNotesListMarkdownEscapes(t *testing.T) {
+	cfg := config.Default()
+	cfg.SessionNotes = map[string]string{"a": "line one\nline two | piped"}
+	withConfigSeams(t, cfg)
+	withNotesList(t, func(data.FilterOptions) ([]data.Session, error) {
+		return []data.Session{{ID: "a", Summary: "Sum | mary"}}, nil
+	})
+
+	var buf bytes.Buffer
+	if err := runNotes(&buf, []string{"notes", "--markdown"}); err != nil {
+		t.Fatalf("runNotes markdown escapes: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "line one\nline two") {
+		t.Fatalf("newline not escaped in note cell:\n%s", out)
+	}
+	if !strings.Contains(out, `\|`) {
+		t.Fatalf("pipe not escaped in cells:\n%s", out)
+	}
+}
+
 func TestRunNotesGetSetClear(t *testing.T) {
 	cfg := withConfigSeams(t, config.Default())
 

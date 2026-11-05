@@ -245,7 +245,7 @@ Config commands:
   config import [--in F]  Read config JSON from stdin or a file
 
 Notes commands:
-  notes [list] [--json]    List notes attached to current sessions
+  notes [list] [--json|--csv|--markdown]  List notes attached to current sessions
   notes get <id>           Print one session note
   notes set <id> <text...> Set one session note
   notes set <id> --stdin   Read one session note from stdin

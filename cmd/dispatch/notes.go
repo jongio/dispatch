@@ -41,7 +41,7 @@ func runNotes(w io.Writer, args []string) error {
 	if len(rest) > 0 {
 		rest = rest[1:]
 	}
-	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" {
+	if len(rest) == 0 || rest[0] == "list" || rest[0] == "--json" || rest[0] == "--csv" || rest[0] == "--markdown" {
 		return runNotesList(w, rest)
 	}
 
@@ -60,6 +60,7 @@ func runNotes(w io.Writer, args []string) error {
 func runNotesList(w io.Writer, args []string) error {
 	jsonOut := false
 	csvOut := false
+	markdownOut := false
 	tag := ""
 	if len(args) > 0 && args[0] == "list" {
 		args = args[1:]
@@ -72,6 +73,8 @@ func runNotesList(w io.Writer, args []string) error {
 			jsonOut = true
 		case "--csv":
 			csvOut = true
+		case "--markdown":
+			markdownOut = true
 		case "--tag":
 			if hasInline {
 				tag = inline
@@ -86,8 +89,8 @@ func runNotesList(w io.Writer, args []string) error {
 			return fmt.Errorf("notes list does not take arguments, got %q", arg)
 		}
 	}
-	if jsonOut && csvOut {
-		return fmt.Errorf("--json and --csv cannot be combined")
+	if (jsonOut && csvOut) || (jsonOut && markdownOut) || (csvOut && markdownOut) {
+		return fmt.Errorf("--json, --csv, and --markdown cannot be combined")
 	}
 	tag = normalizeNotesTag(tag)
 
@@ -110,6 +113,10 @@ func runNotesList(w io.Writer, args []string) error {
 	}
 	if csvOut {
 		return writeNotesCSV(w, report)
+	}
+	if markdownOut {
+		writeNotesMarkdown(w, report)
+		return nil
 	}
 	writeNotesText(w, report)
 	return nil
@@ -284,4 +291,19 @@ func writeNotesCSV(w io.Writer, report notesReport) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func writeNotesMarkdown(w io.Writer, report notesReport) {
+	fmt.Fprintln(w, "# Dispatch notes")
+	fmt.Fprintln(w)
+	if report.TotalNotes == 0 {
+		fmt.Fprintln(w, "No notes found.")
+		return
+	}
+	fmt.Fprintf(w, "Notes: %d\n\n", report.TotalNotes)
+	fmt.Fprintln(w, "| ID | Summary | Note |")
+	fmt.Fprintln(w, "|---|---|---|")
+	for _, entry := range report.Notes {
+		fmt.Fprintf(w, "| %s | %s | %s |\n", markdownCell(entry.ID), markdownCell(entry.Summary), markdownCell(entry.Note))
+	}
 }
