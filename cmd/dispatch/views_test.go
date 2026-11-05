@@ -101,14 +101,56 @@ func TestRunViewsListCSVEmpty(t *testing.T) {
 	}
 }
 
-func TestRunViewsListCSVAndJSONConflict(t *testing.T) {
+func TestRunViewsListMarkdown(t *testing.T) {
 	withConfigSeams(t, viewsConfig())
-	err := runViews(&bytes.Buffer{}, []string{"views", "list", "--json", "--csv"})
-	if err == nil {
-		t.Fatal("expected error for --csv + --json conflict")
+	var buf bytes.Buffer
+	if err := runViews(&buf, []string{"views", "--markdown"}); err != nil {
+		t.Fatalf("runViews markdown: %v", err)
 	}
-	if !strings.Contains(err.Error(), "--json and --csv cannot be combined") {
-		t.Errorf("wrong error: %v", err)
+	out := buf.String()
+	for _, want := range []string{
+		"# Dispatch views",
+		"Active: Work",
+		"| Active | Name | Settings |",
+		"| * | Work |",
+		"repo:jongio/dispatch",
+		"| Personal |",
+		"show_hidden",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("markdown output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Broken") {
+		t.Fatalf("invalid view should not appear:\n%s", out)
+	}
+}
+
+func TestRunViewsListMarkdownEmpty(t *testing.T) {
+	withConfigSeams(t, config.Default())
+	var buf bytes.Buffer
+	if err := runViews(&buf, []string{"views", "list", "--markdown"}); err != nil {
+		t.Fatalf("runViews list markdown: %v", err)
+	}
+	if !strings.Contains(buf.String(), "No named views found.") {
+		t.Fatalf("expected empty note, got:\n%s", buf.String())
+	}
+}
+
+func TestRunViewsListFormatConflicts(t *testing.T) {
+	withConfigSeams(t, viewsConfig())
+	for _, args := range [][]string{
+		{"views", "list", "--json", "--csv"},
+		{"views", "list", "--json", "--markdown"},
+		{"views", "list", "--csv", "--markdown"},
+	} {
+		err := runViews(&bytes.Buffer{}, args)
+		if err == nil {
+			t.Fatalf("expected error for args %v", args)
+		}
+		if !strings.Contains(err.Error(), "cannot be combined") {
+			t.Errorf("wrong error for %v: %v", args, err)
+		}
 	}
 }
 
