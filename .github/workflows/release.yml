@@ -48,6 +48,7 @@ jobs:
         id: version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUMP: ${{ inputs.bump }}
         run: |
           # Base the next version on the latest published release, not merely a
           # pushed tag, so a failed publication can retry the same version.
@@ -63,7 +64,7 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
           # Bump based on input
-          case "${{ inputs.bump }}" in
+          case "$BUMP" in
             major)
               MAJOR=$((MAJOR + 1))
               MINOR=0
@@ -80,7 +81,7 @@ jobs:
 
           NEXT="${MAJOR}.${MINOR}.${PATCH}"
           echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
-          echo "Bumping ${CURRENT} -> ${NEXT} (${{ inputs.bump }})"
+          echo "Bumping ${CURRENT} -> ${NEXT} (${BUMP})"
 
       - name: Verify changelog entry
         env:
@@ -101,10 +102,11 @@ jobs:
       - name: Generate contributor notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          NEW_TAG="v${{ steps.version.outputs.version }}"
+          NEW_TAG="v${RELEASE_VERSION}"
 
           # Generate release contributor notes
           # Use HEAD instead of $NEW_TAG because the tag hasn't been created yet
@@ -138,8 +140,10 @@ jobs:
           mv contrib-notes.md "$RUNNER_TEMP/contrib-notes.md" 2>/dev/null || true
 
       - name: Create and push tag
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
+          TAG="v${RELEASE_VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -163,9 +167,10 @@ jobs:
       - name: Add contributor notes to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          TAG="v${{ steps.version.outputs.version }}"
+          TAG="v${RELEASE_VERSION}"
           if [ -f "$RUNNER_TEMP/contrib-notes.md" ] && [ -s "$RUNNER_TEMP/contrib-notes.md" ]; then
             # Get current release body
             CURRENT_BODY=$(gh release view "$TAG" --json body --jq '.body')

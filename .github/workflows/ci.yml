@@ -112,6 +112,7 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+          retention-days: 7
 
       - name: Test (race detector)
         env:
