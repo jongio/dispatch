@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [v0.16.3] - 2026-11-08
+
+### Added
+
+- **Markdown output for CLI views, compare, and notes**: dispatch views, dispatch compare, and dispatch notes now support --format markdown / --md for structured Markdown output (#427, #429, #431).
+- **Session plan included in exports**: exported sessions now include the session plan alongside conversation turns and metadata (#403).
+
+### Changed
+
+- **Dependencies and CI**: updated Go modules, web dependencies, and GitHub Actions workflows (#414, #415, #420, #477, #478).
+
 ## [v0.16.2] - 2026-08-27
 
 ### Fixed
