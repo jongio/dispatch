@@ -13,7 +13,7 @@
     "screenshots:check": "node scripts/check-screenshots.mjs"
   },
   "dependencies": {
-    "astro": "^7.4.4",
+    "astro": "^7.4.7",
     "marked": "^18.1.2",
     "sanitize-html": "^2.18.1"
   },
